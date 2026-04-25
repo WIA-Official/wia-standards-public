@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Biotechnology Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 4: Protocol Specification</h1>
+
+        <section>
+            <h2>4.1 Data Exchange Protocols</h2>
+            <p>WIA Biotech implements standardized protocols for inter-laboratory data exchange and cross-platform compatibility.</p>
+
+            <h3>Protocol Stack</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Layer</th>
+                        <th>Protocol</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Transport</strong></td>
+                        <td>HTTPS/TLS 1.3</td>
+                        <td>Secure data transmission</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Application</strong></td>
+                        <td>REST/GraphQL</td>
+                        <td>API communication</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Format</strong></td>
+                        <td>JSON/FASTA/PDB</td>
+                        <td>Structured data representation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Authentication</strong></td>
+                        <td>OAuth 2.0 / API Keys</td>
+                        <td>Access control</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4.2 FASTA Compatibility Layer</h2>
+            <p>Bidirectional conversion between WIA JSON format and FASTA files.</p>
+
+            <h3>FASTA Import</h3>
+            <div class="code-header">Python - FASTA to WIA Conversion</div>
+            <pre><code>def convert_fasta_to_wia(fasta_file):
+    """Convert FASTA file to WIA Biotech JSON format"""
+    records = parse_fasta(fasta_file)
+
+    sequences = []
+    for record in records:
+        seq = {
+            "sequence_id": generate_id(),
+            "sequence_info": {
+                "name": record.description,
+                "description": record.description
+            },
+            "sequence_type": infer_type(record.sequence),
+            "length_bp": len(record.sequence),
+            "gc_content": calculate_gc(record.sequence) if is_dna(record.sequence) else None,
+            "files": {
+                "fasta": fasta_file
+            },
+            "checksum": {
+                "algorithm": "sha256",
+                "value": hashlib.sha256(record.sequence.encode()).hexdigest()
+            }
+        }
+        sequences.append(seq)
+
+    return sequences</code></pre>
+
+            <h3>FASTA Export</h3>
+            <div class="code-header">Python - WIA to FASTA Conversion</div>
+            <pre><code>def convert_wia_to_fasta(sequence_json, fasta_file):
+    """Convert WIA Biotech JSON to FASTA format"""
+    seq = load_json(sequence_json)
+
+    header = f">{seq['sequence_id']} {seq['sequence_info']['name']}"
+    if 'organism' in seq['sequence_info']:
+        header += f" | {seq['sequence_info']['organism']}"
+    header += f" | {seq['length_bp']}bp"
+
+    # Read actual sequence from linked FASTA file
+    sequence = read_sequence_from_file(seq['files']['fasta'])
+
+    with open(fasta_file, 'w') as f:
+        f.write(header + '\n')
+        # Write sequence in 80-character lines
+        for i in range(0, len(sequence), 80):
+            f.write(sequence[i:i+80] + '\n')
+
+    return fasta_file</code></pre>
+        </section>
+
+        <section>
+            <h2>4.3 SBOL Compatibility</h2>
+            <p>Synthetic Biology Open Language (SBOL) integration for BioBrick parts.</p>
+
+            <h3>SBOL Export</h3>
+            <div class="code-header">Python - WIA to SBOL Conversion</div>
+            <pre><code>def convert_wia_to_sbol(part_json, sbol_file):
+    """Convert WIA Biotech part to SBOL format"""
+    import sbol2
+
+    part = load_json(part_json)
+    doc = sbol2.Document()
+
+    # Create component definition
+    component = doc.componentDefinitions.create(part['part_id'])
+    component.name = part['part_info']['name']
+    component.description = part['part_info'].get('description', '')
+    component.roles = map_part_type_to_sbol(part['part_info']['part_type'])
+
+    # Add sequence
+    seq = doc.sequences.create(f"{part['part_id']}_seq")
+    seq.elements = part['sequence']['dna']
+    seq.encoding = sbol2.IUPAC_DNA
+    component.sequences = seq
+
+    # Add assembly metadata
+    if 'assembly' in part:
+        component.wasDerivedFrom = part['registry'].get('url', '')
+
+    doc.write(sbol_file)
+    return sbol_file</code></pre>
+
+            <h3>Part Type Mapping</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>WIA Part Type</th>
+                        <th>SBOL Role</th>
+                        <th>SO Term</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>promoter</strong></td>
+                        <td>Promoter</td>
+                        <td>SO:0000167</td>
+                    </tr>
+                    <tr>
+                        <td><strong>rbs</strong></td>
+                        <td>RBS</td>
+                        <td>SO:0000139</td>
+                    </tr>
+                    <tr>
+                        <td><strong>cds</strong></td>
+                        <td>CDS</td>
+                        <td>SO:0000316</td>
+                    </tr>
+                    <tr>
+                        <td><strong>terminator</strong></td>
+                        <td>Terminator</td>
+                        <td>SO:0000141</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4.4 PDB Structure Protocol</h2>
+            <p>Protein Data Bank format integration for structure files.</p>
+
+            <h3>AlphaFold Import</h3>
+            <div class="code-header">Python - AlphaFold to WIA Conversion</div>
+            <pre><code>def import_alphafold_structure(uniprot_id):
+    """Import AlphaFold prediction to WIA format"""
+    # Fetch from AlphaFold DB
+    pdb_url = f"https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v4.pdb"
+    confidence_url = f"https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-confidence_v4.json"
+
+    pdb_data = download_file(pdb_url)
+    confidence_data = download_json(confidence_url)
+
+    structure = {
+        "structure_id": f"struct-{uniprot_id}",
+        "structure_info": {
+            "name": get_protein_name(uniprot_id),
+            "uniprot_id": uniprot_id
+        },
+        "prediction": {
+            "method": "alphafold",
+            "version": "AlphaFold 2.3",
+            "source": "alphafold_db",
+            "date": datetime.now().isoformat()
+        },
+        "quality": {
+            "mean_plddt": calculate_mean_plddt(confidence_data['plddt']),
+            "confident_residues_pct": calculate_confident_pct(confidence_data['plddt'])
+        },
+        "files": {
+            "pdb": save_pdb(pdb_data),
+            "confidence": save_json(confidence_data)
+        }
+    }
+
+    return structure</code></pre>
+
+            <h3>Confidence Metrics</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Range</th>
+                        <th>Interpretation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>pLDDT</strong></td>
+                        <td>0-100</td>
+                        <td>&gt;90: Very high, 70-90: Confident, &lt;70: Low</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PAE</strong></td>
+                        <td>0-31.75 Å</td>
+                        <td>&lt;5: High confidence, &gt;10: Uncertain</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4.5 GenBank Format Integration</h2>
+            <p>Import/export with GenBank annotated sequence format.</p>
+
+            <h3>GenBank Import</h3>
+            <div class="code-header">Python - GenBank to WIA Conversion</div>
+            <pre><code>from Bio import SeqIO
+
+def import_genbank(gb_file):
+    """Import GenBank file to WIA format"""
+    record = SeqIO.read(gb_file, "genbank")
+
+    sequence = {
+        "sequence_id": generate_id(),
+        "sequence_info": {
+            "name": record.name,
+            "description": record.description,
+            "organism": record.annotations.get('organism', ''),
+            "gene_symbol": extract_gene_symbol(record)
+        },
+        "sequence_type": "dna",
+        "length_bp": len(record.seq),
+        "gc_content": calculate_gc(str(record.seq)),
+        "source": {
+            "database": "NCBI GenBank",
+            "accession": record.id,
+            "version": record.annotations.get('sequence_version', '')
+        },
+        "annotations": []
+    }
+
+    # Convert features to WIA annotations
+    for feature in record.features:
+        annotation = {
+            "feature": feature.type,
+            "start": int(feature.location.start) + 1,  # 1-based
+            "end": int(feature.location.end),
+            "strand": "+" if feature.location.strand == 1 else "-",
+            "name": feature.qualifiers.get('gene', [''])[0],
+            "qualifiers": dict(feature.qualifiers)
+        }
+        sequence['annotations'].append(annotation)
+
+    return sequence</code></pre>
+        </section>
+
+        <section>
+            <h2>4.6 Data Validation Protocol</h2>
+            <p>Schema validation ensures data integrity across the ecosystem.</p>
+
+            <h3>JSON Schema Validation</h3>
+            <div class="code-header">Python - Schema Validation</div>
+            <pre><code>import jsonschema
+
+def validate_wia_data(data, schema_type):
+    """Validate WIA Biotech data against JSON schema"""
+    schema_url = f"https://wia.live/schemas/bio/{schema_type}.schema.json"
+    schema = download_json(schema_url)
+
+    try:
+        jsonschema.validate(instance=data, schema=schema)
+        return {"valid": True}
+    except jsonschema.ValidationError as e:
+        return {
+            "valid": False,
+            "error": str(e.message),
+            "path": list(e.path)
+        }
+
+# Example usage
+sequence_data = load_json("sequence.json")
+result = validate_wia_data(sequence_data, "sequence")
+if not result['valid']:
+    print(f"Validation error: {result['error']}")</code></pre>
+
+            <h3>Required Fields by Schema</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Schema</th>
+                        <th>Required Fields</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>sequence</strong></td>
+                        <td>sequence_id, sequence_type, length_bp</td>
+                    </tr>
+                    <tr>
+                        <td><strong>crispr-experiment</strong></td>
+                        <td>experiment_id, target.gene_symbol, editing_system.type, guide_rnas</td>
+                    </tr>
+                    <tr>
+                        <td><strong>structure</strong></td>
+                        <td>structure_id, prediction.method, protein.name</td>
+                    </tr>
+                    <tr>
+                        <td><strong>part</strong></td>
+                        <td>part_id, part_info.part_type, sequence.dna</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        </main>
+</body>
+</html>

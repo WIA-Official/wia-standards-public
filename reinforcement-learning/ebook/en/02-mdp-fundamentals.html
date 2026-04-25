@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Markov Decision Process Fundamentals | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; font-size: 1rem; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; transition: all 0.3s ease; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        .warning-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b; }
+        .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 2: Markov Decision Process Fundamentals</h1>
+            <div class="chapter-meta">WIA-AI-025 Reinforcement Learning Standard | 🎯 The Mathematical Foundation</div>
+        </header>
+
+        <main>
+            <h2>2.1 Introduction to MDPs</h2>
+
+            <p>The Markov Decision Process (MDP) provides the mathematical foundation for reinforcement learning. An MDP formalizes sequential decision-making in stochastic environments where outcomes are partly random and partly under the control of a decision maker.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Definition:</strong>
+                <p>An MDP is defined by a tuple (S, A, P, R, γ) where:</p>
+                <ul>
+                    <li><strong>S:</strong> Set of states</li>
+                    <li><strong>A:</strong> Set of actions</li>
+                    <li><strong>P:</strong> Transition probability function P(s'|s,a)</li>
+                    <li><strong>R:</strong> Reward function R(s,a,s')</li>
+                    <li><strong>γ:</strong> Discount factor [0,1]</li>
+                </ul>
+            </div>
+
+            <h3>The Markov Property</h3>
+
+            <p>The key assumption of MDPs is the Markov property: the future is independent of the past given the present.</p>
+
+            <pre><code>P(sₜ₊₁ | sₜ, aₜ, sₜ₋₁, aₜ₋₁, ..., s₀, a₀) = P(sₜ₊₁ | sₜ, aₜ)
+
+"The future depends only on the present, not the past"</code></pre>
+
+            <p>This means the current state captures all relevant information from the history. The agent doesn't need to remember the entire sequence of past states and actions.</p>
+
+            <h2>2.2 State Value Functions</h2>
+
+            <p>The state value function V^π(s) is the expected return starting from state s and following policy π thereafter:</p>
+
+            <pre><code>V^π(s) = E_π[Gₜ | Sₜ = s]
+       = E_π[Rₜ₊₁ + γRₜ₊₂ + γ²Rₜ₊₃ + ... | Sₜ = s]
+       = E_π[Σ γᵏRₜ₊ᵏ₊₁ | Sₜ = s]</code></pre>
+
+            <h3>Bellman Equation for V^π</h3>
+
+            <p>The value function satisfies a recursive relationship:</p>
+
+            <pre><code>V^π(s) = Σ_a π(a|s) Σ_s' P(s'|s,a) [R(s,a,s') + γV^π(s')]
+
+In words:
+V(s) = Expected immediate reward + Discounted value of next state</code></pre>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">Key Insight:</strong>
+                <p>The Bellman equation expresses a relationship between the value of a state and the values of its successor states. This recursive structure is fundamental to solving MDPs.</p>
+            </div>
+
+            <h2>2.3 Action Value Functions</h2>
+
+            <p>The action value function (Q-function) gives the expected return from taking action a in state s and following policy π thereafter:</p>
+
+            <pre><code>Q^π(s,a) = E_π[Gₜ | Sₜ = s, Aₜ = a]
+         = E_π[Rₜ₊₁ + γV^π(Sₜ₊₁) | Sₜ = s, Aₜ = a]</code></pre>
+
+            <h3>Relationship Between V and Q</h3>
+
+            <pre><code>// From V to Q
+Q^π(s,a) = Σ_s' P(s'|s,a) [R(s,a,s') + γV^π(s')]
+
+// From Q to V
+V^π(s) = Σ_a π(a|s) Q^π(s,a)
+
+// For deterministic policy
+V^π(s) = Q^π(s, π(s))</code></pre>
+
+            <h2>2.4 Optimal Value Functions</h2>
+
+            <p>The optimal state value function V*(s) is the maximum value achievable from state s:</p>
+
+            <pre><code>V*(s) = max_π V^π(s)
+
+Q*(s,a) = max_π Q^π(s,a)</code></pre>
+
+            <h3>Bellman Optimality Equation</h3>
+
+            <pre><code>V*(s) = max_a Σ_s' P(s'|s,a) [R(s,a,s') + γV*(s')]
+
+Q*(s,a) = Σ_s' P(s'|s,a) [R(s,a,s') + γ max_a' Q*(s',a')]</code></pre>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">Important:</strong>
+                <p>The Bellman optimality equation is non-linear due to the max operation. This makes finding V* more challenging than evaluating V^π for a fixed policy.</p>
+            </div>
+
+            <h2>2.5 Optimal Policies</h2>
+
+            <p>An optimal policy π* achieves the maximum expected return from every state:</p>
+
+            <pre><code>π*(s) = argmax_a Q*(s,a)
+      = argmax_a Σ_s' P(s'|s,a) [R(s,a,s') + γV*(s')]</code></pre>
+
+            <h3>Properties of Optimal Policies</h3>
+
+            <ul>
+                <li>There always exists at least one optimal policy (may not be unique)</li>
+                <li>All optimal policies share the same optimal value function V*</li>
+                <li>Optimal policies are deterministic (though stochastic ones may exist)</li>
+                <li>If we know Q*, the optimal policy is trivial to extract</li>
+            </ul>
+
+            <h2>2.6 Policy Evaluation</h2>
+
+            <p>Policy evaluation computes V^π for a given policy π. We can solve the Bellman equation iteratively:</p>
+
+            <pre><code>def policy_evaluation(policy, env, gamma=0.99, theta=1e-6):
+    """
+    Evaluate a policy in an MDP.
+
+    Args:
+        policy: π(a|s) - policy to evaluate
+        env: MDP environment
+        gamma: discount factor
+        theta: convergence threshold
+    """
+    V = {s: 0 for s in env.states}
+
+    while True:
+        delta = 0
+        for s in env.states:
+            v = V[s]
+
+            # Bellman update
+            V[s] = sum(
+                policy[s][a] * sum(
+                    env.P[s][a][s_next] * (
+                        env.R[s][a][s_next] + gamma * V[s_next]
+                    )
+                    for s_next in env.states
+                )
+                for a in env.actions
+            )
+
+            delta = max(delta, abs(v - V[s]))
+
+        if delta < theta:
+            break
+
+    return V</code></pre>
+
+            <h3>Matrix Form</h3>
+
+            <p>For a deterministic policy, we can write the Bellman equation in matrix form:</p>
+
+            <pre><code>V^π = R^π + γP^π V^π
+
+Solving directly:
+V^π = (I - γP^π)^(-1) R^π
+
+where:
+- V^π is a vector of values for all states
+- R^π is the expected immediate reward vector
+- P^π is the transition matrix under policy π</code></pre>
+
+            <h2>2.7 Policy Improvement</h2>
+
+            <p>Given V^π, we can construct a better policy by acting greedily:</p>
+
+            <pre><code>def policy_improvement(V, env, gamma=0.99):
+    """
+    Improve policy based on value function.
+    """
+    policy = {}
+
+    for s in env.states:
+        # Compute Q-values for all actions
+        q_values = {}
+        for a in env.actions:
+            q_values[a] = sum(
+                env.P[s][a][s_next] * (
+                    env.R[s][a][s_next] + gamma * V[s_next]
+                )
+                for s_next in env.states
+            )
+
+        # Greedy action selection
+        best_action = max(q_values, key=q_values.get)
+        policy[s] = best_action
+
+    return policy</code></pre>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Policy Improvement Theorem:</strong>
+                <p>Let π and π' be any pair of deterministic policies such that Q^π(s, π'(s)) ≥ V^π(s) for all s. Then π' must be as good as or better than π: V^π'(s) ≥ V^π(s) for all s.</p>
+            </div>
+
+            <h2>2.8 Policy Iteration</h2>
+
+            <p>Policy iteration alternates between policy evaluation and policy improvement until convergence:</p>
+
+            <pre><code>def policy_iteration(env, gamma=0.99):
+    """
+    Find optimal policy using policy iteration.
+
+    1. Initialize policy arbitrarily
+    2. Repeat until convergence:
+        - Policy Evaluation: Compute V^π
+        - Policy Improvement: π' ← greedy(V^π)
+    """
+    # Initialize random policy
+    policy = {s: random.choice(env.actions) for s in env.states}
+
+    while True:
+        # Policy Evaluation
+        V = policy_evaluation(policy, env, gamma)
+
+        # Policy Improvement
+        new_policy = policy_improvement(V, env, gamma)
+
+        # Check convergence
+        if new_policy == policy:
+            break
+
+        policy = new_policy
+
+    return policy, V</code></pre>
+
+            <h3>Convergence Guarantee</h3>
+
+            <p>Policy iteration is guaranteed to converge to the optimal policy in a finite number of iterations (bounded by |A|^|S|).</p>
+
+            <h2>2.9 Value Iteration</h2>
+
+            <p>Value iteration combines policy evaluation and improvement into a single update:</p>
+
+            <pre><code>def value_iteration(env, gamma=0.99, theta=1e-6):
+    """
+    Find optimal value function using value iteration.
+
+    V(s) ← max_a Σ_s' P(s'|s,a)[R + γV(s')]
+    """
+    V = {s: 0 for s in env.states}
+
+    while True:
+        delta = 0
+        for s in env.states:
+            v = V[s]
+
+            # Bellman optimality update
+            V[s] = max(
+                sum(
+                    env.P[s][a][s_next] * (
+                        env.R[s][a][s_next] + gamma * V[s_next]
+                    )
+                    for s_next in env.states
+                )
+                for a in env.actions
+            )
+
+            delta = max(delta, abs(v - V[s]))
+
+        if delta < theta:
+            break
+
+    # Extract optimal policy
+    policy = policy_improvement(V, env, gamma)
+
+    return policy, V</code></pre>
+
+            <h3>Policy Iteration vs Value Iteration</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Policy Iteration</th>
+                        <th>Value Iteration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Update Rule</td>
+                        <td>Two separate steps</td>
+                        <td>Combined update</td>
+                    </tr>
+                    <tr>
+                        <td>Iterations</td>
+                        <td>Fewer outer iterations</td>
+                        <td>More iterations</td>
+                    </tr>
+                    <tr>
+                        <td>Per-Iteration Cost</td>
+                        <td>Higher (full evaluation)</td>
+                        <td>Lower (single sweep)</td>
+                    </tr>
+                    <tr>
+                        <td>Convergence</td>
+                        <td>Finite iterations</td>
+                        <td>Asymptotic</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2.10 Practical Example: Grid World</h2>
+
+            <pre><code>class GridWorld:
+    def __init__(self, size=5):
+        self.size = size
+        self.states = [(i,j) for i in range(size) for j in range(size)]
+        self.actions = ['up', 'down', 'left', 'right']
+        self.goal = (size-1, size-1)
+
+    def transition(self, state, action):
+        """Return next state given current state and action."""
+        i, j = state
+
+        if action == 'up':
+            next_state = (max(0, i-1), j)
+        elif action == 'down':
+            next_state = (min(self.size-1, i+1), j)
+        elif action == 'left':
+            next_state = (i, max(0, j-1))
+        elif action == 'right':
+            next_state = (i, min(self.size-1, j+1))
+
+        return next_state
+
+    def reward(self, state, action, next_state):
+        """Return reward for transition."""
+        if next_state == self.goal:
+            return 100  # Goal reward
+        else:
+            return -1   # Step penalty
+
+# Solve GridWorld
+env = GridWorld(size=5)
+optimal_policy, V_optimal = value_iteration(env, gamma=0.9)
+
+print("Optimal Value Function:")
+for i in range(env.size):
+    for j in range(env.size):
+        print(f"{V_optimal[(i,j)]:6.2f}", end=" ")
+    print()
+
+print("\nOptimal Policy:")
+for i in range(env.size):
+    for j in range(env.size):
+        action = optimal_policy[(i,j)]
+        symbol = {'up':'↑', 'down':'↓', 'left':'←', 'right':'→'}[action]
+        print(symbol, end=" ")
+    print()</code></pre>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>MDPs provide the mathematical framework for sequential decision-making</li>
+                    <li>The Markov property states that the future depends only on the present</li>
+                    <li>Value functions V(s) and Q(s,a) measure the quality of states and state-action pairs</li>
+                    <li>The Bellman equation relates values of states to values of successor states</li>
+                    <li>Optimal value functions V* and Q* satisfy the Bellman optimality equation</li>
+                    <li>Policy evaluation computes V^π for a given policy</li>
+                    <li>Policy improvement constructs a better policy from a value function</li>
+                    <li>Policy iteration alternates evaluation and improvement until convergence</li>
+                    <li>Value iteration combines these steps for efficient computation</li>
+                    <li>Both algorithms are guaranteed to find optimal policies for finite MDPs</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>Review Questions</h3>
+                <div class="quiz-question">
+                    <strong>1. What is the Markov property and why is it important?</strong>
+                    <p style="color: #94a3b8;">Answer: The Markov property states that the future is independent of the past given the present state. It's important because it allows us to make decisions based only on the current state without needing the entire history.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. What is the difference between V(s) and Q(s,a)?</strong>
+                    <p style="color: #94a3b8;">Answer: V(s) is the value of being in state s, while Q(s,a) is the value of taking action a in state s. Q-values allow action selection without needing the transition model.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. Why is the Bellman optimality equation non-linear?</strong>
+                    <p style="color: #94a3b8;">Answer: Because it contains the max operator, which is non-linear. This makes finding optimal values more challenging than policy evaluation.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>4. What are the main differences between policy iteration and value iteration?</strong>
+                    <p style="color: #94a3b8;">Answer: Policy iteration has separate evaluation and improvement steps and converges in fewer iterations but with higher per-iteration cost. Value iteration combines these steps and requires more iterations but each is cheaper.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

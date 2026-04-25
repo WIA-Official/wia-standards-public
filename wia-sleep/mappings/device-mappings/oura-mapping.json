@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Oura Ring to WIA-SLEEP Mapping",
+  "version": "1.0.0",
+  "deviceInfo": {
+    "manufacturer": "Oura Health",
+    "device": "Oura Ring",
+    "generations": ["Gen 2", "Gen 3"],
+    "apiVersion": "v2",
+    "documentation": "https://cloud.ouraring.com/v2/docs"
+  },
+  "dataSource": "consumer_wearable",
+  "sleepArchitecture": {
+    "mappings": {
+      "totalSleepTime_min": {
+        "ouraField": "sleep.total_sleep_duration",
+        "unit": "seconds",
+        "transform": "value / 60",
+        "notes": "Oura provides in seconds, convert to minutes"
+      },
+      "sleepEfficiency_pct": {
+        "ouraField": "sleep.efficiency",
+        "unit": "percent",
+        "transform": "value",
+        "notes": "Direct mapping, already in percentage"
+      },
+      "sleepOnsetLatency_min": {
+        "ouraField": "sleep.latency",
+        "unit": "seconds",
+        "transform": "value / 60",
+        "notes": "Time to fall asleep"
+      },
+      "wakeAfterSleepOnset_min": {
+        "ouraField": "sleep.awake_time",
+        "unit": "seconds",
+        "transform": "value / 60"
+      },
+      "stages.n1_pct": {
+        "ouraField": null,
+        "notes": "Oura combines N1+N2 as 'light sleep', no separate N1"
+      },
+      "stages.n2_pct": {
+        "ouraField": "sleep.light_sleep_duration",
+        "unit": "seconds",
+        "transform": "(value / sleep.total_sleep_duration) * 100",
+        "notes": "Includes both N1 and N2; split estimate not available"
+      },
+      "stages.n3_sws_pct": {
+        "ouraField": "sleep.deep_sleep_duration",
+        "unit": "seconds",
+        "transform": "(value / sleep.total_sleep_duration) * 100"
+      },
+      "stages.rem_pct": {
+        "ouraField": "sleep.rem_sleep_duration",
+        "unit": "seconds",
+        "transform": "(value / sleep.total_sleep_duration) * 100"
+      },
+      "arousals_per_hour": {
+        "ouraField": "sleep.restless_periods",
+        "transform": "value / (sleep.total_sleep_duration / 3600)",
+        "notes": "Approximation from restless periods count"
+      },
+      "sleepCycles": {
+        "ouraField": null,
+        "derivation": "Estimate from hypnogram transitions",
+        "notes": "Not directly provided; can derive from sleep stages array"
+      }
+    },
+    "hypnogramMapping": {
+      "ouraField": "sleep.sleep_phase_5_min",
+      "epochDuration_sec": 300,
+      "stageMapping": {
+        "1": 0,
+        "2": 2,
+        "3": 3,
+        "4": 5
+      },
+      "stageDescriptions": {
+        "1": "Awake",
+        "2": "Light sleep (N1+N2)",
+        "3": "Deep sleep (N3)",
+        "4": "REM"
+      },
+      "notes": "Oura uses 5-minute epochs; WIA-SLEEP standard uses 30-second. Conversion required."
+    }
+  },
+  "circadianMarkers": {
+    "mappings": {
+      "heartRateVariability.rmssd": {
+        "ouraField": "sleep.hrv.rmssd",
+        "unit": "ms",
+        "transform": "value"
+      },
+      "coreBodyTemperature_C": {
+        "ouraField": "sleep.temperature_deviation",
+        "unit": "celsius_deviation",
+        "transform": "36.8 + value",
+        "notes": "Oura provides deviation from baseline; estimate absolute using 36.8°C base"
+      },
+      "activityRhythm.relativeAmplitude": {
+        "ouraField": null,
+        "derivation": "Calculate from daily_activity data over 7+ days",
+        "notes": "Requires multi-day activity data processing"
+      }
+    }
+  },
+  "sleepQuality": {
+    "mappings": {
+      "overallScore": {
+        "ouraField": "sleep.score",
+        "unit": "0-100",
+        "transform": "value",
+        "notes": "Oura's proprietary sleep score"
+      },
+      "restorationScore": {
+        "ouraField": "sleep.contributors.deep_sleep",
+        "notes": "Contributor score for deep sleep"
+      },
+      "cognitiveRecoveryScore": {
+        "ouraField": "sleep.contributors.rem_sleep",
+        "notes": "Contributor score for REM sleep"
+      }
+    }
+  },
+  "environmentalFactors": {
+    "mappings": {
+      "temperature_C": {
+        "ouraField": null,
+        "notes": "Not measured by Oura; external sensor integration needed"
+      }
+    }
+  },
+  "apiEndpoints": {
+    "dailySleep": {
+      "endpoint": "/v2/usercollection/daily_sleep",
+      "method": "GET",
+      "parameters": {
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD"
+      }
+    },
+    "sleepSessions": {
+      "endpoint": "/v2/usercollection/sleep",
+      "method": "GET",
+      "parameters": {
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD"
+      }
+    },
+    "heartRate": {
+      "endpoint": "/v2/usercollection/heartrate",
+      "method": "GET"
+    }
+  },
+  "dataQuality": {
+    "sleepStaging": {
+      "accuracy": "moderate",
+      "validation": "Validated against PSG with ~80% epoch-by-epoch agreement",
+      "limitations": [
+        "N1/N2 not differentiated",
+        "5-minute epoch resolution limits precision",
+        "Movement artifacts can affect staging"
+      ]
+    },
+    "hrv": {
+      "accuracy": "good",
+      "validation": "Validated against ECG",
+      "limitations": ["Only measured during sleep"]
+    },
+    "temperature": {
+      "accuracy": "moderate",
+      "notes": "Skin temperature, not core; deviation only"
+    }
+  },
+  "transformationFunctions": {
+    "convertToWIASleep": {
+      "description": "Transform Oura API response to WIA-SLEEP format",
+      "pseudocode": "function convertOuraToWIASleep(ouraData) {\n  return {\n    recordId: generateUUID(),\n    subjectId: ouraData.user_id,\n    timestamp: ouraData.sleep.bedtime_end,\n    dataSource: 'consumer_wearable',\n    sleepArchitecture: {\n      summary: {\n        totalSleepTime_min: ouraData.sleep.total_sleep_duration / 60,\n        sleepEfficiency_pct: ouraData.sleep.efficiency,\n        sleepOnsetLatency_min: ouraData.sleep.latency / 60,\n        wakeAfterSleepOnset_min: ouraData.sleep.awake_time / 60\n      },\n      stagePercentages: {\n        n1_pct: 0, // Combined with n2\n        n2_pct: (ouraData.sleep.light_sleep_duration / ouraData.sleep.total_sleep_duration) * 100,\n        n3_sws_pct: (ouraData.sleep.deep_sleep_duration / ouraData.sleep.total_sleep_duration) * 100,\n        rem_pct: (ouraData.sleep.rem_sleep_duration / ouraData.sleep.total_sleep_duration) * 100\n      }\n    }\n  };\n}"
+    }
+  }
+}

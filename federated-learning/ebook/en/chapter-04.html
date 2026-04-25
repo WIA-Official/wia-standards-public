@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 04: Aggregation Algorithms | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #f59e0b; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Contents</a>
+
+        <h1>Chapter 04: Aggregation Algorithms</h1>
+        <p class="chapter-meta">Master techniques for combining distributed model updates into a global model</p>
+
+        <h2>The Role of Aggregation in Federated Learning</h2>
+        <p>
+            Aggregation is the heart of federated learning - the process of combining model updates from multiple clients into an improved global model. The choice of aggregation algorithm significantly impacts convergence speed, robustness to adversarial clients, handling of non-IID data, and overall model quality. This chapter explores aggregation strategies from simple averaging to sophisticated Byzantine-robust methods.
+        </p>
+
+        <h2>Federated Averaging (FedAvg)</h2>
+
+        <h3>The Standard Algorithm</h3>
+        <p>
+            Federated Averaging, proposed by 선행 연구, remains the most widely used aggregation method. It computes a weighted average of client model updates:
+        </p>
+
+        <pre><code>def federated_averaging(client_models, client_data_sizes):
+    """
+    Standard FedAvg aggregation
+
+    Args:
+        client_models: List of model weights from each client
+        client_data_sizes: Number of training samples per client
+
+    Returns:
+        Aggregated global model
+    """
+    total_samples = sum(client_data_sizes)
+
+    # Weighted average by dataset size
+    global_model = np.zeros_like(client_models[0])
+
+    for i, (model, num_samples) in enumerate(zip(client_models, client_data_sizes)):
+        weight = num_samples / total_samples
+        global_model += weight * model
+
+    return global_model
+
+
+# Example
+client_models = [
+    np.array([1.0, 2.0, 3.0]),  # Client 1: 100 samples
+    np.array([1.5, 1.8, 2.9]),  # Client 2: 200 samples
+    np.array([0.9, 2.1, 3.2])   # Client 3: 150 samples
+]
+client_data_sizes = [100, 200, 150]
+
+global_model = federated_averaging(client_models, client_data_sizes)
+# Result: weighted average giving more influence to client 2</code></pre>
+
+        <h3>Why Weight by Data Size?</h3>
+        <p>
+            Weighting by dataset size provides better gradient estimates. A client with 1000 samples gives a more reliable gradient than one with 10 samples. This weighting scheme minimizes the variance of the aggregate gradient estimator.
+        </p>
+
+        <h3>Momentum-Based FedAvg</h3>
+        <p>
+            Adding server-side momentum improves convergence:
+        </p>
+
+        <pre><code>class MomentumFedAvg:
+    def __init__(self, beta=0.9):
+        self.beta = beta  # Momentum coefficient
+        self.velocity = None
+
+    def aggregate(self, client_models, client_data_sizes):
+        """FedAvg with server-side momentum"""
+
+        # Standard weighted average
+        global_update = federated_averaging(client_models, client_data_sizes)
+
+        # Initialize velocity on first round
+        if self.velocity is None:
+            self.velocity = np.zeros_like(global_update)
+
+        # Update velocity with momentum
+        self.velocity = self.beta * self.velocity + (1 - self.beta) * global_update
+
+        return self.velocity</code></pre>
+
+        <h2>Handling Non-IID Data</h2>
+
+        <h3>The Non-IID Challenge</h3>
+        <p>
+            In real-world federated learning, client data is often non-IID (not Independent and Identically Distributed). This causes:
+        </p>
+
+        <ul>
+            <li><strong>Weight Divergence:</strong> Local models drift apart</li>
+            <li><strong>Slow Convergence:</strong> More rounds needed to reach target accuracy</li>
+            <li><strong>Reduced Final Accuracy:</strong> Global model performs worse</li>
+            <li><strong>Unstable Training:</strong> Oscillations in loss/accuracy</li>
+        </ul>
+
+        <h3>FedProx: Proximal Term Regularization</h3>
+        <p>
+            FedProx adds a proximal term to keep local models close to the global model:
+        </p>
+
+        <pre><code>def fedprox_local_training(local_data, global_model, mu=0.01, epochs=5):
+    """
+    FedProx local training with proximal term
+
+    Loss = Original_Loss + (mu/2) * ||w - w_global||^2
+
+    Args:
+        local_data: Client's training data
+        global_model: Current global model weights
+        mu: Proximal term coefficient (higher = stronger regularization)
+        epochs: Number of local training epochs
+
+    Returns:
+        Updated local model
+    """
+    local_model = global_model.copy()
+
+    for epoch in range(epochs):
+        for batch in local_data:
+            # Compute gradient of original loss
+            grad_loss = compute_gradient(local_model, batch)
+
+            # Add proximal term gradient
+            grad_proximal = mu * (local_model - global_model)
+
+            # Combined gradient
+            total_grad = grad_loss + grad_proximal
+
+            # Update step
+            learning_rate = 0.01
+            local_model = local_model - learning_rate * total_grad
+
+    return local_model</code></pre>
+
+        <h3>SCAFFOLD: Variance Reduction</h3>
+        <p>
+            SCAFFOLD uses control variates to correct for client drift:
+        </p>
+
+        <pre><code>class SCAFFOLD:
+    """
+    Stochastic Controlled Averaging for Federated Learning
+
+    Maintains control variates to correct for client drift
+    """
+
+    def __init__(self):
+        self.server_control = None  # Server control variate
+        self.client_controls = {}   # Client control variates
+
+    def client_update(self, client_id, local_data, global_model, steps=100):
+        """Client training with control variates"""
+
+        # Initialize control variates if needed
+        if self.server_control is None:
+            self.server_control = np.zeros_like(global_model)
+
+        if client_id not in self.client_controls:
+            self.client_controls[client_id] = np.zeros_like(global_model)
+
+        local_model = global_model.copy()
+        c_server = self.server_control
+        c_client = self.client_controls[client_id]
+
+        # Track client gradients for control variate update
+        gradient_sum = np.zeros_like(global_model)
+
+        for step in range(steps):
+            # Sample batch
+            batch = sample_batch(local_data)
+
+            # Compute gradient
+            grad = compute_gradient(local_model, batch)
+            gradient_sum += grad
+
+            # Apply control variate correction
+            corrected_grad = grad - c_client + c_server
+
+            # Update local model
+            local_model = local_model - 0.01 * corrected_grad
+
+        # Update client control variate
+        delta_model = local_model - global_model
+        c_client_new = c_client - c_server + delta_model / (steps * 0.01)
+
+        self.client_controls[client_id] = c_client_new
+
+        return local_model, c_client_new
+
+    def server_aggregate(self, client_models, client_controls, num_clients):
+        """Server aggregation with control variate update"""
+
+        # Average client models
+        global_model = np.mean(client_models, axis=0)
+
+        # Average client control variates
+        avg_client_control = np.mean(client_controls, axis=0)
+
+        # Update server control variate
+        self.server_control = avg_client_control
+
+        return global_model</code></pre>
+
+        <h2>Byzantine-Robust Aggregation</h2>
+
+        <h3>The Byzantine Threat</h3>
+        <p>
+            Malicious clients may send arbitrary updates to sabotage the global model. Byzantine-robust aggregation filters or downweights such malicious contributions.
+        </p>
+
+        <h3>Coordinate-wise Median</h3>
+        <p>
+            Replace averaging with median for each model parameter:
+        </p>
+
+        <pre><code>def coordinate_wise_median(client_models):
+    """
+    Robust aggregation using coordinate-wise median
+
+    Tolerates up to 50% Byzantine clients (under certain assumptions)
+
+    Args:
+        client_models: List of client model updates
+
+    Returns:
+        Aggregated model using median
+    """
+    # Stack models as rows
+    stacked = np.stack(client_models, axis=0)
+
+    # Compute median along client axis (axis=0)
+    global_model = np.median(stacked, axis=0)
+
+    return global_model
+
+
+# Example with Byzantine attack
+client_models = [
+    np.array([1.0, 2.0, 3.0]),    # Honest
+    np.array([1.1, 1.9, 3.1]),    # Honest
+    np.array([0.9, 2.1, 2.9]),    # Honest
+    np.array([100.0, -100.0, 50.0])  # Byzantine!
+]
+
+# Average would be heavily influenced: [25.75, -23.5, 14.75]
+avg = np.mean(client_models, axis=0)
+
+# Median is robust: [1.0, 2.0, 3.0]
+robust = coordinate_wise_median(client_models)</code></pre>
+
+        <h3>Trimmed Mean</h3>
+        <p>
+            Remove outliers before averaging:
+        </p>
+
+        <pre><code>def trimmed_mean(client_models, trim_ratio=0.1):
+    """
+    Aggregate using trimmed mean
+
+    Removes top and bottom trim_ratio fraction of values
+    for each coordinate before averaging
+
+    Args:
+        client_models: List of client updates
+        trim_ratio: Fraction to trim from each end (e.g., 0.1 = 10%)
+
+    Returns:
+        Robust aggregated model
+    """
+    stacked = np.stack(client_models, axis=0)
+    num_clients = len(client_models)
+
+    # Number of clients to trim from each end
+    num_trim = int(num_clients * trim_ratio)
+
+    # Sort along client axis
+    sorted_models = np.sort(stacked, axis=0)
+
+    # Remove top and bottom
+    if num_trim > 0:
+        trimmed = sorted_models[num_trim:-num_trim, :]
+    else:
+        trimmed = sorted_models
+
+    # Average remaining
+    global_model = np.mean(trimmed, axis=0)
+
+    return global_model</code></pre>
+
+        <h3>Krum Algorithm</h3>
+        <p>
+            Select the client model closest to others (most "typical"):
+        </p>
+
+        <pre><code>def krum(client_models, num_byzantines):
+    """
+    Krum: Byzantine-robust aggregation
+
+    Selects the model with smallest sum of distances to
+    closest neighbors (excluding suspected Byzantines)
+
+    Args:
+        client_models: List of client model updates
+        num_byzantines: Maximum number of Byzantine clients
+
+    Returns:
+        Selected robust model
+    """
+    num_clients = len(client_models)
+    num_to_consider = num_clients - num_byzantines - 2
+
+    # Compute pairwise distances
+    distances = np.zeros((num_clients, num_clients))
+    for i in range(num_clients):
+        for j in range(i + 1, num_clients):
+            dist = np.linalg.norm(client_models[i] - client_models[j])
+            distances[i, j] = dist
+            distances[j, i] = dist
+
+    # For each client, compute score (sum of distances to closest neighbors)
+    scores = []
+    for i in range(num_clients):
+        # Get distances to all other clients
+        dists_to_others = distances[i, :]
+
+        # Sort and take closest num_to_consider
+        closest_dists = np.sort(dists_to_others)[1:num_to_consider+1]  # Exclude self
+
+        score = np.sum(closest_dists)
+        scores.append(score)
+
+    # Select client with minimum score
+    selected_idx = np.argmin(scores)
+
+    return client_models[selected_idx]
+
+
+# Example
+honest_models = [np.random.randn(100) for _ in range(7)]
+byzantine_models = [np.random.randn(100) * 10 for _ in range(3)]  # Large noise
+all_models = honest_models + byzantine_models
+
+# Krum selects one of the honest models
+robust_model = krum(all_models, num_byzantines=3)</code></pre>
+
+        <h3>Multi-Krum</h3>
+        <p>
+            Average the top-m models selected by Krum:
+        </p>
+
+        <pre><code>def multi_krum(client_models, num_byzantines, m=3):
+    """
+    Multi-Krum: Average top-m models by Krum scoring
+
+    More robust than single Krum
+    """
+    num_clients = len(client_models)
+    num_to_consider = num_clients - num_byzantines - 2
+
+    # Compute distances (same as Krum)
+    distances = np.zeros((num_clients, num_clients))
+    for i in range(num_clients):
+        for j in range(i + 1, num_clients):
+            dist = np.linalg.norm(client_models[i] - client_models[j])
+            distances[i, j] = dist
+            distances[j, i] = dist
+
+    # Compute scores
+    scores = []
+    for i in range(num_clients):
+        dists_to_others = distances[i, :]
+        closest_dists = np.sort(dists_to_others)[1:num_to_consider+1]
+        score = np.sum(closest_dists)
+        scores.append(score)
+
+    # Select top-m models with lowest scores
+    top_m_indices = np.argsort(scores)[:m]
+    selected_models = [client_models[i] for i in top_m_indices]
+
+    # Average selected models
+    return np.mean(selected_models, axis=0)</code></pre>
+
+        <h2>Personalized Federated Learning</h2>
+
+        <h3>Motivation for Personalization</h3>
+        <p>
+            A single global model may not fit all clients well due to data heterogeneity. Personalization creates client-specific models while leveraging global knowledge.
+        </p>
+
+        <h3>Fine-Tuning Approach</h3>
+        <p>
+            Start with global model and fine-tune on local data:
+        </p>
+
+        <pre><code>def personalized_finetuning(global_model, local_data, finetune_epochs=3):
+    """
+    Simple personalization via fine-tuning
+
+    Args:
+        global_model: Global model from server
+        local_data: Client's local dataset
+        finetune_epochs: Number of local fine-tuning epochs
+
+    Returns:
+        Personalized model for this client
+    """
+    personalized_model = global_model.copy()
+
+    # Fine-tune on local data only
+    for epoch in range(finetune_epochs):
+        for batch in local_data:
+            grad = compute_gradient(personalized_model, batch)
+            personalized_model = personalized_model - 0.01 * grad
+
+    return personalized_model</code></pre>
+
+        <h3>Per-FedAvg: Meta-Learning Approach</h3>
+        <p>
+            Learn a global model that can quickly adapt to each client:
+        </p>
+
+        <pre><code>class PerFedAvg:
+    """
+    Personalized Federated Averaging using meta-learning (MAML-style)
+
+    Learn global model parameters that can quickly adapt to each client
+    """
+
+    def client_update(self, global_model, local_data, alpha=0.01, beta=0.001):
+        """
+        Two-level update: inner adaptation + outer update
+
+        Args:
+            global_model: Global meta-parameters
+            local_data: Client's training data
+            alpha: Inner loop learning rate (adaptation)
+            beta: Outer loop learning rate (meta-update)
+        """
+
+        # Inner loop: Adapt to local data
+        adapted_model = global_model.copy()
+        for batch in sample_batches(local_data, num_batches=5):
+            grad = compute_gradient(adapted_model, batch)
+            adapted_model = adapted_model - alpha * grad
+
+        # Outer loop: Compute meta-gradient
+        meta_gradient = (adapted_model - global_model) / alpha
+
+        # Client sends meta-gradient to server
+        return meta_gradient
+
+    def server_aggregate(self, meta_gradients, global_model, beta=0.001):
+        """
+        Server updates global model using aggregated meta-gradients
+        """
+        avg_meta_gradient = np.mean(meta_gradients, axis=0)
+        global_model = global_model - beta * avg_meta_gradient
+
+        return global_model</code></pre>
+
+        <h2>Adaptive Aggregation</h2>
+
+        <h3>Attention-Based Aggregation</h3>
+        <p>
+            Learn weights for each client based on validation performance:
+        </p>
+
+        <pre><code>class AttentionAggregator:
+    """
+    Adaptive aggregation with learned attention weights
+
+    Weights clients based on their validation performance
+    """
+
+    def __init__(self):
+        self.client_weights = {}
+
+    def aggregate(self, client_models, client_ids, validation_data):
+        """
+        Aggregate with attention mechanism
+
+        Args:
+            client_models: List of client model updates
+            client_ids: Client identifiers
+            validation_data: Global validation set
+
+        Returns:
+            Aggregated model with learned weights
+        """
+
+        # Evaluate each client model on validation set
+        val_scores = []
+        for model in client_models:
+            score = evaluate_model(model, validation_data)
+            val_scores.append(score)
+
+        # Softmax to get attention weights
+        attention_weights = softmax(np.array(val_scores))
+
+        # Weighted aggregation
+        global_model = np.zeros_like(client_models[0])
+        for weight, model in zip(attention_weights, client_models):
+            global_model += weight * model
+
+        # Store weights for analysis
+        for client_id, weight in zip(client_ids, attention_weights):
+            self.client_weights[client_id] = weight
+
+        return global_model
+
+
+def softmax(x, temperature=1.0):
+    """Softmax with temperature scaling"""
+    exp_x = np.exp((x - np.max(x)) / temperature)
+    return exp_x / np.sum(exp_x)</code></pre>
+
+        <h2>Comparison of Aggregation Methods</h2>
+
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Pros</th>
+                <th>Cons</th>
+                <th>Best For</th>
+            </tr>
+            <tr>
+                <td><strong>FedAvg</strong></td>
+                <td>Simple, efficient, well-studied</td>
+                <td>Vulnerable to attacks, struggles with non-IID</td>
+                <td>Benign, relatively IID settings</td>
+            </tr>
+            <tr>
+                <td><strong>FedProx</strong></td>
+                <td>Better non-IID handling</td>
+                <td>Hyperparameter tuning (mu)</td>
+                <td>Heterogeneous data distributions</td>
+            </tr>
+            <tr>
+                <td><strong>SCAFFOLD</strong></td>
+                <td>Variance reduction, fast convergence</td>
+                <td>Higher memory (control variates)</td>
+                <td>Non-IID with good resources</td>
+            </tr>
+            <tr>
+                <td><strong>Median</strong></td>
+                <td>Simple, robust to outliers</td>
+                <td>Ignores useful information</td>
+                <td>Small number of Byzantines</td>
+            </tr>
+            <tr>
+                <td><strong>Trimmed Mean</strong></td>
+                <td>Balance robustness and utility</td>
+                <td>Must know Byzantine fraction</td>
+                <td>Known attack percentage</td>
+            </tr>
+            <tr>
+                <td><strong>Krum</strong></td>
+                <td>Strong Byzantine robustness</td>
+                <td>O(n²) complexity, wastes data</td>
+                <td>Critical applications, small n</td>
+            </tr>
+            <tr>
+                <td><strong>Personalization</strong></td>
+                <td>Better individual performance</td>
+                <td>More complex, requires local data</td>
+                <td>Highly heterogeneous clients</td>
+            </tr>
+        </table>
+
+        <h2>Practical Implementation</h2>
+
+        <pre><code>class FederatedAggregationServer:
+    """
+    Flexible federated learning server with multiple aggregation options
+    """
+
+    def __init__(self, aggregation_method='fedavg', byzantine_ratio=0.0):
+        self.aggregation_method = aggregation_method
+        self.byzantine_ratio = byzantine_ratio
+        self.global_model = None
+        self.round = 0
+
+    def aggregate_updates(self, client_updates, client_metadata):
+        """
+        Aggregate client updates using configured method
+
+        Args:
+            client_updates: List of client model updates
+            client_metadata: Dict with client_id, data_size, etc.
+
+        Returns:
+            Updated global model
+        """
+
+        if self.aggregation_method == 'fedavg':
+            data_sizes = [m['data_size'] for m in client_metadata]
+            global_model = federated_averaging(client_updates, data_sizes)
+
+        elif self.aggregation_method == 'median':
+            global_model = coordinate_wise_median(client_updates)
+
+        elif self.aggregation_method == 'trimmed_mean':
+            global_model = trimmed_mean(client_updates, trim_ratio=self.byzantine_ratio)
+
+        elif self.aggregation_method == 'krum':
+            num_byzantines = int(len(client_updates) * self.byzantine_ratio)
+            global_model = krum(client_updates, num_byzantines)
+
+        elif self.aggregation_method == 'multi_krum':
+            num_byzantines = int(len(client_updates) * self.byzantine_ratio)
+            m = len(client_updates) - num_byzantines
+            global_model = multi_krum(client_updates, num_byzantines, m)
+
+        else:
+            raise ValueError(f"Unknown aggregation method: {self.aggregation_method}")
+
+        self.global_model = global_model
+        self.round += 1
+
+        return global_model</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Aggregation combines distributed client updates into a global model</li>
+                <li>FedAvg uses weighted averaging by dataset size - simple and effective baseline</li>
+                <li>FedProx adds proximal term to handle non-IID data distributions</li>
+                <li>SCAFFOLD uses control variates for variance reduction and faster convergence</li>
+                <li>Byzantine-robust methods (median, trimmed mean, Krum) defend against malicious clients</li>
+                <li>Personalized FL creates client-specific models while leveraging global knowledge</li>
+                <li>Attention-based aggregation learns optimal client weights adaptively</li>
+                <li>Choice of aggregation depends on data distribution, threat model, and resources</li>
+                <li>Robust methods trade some accuracy for security against attacks</li>
+                <li>Modern systems often combine multiple techniques (e.g., FedProx + trimmed mean)</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain Federated Averaging. Why weight by dataset size rather than uniform averaging?</li>
+                <li>How does FedProx address the challenge of non-IID data? What does the proximal term do?</li>
+                <li>Describe SCAFFOLD's control variate mechanism. How does it reduce client drift?</li>
+                <li>Compare coordinate-wise median and trimmed mean. Which is more robust to Byzantine attacks?</li>
+                <li>How does the Krum algorithm select the most reliable client model?</li>
+                <li>What is personalized federated learning? When is it beneficial?</li>
+                <li>Design an aggregation strategy for a medical FL system with 50 hospitals and potential adversaries.</li>
+                <li>How would you detect if Byzantine attacks are occurring in production?</li>
+                <li>Explain the trade-off between robustness and utility in Byzantine-robust aggregation.</li>
+                <li>Why might attention-based aggregation outperform simple averaging?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← Chapter 03</a>
+            <a href="chapter-05.html" class="nav-button">Chapter 05 →</a>
+        </div>
+    </div>
+</body>
+</html>

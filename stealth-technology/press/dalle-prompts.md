@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-DEF-009 Press Materials
+
+## Prompt 1: Hero Image - Advanced Stealth Aircraft
+A futuristic stealth aircraft with angular faceted surfaces absorbing radar waves, shown in a cross-section view revealing radar-absorbing material (RAM) layers in slate (#64748B) tones. Holographic displays show RCS (Radar Cross Section) measurements showing -30 dBsm, infrared signature thermal map showing minimal heat emission, and acoustic signature waveforms at ultra-low levels. The aircraft has a sleek, non-reflective coating with geometric precision. Military-grade aerospace engineering photography, defensive technology aesthetic, professional technical visualization.
+
+## Prompt 2: Problem Scenario - Conventional Aircraft Detection
+A conventional military aircraft being easily detected by multiple threat systems: powerful ground radar painting the plane in bright returns, infrared missiles locking onto hot engine exhaust, acoustic sensors picking up loud engine noise, and visual observers spotting the aircraft from far away. Display shows high radar cross-section (+20 dBsm), intense heat signature, and loud acoustic profile making the aircraft highly vulnerable. Tense military scenario highlighting detection vulnerability and risk. Documentary defense photography emphasizing conventional limitations.
+
+## Prompt 3: Solution Visualization - Multi-Spectrum Stealth Protection
+A peaceful scene showing WIA-DEF-009 stealth aircraft invisible to detection systems: radar beams passing harmlessly around angular surfaces, thermal imaging showing cool surface temperatures matching ambient air, acoustic sensors detecting minimal sound, and the aircraft maintaining low observability across all spectrums. Dashboard displays show <0.001 m² RCS, <1000W IR signature, <60 dB acoustic level, and >5000m visual detection range. Crew safely completing reconnaissance mission undetected. Clean, professional, defensive protection technology. Modern aerospace photography celebrating safety through stealth.

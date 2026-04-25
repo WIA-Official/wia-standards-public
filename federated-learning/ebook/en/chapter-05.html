@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05: Client Selection Strategies | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Contents</a>
+
+        <h1>Chapter 05: Client Selection Strategies</h1>
+        <p class="chapter-meta">Optimize participant selection for efficient and fair federated learning</p>
+
+        <h2>The Client Selection Problem</h2>
+        <p>
+            In cross-device federated learning, millions of clients may be available, but only a fraction can participate in each round due to communication, computation, and energy constraints. Client selection determines which subset of clients trains in each round, significantly impacting convergence speed, model quality, fairness, and system efficiency.
+        </p>
+
+        <h2>Random Selection</h2>
+        <h3>Uniform Random Sampling</h3>
+        <p>
+            The simplest approach: randomly select C clients from N available.
+        </p>
+
+        <pre><code>import random
+
+def uniform_random_selection(available_clients, num_to_select):
+    """
+    Uniformly random client selection
+
+    Args:
+        available_clients: List of client IDs currently online
+        num_to_select: Number of clients for this round
+
+    Returns:
+        Selected client IDs
+    """
+    return random.sample(available_clients, min(num_to_select, len(available_clients)))
+
+
+# Example
+available = list(range(1000))  # 1000 clients online
+selected = uniform_random_selection(available, num_to_select=100)
+# Randomly selects 100 clients</code></pre>
+
+        <p><strong>Advantages:</strong> Simple, unbiased, easy to implement<br>
+        <strong>Disadvantages:</strong> Ignores client heterogeneity, may select slow devices, doesn't account for data quality</p>
+
+        <h2>Data-Aware Selection</h2>
+
+        <h3>Dataset Size Weighted Selection</h3>
+        <p>
+            Prefer clients with more data for better gradient estimates:
+        </p>
+
+        <pre><code>def data_weighted_selection(clients, dataset_sizes, num_to_select):
+    """
+    Select clients with probability proportional to dataset size
+
+    Clients with more data have higher selection probability
+    """
+    total_data = sum(dataset_sizes)
+    probabilities = [size / total_data for size in dataset_sizes]
+
+    # Sample without replacement weighted by probabilities
+    selected_indices = np.random.choice(
+        len(clients),
+        size=num_to_select,
+        replace=False,
+        p=probabilities
+    )
+
+    return [clients[i] for i in selected_indices]
+
+
+# Example
+clients = ['client_' + str(i) for i in range(100)]
+dataset_sizes = np.random.randint(10, 1000, size=100)  # Varying sizes
+
+selected = data_weighted_selection(clients, dataset_sizes, num_to_select=20)
+# Larger datasets get higher selection probability</code></pre>
+
+        <h3>Diversity-Based Selection</h3>
+        <p>
+            Select clients with diverse data distributions to improve generalization:
+        </p>
+
+        <pre><code>def diversity_based_selection(clients, data_distributions, num_to_select):
+    """
+    Maximize data distribution diversity
+
+    Args:
+        clients: List of client IDs
+        data_distributions: Data statistics per client (e.g., label distributions)
+        num_to_select: Number to select
+
+    Returns:
+        Diverse subset of clients
+    """
+    # Start with random client
+    selected_indices = [random.randint(0, len(clients) - 1)]
+
+    while len(selected_indices) < num_to_select:
+        max_diversity = -1
+        best_candidate = None
+
+        # Find client that maximizes diversity from selected
+        for i in range(len(clients)):
+            if i in selected_indices:
+                continue
+
+            # Calculate average distance to selected clients
+            diversity = 0
+            for j in selected_indices:
+                # Use KL divergence or other distance metric
+                dist = kl_divergence(data_distributions[i], data_distributions[j])
+                diversity += dist
+
+            diversity /= len(selected_indices)
+
+            if diversity > max_diversity:
+                max_diversity = diversity
+                best_candidate = i
+
+        selected_indices.append(best_candidate)
+
+    return [clients[i] for i in selected_indices]
+
+
+def kl_divergence(p, q):
+    """KL divergence between two distributions"""
+    p = np.array(p) + 1e-10  # Avoid log(0)
+    q = np.array(q) + 1e-10
+    return np.sum(p * np.log(p / q))</code></pre>
+
+        <h2>System-Aware Selection</h2>
+
+        <h3>Device Speed Prioritization</h3>
+        <p>
+            Prefer faster devices to reduce stragglers:
+        </p>
+
+        <pre><code>class DeviceSpeedSelector:
+    """
+    Select based on device computational capability
+
+    Tracks device performance history
+    """
+
+    def __init__(self):
+        self.device_speeds = {}  # client_id -> average training time
+
+    def update_speed(self, client_id, training_time):
+        """Record client's training time"""
+        if client_id not in self.device_speeds:
+            self.device_speeds[client_id] = []
+
+        self.device_speeds[client_id].append(training_time)
+
+        # Keep only recent history
+        if len(self.device_speeds[client_id]) > 10:
+            self.device_speeds[client_id] = self.device_speeds[client_id][-10:]
+
+    def select_clients(self, available_clients, num_to_select):
+        """Select fastest clients"""
+
+        # Calculate average speed for each client
+        client_avg_speeds = []
+        for client in available_clients:
+            if client in self.device_speeds and self.device_speeds[client]:
+                avg_time = np.mean(self.device_speeds[client])
+                client_avg_speeds.append((client, avg_time))
+            else:
+                # Unknown clients get average priority
+                client_avg_speeds.append((client, float('inf')))
+
+        # Sort by speed (lower time = faster)
+        client_avg_speeds.sort(key=lambda x: x[1])
+
+        # Select top-k fastest
+        selected = [client for client, _ in client_avg_speeds[:num_to_select]]
+
+        return selected</code></pre>
+
+        <h3>Resource-Constrained Selection</h3>
+        <p>
+            Consider battery, network, and compute availability:
+        </p>
+
+        <pre><code>def resource_aware_selection(clients, resource_states, num_to_select):
+    """
+    Select clients based on resource availability
+
+    Args:
+        clients: List of client IDs
+        resource_states: Dict[client_id] -> {battery, network, cpu}
+        num_to_select: Number to select
+
+    Returns:
+        Clients with adequate resources
+    """
+    # Score each client based on resources
+    client_scores = []
+
+    for client in clients:
+        if client not in resource_states:
+            continue
+
+        state = resource_states[client]
+
+        # Calculate resource score (0-1)
+        battery_score = state.get('battery_level', 0) if state.get('charging', False) else state.get('battery_level', 0) * 0.5
+        network_score = 1.0 if state.get('network_type') == 'wifi' else 0.3
+        cpu_score = 1.0 - state.get('cpu_usage', 0)
+
+        # Weighted combination
+        total_score = (
+            0.4 * battery_score +
+            0.4 * network_score +
+            0.2 * cpu_score
+        )
+
+        client_scores.append((client, total_score))
+
+    # Sort by score and select top clients
+    client_scores.sort(key=lambda x: x[1], reverse=True)
+    selected = [client for client, _ in client_scores[:num_to_select]]
+
+    return selected</code></pre>
+
+        <h2>Fairness-Aware Selection</h2>
+
+        <h3>Ensuring Equal Participation</h3>
+        <p>
+            Track participation history to ensure fairness:
+        </p>
+
+        <pre><code>class FairSelector:
+    """
+    Fair client selection ensuring equal opportunity
+
+    Tracks participation and prioritizes underrepresented clients
+    """
+
+    def __init__(self):
+        self.participation_counts = {}
+
+    def select_clients(self, available_clients, num_to_select):
+        """
+        Select clients to balance participation
+
+        Clients selected fewer times get higher priority
+        """
+
+        # Initialize counts for new clients
+        for client in available_clients:
+            if client not in self.participation_counts:
+                self.participation_counts[client] = 0
+
+        # Sort by participation count (ascending)
+        client_participation = [(client, self.participation_counts[client])
+                               for client in available_clients]
+        client_participation.sort(key=lambda x: x[1])
+
+        # Select clients with lowest participation
+        selected = [client for client, _ in client_participation[:num_to_select]]
+
+        # Update counts
+        for client in selected:
+            self.participation_counts[client] += 1
+
+        return selected</code></pre>
+
+        <h3>Geographic Diversity</h3>
+        <p>
+            Ensure representation from different regions:
+        </p>
+
+        <pre><code>def geographic_diversity_selection(clients, locations, num_to_select):
+    """
+    Select clients ensuring geographic diversity
+
+    Args:
+        clients: List of client IDs
+        locations: Dict[client_id] -> (latitude, longitude)
+        num_to_select: Number to select
+
+    Returns:
+        Geographically diverse clients
+    """
+    # Group clients by region (e.g., grid cells)
+    regions = {}
+    for client in clients:
+        if client not in locations:
+            continue
+
+        lat, lon = locations[client]
+
+        # Simple grid: 10-degree cells
+        region_key = (int(lat // 10), int(lon // 10))
+
+        if region_key not in regions:
+            regions[region_key] = []
+        regions[region_key].append(client)
+
+    # Select proportionally from each region
+    selected = []
+    region_list = list(regions.values())
+
+    # Round-robin selection from regions
+    region_idx = 0
+    while len(selected) < num_to_select and sum(len(r) for r in region_list) > 0:
+        if region_list[region_idx]:
+            client = region_list[region_idx].pop(0)
+            selected.append(client)
+
+        region_idx = (region_idx + 1) % len(region_list)
+
+    return selected</code></pre>
+
+        <h2>Adaptive Selection Strategies</h2>
+
+        <h3>Multi-Armed Bandit Approach</h3>
+        <p>
+            Balance exploration (trying new clients) with exploitation (selecting proven clients):
+        </p>
+
+        <pre><code>class MABClientSelector:
+    """
+    Multi-Armed Bandit client selection
+
+    Treats each client as an arm, learns which clients provide best updates
+    """
+
+    def __init__(self, epsilon=0.1):
+        self.epsilon = epsilon  # Exploration rate
+        self.client_rewards = {}  # client_id -> list of rewards
+        self.client_pulls = {}    # client_id -> number of selections
+
+    def select_clients(self, available_clients, num_to_select):
+        """
+        UCB (Upper Confidence Bound) selection
+
+        Balance expected reward with uncertainty
+        """
+        ucb_scores = []
+
+        total_pulls = sum(self.client_pulls.get(c, 0) for c in available_clients)
+
+        for client in available_clients:
+            if client not in self.client_rewards or not self.client_rewards[client]:
+                # Unexplored clients get high priority
+                ucb_scores.append((client, float('inf')))
+                continue
+
+            # Average reward
+            avg_reward = np.mean(self.client_rewards[client])
+
+            # Exploration bonus
+            pulls = self.client_pulls[client]
+            if total_pulls > 0 and pulls > 0:
+                exploration_bonus = np.sqrt(2 * np.log(total_pulls) / pulls)
+            else:
+                exploration_bonus = 0
+
+            ucb_score = avg_reward + exploration_bonus
+            ucb_scores.append((client, ucb_score))
+
+        # Select top-k by UCB score
+        ucb_scores.sort(key=lambda x: x[1], reverse=True)
+        selected = [client for client, _ in ucb_scores[:num_to_select]]
+
+        return selected
+
+    def update_reward(self, client_id, reward):
+        """
+        Update client's reward after training round
+
+        Reward could be: -loss_reduction, accuracy_gain, convergence_contribution, etc.
+        """
+        if client_id not in self.client_rewards:
+            self.client_rewards[client_id] = []
+            self.client_pulls[client_id] = 0
+
+        self.client_rewards[client_id].append(reward)
+        self.client_pulls[client_id] += 1
+
+        # Keep only recent history
+        if len(self.client_rewards[client_id]) > 100:
+            self.client_rewards[client_id] = self.client_rewards[client_id][-100:]</code></pre>
+
+        <h3>Active Learning-Based Selection</h3>
+        <p>
+            Select clients whose data would be most informative:
+        </p>
+
+        <pre><code>def active_learning_selection(clients, local_losses, global_model, num_to_select):
+    """
+    Select clients with highest expected information gain
+
+    Prioritize clients where model performs poorly (high loss)
+    """
+
+    # Calculate selection scores
+    client_scores = []
+
+    for client, loss in zip(clients, local_losses):
+        # Higher loss = more informative
+        # Can also use prediction uncertainty, gradient norm, etc.
+        score = loss
+
+        client_scores.append((client, score))
+
+    # Select clients with highest scores
+    client_scores.sort(key=lambda x: x[1], reverse=True)
+    selected = [client for client, _ in client_scores[:num_to_select]]
+
+    return selected</code></pre>
+
+        <h2>Handling Client Availability</h2>
+
+        <h3>Client Dropout and Stragglers</h3>
+        <p>
+            Handle clients that disconnect or are slow:
+        </p>
+
+        <pre><code>class RobustClientManager:
+    """
+    Manage client selection and handle dropouts
+    """
+
+    def __init__(self, timeout=300):  # 5 minutes
+        self.timeout = timeout
+        self.reliability_scores = {}
+
+    def select_with_backup(self, available_clients, num_to_select):
+        """
+        Select primary + backup clients to handle dropouts
+
+        Over-select by ~20% to account for expected dropouts
+        """
+        dropout_rate = 0.2  # Expect 20% dropout
+        total_to_select = int(num_to_select / (1 - dropout_rate))
+
+        # Prioritize reliable clients
+        clients_by_reliability = sorted(
+            available_clients,
+            key=lambda c: self.reliability_scores.get(c, 0.5),
+            reverse=True
+        )
+
+        selected = clients_by_reliability[:total_to_select]
+
+        return {
+            'primary': selected[:num_to_select],
+            'backup': selected[num_to_select:]
+        }
+
+    def update_reliability(self, client_id, completed, training_time):
+        """
+        Track client reliability
+
+        Args:
+            client_id: Client identifier
+            completed: Boolean - did client complete training?
+            training_time: How long it took (or timeout value if failed)
+        """
+        if client_id not in self.reliability_scores:
+            self.reliability_scores[client_id] = 0.5
+
+        # Update score based on completion
+        if completed:
+            # Faster completion = higher score
+            time_score = max(0, 1 - training_time / self.timeout)
+            new_score = 0.9 * self.reliability_scores[client_id] + 0.1 * time_score
+        else:
+            # Penalize failures
+            new_score = 0.9 * self.reliability_scores[client_id]
+
+        self.reliability_scores[client_id] = new_score</code></pre>
+
+        <h2>Practical Selection Framework</h2>
+
+        <pre><code>class ComprehensiveClientSelector:
+    """
+    Production-ready client selection combining multiple strategies
+    """
+
+    def __init__(self, strategy='hybrid'):
+        self.strategy = strategy
+        self.fair_selector = FairSelector()
+        self.mab_selector = MABClientSelector()
+        self.device_speed_selector = DeviceSpeedSelector()
+        self.client_manager = RobustClientManager()
+
+    def select_clients(self, context):
+        """
+        Select clients based on comprehensive context
+
+        Args:
+            context: Dict with:
+                - available_clients: List of online clients
+                - num_to_select: Target number
+                - resource_states: Resource info per client
+                - data_distributions: Data stats per client
+                - round_number: Current training round
+
+        Returns:
+            Selected client IDs
+        """
+        available = context['available_clients']
+        num_to_select = context['num_to_select']
+
+        if self.strategy == 'random':
+            return uniform_random_selection(available, num_to_select)
+
+        elif self.strategy == 'fair':
+            return self.fair_selector.select_clients(available, num_to_select)
+
+        elif self.strategy == 'device_speed':
+            return self.device_speed_selector.select_clients(available, num_to_select)
+
+        elif self.strategy == 'hybrid':
+            # Multi-stage selection
+
+            # Stage 1: Filter by resources
+            resource_filtered = resource_aware_selection(
+                available,
+                context['resource_states'],
+                num_to_select * 3  # Get 3x candidates
+            )
+
+            # Stage 2: Ensure fairness among filtered
+            fair_candidates = self.fair_selector.select_clients(
+                resource_filtered,
+                num_to_select * 2  # Get 2x candidates
+            )
+
+            # Stage 3: Use MAB to select final set
+            selected = self.mab_selector.select_clients(
+                fair_candidates,
+                num_to_select
+            )
+
+            # Stage 4: Add backups
+            result = self.client_manager.select_with_backup(
+                selected,
+                num_to_select
+            )
+
+            return result['primary']
+
+        else:
+            raise ValueError(f"Unknown strategy: {self.strategy}")</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Client selection determines which devices participate in each training round</li>
+                <li>Random selection is simple but ignores client heterogeneity</li>
+                <li>Data-aware selection prioritizes clients with more or diverse data</li>
+                <li>System-aware selection considers device speed, battery, and network</li>
+                <li>Fairness-aware selection ensures equal participation opportunities</li>
+                <li>MAB approaches balance exploration (new clients) and exploitation (proven clients)</li>
+                <li>Active learning selects clients where the model is most uncertain</li>
+                <li>Handling dropouts requires over-selection and backup clients</li>
+                <li>Production systems typically combine multiple selection criteria</li>
+                <li>Selection strategy should align with application goals (speed vs fairness vs accuracy)</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Why is client selection important in federated learning? What factors make it challenging?</li>
+                <li>Compare random selection with data-weighted selection. When is each appropriate?</li>
+                <li>How does diversity-based selection improve model generalization?</li>
+                <li>Explain the straggler problem. How can device-speed prioritization help?</li>
+                <li>What fairness concerns arise in client selection? How can they be addressed?</li>
+                <li>Describe the multi-armed bandit approach to client selection. What does it optimize?</li>
+                <li>How would you handle client dropouts in production? Why over-select clients?</li>
+                <li>Design a client selection strategy for a cross-device mobile keyboard application.</li>
+                <li>What trade-offs exist between fairness and efficiency in client selection?</li>
+                <li>How can geographic diversity be incorporated into selection while maintaining other goals?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-04.html" class="nav-button">← Chapter 04</a>
+            <a href="chapter-06.html" class="nav-button">Chapter 06 →</a>
+        </div>
+    </div>
+</body>
+</html>

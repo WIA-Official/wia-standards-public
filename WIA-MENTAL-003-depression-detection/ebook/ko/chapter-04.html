@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제04장 - WIA-MENTAL-003</title>
+    <style>
+        :root {--primary: #EC4899; --bg: #0f172a; --surface: #1e293b; --text: #e2e8f0; --text-secondary: #94a3b8; --border: #475569;}
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 1200px; margin: 0 auto;}
+        header {border-bottom: 3px solid var(--primary); padding-bottom: 2rem; margin-bottom: 3rem;}
+        h1 {font-size: 2.5rem; color: var(--primary);}
+        h2 {font-size: 1.8rem; color: var(--primary); margin: 3rem 0 1.5rem 0; padding-left: 1rem; border-left: 4px solid var(--primary);}
+        p {margin: 1rem 0;}
+        table {width: 100%; border-collapse: collapse; margin: 2rem 0; background: var(--surface); border-radius: 8px;}
+        th {background: linear-gradient(135deg, #EC4899, #DB2777); color: white; padding: 1rem; text-align: left;}
+        td {padding: 1rem; border-top: 1px solid var(--border);}
+        .philosophy-box {background: linear-gradient(135deg, #EC4899, #DB2777); color: white; padding: 2rem; border-radius: 12px; margin: 3rem 0; text-align: center;}
+        .key-takeaways, .review-questions {background: var(--surface); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid var(--primary);}
+        ul, ol {margin: 1rem 0 1rem 2rem;}
+        .navigation {display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 2px solid var(--border);}
+        .nav-button {background: var(--primary); color: white; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600;}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>제04장: 우울증 탐지 - WIA-MENTAL-003</h1>
+        <div style="color: var(--text-secondary); margin-top: 0.5rem;">弘益人間 · 널리 인간을 이롭게 하라</div>
+    </header>
+    <main>
+        <h2>API 사양 및 데이터 모델</h2>
+        <p>제4장에서는 WIA-MENTAL-003 표준의 API 사양과 데이터 모델을 상세히 다룹니다. 우울증 감지 시스템의 성공적인 구현은 잘 정의된 API와 표준화된 데이터 형식에 달려 있습니다. 이 장에서는 다양한 시스템 구성 요소 간의 통신을 가능하게 하는 RESTful API 엔드포인트, 데이터 스키마, 보안 메커니즘을 포괄적으로 설명합니다.</p>
+
+        <h2>핵심 API 엔드포인트</h2>
+        <p>WIA-MENTAL-003 표준은 우울증 감지 시스템의 다양한 측면을 처리하기 위한 포괄적인 API 엔드포인트 세트를 정의합니다:</p>
+
+        <table>
+            <thead>
+                <tr><th>엔드포인트</th><th>HTTP 메서드</th><th>기능</th><th>인증</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/api/v1/assessments/depression</code></td><td>POST, GET</td><td>우울증 평가 제출 및 조회</td><td>OAuth 2.0</td></tr>
+                <tr><td><code>/api/v1/biomarkers/collect</code></td><td>POST</td><td>디지털 바이오마커 데이터 수집</td><td>Bearer Token</td></tr>
+                <tr><td><code>/api/v1/predictions/risk</code></td><td>POST</td><td>우울증 위험 예측 요청</td><td>OAuth 2.0</td></tr>
+                <tr><td><code>/api/v1/patients/{id}/timeline</code></td><td>GET</td><td>환자의 시간 경과 데이터 조회</td><td>RBAC</td></tr>
+                <tr><td><code>/api/v1/interventions/recommend</code></td><td>POST</td><td>개입 권장사항 생성</td><td>Clinical Role</td></tr>
+                <tr><td><code>/api/v1/reports/generate</code></td><td>POST</td><td>임상 보고서 생성</td><td>OAuth 2.0</td></tr>
+            </tbody>
+        </table>
+
+        <h2>우울증 평가 API</h2>
+        <p>우울증 평가 API는 PHQ-9, BDI-II, MADRS 등 다양한 표준화된 평가 도구의 결과를 제출하고 조회할 수 있게 합니다:</p>
+
+        <pre style="background: var(--surface); padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border);"><code>// 우울증 평가 제출 API
+POST /api/v1/assessments/depression
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "resourceType": "MentalHealth.DepressionAssessment",
+  "patient": {
+    "id": "patient-12345",
+    "reference": "Patient/12345"
+  },
+  "assessment": {
+    "type": "PHQ-9",
+    "version": "1.0",
+    "date": "2025-12-28T14:30:00Z",
+    "administeredBy": {
+      "type": "self",
+      "clinicianId": null
+    }
+  },
+  "responses": [
+    {
+      "questionId": "phq9_q1",
+      "questionText": "Little interest or pleasure in doing things",
+      "score": 2,
+      "answer": "More than half the days"
+    },
+    {
+      "questionId": "phq9_q2",
+      "questionText": "Feeling down, depressed, or hopeless",
+      "score": 2,
+      "answer": "More than half the days"
+    },
+    {
+      "questionId": "phq9_q3",
+      "questionText": "Trouble falling/staying asleep, or sleeping too much",
+      "score": 3,
+      "answer": "Nearly every day"
+    },
+    {
+      "questionId": "phq9_q4",
+      "questionText": "Feeling tired or having little energy",
+      "score": 3,
+      "answer": "Nearly every day"
+    },
+    {
+      "questionId": "phq9_q5",
+      "questionText": "Poor appetite or overeating",
+      "score": 1,
+      "answer": "Several days"
+    },
+    {
+      "questionId": "phq9_q6",
+      "questionText": "Feeling bad about yourself",
+      "score": 2,
+      "answer": "More than half the days"
+    },
+    {
+      "questionId": "phq9_q7",
+      "questionText": "Trouble concentrating on things",
+      "score": 1,
+      "answer": "Several days"
+    },
+    {
+      "questionId": "phq9_q8",
+      "questionText": "Moving or speaking slowly/being fidgety",
+      "score": 0,
+      "answer": "Not at all"
+    },
+    {
+      "questionId": "phq9_q9",
+      "questionText": "Thoughts of being better off dead or hurting yourself",
+      "score": 1,
+      "answer": "Several days"
+    }
+  ],
+  "scoring": {
+    "totalScore": 15,
+    "maxScore": 27,
+    "severity": "moderately_severe",
+    "interpretation": "Moderately severe depression (15-19)",
+    "suicidalIdeation": {
+      "present": true,
+      "score": 1,
+      "requiresImmediateAttention": true
+    }
+  },
+  "functionalImpairment": {
+    "questionText": "If you checked off any problems, how difficult have these made it for you to do your work, take care of things at home, or get along with other people?",
+    "answer": "Very difficult",
+    "score": 3
+  },
+  "metadata": {
+    "deviceId": "mobile-app-ios-001",
+    "appVersion": "2.1.4",
+    "locale": "ko-KR",
+    "timezone": "Asia/Seoul",
+    "completionTime": 185
+  }
+}
+
+// 응답
+{
+  "status": "success",
+  "assessmentId": "assess-789456",
+  "timestamp": "2025-12-28T14:32:15Z",
+  "alerts": [
+    {
+      "type": "suicidal_ideation",
+      "severity": "high",
+      "message": "Patient reported thoughts of self-harm. Immediate clinical follow-up recommended.",
+      "actionRequired": true,
+      "recommendedActions": [
+        "Contact patient within 24 hours",
+        "Assess suicide risk using Columbia Scale",
+        "Consider crisis intervention referral"
+      ]
+    },
+    {
+      "type": "severity_increase",
+      "severity": "moderate",
+      "message": "PHQ-9 score increased from 10 to 15 (50% increase) since last assessment.",
+      "actionRequired": true
+    }
+  ],
+  "nextAssessment": {
+    "recommendedDate": "2026-01-04",
+    "reason": "Moderately severe depression requires weekly monitoring"
+  }
+}
+</code></pre>
+
+        <h2>위험 예측 API</h2>
+        <p>위험 예측 API는 디지털 바이오마커와 임상 데이터를 결합하여 우울증 악화 또는 재발 위험을 예측합니다:</p>
+
+        <pre style="background: var(--surface); padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border);"><code>// 우울증 위험 예측 요청
+POST /api/v1/predictions/risk
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "patientId": "patient-12345",
+  "predictionType": "depression_onset",
+  "timeWindow": "30_days",
+  "dataSource": {
+    "includeBiomarkers": true,
+    "includeClinicalHistory": true,
+    "includeSelfReports": true
+  },
+  "features": {
+    "recentAssessments": [
+      {
+        "date": "2025-12-28",
+        "type": "PHQ-9",
+        "score": 15
+      },
+      {
+        "date": "2025-12-21",
+        "type": "PHQ-9",
+        "score": 12
+      },
+      {
+        "date": "2025-12-14",
+        "type": "PHQ-9",
+        "score": 10
+      }
+    ],
+    "biomarkers": {
+      "activity": {
+        "avgDailySteps": 3200,
+        "trend": "declining",
+        "changeRate": -0.18
+      },
+      "sleep": {
+        "avgDuration": 5.1,
+        "avgEfficiency": 0.71,
+        "irregularity": 1.8
+      },
+      "social": {
+        "interactionFrequency": 8,
+        "trend": "declining",
+        "isolationScore": 0.68
+      }
+    },
+    "clinicalHistory": {
+      "previousEpisodes": 2,
+      "treatmentHistory": "SSRI medication",
+      "comorbidities": ["anxiety", "insomnia"]
+    }
+  }
+}
+
+// 응답
+{
+  "predictionId": "pred-456789",
+  "timestamp": "2025-12-28T14:35:00Z",
+  "prediction": {
+    "riskLevel": "high",
+    "riskScore": 0.76,
+    "confidence": 0.88,
+    "timeWindow": "30_days",
+    "interpretation": "76% probability of significant depression worsening within 30 days"
+  },
+  "contributingFactors": [
+    {
+      "factor": "increasing_phq9_trend",
+      "importance": 0.32,
+      "description": "PHQ-9 scores showing consistent upward trend"
+    },
+    {
+      "factor": "poor_sleep_quality",
+      "importance": 0.24,
+      "description": "Sleep efficiency below 75% with high variability"
+    },
+    {
+      "factor": "social_withdrawal",
+      "importance": 0.19,
+      "description": "Social interactions decreased by 45% in past 2 weeks"
+    },
+    {
+      "factor": "reduced_activity",
+      "importance": 0.15,
+      "description": "Daily step count 40% below baseline"
+    },
+    {
+      "factor": "previous_episodes",
+      "importance": 0.10,
+      "description": "History of 2 previous depressive episodes"
+    }
+  ],
+  "recommendations": {
+    "clinical": [
+      "Schedule urgent psychiatric evaluation",
+      "Consider medication adjustment",
+      "Increase therapy session frequency to weekly"
+    ],
+    "behavioral": [
+      "Sleep hygiene intervention",
+      "Behavioral activation therapy",
+      "Social engagement support"
+    ],
+    "monitoring": [
+      "Increase PHQ-9 frequency to weekly",
+      "Daily mood tracking via app",
+      "Weekly clinician check-ins"
+    ]
+  },
+  "modelInfo": {
+    "modelType": "gradient_boosting",
+    "modelVersion": "2.3.1",
+    "trainingData": "50,000 patients, 2019-2024",
+    "validationAUC": 0.89
+  }
+}
+</code></pre>
+
+        <h2>데이터 보안 및 프라이버시</h2>
+        <p>WIA-MENTAL-003 표준은 우울증 데이터의 민감성을 고려하여 엄격한 보안 및 프라이버시 요구사항을 명시합니다:</p>
+
+        <table>
+            <thead>
+                <tr><th>보안 요소</th><th>요구사항</th><th>구현 방법</th><th>규정 준수</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>데이터 암호화</strong></td>
+                    <td>저장 시 AES-256, 전송 시 TLS 1.3+</td>
+                    <td>암호화 라이브러리, HTTPS</td>
+                    <td>HIPAA, GDPR</td>
+                </tr>
+                <tr>
+                    <td><strong>접근 제어</strong></td>
+                    <td>역할 기반 접근 제어 (RBAC)</td>
+                    <td>OAuth 2.0, JWT 토큰</td>
+                    <td>HIPAA</td>
+                </tr>
+                <tr>
+                    <td><strong>감사 로깅</strong></td>
+                    <td>모든 데이터 접근 기록</td>
+                    <td>중앙집중식 로그 시스템</td>
+                    <td>HIPAA, SOC 2</td>
+                </tr>
+                <tr>
+                    <td><strong>데이터 최소화</strong></td>
+                    <td>필요한 데이터만 수집</td>
+                    <td>명시적 동의, 목적 제한</td>
+                    <td>GDPR</td>
+                </tr>
+                <tr>
+                    <td><strong>익명화</strong></td>
+                    <td>연구용 데이터 익명화</td>
+                    <td>차등 프라이버시, K-익명성</td>
+                    <td>GDPR, IRB</td>
+                </tr>
+                <tr>
+                    <td><strong>삭제 권리</strong></td>
+                    <td>사용자 데이터 삭제 요청 처리</td>
+                    <td>자동화된 삭제 프로세스</td>
+                    <td>GDPR Article 17</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <pre style="background: var(--surface); padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border);"><code>// 데이터 접근 제어 예시 (Node.js/Express)
+const express = require('express');
+const jwt = require('jsonwebtoken');
+
+// 역할 기반 접근 제어 미들웨어
+function requireRole(allowedRoles) {
+  return (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userRole = decoded.role;
+
+      if (!allowedRoles.includes(userRole)) {
+        return res.status(403).json({
+          error: 'Insufficient permissions',
+          required: allowedRoles,
+          current: userRole
+        });
+      }
+
+      req.user = decoded;
+      next();
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+  };
+}
+
+// 환자 자신의 데이터만 접근 가능
+function requireOwnerOrClinician(req, res, next) {
+  const requestedPatientId = req.params.patientId;
+  const userId = req.user.userId;
+  const userRole = req.user.role;
+
+  if (userRole === 'clinician' || userRole === 'admin') {
+    // 임상의는 자신이 담당하는 환자 데이터에 접근 가능
+    // 실제 구현에서는 담당 환자 목록 확인 필요
+    return next();
+  }
+
+  if (userId !== requestedPatientId) {
+    return res.status(403).json({
+      error: 'Cannot access other patient data'
+    });
+  }
+
+  next();
+}
+
+// API 라우트 예시
+const app = express();
+
+// 환자 본인 또는 임상의만 접근 가능
+app.get('/api/v1/patients/:patientId/assessments',
+  requireRole(['patient', 'clinician', 'admin']),
+  requireOwnerOrClinician,
+  async (req, res) => {
+    // 평가 데이터 조회 로직
+  }
+);
+
+// 임상의만 위험 예측 요청 가능
+app.post('/api/v1/predictions/risk',
+  requireRole(['clinician', 'admin']),
+  async (req, res) => {
+    // 위험 예측 로직
+  }
+);
+
+// 감사 로깅 미들웨어
+app.use((req, res, next) => {
+  const auditLog = {
+    timestamp: new Date().toISOString(),
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    action: `${req.method} ${req.path}`,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent')
+  };
+
+  // 감사 로그 저장
+  saveAuditLog(auditLog);
+  next();
+});
+</code></pre>
+
+        <h2>기술 구현</h2>
+        <p>성공적인 우울증 탐지 시스템은 다음을 통합합니다:</p>
+        <ul>
+            <li><strong>데이터 수집:</strong> 센서 데이터, 설문 조사, 임상 기록의 다중 소스 통합</li>
+            <li><strong>특징 추출:</strong> 원시 데이터에서 관련 우울증 지표 식별</li>
+            <li><strong>모델 추론:</strong> 머신러닝 알고리즘을 사용한 위험 점수 예측</li>
+            <li><strong>임상 통합:</strong> 의사 결정 지원 및 워크플로우 통합</li>
+            <li><strong>모니터링:</strong> 시스템 성능 및 임상 결과의 지속적인 평가</li>
+        </ul>
+
+        <h2>임상 증거</h2>
+        <p>연구는 AI 기반 우울증 탐지의 효과를 입증합니다:</p>
+        <ul>
+            <li>1차 진료 환경에서 검사율이 12%에서 68%로 증가</li>
+            <li>진단까지의 시간이 8개월에서 2개월로 감소</li>
+            <li>6개월 관해율이 31%에서 39%로 개선 (p=0.003)</li>
+            <li>정신 건강 위기로 인한 응급실 방문 18% 감소</li>
+            <li>조기 발견을 위한 78% 민감도, 2-3주 조기 경고 창</li>
+        </ul>
+
+        <h2>윤리적 고려 사항</h2>
+        <p>책임 있는 AI 배포는 다음을 요구합니다:</p>
+        <ul>
+            <li><strong>사전 동의:</strong> 데이터 수집 및 사용에 대한 명확하고 이해 가능한 정보</li>
+            <li><strong>개인정보 보호:</strong> 암호화, 접근 제어 및 규정 준수를 통한 데이터 보호</li>
+            <li><strong>공정성:</strong> 모든 인구 통계학적 그룹에서 공평한 성능 보장</li>
+            <li><strong>투명성:</strong> 알고리즘 결정에 대한 설명 가능성</li>
+            <li><strong>임상 감독:</strong> AI는 임상 판단을 대체하는 것이 아니라 보완</li>
+        </ul>
+
+        <div class="philosophy-box">
+            <h3>弘益人間 (홍익인간)</h3>
+            <p>"널리 인간을 이롭게 하라"</p>
+            <p>우울증 탐지 기술은 정신 건강 관리를 민주화하고, 전 세계 소외된 인구에게 증거 기반 검사를 제공하며, 조기 개입을 통해 고통을 줄이고 생명을 구함으로써 弘益人間의 원칙을 구현합니다. 우리의 목표는 지리적 위치, 경제적 지위 또는 전통적인 의료 자원에 대한 접근과 관계없이 모든 인류에게 혜택을 주는 것입니다.</p>
+        </div>
+
+        <h2>실제 응용</h2>
+        <p>우울증 탐지 시스템은 다양한 환경에서 배포됩니다:</p>
+        <ul>
+            <li><strong>1차 진료:</strong> 루틴 검사 및 조기 발견을 위한 통합</li>
+            <li><strong>정신 건강 클리닉:</strong> 전문 평가 및 치료 모니터링</li>
+            <li><strong>대학 건강 서비스:</strong> 학생 인구에 대한 예방적 검사</li>
+            <li><strong>원격 의료 플랫폼:</strong> 원격 모니터링 및 가상 치료 지원</li>
+            <li><strong>직장 웰니스:</strong> 직원 정신 건강 지원 프로그램</li>
+            <li><strong>지역 사회 건강:</strong> 소외된 인구에 대한 접근 가능한 검사</li>
+        </ul>
+
+        <h2>미래 방향</h2>
+        <p>우울증 탐지 기술의 미래는 다음을 포함합니다:</p>
+        <ul>
+            <li><strong>다중 모드 통합:</strong> 텍스트, 음성, 비디오, 센서 및 유전체학의 결합</li>
+            <li><strong>디지털 치료제:</strong> 탐지를 넘어 AI 기반 개입으로 이동</li>
+            <li><strong>정밀 정신의학:</strong> 개인화된 치료 선택 및 최적화</li>
+            <li><strong>글로벌 접근성:</strong> 저소득 및 중간 소득 국가에서 확장 가능한 배포</li>
+            <li><strong>신흥 기술:</strong> 대형 언어 모델, VR/AR, 뇌-컴퓨터 인터페이스</li>
+        </ul>
+
+        <div class="key-takeaways">
+            <h3>핵심 요약</h3>
+            <ol>
+                <li>AI 기반 우울증 탐지는 85-92%의 민감도로 임상적으로 의미 있는 정확도를 달성합니다</li>
+                <li>디지털 바이오마커는 전통적인 평가로는 불가능한 연속적이고 객관적인 모니터링을 가능하게 합니다</li>
+                <li>여러 데이터 양식을 결합하면 단일 양식 접근 방식보다 18-24% 정확도가 향상됩니다</li>
+                <li>개인정보 보호 및 윤리적 고려 사항은 임상 효과만큼 중요합니다</li>
+                <li>성공적인 배포는 기존 임상 워크플로우 및 EHR 시스템과의 통합이 필요합니다</li>
+                <li>임상 검증 및 규제 승인은 의료 환경에서 배포하기 전에 필수적입니다</li>
+                <li>弘益人間의 원칙은 전 세계적으로 공평한 접근과 인류 전체에 대한 혜택을 요구합니다</li>
+            </ol>
+        </div>
+
+        <div class="review-questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>이 장에서 다룬 주요 기술 구성 요소는 무엇입니까?</li>
+                <li>AI 기반 우울증 탐지의 임상 증거는 무엇을 보여줍니까?</li>
+                <li>책임 있는 AI 배포를 위한 주요 윤리적 고려 사항은 무엇입니까?</li>
+                <li>다중 모드 데이터 통합이 단일 모드 접근 방식보다 어떻게 성능을 향상시킵니까?</li>
+                <li>弘益人間의 원칙이 우울증 탐지 기술에 어떻게 적용됩니까?</li>
+                <li>우울증 탐지 시스템의 미래 방향은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← 이전</a>
+            <a href="chapter-05.html" class="nav-button">다음 →</a>
+        </div>
+    </main>
+</body>
+</html>

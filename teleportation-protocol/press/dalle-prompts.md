@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-QUA-011 Press Materials
+
+## Prompt 1: Hero Image - Quantum Teleportation Laboratory
+A cutting-edge quantum physics laboratory showing quantum teleportation in action with indigo (#6366F1) quantum glow: Alice's qubit being measured in Bell state measurement destroying the original state, entangled photon pairs connecting Alice and Bob across lab, 2 classical bits of information being transmitted to enable state reconstruction, and Bob's qubit perfectly recreating the original quantum state through unitary correction. Visualization of quantum no-cloning theorem ensuring security. Futuristic quantum lab, ultra-precise optics, cryogenic systems. Professional quantum physics photography.
+
+## Prompt 2: Problem Scenario - Classical Communication Limitations
+A frustrated scene showing limitations of classical communication over long distances: satellite communication with seconds of latency making real-time coordination impossible, fiber optic cables limited by distance and signal degradation, wireless communication subject to interference and eavesdropping, and quantum information being impossible to transmit classically without destroying it. Show delayed video conferences, signal loss, security vulnerabilities. Documentary telecommunications photography emphasizing fundamental limits of classical information transfer.
+
+## Prompt 3: Solution Visualization - Quantum Network Revolution
+A revolutionary quantum internet enabled by WIA-QUA-011 teleportation protocols: quantum states being instantly teleported between nodes with >99% fidelity, secure quantum communication networks immune to eavesdropping due to no-cloning theorem, distributed quantum computers sharing quantum states for collaborative computation, and satellite-based quantum links spanning continents with 1400 km demonstrated range. Dashboard shows teleportation rate >1 kHz, Bell state measurement efficiency 95%, entanglement fidelity 98%. Clean, secure, instantaneous quantum communication. Futuristic quantum technology photography celebrating the future of information transfer.

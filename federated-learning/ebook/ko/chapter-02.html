@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 프라이버시 보존 기법 | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #f59e0b; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning-box h4 { color: #f59e0b; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제2장: 프라이버시 보존 기법</h1>
+        <p class="chapter-meta">연합학습에서 데이터를 보호하기 위한 암호화 및 통계적 방법 마스터하기</p>
+
+        <h2>연합학습의 프라이버시 도전과제</h2>
+        <p>
+            연합학습은 원시 데이터가 클라이언트 장치를 떠나지 않도록 하지만, 모델 업데이트 자체가 민감한 정보를 유출할 수 있습니다. 연구자들은 그래디언트 정보를 사용하여 학습 샘플을 재구성하고, 멤버십을 추론하며, 개인 속성을 추출할 수 있음을 입증했습니다. 이 장에서는 연합학습 시스템의 프라이버시 보장을 강화하는 기술을 탐구합니다.
+        </p>
+
+        <div class="warning-box">
+            <h4>핵심 이해</h4>
+            <p>연합학습만으로는 프라이버시를 보장할 수 없습니다. 추가 보호 없이 모델 업데이트는 그래디언트 역전 공격, 멤버십 추론, 모델 역전을 통해 학습 데이터에 대한 정보를 드러낼 수 있습니다.</p>
+        </div>
+
+        <h2>차등 프라이버시</h2>
+
+        <h3>기본 개념</h3>
+        <p>
+            차등 프라이버시(Differential Privacy, DP)는 프라이버시 손실을 정량화하기 위한 수학적 프레임워크를 제공합니다. 무작위 알고리즘 M은 하나의 레코드에서 다른 두 데이터셋 D와 D'에 대해, 그리고 모든 가능한 출력 S에 대해 다음을 만족하면 (ε, δ)-차등 프라이버시를 충족합니다:
+        </p>
+
+        <pre><code>Pr[M(D) ∈ S] ≤ exp(ε) × Pr[M(D') ∈ S] + δ</code></pre>
+
+        <p>여기서:</p>
+        <ul>
+            <li><strong>ε (엡실론):</strong> 프라이버시 예산 - 값이 작을수록 더 강한 프라이버시</li>
+            <li><strong>δ (델타):</strong> 프라이버시 침해 확률 - 일반적으로 매우 작음 (예: 10⁻⁵)</li>
+        </ul>
+
+        <h3>프라이버시 예산 가이드라인</h3>
+        <table>
+            <tr>
+                <th>엡실론 범위</th>
+                <th>프라이버시 수준</th>
+                <th>일반적인 사용 사례</th>
+            </tr>
+            <tr>
+                <td>ε &lt; 1</td>
+                <td>매우 강함</td>
+                <td>의료 기록, 금융 데이터</td>
+            </tr>
+            <tr>
+                <td>ε = 1-3</td>
+                <td>강함</td>
+                <td>개인 선호도, 위치 기록</td>
+            </tr>
+            <tr>
+                <td>ε = 3-6</td>
+                <td>보통</td>
+                <td>집계 통계, 인구통계 정보</td>
+            </tr>
+            <tr>
+                <td>ε &gt; 6</td>
+                <td>약함</td>
+                <td>공개 또는 준공개 데이터</td>
+            </tr>
+        </table>
+
+        <h3>연합학습의 차등 프라이버시</h3>
+        <p>
+            연합학습에 차등 프라이버시를 적용하는 두 가지 주요 접근 방식이 있습니다:
+        </p>
+
+        <h4>1. 로컬 차등 프라이버시 (LDP)</h4>
+        <p>
+            각 클라이언트는 서버로 전송하기 전에 모델 업데이트에 노이즈를 추가합니다. 이는 서버도 깨끗한 업데이트를 볼 수 없기 때문에 가장 강력한 프라이버시 보장을 제공합니다.
+        </p>
+
+        <pre><code>def add_local_noise(gradient, epsilon, sensitivity):
+    """
+    로컬 차등 프라이버시를 위한 라플라스 노이즈 추가
+
+    인자:
+        gradient: 로컬 데이터에서 계산된 모델 그래디언트
+        epsilon: 프라이버시 예산
+        sensitivity: 그래디언트의 L2 민감도
+
+    반환:
+        epsilon-DP를 만족하는 노이즈가 추가된 그래디언트
+    """
+    scale = sensitivity / epsilon
+    noise = np.random.laplace(0, scale, gradient.shape)
+    noisy_gradient = gradient + noise
+
+    # 민감도를 제한하기 위해 그래디언트 클리핑
+    clip_norm = 1.0
+    gradient_norm = np.linalg.norm(noisy_gradient)
+    if gradient_norm > clip_norm:
+        noisy_gradient = noisy_gradient * (clip_norm / gradient_norm)
+
+    return noisy_gradient</code></pre>
+
+        <h4>2. 중앙 차등 프라이버시 (CDP)</h4>
+        <p>
+            서버가 업데이트를 집계한 후 노이즈를 추가합니다. 더 나은 유용성(정확도)을 제공하지만 서버가 깨끗한 집계 업데이트를 보도록 신뢰해야 합니다.
+        </p>
+
+        <pre><code>def aggregate_with_central_dp(client_updates, epsilon, delta, num_clients):
+    """
+    중앙 차등 프라이버시를 사용하여 클라이언트 업데이트 집계
+
+    (epsilon, delta)-DP를 위한 가우시안 메커니즘 사용
+    """
+    # 클라이언트 업데이트 집계
+    aggregated = sum(client_updates) / num_clients
+
+    # 가우시안 메커니즘을 위한 노이즈 스케일 계산
+    sensitivity = 2.0 / num_clients  # 클리핑된 그래디언트 가정
+    sigma = sensitivity * math.sqrt(2 * math.log(1.25 / delta)) / epsilon
+
+    # 가우시안 노이즈 추가
+    noise = np.random.normal(0, sigma, aggregated.shape)
+    private_aggregated = aggregated + noise
+
+    return private_aggregated</code></pre>
+
+        <h3>그래디언트 클리핑</h3>
+        <p>
+            그래디언트 클리핑은 업데이트의 민감도를 제한하므로 차등 프라이버시에 필수적입니다:
+        </p>
+
+        <pre><code>def clip_gradients(gradients, max_norm=1.0):
+    """
+    그래디언트를 제한된 L2 노름으로 클리핑
+
+    민감도를 제한하여 의미 있는 차등 프라이버시 가능
+    """
+    total_norm = 0.0
+    for grad in gradients:
+        param_norm = np.linalg.norm(grad)
+        total_norm += param_norm ** 2
+    total_norm = math.sqrt(total_norm)
+
+    clip_coef = max_norm / (total_norm + 1e-6)
+
+    if clip_coef < 1:
+        for grad in gradients:
+            grad *= clip_coef
+
+    return gradients</code></pre>
+
+        <h2>보안 다자간 계산 (SMPC)</h2>
+
+        <h3>핵심 원리</h3>
+        <p>
+            보안 다자간 계산(Secure Multi-Party Computation)은 여러 당사자가 입력을 비공개로 유지하면서 입력에 대한 함수를 공동으로 계산할 수 있게 합니다. 연합학습에서 SMPC는 서버가 개별 기여가 아닌 집계 결과만 학습하는 보안 집계를 가능하게 합니다.
+        </p>
+
+        <h3>비밀 공유</h3>
+        <p>
+            비밀 공유는 값을 여러 당사자에게 분산된 공유로 분할합니다. 원래 값은 임계값의 공유가 결합될 때만 재구성할 수 있습니다:
+        </p>
+
+        <pre><code>def shamir_share(secret, num_shares, threshold):
+    """
+    Shamir의 비밀 공유: 비밀을 공유로 분할
+
+    인자:
+        secret: 공유할 값
+        num_shares: 생성할 총 공유 수
+        threshold: 재구성에 필요한 최소 공유 수
+
+    반환:
+        공유 목록
+    """
+    import random
+
+    # 무작위 다항식 계수 생성
+    coefficients = [secret] + [random.randint(0, 2**32)
+                               for _ in range(threshold - 1)]
+
+    def evaluate_polynomial(x):
+        result = 0
+        for i, coef in enumerate(coefficients):
+            result += coef * (x ** i)
+        return result
+
+    # 공유 생성
+    shares = [(i, evaluate_polynomial(i))
+              for i in range(1, num_shares + 1)]
+
+    return shares</code></pre>
+
+        <h2>동형 암호화</h2>
+
+        <h3>소개</h3>
+        <p>
+            동형 암호화는 데이터를 복호화하지 않고 암호화된 데이터에 대한 계산을 가능하게 합니다. 연합학습의 경우, 이를 통해 서버가 암호화된 모델 업데이트를 집계할 수 있습니다.
+        </p>
+
+        <h3>동형 암호화 유형</h3>
+        <ul>
+            <li><strong>부분 동형:</strong> 하나의 연산 지원 (예: 덧셈 또는 곱셈)</li>
+            <li><strong>다소 동형:</strong> 제한된 수의 연산</li>
+            <li><strong>완전 동형:</strong> 임의의 계산 (매우 비쌈)</li>
+        </ul>
+
+        <p>
+            연합학습 집계의 경우, 덧셈을 지원하는 부분 동형 암호화(PHE)로 충분합니다:
+        </p>
+
+        <pre><code>from phe import paillier
+
+class HomomorphicAggregator:
+    def __init__(self):
+        # 공개/개인 키 쌍 생성
+        self.public_key, self.private_key = paillier.generate_paillier_keypair()
+
+    def encrypt_update(self, update):
+        """클라이언트가 공개 키로 업데이트 암호화"""
+        encrypted = [self.public_key.encrypt(float(x)) for x in update]
+        return encrypted
+
+    def aggregate_encrypted(self, encrypted_updates):
+        """
+        서버가 복호화 없이 암호화된 업데이트 집계
+
+        동형 속성: Enc(a) + Enc(b) = Enc(a + b)
+        """
+        num_updates = len(encrypted_updates)
+        dimension = len(encrypted_updates[0])
+
+        # 첫 번째 암호화된 업데이트로 초기화
+        aggregated = encrypted_updates[0]
+
+        # 나머지 암호화된 업데이트 추가
+        for i in range(1, num_updates):
+            for j in range(dimension):
+                aggregated[j] += encrypted_updates[i][j]
+
+        # 클라이언트 수로 나누기 (스칼라 곱셈)
+        aggregated = [x / num_updates for x in aggregated]
+
+        return aggregated
+
+    def decrypt_result(self, encrypted_aggregated):
+        """서버가 최종 집계 결과 복호화"""
+        decrypted = [self.private_key.decrypt(x)
+                    for x in encrypted_aggregated]
+        return np.array(decrypted)</code></pre>
+
+        <div class="warning-box">
+            <h4>성능 고려사항</h4>
+            <p>동형 암호화는 계산 비용이 많이 듭니다. 단일 모델 업데이트의 암호화/복호화는 수 초에서 수 분이 걸릴 수 있으며, 하드웨어 가속 없이는 대규모 모델이나 빈번한 업데이트에 비실용적입니다.</p>
+        </div>
+
+        <h2>신뢰 실행 환경 (TEE)</h2>
+
+        <h3>하드웨어 기반 프라이버시</h3>
+        <p>
+            Intel SGX 및 ARM TrustZone과 같은 신뢰 실행 환경은 운영 체제 및 다른 애플리케이션으로부터 코드와 데이터가 보호되는 하드웨어 격리 보안 엔클레이브를 제공합니다.
+        </p>
+
+        <h3>연합학습의 TEE</h3>
+        <p>TEE는 다음에 사용할 수 있습니다:</p>
+        <ul>
+            <li><strong>보안 집계:</strong> 격리된 엔클레이브에서 서버 측 집계</li>
+            <li><strong>키 관리:</strong> 암호화 키의 안전한 저장</li>
+            <li><strong>증명:</strong> 클라이언트가 서버가 올바른 코드를 실행하는지 확인</li>
+            <li><strong>하이브리드 접근:</strong> TEE를 암호화 방법과 결합</li>
+        </ul>
+
+        <h2>프라이버시 공격 및 방어</h2>
+
+        <h3>모델 역전 공격</h3>
+        <p>
+            공격자는 모델 파라미터 또는 예측에서 학습 샘플을 재구성하려고 시도합니다. 방어 전략은 다음과 같습니다:
+        </p>
+
+        <ul>
+            <li>모델 출력에 대한 차등 프라이버시</li>
+            <li>예측 신뢰도 점수 제한</li>
+            <li>정규화 기술</li>
+            <li>과적합을 줄이는 앙상블 방법</li>
+        </ul>
+
+        <h3>멤버십 추론 공격</h3>
+        <p>
+            특정 데이터 포인트가 학습 세트에 있었는지 확인합니다. 방어:
+        </p>
+
+        <ul>
+            <li>학습 중 차등 프라이버시</li>
+            <li>정규화 (드롭아웃, L2)</li>
+            <li>예측 섭동</li>
+            <li>신뢰도 마스킹</li>
+        </ul>
+
+        <h3>그래디언트 누출 공격</h3>
+        <p>
+            최근 연구에 따르면 그래디언트가 상당한 정보를 유출할 수 있습니다. 방어 예시:
+        </p>
+
+        <pre><code>def defend_gradient_leakage(gradient, epsilon=1.0):
+    """
+    그래디언트 공격에 대한 여러 방어 기술 결합
+    """
+    # 1. 그래디언트 클리핑
+    max_norm = 1.0
+    grad_norm = np.linalg.norm(gradient)
+    if grad_norm > max_norm:
+        gradient = gradient * (max_norm / grad_norm)
+
+    # 2. 차등 프라이버시 노이즈 추가
+    sensitivity = max_norm
+    scale = sensitivity / epsilon
+    noise = np.random.laplace(0, scale, gradient.shape)
+    gradient = gradient + noise
+
+    # 3. 그래디언트 압축 (희소화)
+    k = int(0.1 * len(gradient))  # 상위 10% 유지
+    threshold = np.sort(np.abs(gradient))[-k]
+    gradient[np.abs(gradient) < threshold] = 0
+
+    return gradient</code></pre>
+
+        <h2>프라이버시-유용성 트레이드오프</h2>
+
+        <h3>기본 트레이드오프</h3>
+        <p>
+            더 강한 프라이버시 보장은 일반적으로 모델 유용성(정확도)을 감소시킵니다. 이 트레이드오프에 영향을 미치는 주요 요인:
+        </p>
+
+        <table>
+            <tr>
+                <th>요인</th>
+                <th>프라이버시에 미치는 영향</th>
+                <th>유용성에 미치는 영향</th>
+            </tr>
+            <tr>
+                <td>낮은 ε (엡실론)</td>
+                <td>더 강한 프라이버시</td>
+                <td>낮은 정확도 (더 많은 노이즈)</td>
+            </tr>
+            <tr>
+                <td>더 강한 클리핑</td>
+                <td>더 나은 프라이버시</td>
+                <td>느린 수렴</td>
+            </tr>
+            <tr>
+                <td>더 많은 참가자</td>
+                <td>더 나은 프라이버시 (더 큰 군중)</td>
+                <td>더 나은 유용성 (더 많은 데이터)</td>
+            </tr>
+            <tr>
+                <td>더 적은 학습 라운드</td>
+                <td>더 나은 프라이버시 (적은 노출)</td>
+                <td>낮은 유용성 (학습 부족)</td>
+            </tr>
+        </table>
+
+        <div class="info-box">
+            <h4>弘益人間의 구현</h4>
+            <p>프라이버시 보존 기술은 연합학습이 弘益人間(홍익인간)의 철학을 실현하는 핵심입니다. 강력한 프라이버시 보장을 통해 개인의 존엄성과 데이터 주권을 보호하면서도 집단 지식으로부터 이익을 얻을 수 있어 진정으로 모든 인류에게 이익이 되는 AI를 만들 수 있습니다.</p>
+        </div>
+
+        <div class="summary">
+            <h2>장 요약</h2>
+            <ul>
+                <li>연합학습만으로는 프라이버시를 보장하지 못하며 추가 기술이 필요</li>
+                <li>차등 프라이버시는 제어된 노이즈 추가를 통해 수학적 프라이버시 보장 제공</li>
+                <li>로컬 DP (클라이언트 측 노이즈)는 중앙 DP (서버 측)보다 강력한 보장 제공</li>
+                <li>보안 다자간 계산은 개별 기여를 드러내지 않고 집계 가능</li>
+                <li>동형 암호화는 암호화된 데이터에 대한 계산을 허용하지만 오버헤드가 높음</li>
+                <li>TEE는 중요한 작업에 대한 하드웨어 기반 보안 제공</li>
+                <li>프라이버시 기술은 모델 역전, 멤버십 추론, 그래디언트 누출에 대해 방어해야 함</li>
+                <li>프라이버시-유용성 트레이드오프는 엡실론, 클리핑 및 기타 파라미터의 신중한 조정 필요</li>
+                <li>실용적인 시스템은 강력한 프라이버시 보호를 위해 여러 기술을 결합</li>
+                <li>프라이버시 회계는 학습 라운드 전체의 누적 프라이버시 손실 추적</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>(ε, δ)-차등 프라이버시 정의를 설명하세요. 엡실론 값이 작다는 것은 무엇을 의미합니까?</li>
+                <li>로컬 차등 프라이버시(LDP)와 중앙 차등 프라이버시(CDP)를 비교하세요. 각각을 언제 사용하겠습니까?</li>
+                <li>연합학습에서 차등 프라이버시를 위해 그래디언트 클리핑이 필수적인 이유는 무엇입니까?</li>
+                <li>쌍별 비밀 공유를 사용한 보안 집계가 어떻게 작동하는지 설명하세요. 마스크가 왜 상쇄됩니까?</li>
+                <li>동형 암호화란 무엇입니까? 연합학습에 왜 계산 비용이 많이 듭니까?</li>
+                <li>연합학습 시스템에 대한 세 가지 유형의 프라이버시 공격과 그 방어를 설명하세요.</li>
+                <li>프라이버시-유용성 트레이드오프란 무엇입니까? 엡실론을 증가시키면 모델 정확도에 어떤 영향을 미칩니까?</li>
+                <li>단일 연합학습 시스템에서 여러 프라이버시 기술을 어떻게 결합할 수 있습니까?</li>
+                <li>프라이버시 보존 연합학습에서 신뢰 실행 환경은 어떤 역할을 합니까?</li>
+                <li>의료 애플리케이션에 적합한 프라이버시 파라미터(엡실론, 델타, 클리핑 노름)를 어떻게 선택하겠습니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-01.html" class="nav-button">← 제1장</a>
+            <a href="chapter-03.html" class="nav-button">제3장 →</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 02: Privacy-Preserving Techniques | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        .back-link:hover { background: #334155; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #f59e0b; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning-box h4 { color: #f59e0b; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .review-questions ol { margin-left: 1.5rem; }
+        .review-questions li { margin-bottom: 1rem; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s; }
+        .nav-button:hover { background: #059669; transform: translateY(-2px); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Contents</a>
+
+        <h1>Chapter 02: Privacy-Preserving Techniques</h1>
+        <p class="chapter-meta">Master cryptographic and statistical methods for protecting data in federated learning</p>
+
+        <h2>The Privacy Challenge in Federated Learning</h2>
+        <p>
+            While federated learning prevents raw data from leaving client devices, model updates themselves can leak sensitive information. Researchers have demonstrated that gradient information can be used to reconstruct training samples, infer membership, and extract private attributes. This chapter explores techniques to strengthen privacy guarantees in federated learning systems.
+        </p>
+
+        <div class="warning-box">
+            <h4>Critical Understanding</h4>
+            <p>Federated learning alone does not guarantee privacy. Without additional protections, model updates can reveal information about training data through gradient inversion attacks, membership inference, and model inversion.</p>
+        </div>
+
+        <h2>Differential Privacy</h2>
+
+        <h3>Fundamental Concept</h3>
+        <p>
+            Differential Privacy (DP) provides a mathematical framework for quantifying privacy loss. A randomized algorithm M satisfies (ε, δ)-differential privacy if for any two datasets D and D' differing in a single record, and for all possible outputs S:
+        </p>
+
+        <pre><code>Pr[M(D) ∈ S] ≤ exp(ε) × Pr[M(D') ∈ S] + δ</code></pre>
+
+        <p>
+            Where:
+        </p>
+        <ul>
+            <li><strong>ε (epsilon):</strong> Privacy budget - smaller values mean stronger privacy</li>
+            <li><strong>δ (delta):</strong> Probability of privacy breach - typically very small (e.g., 10⁻⁵)</li>
+        </ul>
+
+        <h3>Privacy Budget Guidelines</h3>
+        <table>
+            <tr>
+                <th>Epsilon Range</th>
+                <th>Privacy Level</th>
+                <th>Typical Use Cases</th>
+            </tr>
+            <tr>
+                <td>ε &lt; 1</td>
+                <td>Very Strong</td>
+                <td>Medical records, financial data</td>
+            </tr>
+            <tr>
+                <td>ε = 1-3</td>
+                <td>Strong</td>
+                <td>Personal preferences, location history</td>
+            </tr>
+            <tr>
+                <td>ε = 3-6</td>
+                <td>Moderate</td>
+                <td>Aggregated statistics, demographic info</td>
+            </tr>
+            <tr>
+                <td>ε &gt; 6</td>
+                <td>Weak</td>
+                <td>Public or semi-public data</td>
+            </tr>
+        </table>
+
+        <h3>Differential Privacy in Federated Learning</h3>
+        <p>
+            Two main approaches exist for applying differential privacy to federated learning:
+        </p>
+
+        <h4>1. Local Differential Privacy (LDP)</h4>
+        <p>
+            Each client adds noise to their model updates before sending to the server. This provides the strongest privacy guarantee as even the server cannot see clean updates.
+        </p>
+
+        <pre><code>def add_local_noise(gradient, epsilon, sensitivity):
+    """
+    Add Laplace noise for local differential privacy
+
+    Args:
+        gradient: Model gradient computed on local data
+        epsilon: Privacy budget
+        sensitivity: L2 sensitivity of gradient
+
+    Returns:
+        Noisy gradient satisfying epsilon-DP
+    """
+    scale = sensitivity / epsilon
+    noise = np.random.laplace(0, scale, gradient.shape)
+    noisy_gradient = gradient + noise
+
+    # Clip gradient to bound sensitivity
+    clip_norm = 1.0
+    gradient_norm = np.linalg.norm(noisy_gradient)
+    if gradient_norm > clip_norm:
+        noisy_gradient = noisy_gradient * (clip_norm / gradient_norm)
+
+    return noisy_gradient</code></pre>
+
+        <h4>2. Central Differential Privacy (CDP)</h4>
+        <p>
+            The server adds noise after aggregating updates. Provides better utility (accuracy) but requires trusting the server to see clean aggregated updates.
+        </p>
+
+        <pre><code>def aggregate_with_central_dp(client_updates, epsilon, delta, num_clients):
+    """
+    Aggregate client updates with central differential privacy
+
+    Uses Gaussian mechanism for (epsilon, delta)-DP
+    """
+    # Aggregate client updates
+    aggregated = sum(client_updates) / num_clients
+
+    # Calculate noise scale for Gaussian mechanism
+    sensitivity = 2.0 / num_clients  # Assuming clipped gradients
+    sigma = sensitivity * math.sqrt(2 * math.log(1.25 / delta)) / epsilon
+
+    # Add Gaussian noise
+    noise = np.random.normal(0, sigma, aggregated.shape)
+    private_aggregated = aggregated + noise
+
+    return private_aggregated</code></pre>
+
+        <h3>Gradient Clipping</h3>
+        <p>
+            Gradient clipping is essential for differential privacy as it bounds the sensitivity of updates:
+        </p>
+
+        <pre><code>def clip_gradients(gradients, max_norm=1.0):
+    """
+    Clip gradients to bounded L2 norm
+
+    This bounds sensitivity, enabling meaningful differential privacy
+    """
+    total_norm = 0.0
+    for grad in gradients:
+        param_norm = np.linalg.norm(grad)
+        total_norm += param_norm ** 2
+    total_norm = math.sqrt(total_norm)
+
+    clip_coef = max_norm / (total_norm + 1e-6)
+
+    if clip_coef < 1:
+        for grad in gradients:
+            grad *= clip_coef
+
+    return gradients</code></pre>
+
+        <h2>Secure Multi-Party Computation (SMPC)</h2>
+
+        <h3>Core Principles</h3>
+        <p>
+            Secure Multi-Party Computation allows multiple parties to jointly compute a function over their inputs while keeping those inputs private. In federated learning, SMPC enables secure aggregation where the server learns only the aggregate result, not individual contributions.
+        </p>
+
+        <h3>Secret Sharing</h3>
+        <p>
+            Secret sharing splits a value into shares distributed across multiple parties. The original value can only be reconstructed when a threshold of shares is combined:
+        </p>
+
+        <pre><code>def shamir_share(secret, num_shares, threshold):
+    """
+    Shamir's Secret Sharing: split secret into shares
+
+    Args:
+        secret: Value to share
+        num_shares: Total number of shares to create
+        threshold: Minimum shares needed to reconstruct
+
+    Returns:
+        List of shares
+    """
+    import random
+
+    # Generate random polynomial coefficients
+    coefficients = [secret] + [random.randint(0, 2**32)
+                               for _ in range(threshold - 1)]
+
+    def evaluate_polynomial(x):
+        result = 0
+        for i, coef in enumerate(coefficients):
+            result += coef * (x ** i)
+        return result
+
+    # Generate shares
+    shares = [(i, evaluate_polynomial(i))
+              for i in range(1, num_shares + 1)]
+
+    return shares
+
+
+def shamir_reconstruct(shares):
+    """
+    Reconstruct secret from shares using Lagrange interpolation
+    """
+    def lagrange_basis(j, x_values):
+        def basis(x):
+            numerator = denominator = 1
+            for m, x_m in enumerate(x_values):
+                if m != j:
+                    numerator *= (x - x_m)
+                    denominator *= (x_values[j] - x_m)
+            return numerator / denominator
+        return basis
+
+    x_values = [x for x, _ in shares]
+    y_values = [y for _, y in shares]
+
+    # Evaluate at x=0 to get secret
+    secret = 0
+    for j in range(len(shares)):
+        secret += y_values[j] * lagrange_basis(j, x_values)(0)
+
+    return int(round(secret))</code></pre>
+
+        <h3>Secure Aggregation Protocol</h3>
+        <p>
+            A practical secure aggregation protocol for federated learning:
+        </p>
+
+        <ol>
+            <li><strong>Setup:</strong> Server and clients agree on cryptographic parameters</li>
+            <li><strong>Share Keys:</strong> Each pair of clients establishes a shared secret key</li>
+            <li><strong>Mask Generation:</strong> Each client generates random masks using shared keys</li>
+            <li><strong>Masked Upload:</strong> Clients add masks to their updates and upload</li>
+            <li><strong>Aggregation:</strong> Server sums all masked updates (masks cancel out)</li>
+            <li><strong>Result:</strong> Server obtains sum of client updates without seeing individuals</li>
+        </ol>
+
+        <pre><code>class SecureAggregationClient:
+    def __init__(self, client_id, num_clients):
+        self.id = client_id
+        self.num_clients = num_clients
+        self.shared_keys = {}
+
+    def setup_pairwise_keys(self, other_clients):
+        """Establish shared keys with other clients using Diffie-Hellman"""
+        from cryptography.hazmat.primitives.asymmetric import dh
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        from cryptography.hazmat.primitives import hashes
+
+        for other_id in other_clients:
+            if other_id == self.id:
+                continue
+
+            # Simplified: In practice, use proper DH key exchange
+            shared_secret = hash((min(self.id, other_id),
+                                 max(self.id, other_id)))
+            self.shared_keys[other_id] = shared_secret
+
+    def generate_mask(self, dimension):
+        """Generate mask from pairwise keys"""
+        mask = np.zeros(dimension)
+
+        for other_id, key in self.shared_keys.items():
+            # Generate pseudorandom mask from shared key
+            np.random.seed(key)
+            pairwise_mask = np.random.randn(dimension)
+
+            # Add or subtract based on ID ordering
+            if self.id < other_id:
+                mask += pairwise_mask
+            else:
+                mask -= pairwise_mask
+
+        return mask
+
+    def create_masked_update(self, gradient):
+        """Add mask to gradient for secure aggregation"""
+        mask = self.generate_mask(len(gradient))
+        return gradient + mask</code></pre>
+
+        <h2>Homomorphic Encryption</h2>
+
+        <h3>Introduction</h3>
+        <p>
+            Homomorphic encryption allows computations on encrypted data without decrypting it. For federated learning, this enables the server to aggregate encrypted model updates.
+        </p>
+
+        <h3>Types of Homomorphic Encryption</h3>
+        <ul>
+            <li><strong>Partially Homomorphic:</strong> Supports one operation (e.g., addition or multiplication)</li>
+            <li><strong>Somewhat Homomorphic:</strong> Limited number of operations</li>
+            <li><strong>Fully Homomorphic:</strong> Arbitrary computations (very expensive)</li>
+        </ul>
+
+        <p>
+            For federated learning aggregation, partially homomorphic encryption (PHE) supporting addition is sufficient:
+        </p>
+
+        <pre><code>from phe import paillier
+
+class HomomorphicAggregator:
+    def __init__(self):
+        # Generate public/private key pair
+        self.public_key, self.private_key = paillier.generate_paillier_keypair()
+
+    def encrypt_update(self, update):
+        """Client encrypts their update with public key"""
+        encrypted = [self.public_key.encrypt(float(x)) for x in update]
+        return encrypted
+
+    def aggregate_encrypted(self, encrypted_updates):
+        """
+        Server aggregates encrypted updates without decryption
+
+        Homomorphic property: Enc(a) + Enc(b) = Enc(a + b)
+        """
+        num_updates = len(encrypted_updates)
+        dimension = len(encrypted_updates[0])
+
+        # Initialize with first encrypted update
+        aggregated = encrypted_updates[0]
+
+        # Add remaining encrypted updates
+        for i in range(1, num_updates):
+            for j in range(dimension):
+                aggregated[j] += encrypted_updates[i][j]
+
+        # Divide by number of clients (scalar multiplication)
+        aggregated = [x / num_updates for x in aggregated]
+
+        return aggregated
+
+    def decrypt_result(self, encrypted_aggregated):
+        """Server decrypts final aggregated result"""
+        decrypted = [self.private_key.decrypt(x)
+                    for x in encrypted_aggregated]
+        return np.array(decrypted)
+
+
+# Usage example
+aggregator = HomomorphicAggregator()
+
+# Client 1
+update1 = np.array([1.5, 2.3, -0.7])
+enc1 = aggregator.encrypt_update(update1)
+
+# Client 2
+update2 = np.array([0.8, -1.2, 1.1])
+enc2 = aggregator.encrypt_update(update2)
+
+# Server aggregates without seeing individual updates
+encrypted_avg = aggregator.aggregate_encrypted([enc1, enc2])
+result = aggregator.decrypt_result(encrypted_avg)
+
+print(f"Average: {result}")  # [1.15, 0.55, 0.2]</code></pre>
+
+        <div class="warning-box">
+            <h4>Performance Consideration</h4>
+            <p>Homomorphic encryption is computationally expensive. Encryption/decryption of a single model update can take seconds to minutes, making it impractical for large models or frequent updates without hardware acceleration.</p>
+        </div>
+
+        <h2>Trusted Execution Environments (TEE)</h2>
+
+        <h3>Hardware-Based Privacy</h3>
+        <p>
+            Trusted Execution Environments like Intel SGX and ARM TrustZone provide hardware-isolated secure enclaves where code and data are protected from the operating system and other applications.
+        </p>
+
+        <h3>TEE in Federated Learning</h3>
+        <p>
+            TEEs can be used for:
+        </p>
+
+        <ul>
+            <li><strong>Secure Aggregation:</strong> Server-side aggregation in isolated enclave</li>
+            <li><strong>Key Management:</strong> Secure storage of cryptographic keys</li>
+            <li><strong>Attestation:</strong> Clients verify server is running correct code</li>
+            <li><strong>Hybrid Approach:</strong> Combine TEE with cryptographic methods</li>
+        </ul>
+
+        <h2>Privacy Attacks and Defenses</h2>
+
+        <h3>Model Inversion Attacks</h3>
+        <p>
+            Attackers attempt to reconstruct training samples from model parameters or predictions. Defense strategies include:
+        </p>
+
+        <ul>
+            <li>Differential privacy on model outputs</li>
+            <li>Limiting prediction confidence scores</li>
+            <li>Regularization techniques</li>
+            <li>Ensemble methods that reduce overfitting</li>
+        </ul>
+
+        <h3>Membership Inference Attacks</h3>
+        <p>
+            Determining whether a specific data point was in the training set. Defenses:
+        </p>
+
+        <ul>
+            <li>Differential privacy during training</li>
+            <li>Regularization (dropout, L2)</li>
+            <li>Prediction perturbation</li>
+            <li>Confidence masking</li>
+        </ul>
+
+        <h3>Gradient Leakage Attacks</h3>
+        <p>
+            Recent research shows gradients can leak significant information. Example defense:
+        </p>
+
+        <pre><code>def defend_gradient_leakage(gradient, epsilon=1.0):
+    """
+    Combine multiple defense techniques against gradient attacks
+    """
+    # 1. Gradient clipping
+    max_norm = 1.0
+    grad_norm = np.linalg.norm(gradient)
+    if grad_norm > max_norm:
+        gradient = gradient * (max_norm / grad_norm)
+
+    # 2. Add differential privacy noise
+    sensitivity = max_norm
+    scale = sensitivity / epsilon
+    noise = np.random.laplace(0, scale, gradient.shape)
+    gradient = gradient + noise
+
+    # 3. Gradient compression (sparsification)
+    k = int(0.1 * len(gradient))  # Keep top 10%
+    threshold = np.sort(np.abs(gradient))[-k]
+    gradient[np.abs(gradient) < threshold] = 0
+
+    return gradient</code></pre>
+
+        <h2>Privacy-Utility Trade-offs</h2>
+
+        <h3>The Fundamental Trade-off</h3>
+        <p>
+            Stronger privacy guarantees typically reduce model utility (accuracy). Key factors affecting this trade-off:
+        </p>
+
+        <table>
+            <tr>
+                <th>Factor</th>
+                <th>Impact on Privacy</th>
+                <th>Impact on Utility</th>
+            </tr>
+            <tr>
+                <td>Lower ε (epsilon)</td>
+                <td>Stronger privacy</td>
+                <td>Lower accuracy (more noise)</td>
+            </tr>
+            <tr>
+                <td>Tighter clipping</td>
+                <td>Better privacy</td>
+                <td>Slower convergence</td>
+            </tr>
+            <tr>
+                <td>More participants</td>
+                <td>Better privacy (larger crowd)</td>
+                <td>Better utility (more data)</td>
+            </tr>
+            <tr>
+                <td>Fewer training rounds</td>
+                <td>Better privacy (less exposure)</td>
+                <td>Lower utility (undertrained)</td>
+            </tr>
+        </table>
+
+        <h3>Optimizing the Trade-off</h3>
+        <pre><code>def adaptive_privacy_budget(round_num, total_rounds, initial_epsilon=1.0):
+    """
+    Adaptively allocate privacy budget across training rounds
+
+    Spend more budget in later rounds when model is converging
+    """
+    # Exponential budget allocation
+    remaining_rounds = total_rounds - round_num
+    budget_fraction = 1 - (remaining_rounds / total_rounds) ** 2
+
+    epsilon = initial_epsilon * budget_fraction
+    return max(epsilon, 0.1)  # Minimum epsilon
+
+
+def privacy_accounting(epsilons, deltas, composition='advanced'):
+    """
+    Track cumulative privacy loss across multiple mechanisms
+
+    Args:
+        epsilons: List of epsilon values from different operations
+        deltas: List of delta values
+        composition: 'basic', 'advanced', or 'renyi'
+
+    Returns:
+        Total privacy budget
+    """
+    if composition == 'basic':
+        # Simple composition: privacy losses add up
+        total_epsilon = sum(epsilons)
+        total_delta = sum(deltas)
+
+    elif composition == 'advanced':
+        # Advanced composition: sqrt improvement
+        import math
+        k = len(epsilons)
+        epsilon = max(epsilons)
+        delta = max(deltas)
+
+        total_epsilon = epsilon * math.sqrt(2 * k * math.log(1/delta))
+        total_delta = k * delta
+
+    return total_epsilon, total_delta</code></pre>
+
+        <h2>Practical Implementation Guidelines</h2>
+
+        <h3>Choosing Privacy Techniques</h3>
+        <p>
+            Selection criteria for privacy methods:
+        </p>
+
+        <table>
+            <tr>
+                <th>Technique</th>
+                <th>Best For</th>
+                <th>Limitations</th>
+            </tr>
+            <tr>
+                <td>Differential Privacy</td>
+                <td>Strong mathematical guarantees</td>
+                <td>Accuracy loss, parameter tuning</td>
+            </tr>
+            <tr>
+                <td>Secure Aggregation</td>
+                <td>Hiding individual contributions</td>
+                <td>Communication overhead, dropout handling</td>
+            </tr>
+            <tr>
+                <td>Homomorphic Encryption</td>
+                <td>Complete encryption of updates</td>
+                <td>Very high computational cost</td>
+            </tr>
+            <tr>
+                <td>TEE</td>
+                <td>Hardware-backed security</td>
+                <td>Limited availability, side-channels</td>
+            </tr>
+        </table>
+
+        <h3>Combining Multiple Techniques</h3>
+        <p>
+            A robust federated learning system often combines multiple privacy techniques:
+        </p>
+
+        <pre><code>class PrivacyPreservingFederatedLearning:
+    def __init__(self, epsilon=1.0, delta=1e-5, use_secure_agg=True):
+        self.epsilon = epsilon
+        self.delta = delta
+        self.use_secure_agg = use_secure_agg
+        self.privacy_budget_used = 0.0
+
+    def client_update(self, local_data, global_model):
+        # 1. Train locally
+        gradients = self.train_local(local_data, global_model)
+
+        # 2. Clip gradients (bound sensitivity)
+        clipped = self.clip_gradients(gradients, max_norm=1.0)
+
+        # 3. Add local differential privacy noise
+        private_gradients = self.add_local_noise(clipped, self.epsilon)
+
+        # 4. Apply secure aggregation masking (if enabled)
+        if self.use_secure_agg:
+            masked_gradients = self.apply_secure_mask(private_gradients)
+            return masked_gradients
+
+        return private_gradients
+
+    def server_aggregate(self, client_updates):
+        # 1. Aggregate (secure aggregation masks cancel out)
+        aggregated = np.mean(client_updates, axis=0)
+
+        # 2. Optional: Add central DP noise
+        # (already have local DP, so this might be redundant)
+
+        # 3. Track privacy budget
+        self.privacy_budget_used += self.epsilon
+
+        return aggregated</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Federated learning alone doesn't guarantee privacy; additional techniques are needed</li>
+                <li>Differential privacy provides mathematical privacy guarantees through controlled noise addition</li>
+                <li>Local DP (client-side noise) offers stronger guarantees than central DP (server-side)</li>
+                <li>Secure Multi-Party Computation enables aggregation without revealing individual contributions</li>
+                <li>Homomorphic encryption allows computation on encrypted data but has high overhead</li>
+                <li>TEEs provide hardware-based security for critical operations</li>
+                <li>Privacy techniques must defend against model inversion, membership inference, and gradient leakage</li>
+                <li>Privacy-utility trade-offs require careful tuning of epsilon, clipping, and other parameters</li>
+                <li>Practical systems often combine multiple techniques for robust privacy protection</li>
+                <li>Privacy accounting tracks cumulative privacy loss across training rounds</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain the (ε, δ)-differential privacy definition. What do smaller values of epsilon signify?</li>
+                <li>Compare local differential privacy (LDP) and central differential privacy (CDP). When would you use each?</li>
+                <li>Why is gradient clipping essential for differential privacy in federated learning?</li>
+                <li>Describe how secure aggregation works using pairwise secret sharing. Why do the masks cancel out?</li>
+                <li>What is homomorphic encryption? Why is it computationally expensive for federated learning?</li>
+                <li>Explain three types of privacy attacks on federated learning systems and their defenses.</li>
+                <li>What is the privacy-utility trade-off? How does increasing epsilon affect model accuracy?</li>
+                <li>How can multiple privacy techniques be combined in a single federated learning system?</li>
+                <li>What role do Trusted Execution Environments play in privacy-preserving federated learning?</li>
+                <li>How would you choose appropriate privacy parameters (epsilon, delta, clipping norm) for a healthcare application?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-01.html" class="nav-button">← Chapter 01</a>
+            <a href="chapter-03.html" class="nav-button">Chapter 03 →</a>
+        </div>
+    </div>
+</body>
+</html>

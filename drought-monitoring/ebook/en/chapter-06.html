@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol - WIA Drought Monitoring</title>
+    <style>
+        :root{--bg:#0f172a;--bg-secondary:#1e293b;--bg-tertiary:#334155;--text:#f1f5f9;--text-secondary:#cbd5e1;--primary: #8B5CF6;--primary: #8B5CF6}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:3rem 2rem}h1{font-size:2.5rem;color:var(--primary);margin-bottom:.5rem}h2{font-size:1.8rem;color:var(--primary);margin-top:3rem;margin-bottom:1rem}h3{font-size:1.3rem;color:var(--accent);margin-top:2rem;margin-bottom:1rem}.chapter-number{color:var(--text-secondary);font-size:1.2rem;margin-bottom:2rem}p{margin-bottom:1.5rem;color:var(--text-secondary)}table{width:100%;border-collapse:collapse;margin:2rem 0;background:var(--bg-secondary);border-radius:8px;overflow:hidden}th,td{padding:1rem;text-align:left;border-bottom:1px solid var(--bg-tertiary)}th{background:var(--bg-tertiary);color:var(--primary);font-weight:600}.summary-box,.key-takeaways,.review-questions{background:var(--bg-secondary);padding:2rem;border-radius:8px;margin:2rem 0}.summary-box{border-left:4px solid var(--primary)}ul,ol{margin:1rem 0 1rem 2rem}li{margin:.5rem 0;color:var(--text-secondary)}.callout{background:var(--bg-tertiary);border-left:4px solid var(--accent);padding:1.5rem;margin:1.5rem 0;border-radius:4px}.nav-links{display:flex;justify-content:space-between;margin-top:3rem;padding-top:2rem;border-top:2px solid var(--bg-tertiary)}.nav-links a{color:var(--primary);text-decoration:none;padding:.75rem 1.5rem;background:var(--bg-secondary);border-radius:8px;transition:all .3s}.nav-links a:hover{background:var(--primary);color:var(--bg)}pre{background:var(--bg);border:1px solid var(--bg-tertiary);border-radius:8px;padding:1.5rem;overflow-x:auto;margin:1rem 0}code{color:var(--accent);font-family:'Courier New',monospace;font-size:.9em}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-number">Chapter 6</div>
+        <h1>Phase 3 - Protocol Standards</h1>
+
+        <h2>From Raw Data to Actionable Intelligence</h2>
+
+        <p>Phase 3 of the WIA standard addresses the critical question: how should raw satellite imagery, weather station data, and sensor measurements be processed into standardized drought indices? While Phases 1 and 2 define what drought data looks like and how to access it, Phase 3 ensures that different implementations calculate drought indices consistently using validated scientific methods.</p>
+
+        <p>Without processing protocol standards, two systems could claim WIA compliance while producing completely different drought assessments for the same location and time, defeating the purpose of standardization.</p>
+
+        <h2>Satellite Data Acquisition Standards</h2>
+
+        <p>The foundation of modern drought monitoring is satellite remote sensing. The WIA standard specifies protocols for acquiring and preprocessing data from major Earth observation satellites.</p>
+
+        <h3>Supported Satellite Platforms</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Satellite</th>
+                    <th>Sensor</th>
+                    <th>Products</th>
+                    <th>WIA Standard Resolution</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>MODIS Terra/Aqua</td>
+                    <td>MOD13Q1/MYD13Q1</td>
+                    <td>NDVI, EVI</td>
+                    <td>250m, 16-day composite</td>
+                </tr>
+                <tr>
+                    <td>Landsat 8/9</td>
+                    <td>OLI, TIRS</td>
+                    <td>NDVI, LST</td>
+                    <td>30m, 16-day revisit</td>
+                </tr>
+                <tr>
+                    <td>Sentinel-2</td>
+                    <td>MSI</td>
+                    <td>NDVI, Moisture Index</td>
+                    <td>10-20m, 5-day revisit</td>
+                </tr>
+                <tr>
+                    <td>SMAP</td>
+                    <td>L-band Radiometer</td>
+                    <td>Soil Moisture</td>
+                    <td>9km, 2-3 day revisit</td>
+                </tr>
+                <tr>
+                    <td>SMOS</td>
+                    <td>MIRAS</td>
+                    <td>Soil Moisture</td>
+                    <td>25km, 3-day revisit</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Atmospheric Correction Protocol</h2>
+
+        <p>Raw satellite reflectance values are affected by atmospheric conditions. The WIA standard requires atmospheric correction to obtain surface reflectance suitable for vegetation index calculation.</p>
+
+        <h3>Standard Method: 6S Radiative Transfer Model</h3>
+
+        <p>The Second Simulation of a Satellite Signal in the Solar Spectrum (6S) is the WIA standard method for atmospheric correction:</p>
+
+        <pre><code>// Atmospheric Correction Pseudocode
+
+function atmosphericCorrection(rawReflectance, sensorGeometry, atmosphericConditions) {
+  // Input parameters
+  const {
+    solarZenithAngle,
+    sensorZenithAngle,
+    relativeAzimuth
+  } = sensorGeometry;
+
+  const {
+    waterVapor_cm,
+    ozone_atm_cm,
+    aerosolOpticalDepth,
+    surfacePressure_mb
+  } = atmosphericConditions;
+
+  // Run 6S model
+  const correction = run6SModel({
+    geometry: sensorGeometry,
+    atmosphere: atmosphericConditions,
+    wavelength: sensorBands
+  });
+
+  // Apply correction
+  const surfaceReflectance = (rawReflectance - correction.pathRadiance) /
+                              correction.transmittance;
+
+  return surfaceReflectance;
+}
+
+// Quality requirements
+// - RMSE vs ground targets: < 5%
+// - Residual atmospheric effects: < 2% reflectance units</code></pre>
+
+        <h3>Alternative Methods (If 6S Unavailable)</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Applicability</th>
+                    <th>Accuracy</th>
+                    <th>Computational Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>DOS (Dark Object Subtraction)</td>
+                    <td>Quick processing</td>
+                    <td>±8%</td>
+                    <td>Very Low</td>
+                </tr>
+                <tr>
+                    <td>QUAC (Quick Atmospheric Correction)</td>
+                    <td>No atmospheric data needed</td>
+                    <td>±6%</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>FLAASH</td>
+                    <td>Hyperspectral imagery</td>
+                    <td>±4%</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td>Sen2Cor (Sentinel-2)</td>
+                    <td>Sentinel-2 specific</td>
+                    <td>±5%</td>
+                    <td>Medium</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <strong>Implementation Requirement:</strong> WIA-compliant systems must document which atmospheric correction method is used and include this in metadata. When 6S is not used, validation against ground reference targets is mandatory.
+        </div>
+
+        <h2>Cloud Masking Standards</h2>
+
+        <p>Clouds obscure surface conditions and must be identified and masked before drought index calculation. The WIA standard adopts the Fmask (Function of mask) algorithm for cloud detection.</p>
+
+        <h3>Fmask Cloud Detection Algorithm</h3>
+
+        <pre><code>function cloudMask(surfaceReflectance, brightnessTemp, metadata) {
+  // Stage 1: Potential cloud pixels
+  const potentialClouds = identifyPotentialClouds({
+    blue: surfaceReflectance.blue,
+    green: surfaceReflectance.green,
+    red: surfaceReflectance.red,
+    nir: surfaceReflectance.nir,
+    swir1: surfaceReflectance.swir1,
+    swir2: surfaceReflectance.swir2,
+    thermal: brightnessTemp
+  });
+
+  // Stage 2: Cloud probability
+  const cloudProbability = calculateCloudProbability(potentialClouds, {
+    temperature: brightnessTemp,
+    whiteness: calculateWhiteness(surfaceReflectance),
+    brightness: calculateBrightness(surfaceReflectance),
+    variability: calculateSpectralVariability(surfaceReflectance)
+  });
+
+  // Stage 3: Cloud shadows
+  const shadowMask = detectCloudShadows({
+    cloudMask: cloudProbability > 0.5,
+    solarAzimuth: metadata.solarAzimuth,
+    solarZenith: metadata.solarZenith,
+    cloudHeight: estimateCloudHeight(brightnessTemp)
+  });
+
+  // Final mask
+  return {
+    cloudMask: cloudProbability > 0.5,
+    cloudShadowMask: shadowMask,
+    cloudProbability: cloudProbability,
+    quality: assessMaskQuality(cloudProbability, shadowMask)
+  };
+}
+
+// Quality Requirements:
+// - Cloud detection accuracy: > 95%
+// - Commission error (false positives): < 3%
+// - Omission error (missed clouds): < 5%</code></pre>
+
+        <h2>NDVI Calculation Protocol</h2>
+
+        <p>The Normalized Difference Vegetation Index is fundamental to vegetation-based drought monitoring. The WIA standard specifies exact calculation methods and quality requirements.</p>
+
+        <h3>Standard NDVI Calculation</h3>
+
+        <pre><code>function calculateNDVI(surfaceReflectance, cloudMask) {
+  // Extract spectral bands (atmospherically corrected)
+  const red = surfaceReflectance.red;     // 0.63-0.69 μm
+  const nir = surfaceReflectance.nir;     // 0.76-0.90 μm
+
+  // Apply cloud mask
+  const validPixels = !cloudMask.cloudMask && !cloudMask.cloudShadowMask;
+
+  // Calculate NDVI where valid
+  const ndvi = validPixels.map((valid, index) => {
+    if (!valid) return NaN;
+
+    const nirVal = nir[index];
+    const redVal = red[index];
+
+    // Avoid division by zero
+    if (Math.abs(nirVal + redVal) < 0.001) return NaN;
+
+    // Standard NDVI formula
+    return (nirVal - redVal) / (nirVal + redVal);
+  });
+
+  // Quality control
+  const qualityNDVI = applyQualityControl(ndvi, {
+    validRange: [-1.0, 1.0],
+    expectedVegetationRange: [0.2, 0.9],
+    adjacencyEffect: checkAdjacentPixels(ndvi)
+  });
+
+  return {
+    ndvi: qualityNDVI,
+    validPixelPercent: calculateValidPercent(qualityNDVI),
+    meanNDVI: calculateMean(qualityNDVI),
+    stddevNDVI: calculateStdDev(qualityNDVI)
+  };
+}
+
+// Precision requirement: 0.01 NDVI units
+// Cross-sensor consistency: ±0.02 NDVI units</code></pre>
+
+        <h3>NDVI Anomaly Calculation</h3>
+
+        <p>Drought detection requires comparing current NDVI to historical norms:</p>
+
+        <pre><code>function calculateNDVIAnomaly(currentNDVI, historicalData, location, date) {
+  // Extract same period from historical record
+  const samePeriod = historicalData.filter(record =>
+    isSamePeriod(record.date, date, windowDays = 16)
+  );
+
+  // Calculate statistics
+  const historicalMean = calculateMean(samePeriod.map(r => r.ndvi));
+  const historicalStdDev = calculateStdDev(samePeriod.map(r => r.ndvi));
+
+  // Anomaly calculation
+  const absoluteAnomaly = currentNDVI - historicalMean;
+  const standardizedAnomaly = absoluteAnomaly / historicalStdDev;
+  const percentile = calculatePercentile(currentNDVI, samePeriod.map(r => r.ndvi));
+
+  // Drought classification based on anomaly
+  let droughtStatus;
+  if (standardizedAnomaly < -2.0) droughtStatus = "severe_drought";
+  else if (standardizedAnomaly < -1.5) droughtStatus = "moderate_drought";
+  else if (standardizedAnomaly < -1.0) droughtStatus = "mild_drought";
+  else droughtStatus = "normal";
+
+  return {
+    ndvi: currentNDVI,
+    anomaly: absoluteAnomaly,
+    zscore: standardizedAnomaly,
+    percentile: percentile,
+    historicalMean: historicalMean,
+    droughtStatus: droughtStatus
+  };
+}
+
+// Historical baseline requirement: Minimum 10 years of data
+// Window matching: ±16 days from current date</code></pre>
+
+        <h2>Evapotranspiration Calculation Standards</h2>
+
+        <p>Evapotranspiration (ET) quantifies water loss, essential for water balance drought indices like PDSI. The WIA standard adopts the FAO-56 Penman-Monteith equation.</p>
+
+        <h3>FAO-56 Penman-Monteith Method</h3>
+
+        <pre><code>function calculateET0(weatherData) {
+  // Weather inputs
+  const {
+    temperatureMin_C,
+    temperatureMax_C,
+    relativeHumidityMin_percent,
+    relativeHumidityMax_percent,
+    windSpeed2m_ms,
+    solarRadiation_MJm2day,
+    latitude,
+    elevation_m,
+    date
+  } = weatherData;
+
+  // Derived parameters
+  const tempMean = (temperatureMin_C + temperatureMax_C) / 2;
+  const delta = saturationVaporPressureSlope(tempMean);  // kPa/°C
+  const P = atmosphericPressure(elevation_m);  // kPa
+  const gamma = psychrometricConstant(P);  // kPa/°C
+
+  // Saturation vapor pressure
+  const es = (saturationVaporPressure(temperatureMax_C) +
+              saturationVaporPressure(temperatureMin_C)) / 2;
+
+  // Actual vapor pressure
+  const ea = (saturationVaporPressure(temperatureMin_C) * relativeHumidityMax_percent / 100 +
+              saturationVaporPressure(temperatureMax_C) * relativeHumidityMin_percent / 100) / 2;
+
+  // Net radiation
+  const Rn = netRadiation(solarRadiation_MJm2day, latitude, date, tempMean, ea);
+
+  // Soil heat flux (negligible for daily calculations)
+  const G = 0;
+
+  // Wind speed adjustment to 2m height (if needed)
+  const u2 = windSpeed2m_ms;
+
+  // FAO-56 Penman-Monteith equation
+  const numerator = 0.408 * delta * (Rn - G) +
+                     gamma * (900 / (tempMean + 273)) * u2 * (es - ea);
+  const denominator = delta + gamma * (1 + 0.34 * u2);
+
+  const ET0 = numerator / denominator;  // mm/day
+
+  return {
+    et0_mm_day: Math.max(0, ET0),
+    temperature_c: tempMean,
+    vaporPressureDeficit_kPa: es - ea,
+    netRadiation_MJm2day: Rn,
+    quality: assessETQuality(weatherData)
+  };
+}
+
+// Supporting functions
+function saturationVaporPressure(temp_C) {
+  return 0.6108 * Math.exp((17.27 * temp_C) / (temp_C + 237.3));
+}
+
+function saturationVaporPressureSlope(temp_C) {
+  const es = saturationVaporPressure(temp_C);
+  return (4098 * es) / Math.pow(temp_C + 237.3, 2);
+}
+
+function atmosphericPressure(elevation_m) {
+  return 101.3 * Math.pow((293 - 0.0065 * elevation_m) / 293, 5.26);
+}
+
+function psychrometricConstant(P_kPa) {
+  return 0.000665 * P_kPa;
+}
+
+// Accuracy requirement: RMSE < 15% vs eddy covariance measurements</code></pre>
+
+        <h3>Crop-Specific ET Calculation</h3>
+
+        <p>Converting reference ET to crop-specific ET using crop coefficients:</p>
+
+        <pre><code>function calculateETc(ET0, cropType, growthStage, stressConditions) {
+  // Crop coefficient lookup
+  const Kc = getCropCoefficient(cropType, growthStage);
+
+  // Stress coefficient (reduces ET under water stress)
+  const Ks = calculateStressCoefficient(stressConditions);
+
+  // Crop ET
+  const ETc = ET0 * Kc * Ks;
+
+  return {
+    etc_mm_day: ETc,
+    et0_mm_day: ET0,
+    cropCoefficient: Kc,
+    stressCoefficient: Ks,
+    cropType: cropType,
+    growthStage: growthStage
+  };
+}
+
+// Crop coefficient database (example values)
+const cropCoefficients = {
+  wheat: {
+    initial: 0.30,
+    development: 0.75,
+    mid_season: 1.15,
+    late_season: 0.40
+  },
+  corn: {
+    initial: 0.30,
+    development: 0.80,
+    mid_season: 1.20,
+    late_season: 0.60
+  },
+  alfalfa: {
+    cutting_period: 1.20,
+    regrowth: 0.40
+  }
+};
+
+// WIA standard includes crop coefficient database for 50+ major crops</code></pre>
+
+        <h2>Soil Moisture Processing Protocol</h2>
+
+        <p>For satellite-derived soil moisture (SMAP, SMOS), the WIA standard specifies retrieval algorithms and quality control:</p>
+
+        <h3>L-Band Radiometry Soil Moisture Retrieval</h3>
+
+        <pre><code>function retrieveSoilMoisture(brightnessTemperature, landCover, soilTexture, vegetation) {
+  // Input: L-band brightness temperature (1.4 GHz)
+  const Tb_h = brightnessTemperature.horizontal;
+  const Tb_v = brightnessTemperature.vertical;
+
+  // Remove vegetation attenuation
+  const tau = vegetationOpticalDepth(vegetation.waterContent, vegetation.type);
+  const Tsoil_h = removeVegetationEffect(Tb_h, tau, vegetation.temperature);
+  const Tsoil_v = removeVegetationEffect(Tb_v, tau, vegetation.temperature);
+
+  // Dielectric model inversion
+  const soilDielectric = calculateDielectric(Tsoil_h, Tsoil_v, soilTexture);
+
+  // Convert dielectric to volumetric soil moisture
+  const soilMoisture = dielectricToMoisture(soilDielectric, soilTexture);
+
+  // Quality control
+  const quality = assessSoilMoistureQuality({
+    landCover: landCover,
+    vegetation: vegetation,
+    retrieval: soilMoisture,
+    RFI_check: radioFrequencyInterferenceCheck(Tb_h, Tb_v)
+  });
+
+  return {
+    soil_moisture_percent: soilMoisture * 100,
+    depth_cm: [0, 5],  // L-band penetration depth
+    quality_flag: quality.flag,
+    uncertainty_percent: quality.uncertainty,
+    retrieval_algorithm: "tau-omega_model"
+  };
+}
+
+// Accuracy target: 0.04 m³/m³ (4% volumetric)
+// Validation: Against in-situ sensor networks</code></pre>
+
+        <h2>Quality Control and Validation</h2>
+
+        <p>All WIA-compliant drought indices must undergo rigorous quality control:</p>
+
+        <h3>Required Quality Checks</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Quality Check</th>
+                    <th>Method</th>
+                    <th>Threshold</th>
+                    <th>Action if Failed</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Range validation</td>
+                    <td>Check values within physical limits</td>
+                    <td>Index-specific ranges</td>
+                    <td>Flag as invalid</td>
+                </tr>
+                <tr>
+                    <td>Spatial consistency</td>
+                    <td>Compare with neighboring pixels</td>
+                    <td>Z-score < 3.0</td>
+                    <td>Flag for review</td>
+                </tr>
+                <tr>
+                    <td>Temporal consistency</td>
+                    <td>Compare with previous values</td>
+                    <td>Change < 2 std dev</td>
+                    <td>Flag rapid changes</td>
+                </tr>
+                <tr>
+                    <td>Cross-validation</td>
+                    <td>Compare multiple indices</td>
+                    <td>Agreement > 80%</td>
+                    <td>Lower confidence score</td>
+                </tr>
+                <tr>
+                    <td>Ground truth comparison</td>
+                    <td>Validate against field data</td>
+                    <td>RMSE within targets</td>
+                    <td>Adjust algorithms</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Uncertainty Quantification</h3>
+
+        <p>WIA-compliant systems must report uncertainty estimates:</p>
+
+        <pre><code>function quantifyUncertainty(droughtIndex, sourceData, processingChain) {
+  // Measurement uncertainty
+  const sensorUncertainty = getSensorSpecifications(sourceData.satellite).uncertainty;
+
+  // Processing uncertainty
+  const atmosphericCorrectionError = 0.03;  // 3% reflectance
+  const cloudMaskError = 0.02;  // 2% misclassification
+  const algorithmError = getAlgorithmUncertainty(processingChain.algorithm);
+
+  // Validation uncertainty
+  const validationRMSE = getValidationStatistics(droughtIndex.type).rmse;
+
+  // Combined uncertainty (root sum of squares)
+  const totalUncertainty = Math.sqrt(
+    Math.pow(sensorUncertainty, 2) +
+    Math.pow(atmosphericCorrectionError, 2) +
+    Math.pow(cloudMaskError, 2) +
+    Math.pow(algorithmError, 2) +
+    Math.pow(validationRMSE, 2)
+  );
+
+  return {
+    uncertainty: totalUncertainty,
+    components: {
+      sensor: sensorUncertainty,
+      processing: Math.sqrt(Math.pow(atmosphericCorrectionError, 2) +
+                            Math.pow(cloudMaskError, 2)),
+      algorithm: algorithmError,
+      validation: validationRMSE
+    },
+    confidenceLevel: uncertaintyToConfidence(totalUncertainty)
+  };
+}</code></pre>
+
+        <h2>Data Fusion Protocols</h2>
+
+        <p>Combining multiple data sources improves drought assessment accuracy:</p>
+
+        <h3>Multi-Sensor Fusion</h3>
+
+        <pre><code>function fuseDroughtIndices(indices, weights, uncertainties) {
+  // Weighted average based on inverse uncertainty
+  const precisionWeights = uncertainties.map(u => 1 / (u * u));
+  const totalWeight = precisionWeights.reduce((a, b) => a + b, 0);
+
+  const fusedValue = indices.reduce((sum, index, i) => {
+    return sum + (index * precisionWeights[i] / totalWeight);
+  }, 0);
+
+  // Fused uncertainty
+  const fusedUncertainty = Math.sqrt(1 / totalWeight);
+
+  return {
+    fusedIndex: fusedValue,
+    uncertainty: fusedUncertainty,
+    sourceIndices: indices,
+    weights: precisionWeights.map(w => w / totalWeight)
+  };
+}</code></pre>
+
+        <div class="summary-box">
+            <h3>Chapter Summary</h3>
+            <p>This chapter detailed Phase 3 of the WIA standard: Protocol Standards for processing raw satellite and sensor data into standardized drought indices. We explored atmospheric correction using the 6S radiative transfer model, cloud masking with the Fmask algorithm, precise NDVI calculation and anomaly detection, evapotranspiration estimation via FAO-56 Penman-Monteith, and soil moisture retrieval from L-band radiometry. Rigorous quality control procedures and uncertainty quantification ensure consistent, reliable drought information across all WIA-compliant implementations.</p>
+        </div>
+
+        <div class="key-takeaways">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Standardized Processing:</strong> 6S atmospheric correction and Fmask cloud detection ensure different systems process satellite data consistently, achieving <5% RMSE and >95% cloud detection accuracy.</li>
+                <li><strong>Precise NDVI Methodology:</strong> Standard formula (NIR-Red)/(NIR+Red) with 0.01 unit precision and ±0.02 cross-sensor consistency requirements enable reliable vegetation drought detection.</li>
+                <li><strong>Scientific ET Calculation:</strong> FAO-56 Penman-Monteith provides physically-based evapotranspiration estimates with <15% RMSE, incorporating weather data, crop coefficients, and water stress factors.</li>
+                <li><strong>Quality Assurance:</strong> Five-stage quality control (range, spatial consistency, temporal consistency, cross-validation, ground truth) with required uncertainty quantification ensures data reliability.</li>
+                <li><strong>Multi-Sensor Fusion:</strong> Precision-weighted averaging of multiple drought indices reduces uncertainty and provides more robust drought assessments than any single data source.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain why atmospheric correction is necessary before calculating vegetation indices. What specific atmospheric effects does the 6S model account for, and how do these affect surface reflectance measurements?</li>
+                <li>Describe the Fmask cloud detection algorithm's three-stage process. Why is detecting both clouds and cloud shadows important for drought monitoring applications?</li>
+                <li>Compare absolute NDVI values with NDVI anomalies for drought detection. Why might a region with NDVI=0.40 be experiencing drought while another with NDVI=0.30 is normal?</li>
+                <li>Analyze the FAO-56 Penman-Monteith equation components. How does each weather variable (temperature, humidity, wind, solar radiation) contribute to evapotranspiration, and which has the greatest impact?</li>
+                <li>Discuss the five required quality control checks for WIA-compliant drought indices. How does each check address different types of potential errors in drought assessment?</li>
+                <li>Evaluate the uncertainty quantification approach using root sum of squares. Why is reporting uncertainty important for drought-based decision making, especially for critical applications like irrigation scheduling or disaster declaration?</li>
+            </ol>
+        </div>
+
+        <div class="summary-box">
+            <h3>Looking Ahead</h3>
+            <p>With processing protocols established in Phase 3, Chapter 7 explores Phase 4: Integration Standards. We'll examine how standardized drought information connects with agricultural management systems, irrigation controllers, early warning platforms, and water resource management tools to enable automated, data-driven responses to drought conditions.</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-05.html">← Chapter 5</a>
+            <a href="chapter-07.html">Chapter 7: Phase 4 - Integration →</a>
+        </div>
+    </div>
+</body>
+</html>

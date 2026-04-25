@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 08: Production Deployment | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Contents</a>
+
+        <h1>Chapter 08: Production Deployment</h1>
+        <p class="chapter-meta">Build, deploy, monitor, and scale federated learning systems in production</p>
+
+        <h2>From Research to Production</h2>
+        <p>
+            Deploying federated learning in production requires addressing challenges beyond algorithmic design: infrastructure scalability, monitoring, debugging distributed systems, versioning, compliance, and operational excellence. This chapter provides practical guidance for production FL systems.
+        </p>
+
+        <h2>Infrastructure Architecture</h2>
+
+        <h3>Core Components</h3>
+        <pre><code>"""
+Production FL System Architecture
+
+Components:
+1. Orchestration Server - Coordinates training rounds
+2. Model Repository - Stores model versions
+3. Client SDK - Runs on edge devices
+4. Aggregation Service - Combines client updates
+5. Privacy Service - DP, secure aggregation
+6. Monitoring - Metrics, logging, alerts
+7. Storage - Client metadata, training history
+8. API Gateway - Client-server communication
+"""
+
+class FederatedLearningPlatform:
+    def __init__(self):
+        # Core services
+        self.orchestrator = OrchestrationServer()
+        self.model_repo = ModelRepository()
+        self.aggregation_service = AggregationService()
+        self.privacy_service = PrivacyService()
+        self.monitoring = MonitoringService()
+
+        # Storage
+        self.database = PostgreSQL()  # Client metadata
+        self.object_storage = S3()    # Models, checkpoints
+
+        # Communication
+        self.message_queue = RabbitMQ()  # Asynchronous messaging
+        self.api_gateway = FastAPI()     # REST/gRPC endpoints
+
+    def deploy(self):
+        """Deploy all services"""
+        # Use Kubernetes for orchestration
+        self.deploy_kubernetes_cluster()
+
+        # Setup autoscaling
+        self.configure_autoscaling()
+
+        # Enable monitoring
+        self.setup_prometheus_grafana()
+
+        #Load balancing
+        self.configure_load_balancer()</code></pre>
+
+        <h3>Kubernetes Deployment</h3>
+        <pre><code># kubernetes/fl-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fl-orchestrator
+  namespace: federated-learning
+spec:
+  replicas: 3  # High availability
+  selector:
+    matchLabels:
+      app: fl-orchestrator
+  template:
+    metadata:
+      labels:
+        app: fl-orchestrator
+    spec:
+      containers:
+      - name: orchestrator
+        image: fl-platform/orchestrator:v1.0
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: fl-secrets
+              key: database-url
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: grpc
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5</code></pre>
+
+        <h2>Client SDK Implementation</h2>
+
+        <h3>Mobile Client SDK</h3>
+        <pre><code>class FederatedLearningClient:
+    """
+    Client SDK for mobile devices
+
+    Features:
+    - Automatic model download
+    - Local training
+    - Secure update upload
+    - Resource-aware execution
+    """
+
+    def __init__(self, server_url, client_id):
+        self.server_url = server_url
+        self.client_id = client_id
+        self.model = None
+        self.config = self.fetch_config()
+
+    def participate_in_round(self):
+        """
+        Full client participation workflow
+
+        1. Check eligibility
+        2. Download global model
+        3. Train locally
+        4. Upload update
+        """
+
+        # 1. Check if eligible to participate
+        if not self.is_eligible():
+            logging.info("Not eligible for this round")
+            return False
+
+        try:
+            # 2. Download global model
+            self.model = self.download_model()
+
+            # 3. Train on local data
+            local_data = self.load_local_data()
+            model_update = self.train_locally(local_data)
+
+            # 4. Upload update securely
+            success = self.upload_update(model_update)
+
+            return success
+
+        except Exception as e:
+            logging.error(f"Training failed: {e}")
+            self.report_failure(e)
+            return False
+
+    def is_eligible(self):
+        """Check device conditions for participation"""
+        return (
+            self.is_charging() or self.battery_level() > 0.5
+        ) and (
+            self.is_on_wifi()
+        ) and (
+            self.is_idle()
+        ) and (
+            not self.is_low_power_mode()
+        )
+
+    def train_locally(self, local_data):
+        """Local training with resource management"""
+
+        # Adaptive batch size based on available memory
+        available_memory = get_available_memory()
+        batch_size = self.calculate_batch_size(available_memory)
+
+        # Train for configured epochs
+        for epoch in range(self.config['local_epochs']):
+            for batch in local_data.batch(batch_size):
+                loss = self.model.train_step(batch)
+
+                # Check if should stop early (battery, network lost)
+                if not self.should_continue_training():
+                    break
+
+        # Compute model update
+        update = self.model.get_weights() - self.global_model_weights
+
+        # Compress update
+        compressed_update = self.compress(update)
+
+        return compressed_update
+
+    def upload_update(self, model_update):
+        """Securely upload model update to server"""
+
+        # Add differential privacy noise
+        private_update = self.add_local_dp_noise(model_update)
+
+        # Encrypt for transmission
+        encrypted_update = self.encrypt(private_update)
+
+        # Upload with retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    f"{self.server_url}/api/v1/updates",
+                    json={
+                        'client_id': self.client_id,
+                        'update': encrypted_update,
+                        'metrics': self.get_training_metrics()
+                    },
+                    timeout=300  # 5 minutes
+                )
+
+                if response.status_code == 200:
+                    return True
+
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                else:
+                    raise
+
+        return False</code></pre>
+
+        <h2>Server-Side Implementation</h2>
+
+        <h3>Orchestration Service</h3>
+        <pre><code>class OrchestrationServer:
+    """
+    Manages training rounds and coordinates clients
+
+    Responsibilities:
+    - Schedule training rounds
+    - Select participating clients
+    - Coordinate aggregation
+    - Distribute updated global model
+    """
+
+    def __init__(self):
+        self.current_round = 0
+        self.global_model = initialize_model()
+        self.client_registry = ClientRegistry()
+        self.aggregator = AggregationService()
+
+    async def run_training_round(self):
+        """Execute one complete training round"""
+
+        self.current_round += 1
+        logging.info(f"Starting round {self.current_round}")
+
+        # 1. Select participating clients
+        selected_clients = self.select_clients()
+
+        # 2. Send training invitation
+        await self.invite_clients(selected_clients)
+
+        # 3. Collect updates (with timeout)
+        updates = await self.collect_updates(
+            timeout=self.config['round_timeout']
+        )
+
+        # 4. Aggregate updates
+        new_global_model = self.aggregator.aggregate(
+            updates,
+            self.global_model
+        )
+
+        # 5. Evaluate new model
+        metrics = self.evaluate_model(new_global_model)
+
+        # 6. Decide whether to accept new model
+        if self.should_accept(metrics):
+            self.global_model = new_global_model
+            self.save_checkpoint()
+
+        # 7. Broadcast new model to clients
+        await self.broadcast_model()
+
+        # 8. Log metrics
+        self.log_round_metrics(metrics)
+
+        return metrics
+
+    async def collect_updates(self, timeout):
+        """
+        Collect client updates with deadline
+
+        Handle stragglers and failures gracefully
+        """
+        updates_received = []
+        min_clients = int(self.config['clients_per_round'] * 0.5)
+
+        async with asyncio.timeout(timeout):
+            async for update in self.update_stream():
+                # Validate update
+                if self.validate_update(update):
+                    updates_received.append(update)
+
+                # Can proceed if have minimum
+                if len(updates_received) >= self.config['clients_per_round']:
+                    break
+
+        # Check if have minimum required
+        if len(updates_received) < min_clients:
+            raise InsufficientUpdatesError(
+                f"Only {len(updates_received)} updates received"
+            )
+
+        return updates_received
+
+    def save_checkpoint(self):
+        """Save model checkpoint for recovery"""
+        checkpoint = {
+            'round': self.current_round,
+            'model': self.global_model,
+            'optimizer_state': self.optimizer.state_dict(),
+            'metrics': self.get_current_metrics(),
+            'timestamp': datetime.now().isoformat()
+        }
+
+        # Save to object storage
+        self.object_storage.put(
+            f"checkpoints/round_{self.current_round}.pkl",
+            pickle.dumps(checkpoint)
+        )
+
+        # Keep only recent checkpoints
+        self.cleanup_old_checkpoints(keep_last=10)</code></pre>
+
+        <h2>Monitoring and Observability</h2>
+
+        <h3>Metrics Collection</h3>
+        <pre><code>class MonitoringService:
+    """
+    Comprehensive monitoring for FL system
+
+    Tracks:
+    - Training metrics (loss, accuracy)
+    - System metrics (latency, throughput)
+    - Client metrics (participation, dropout)
+    - Security metrics (anomalies, attacks)
+    """
+
+    def __init__(self):
+        # Prometheus client
+        self.registry = CollectorRegistry()
+
+        # Define metrics
+        self.round_duration = Histogram(
+            'fl_round_duration_seconds',
+            'Training round duration',
+            registry=self.registry
+        )
+
+        self.clients_participated = Gauge(
+            'fl_clients_participated',
+            'Number of clients in round',
+            registry=self.registry
+        )
+
+        self.global_loss = Gauge(
+            'fl_global_loss',
+            'Global model loss',
+            registry=self.registry
+        )
+
+        self.global_accuracy = Gauge(
+            'fl_global_accuracy',
+            'Global model accuracy',
+            registry=self.registry
+        )
+
+        self.client_dropout_rate = Gauge(
+            'fl_client_dropout_rate',
+            'Client dropout percentage',
+            registry=self.registry
+        )
+
+        self.anomalous_updates = Counter(
+            'fl_anomalous_updates_total',
+            'Number of rejected updates',
+            registry=self.registry
+        )
+
+    @contextmanager
+    def track_round(self, round_number):
+        """Track round execution time"""
+        start_time = time.time()
+        try:
+            yield
+        finally:
+            duration = time.time() - start_time
+            self.round_duration.observe(duration)
+
+    def log_round_metrics(self, round_num, metrics, num_clients):
+        """Log all metrics for a training round"""
+
+        self.clients_participated.set(num_clients)
+        self.global_loss.set(metrics['loss'])
+        self.global_accuracy.set(metrics['accuracy'])
+
+        # Log to structured logging
+        logging.info({
+            'event': 'round_completed',
+            'round': round_num,
+            'metrics': metrics,
+            'num_clients': num_clients,
+            'timestamp': datetime.now().isoformat()
+        })
+
+# Grafana Dashboard (JSON config)
+grafana_dashboard = {
+    "dashboard": {
+        "title": "Federated Learning Monitoring",
+        "panels": [
+            {
+                "title": "Global Model Accuracy",
+                "targets": [{"expr": "fl_global_accuracy"}],
+                "type": "graph"
+            },
+            {
+                "title": "Clients Per Round",
+                "targets": [{"expr": "fl_clients_participated"}],
+                "type": "graph"
+            },
+            {
+                "title": "Round Duration",
+                "targets": [{"expr": "fl_round_duration_seconds"}],
+                "type": "graph"
+            },
+            {
+                "title": "Dropout Rate",
+                "targets": [{"expr": "fl_client_dropout_rate"}],
+                "type": "gauge"
+            }
+        ]
+    }
+}</code></pre>
+
+        <h2>Debugging and Troubleshooting</h2>
+
+        <h3>Common Issues and Solutions</h3>
+        <table>
+            <tr>
+                <th>Issue</th>
+                <th>Symptoms</th>
+                <th>Solution</th>
+            </tr>
+            <tr>
+                <td>Model Divergence</td>
+                <td>Loss increasing, accuracy dropping</td>
+                <td>Reduce learning rate, use FedProx, check for poisoning</td>
+            </tr>
+            <tr>
+                <td>Slow Convergence</td>
+                <td>Many rounds with little improvement</td>
+                <td>Increase local epochs, improve client selection, check data quality</td>
+            </tr>
+            <tr>
+                <td>High Dropout</td>
+                <td>&lt;50% clients complete training</td>
+                <td>Reduce model size, allow more time, check client conditions</td>
+            </tr>
+            <tr>
+                <td>Privacy Budget Exceeded</td>
+                <td>ε accumulates too quickly</td>
+                <td>Reduce rounds, increase per-round epsilon, use subsampling</td>
+            </tr>
+            <tr>
+                <td>Aggregation Failures</td>
+                <td>Server errors, timeouts</td>
+                <td>Scale server resources, optimize aggregation, partition clients</td>
+            </tr>
+        </table>
+
+        <h3>Distributed Debugging Tools</h3>
+        <pre><code>class FLDebugger:
+    """Tools for debugging distributed FL systems"""
+
+    def analyze_client_updates(self, updates):
+        """Analyze client update statistics"""
+
+        # Compute statistics
+        norms = [np.linalg.norm(u) for u in updates]
+        similarities = compute_pairwise_similarities(updates)
+
+        report = {
+            'num_updates': len(updates),
+            'norm_stats': {
+                'mean': np.mean(norms),
+                'std': np.std(norms),
+                'min': np.min(norms),
+                'max': np.max(norms)
+            },
+            'similarity_stats': {
+                'mean': np.mean(similarities),
+                'std': np.std(similarities)
+            },
+            'outliers': [i for i, n in enumerate(norms)
+                        if n > np.mean(norms) + 3 * np.std(norms)]
+        }
+
+        return report
+
+    def trace_client_performance(self, client_id):
+        """Detailed performance trace for specific client"""
+
+        trace = {
+            'client_id': client_id,
+            'participation_history': self.get_participation_history(client_id),
+            'device_specs': self.get_device_specs(client_id),
+            'training_times': self.get_training_times(client_id),
+            'dropout_reasons': self.get_dropout_reasons(client_id),
+            'update_quality': self.get_update_quality_scores(client_id)
+        }
+
+        return trace</code></pre>
+
+        <h2>Scaling Strategies</h2>
+
+        <h3>Horizontal Scaling</h3>
+        <pre><code>class ScalableFLServer:
+    """
+    Scale FL server to millions of clients
+
+    Strategies:
+    - Client partitioning
+    - Multiple aggregation servers
+    - Asynchronous updates
+    - Caching and CDN for model distribution
+    """
+
+    def __init__(self):
+        # Partition clients across aggregation servers
+        self.num_aggregators = 100
+        self.aggregators = [
+            AggregationServer(i) for i in range(self.num_aggregators)
+        ]
+
+    def assign_client_to_aggregator(self, client_id):
+        """Hash-based client partitioning"""
+        aggregator_id = hash(client_id) % self.num_aggregators
+        return self.aggregators[aggregator_id]
+
+    def hierarchical_aggregation(self):
+        """
+        Two-level aggregation for scale
+
+        1. Clients → Regional aggregators
+        2. Regional aggregators → Global server
+        """
+
+        # Level 1: Each aggregator processes its partition
+        regional_models = []
+        for aggregator in self.aggregators:
+            regional_model = aggregator.aggregate_local_clients()
+            regional_models.append(regional_model)
+
+        # Level 2: Global aggregation
+        global_model = self.global_aggregator.aggregate(regional_models)
+
+        return global_model</code></pre>
+
+        <h2>Case Study: Google Gboard</h2>
+
+        <div class="info-box">
+            <h4>Real-World Production System</h4>
+            <p>
+                <strong>Scale:</strong> 1+ billion Android devices<br>
+                <strong>Task:</strong> Next-word prediction<br>
+                <strong>Approach:</strong> Cross-device federated learning<br>
+                <strong>Key Techniques:</strong><br>
+                • Secure aggregation for privacy<br>
+                • Aggressive compression (sparse updates)<br>
+                • Client selection based on WiFi/charging<br>
+                • ~5000 clients per round<br>
+                • Hundreds of rounds to convergence<br>
+                <strong>Impact:</strong> Improved predictions without seeing what users type
+            </p>
+        </div>
+
+        <h2>Compliance and Governance</h2>
+
+        <h3>GDPR Compliance</h3>
+        <ul>
+            <li>Right to deletion: Remove client from future rounds</li>
+            <li>Data minimization: Only collect necessary metadata</li>
+            <li>Purpose limitation: Document FL use case clearly</li>
+            <li>Transparency: Explain FL to users</li>
+            <li>Security measures: Encryption, DP, access controls</li>
+        </ul>
+
+        <h3>Model Governance</h3>
+        <pre><code>class ModelGovernance:
+    """Track model lineage and ensure compliance"""
+
+    def __init__(self):
+        self.model_registry = ModelRegistry()
+        self.audit_log = AuditLog()
+
+    def register_model(self, model, metadata):
+        """Register model with full lineage"""
+
+        record = {
+            'model_id': generate_id(),
+            'version': metadata['version'],
+            'training_rounds': metadata['rounds'],
+            'num_clients': metadata['clients'],
+            'privacy_budget': metadata['epsilon'],
+            'created_at': datetime.now(),
+            'creator': metadata['creator'],
+            'purpose': metadata['purpose']
+        }
+
+        self.model_registry.save(record)
+        self.audit_log.log_model_creation(record)
+
+        return record['model_id']
+
+    def audit_trail(self, model_id):
+        """Complete audit trail for model"""
+        return self.audit_log.get_trail(model_id)</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Production FL requires robust infrastructure: orchestration, aggregation, privacy, monitoring</li>
+                <li>Kubernetes deployment enables scalability and high availability</li>
+                <li>Client SDK handles eligibility checks, resource management, and secure uploads</li>
+                <li>Server orchestrates rounds, handles stragglers, and maintains checkpoints</li>
+                <li>Comprehensive monitoring tracks training, system, client, and security metrics</li>
+                <li>Common issues: divergence, slow convergence, high dropout, privacy budget</li>
+                <li>Scaling strategies: horizontal scaling, hierarchical aggregation, partitioning</li>
+                <li>Google Gboard demonstrates billion-device FL in production</li>
+                <li>Compliance requires GDPR adherence, model governance, audit trails</li>
+                <li>Success requires operational excellence beyond algorithmic innovation</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Describe the core components of a production FL system. What is each component's role?</li>
+                <li>How does the client SDK determine eligibility for training participation?</li>
+                <li>Explain the server's workflow for one complete training round.</li>
+                <li>What metrics should be monitored in production FL systems? Why?</li>
+                <li>How would you debug slow convergence in a deployed FL system?</li>
+                <li>Describe strategies for scaling FL to millions of clients.</li>
+                <li>What makes Google Gboard's FL deployment successful at billion-device scale?</li>
+                <li>How can FL systems comply with GDPR's right to deletion?</li>
+                <li>Design a disaster recovery plan for an FL production system.</li>
+                <li>What operational metrics indicate a healthy FL system?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-07.html" class="nav-button">← Chapter 07</a>
+            <a href="index.html" class="nav-button">Back to Contents</a>
+        </div>
+
+        <div style="text-align: center; margin-top: 4rem; padding: 2rem; background: #1e293b; border-radius: 12px;">
+            <h2 style="color: #10B981; margin-bottom: 1rem;">Congratulations!</h2>
+            <p style="color: #cbd5e1; font-size: 1.2rem;">
+                You've completed the Federated Learning ebook. You now have comprehensive knowledge of privacy-preserving collaborative machine learning, from fundamentals to production deployment.
+            </p>
+            <p style="color: #94a3b8; margin-top: 1rem;">
+                弘益人間 (Hongik Ingan) · Benefit All Humanity<br>
+                © 2025 SmileStory Inc. / World Certification Industry Association
+            </p>
+        </div>
+    </div>
+</body>
+</html>

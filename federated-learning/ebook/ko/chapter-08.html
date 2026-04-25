@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 프로덕션 배포 | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #f59e0b; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning-box h4 { color: #f59e0b; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+        .checklist { background: #1e293b; padding: 1.5rem; margin: 1.5rem 0; border-radius: 8px; }
+        .checklist h4 { color: #10B981; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제8장: 프로덕션 배포</h1>
+        <p class="chapter-meta">연구에서 실제 서비스로: 확장 가능하고 신뢰할 수 있는 FL 시스템 구축</p>
+
+        <h2>프로덕션 준비 체크리스트</h2>
+        <p>
+            연합학습 시스템을 프로덕션에 배포하기 전에 고려해야 할 핵심 요소들입니다:
+        </p>
+
+        <div class="checklist">
+            <h4>✓ 배포 전 체크리스트</h4>
+            <ul>
+                <li>☐ <strong>확장성:</strong> 목표 클라이언트 수 처리 가능?</li>
+                <li>☐ <strong>보안:</strong> 차등 프라이버시, 암호화, 인증 구현?</li>
+                <li>☐ <strong>모니터링:</strong> 실시간 메트릭 및 알림 시스템?</li>
+                <li>☐ <strong>내결함성:</strong> 클라이언트/서버 장애 처리?</li>
+                <li>☐ <strong>버전 관리:</strong> 모델 및 프로토콜 버전 호환성?</li>
+                <li>☐ <strong>규제 준수:</strong> GDPR, HIPAA 등 법적 요구사항?</li>
+                <li>☐ <strong>성능:</strong> 지연시간, 대역폭, 배터리 소비 최적화?</li>
+                <li>☐ <strong>테스트:</strong> 통합, 부하, 보안 테스트 완료?</li>
+                <li>☐ <strong>문서화:</strong> API, 배포 가이드, 트러블슈팅?</li>
+                <li>☐ <strong>롤백 계획:</strong> 문제 발생 시 복구 전략?</li>
+            </ul>
+        </div>
+
+        <h2>시스템 아키텍처</h2>
+
+        <h3>마이크로서비스 아키텍처</h3>
+        <p>
+            확장 가능한 프로덕션 FL 시스템은 여러 전문화된 서비스로 구성됩니다:
+        </p>
+
+        <pre><code>"""
+프로덕션 연합학습 시스템 아키텍처
+
+구성요소:
+1. 조율 서버 (Orchestrator): 라운드 관리, 클라이언트 선택
+2. 집계 서버 (Aggregator): 모델 업데이트 집계
+3. 모델 저장소 (Model Store): 버전 관리된 모델 저장
+4. 메트릭 서비스 (Metrics): 모니터링 및 로깅
+5. 인증 서비스 (Auth): 클라이언트 인증 및 권한 부여
+6. 메시지 큐 (Queue): 비동기 통신
+"""
+
+import asyncio
+import logging
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+from datetime import datetime
+import json
+
+
+@dataclass
+class ClientMetadata:
+    """클라이언트 메타데이터"""
+    client_id: str
+    device_type: str
+    os_version: str
+    app_version: str
+    registered_at: datetime
+    last_active: Optional[datetime] = None
+    reliability_score: float = 1.0
+
+
+class OrchestrationService:
+    """
+    조율 서비스: FL 라운드 관리 및 클라이언트 조율
+    """
+
+    def __init__(self, config: Dict):
+        """
+        인자:
+            config: 시스템 설정
+                {
+                    'min_clients': 100,
+                    'max_clients': 1000,
+                    'round_timeout': 3600,
+                    'target_accuracy': 0.95
+                }
+        """
+        self.config = config
+        self.current_round = 0
+        self.global_model_version = 0
+        self.active_clients = {}
+        self.logger = logging.getLogger(__name__)
+
+    async def start_round(self) -> Dict:
+        """
+        새 학습 라운드 시작
+
+        반환:
+            라운드 정보 딕셔너리
+        """
+        self.current_round += 1
+
+        self.logger.info(f"라운드 {self.current_round} 시작")
+
+        # 1. 클라이언트 선택
+        selected_clients = await self.select_clients()
+
+        if len(selected_clients) < self.config['min_clients']:
+            self.logger.warning(f"클라이언트 수 부족: {len(selected_clients)}")
+            return {'status': 'insufficient_clients'}
+
+        # 2. 라운드 설정 생성
+        round_config = {
+            'round_id': self.current_round,
+            'model_version': self.global_model_version,
+            'selected_clients': selected_clients,
+            'deadline': datetime.now().timestamp() + self.config['round_timeout'],
+            'hyperparameters': {
+                'learning_rate': 0.01,
+                'local_epochs': 5,
+                'batch_size': 32
+            }
+        }
+
+        # 3. 클라이언트에 알림 전송
+        await self.notify_clients(selected_clients, round_config)
+
+        return round_config
+
+    async def select_clients(self) -> List[str]:
+        """클라이언트 선택 로직"""
+        # 실제로는 복잡한 선택 알고리즘 사용
+        available = list(self.active_clients.keys())
+        num_to_select = min(len(available), self.config['max_clients'])
+
+        import random
+        return random.sample(available, min(num_to_select, len(available)))
+
+    async def notify_clients(self, clients: List[str], config: Dict):
+        """클라이언트에 라운드 시작 알림"""
+        # 메시지 큐를 통해 비동기 전송
+        for client_id in clients:
+            await self.send_message(client_id, {
+                'type': 'round_start',
+                'config': config
+            })
+
+    async def send_message(self, client_id: str, message: Dict):
+        """메시지 전송 (시뮬레이션)"""
+        self.logger.debug(f"메시지 전송 → {client_id}: {message['type']}")
+
+
+class AggregationService:
+    """
+    집계 서비스: 클라이언트 업데이트 수집 및 집계
+    """
+
+    def __init__(self):
+        self.pending_updates = {}
+        self.logger = logging.getLogger(__name__)
+
+    async def submit_update(self, round_id: int, client_id: str,
+                          update: Dict) -> Dict:
+        """
+        클라이언트 업데이트 제출
+
+        인자:
+            round_id: 라운드 ID
+            client_id: 클라이언트 ID
+            update: 모델 업데이트 및 메타데이터
+
+        반환:
+            제출 결과
+        """
+        # 1. 검증
+        if not self.validate_update(update):
+            return {'status': 'invalid', 'reason': 'validation_failed'}
+
+        # 2. 저장
+        if round_id not in self.pending_updates:
+            self.pending_updates[round_id] = {}
+
+        self.pending_updates[round_id][client_id] = {
+            'model_update': update['model'],
+            'num_examples': update['num_examples'],
+            'loss': update['loss'],
+            'timestamp': datetime.now()
+        }
+
+        self.logger.info(f"업데이트 수신: 라운드 {round_id}, 클라이언트 {client_id}")
+
+        return {'status': 'accepted'}
+
+    def validate_update(self, update: Dict) -> bool:
+        """업데이트 유효성 검증"""
+        required_fields = ['model', 'num_examples', 'loss']
+
+        if not all(field in update for field in required_fields):
+            return False
+
+        # 추가 검증: 노름 체크, 타입 체크 등
+        return True
+
+    async def aggregate_round(self, round_id: int) -> Optional[Dict]:
+        """
+        라운드의 모든 업데이트 집계
+
+        인자:
+            round_id: 라운드 ID
+
+        반환:
+            집계된 모델
+        """
+        if round_id not in self.pending_updates:
+            return None
+
+        updates = self.pending_updates[round_id]
+
+        if len(updates) == 0:
+            return None
+
+        self.logger.info(f"라운드 {round_id} 집계 시작: {len(updates)}개 업데이트")
+
+        # 가중 평균 집계
+        total_examples = sum(u['num_examples'] for u in updates.values())
+
+        aggregated_model = None
+        for client_id, update_info in updates.items():
+            weight = update_info['num_examples'] / total_examples
+            model_update = update_info['model_update']
+
+            if aggregated_model is None:
+                aggregated_model = {k: v * weight for k, v in model_update.items()}
+            else:
+                for k, v in model_update.items():
+                    aggregated_model[k] += v * weight
+
+        # 평균 손실 계산
+        avg_loss = sum(u['loss'] for u in updates.values()) / len(updates)
+
+        result = {
+            'model': aggregated_model,
+            'round_id': round_id,
+            'num_clients': len(updates),
+            'avg_loss': avg_loss,
+            'total_examples': total_examples
+        }
+
+        # 정리
+        del self.pending_updates[round_id]
+
+        return result
+
+
+class ModelStore:
+    """
+    모델 저장소: 버전 관리 및 배포
+    """
+
+    def __init__(self, storage_path: str):
+        self.storage_path = storage_path
+        self.versions = {}
+        self.logger = logging.getLogger(__name__)
+
+    async def save_model(self, model: Dict, version: int, metadata: Dict) -> bool:
+        """
+        모델 저장
+
+        인자:
+            model: 모델 가중치
+            version: 버전 번호
+            metadata: 메타데이터 (정확도, 라운드 등)
+
+        반환:
+            저장 성공 여부
+        """
+        try:
+            # 실제로는 파일 또는 데이터베이스에 저장
+            self.versions[version] = {
+                'model': model,
+                'metadata': metadata,
+                'created_at': datetime.now()
+            }
+
+            self.logger.info(f"모델 v{version} 저장 완료")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"모델 저장 실패: {e}")
+            return False
+
+    async def load_model(self, version: Optional[int] = None) -> Optional[Dict]:
+        """
+        모델 로드
+
+        인자:
+            version: 로드할 버전 (None이면 최신 버전)
+
+        반환:
+            모델 딕셔너리
+        """
+        if version is None:
+            # 최신 버전
+            version = max(self.versions.keys()) if self.versions else None
+
+        if version is None or version not in self.versions:
+            return None
+
+        return self.versions[version]
+
+    async def rollback(self, target_version: int) -> bool:
+        """
+        특정 버전으로 롤백
+
+        인자:
+            target_version: 롤백할 버전
+
+        반환:
+            롤백 성공 여부
+        """
+        if target_version not in self.versions:
+            self.logger.error(f"버전 {target_version} 존재하지 않음")
+            return False
+
+        self.logger.warning(f"버전 {target_version}으로 롤백")
+
+        # 실제 배포 시스템에서 롤백 수행
+        return True
+
+
+class MetricsService:
+    """
+    메트릭 서비스: 모니터링 및 알림
+    """
+
+    def __init__(self):
+        self.metrics = {
+            'rounds_completed': 0,
+            'total_updates': 0,
+            'avg_round_time': 0,
+            'current_accuracy': 0,
+            'active_clients': 0
+        }
+        self.logger = logging.getLogger(__name__)
+
+    async def record_metric(self, metric_name: str, value: float, tags: Dict = None):
+        """
+        메트릭 기록
+
+        인자:
+            metric_name: 메트릭 이름
+            value: 값
+            tags: 추가 태그 (예: {'round': 10, 'client_type': 'mobile'})
+        """
+        if metric_name in self.metrics:
+            self.metrics[metric_name] = value
+
+        # 실제로는 Prometheus, Grafana 등으로 전송
+        self.logger.debug(f"메트릭 기록: {metric_name} = {value}")
+
+    async def check_alerts(self):
+        """알림 조건 확인"""
+        # 정확도 하락
+        if self.metrics['current_accuracy'] < 0.8:
+            await self.send_alert('accuracy_drop',
+                                f"정확도 하락: {self.metrics['current_accuracy']:.2%}")
+
+        # 활성 클라이언트 부족
+        if self.metrics['active_clients'] < 100:
+            await self.send_alert('low_clients',
+                                f"활성 클라이언트 부족: {self.metrics['active_clients']}")
+
+    async def send_alert(self, alert_type: str, message: str):
+        """알림 전송 (이메일, Slack 등)"""
+        self.logger.warning(f"🚨 알림 [{alert_type}]: {message}")
+
+
+# 예시: 통합 시스템
+async def main():
+    """프로덕션 FL 시스템 실행"""
+    # 설정
+    config = {
+        'min_clients': 50,
+        'max_clients': 200,
+        'round_timeout': 3600,
+        'target_accuracy': 0.95
+    }
+
+    # 서비스 초기화
+    orchestrator = OrchestrationService(config)
+    aggregator = AggregationService()
+    model_store = ModelStore('/models')
+    metrics = MetricsService()
+
+    # 로깅 설정
+    logging.basicConfig(level=logging.INFO,
+                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    print("✅ 연합학습 프로덕션 시스템 시작")
+
+    # 시뮬레이션: 클라이언트 등록
+    for i in range(300):
+        orchestrator.active_clients[f'client_{i}'] = ClientMetadata(
+            client_id=f'client_{i}',
+            device_type='mobile',
+            os_version='android-13',
+            app_version='1.0.0',
+            registered_at=datetime.now()
+        )
+
+    # 라운드 실행
+    for round_num in range(5):
+        # 라운드 시작
+        round_config = await orchestrator.start_round()
+
+        if round_config.get('status') == 'insufficient_clients':
+            continue
+
+        # 클라이언트 업데이트 시뮬레이션
+        import numpy as np
+        for client_id in round_config['selected_clients'][:50]:  # 일부만 참여
+            update = {
+                'model': {'layer1': np.random.randn(100).tolist()},
+                'num_examples': np.random.randint(100, 1000),
+                'loss': 0.5 - round_num * 0.05
+            }
+
+            await aggregator.submit_update(
+                round_config['round_id'],
+                client_id,
+                update
+            )
+
+        # 집계
+        aggregated = await aggregator.aggregate_round(round_config['round_id'])
+
+        if aggregated:
+            # 모델 저장
+            await model_store.save_model(
+                aggregated['model'],
+                version=round_num + 1,
+                metadata={
+                    'round': round_num,
+                    'loss': aggregated['avg_loss'],
+                    'num_clients': aggregated['num_clients']
+                }
+            )
+
+            # 메트릭 기록
+            await metrics.record_metric('rounds_completed', round_num + 1)
+            await metrics.record_metric('current_accuracy', 0.85 + round_num * 0.02)
+
+        # 알림 확인
+        await metrics.check_alerts()
+
+        await asyncio.sleep(1)  # 시뮬레이션 지연
+
+    print("\n✅ 5개 라운드 완료")
+
+
+# 실행
+if __name__ == '__main__':
+    asyncio.run(main())</code></pre>
+
+        <h2>클라이언트 SDK 설계</h2>
+
+        <h3>사용하기 쉬운 클라이언트 라이브러리</h3>
+        <p>
+            개발자가 쉽게 통합할 수 있는 클라이언트 SDK:
+        </p>
+
+        <pre><code>"""
+연합학습 클라이언트 SDK
+
+사용 예시:
+    from fl_client import FLClient
+
+    client = FLClient(server_url="https://fl.example.com")
+    client.connect(api_key="your_key")
+
+    @client.on_training_request
+    def train_model(global_model, config):
+        # 로컬 데이터로 학습
+        local_model = train_on_local_data(global_model)
+        return local_model
+"""
+
+import requests
+import numpy as np
+from typing import Callable, Dict, Optional
+import logging
+
+
+class FLClient:
+    """
+    연합학습 클라이언트 SDK
+    """
+
+    def __init__(self, server_url: str, client_id: Optional[str] = None):
+        """
+        인자:
+            server_url: FL 서버 URL
+            client_id: 클라이언트 고유 ID (없으면 자동 생성)
+        """
+        self.server_url = server_url
+        self.client_id = client_id or self._generate_client_id()
+        self.api_key = None
+        self.training_callback = None
+        self.logger = logging.getLogger(__name__)
+
+    def _generate_client_id(self) -> str:
+        """고유 클라이언트 ID 생성"""
+        import uuid
+        return f"client_{uuid.uuid4().hex[:8]}"
+
+    def connect(self, api_key: str) -> bool:
+        """
+        서버에 연결 및 인증
+
+        인자:
+            api_key: API 키
+
+        반환:
+            연결 성공 여부
+        """
+        self.api_key = api_key
+
+        try:
+            # 등록 요청
+            response = requests.post(
+                f"{self.server_url}/api/register",
+                json={
+                    'client_id': self.client_id,
+                    'device_info': self._get_device_info()
+                },
+                headers={'Authorization': f'Bearer {api_key}'},
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                self.logger.info("서버 연결 성공")
+                return True
+            else:
+                self.logger.error(f"연결 실패: {response.status_code}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"연결 오류: {e}")
+            return False
+
+    def _get_device_info(self) -> Dict:
+        """디바이스 정보 수집"""
+        import platform
+        return {
+            'os': platform.system(),
+            'os_version': platform.release(),
+            'python_version': platform.python_version()
+        }
+
+    def on_training_request(self, callback: Callable):
+        """
+        학습 요청 콜백 등록
+
+        인자:
+            callback: 학습 함수
+                def train(global_model, config) -> local_model
+        """
+        self.training_callback = callback
+        return callback
+
+    def start_listening(self):
+        """
+        학습 요청 대기 (롱 폴링 또는 웹소켓)
+
+        실제로는 백그라운드 스레드에서 실행
+        """
+        self.logger.info("학습 요청 대기 중...")
+
+        while True:
+            try:
+                # 롱 폴링으로 학습 요청 확인
+                response = requests.get(
+                    f"{self.server_url}/api/poll",
+                    params={'client_id': self.client_id},
+                    headers={'Authorization': f'Bearer {self.api_key}'},
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+
+                    if data.get('type') == 'training_request':
+                        # 학습 수행
+                        self._handle_training_request(data)
+
+            except requests.Timeout:
+                # 타임아웃은 정상 (롱 폴링)
+                continue
+            except Exception as e:
+                self.logger.error(f"폴링 오류: {e}")
+                import time
+                time.sleep(5)
+
+    def _handle_training_request(self, request_data: Dict):
+        """학습 요청 처리"""
+        if self.training_callback is None:
+            self.logger.warning("학습 콜백이 등록되지 않음")
+            return
+
+        # 전역 모델 다운로드
+        global_model = self._download_model(request_data['model_version'])
+
+        if global_model is None:
+            return
+
+        # 로컬 학습 수행
+        self.logger.info("로컬 학습 시작...")
+
+        try:
+            local_model = self.training_callback(
+                global_model,
+                request_data['config']
+            )
+
+            # 업데이트 업로드
+            self._upload_update(
+                round_id=request_data['round_id'],
+                model_update=local_model,
+                metadata=request_data.get('metadata', {})
+            )
+
+            self.logger.info("학습 완료 및 업데이트 전송")
+
+        except Exception as e:
+            self.logger.error(f"학습 오류: {e}")
+
+    def _download_model(self, version: int) -> Optional[Dict]:
+        """전역 모델 다운로드"""
+        try:
+            response = requests.get(
+                f"{self.server_url}/api/model/{version}",
+                headers={'Authorization': f'Bearer {self.api_key}'},
+                timeout=60
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                self.logger.error(f"모델 다운로드 실패: {response.status_code}")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"다운로드 오류: {e}")
+            return None
+
+    def _upload_update(self, round_id: int, model_update: Dict, metadata: Dict):
+        """모델 업데이트 업로드"""
+        try:
+            response = requests.post(
+                f"{self.server_url}/api/update",
+                json={
+                    'round_id': round_id,
+                    'client_id': self.client_id,
+                    'model_update': model_update,
+                    'metadata': metadata
+                },
+                headers={'Authorization': f'Bearer {self.api_key}'},
+                timeout=60
+            )
+
+            if response.status_code != 200:
+                self.logger.error(f"업로드 실패: {response.status_code}")
+
+        except Exception as e:
+            self.logger.error(f"업로드 오류: {e}")
+
+
+# 사용 예시
+def example_usage():
+    """SDK 사용 예시"""
+    client = FLClient(server_url="https://fl.example.com")
+
+    # 연결
+    if not client.connect(api_key="your_api_key"):
+        print("연결 실패")
+        return
+
+    # 학습 콜백 등록
+    @client.on_training_request
+    def train_model(global_model, config):
+        """
+        로컬 학습 로직
+
+        인자:
+            global_model: 서버의 전역 모델
+            config: 하이퍼파라미터 등 설정
+
+        반환:
+            학습된 로컬 모델 업데이트
+        """
+        print(f"학습 시작: {config}")
+
+        # 실제 학습 코드
+        # local_data = load_local_data()
+        # model = train(global_model, local_data, config)
+
+        # 시뮬레이션
+        import numpy as np
+        local_update = {
+            'weights': np.random.randn(100).tolist(),
+            'num_examples': 500,
+            'loss': 0.3
+        }
+
+        return local_update
+
+    # 학습 요청 대기
+    client.start_listening()
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    example_usage()</code></pre>
+
+        <h2>모니터링 및 디버깅</h2>
+
+        <h3>종합 모니터링 대시보드</h3>
+        <p>
+            프로덕션 시스템의 건강 상태를 실시간으로 추적:
+        </p>
+
+        <pre><code>class MonitoringDashboard:
+    """
+    연합학습 시스템 모니터링 대시보드
+
+    주요 메트릭:
+    - 라운드 진행 상황
+    - 클라이언트 참여율
+    - 모델 성능 (손실, 정확도)
+    - 시스템 리소스 (CPU, 메모리, 네트워크)
+    - 보안 알림
+    """
+
+    def __init__(self):
+        self.metrics_history = []
+        self.current_metrics = {}
+
+    def update_metrics(self, round_num: int, metrics: Dict):
+        """
+        메트릭 업데이트
+
+        인자:
+            round_num: 라운드 번호
+            metrics: 메트릭 딕셔너리
+        """
+        self.current_metrics = {
+            'round': round_num,
+            'timestamp': datetime.now(),
+            **metrics
+        }
+
+        self.metrics_history.append(self.current_metrics.copy())
+
+    def get_dashboard_data(self) -> Dict:
+        """
+        대시보드 데이터 생성
+
+        반환:
+            시각화를 위한 데이터
+        """
+        if not self.metrics_history:
+            return {}
+
+        # 최근 메트릭
+        recent = self.metrics_history[-1]
+
+        # 추세 분석
+        if len(self.metrics_history) > 1:
+            trend = self._compute_trends()
+        else:
+            trend = {}
+
+        dashboard = {
+            'current': {
+                'round': recent['round'],
+                'accuracy': recent.get('accuracy', 0),
+                'loss': recent.get('loss', 0),
+                'active_clients': recent.get('active_clients', 0),
+                'total_examples': recent.get('total_examples', 0)
+            },
+            'trends': trend,
+            'health_status': self._compute_health_status(),
+            'alerts': self._get_active_alerts()
+        }
+
+        return dashboard
+
+    def _compute_trends(self) -> Dict:
+        """메트릭 추세 계산"""
+        recent_10 = self.metrics_history[-10:] if len(self.metrics_history) >= 10 else self.metrics_history
+
+        accuracy_trend = [m.get('accuracy', 0) for m in recent_10]
+        loss_trend = [m.get('loss', 0) for m in recent_10]
+
+        return {
+            'accuracy': {
+                'values': accuracy_trend,
+                'direction': 'up' if len(accuracy_trend) > 1 and accuracy_trend[-1] > accuracy_trend[0] else 'down'
+            },
+            'loss': {
+                'values': loss_trend,
+                'direction': 'down' if len(loss_trend) > 1 and loss_trend[-1] < loss_trend[0] else 'up'
+            }
+        }
+
+    def _compute_health_status(self) -> str:
+        """시스템 건강 상태 평가"""
+        if not self.current_metrics:
+            return 'unknown'
+
+        # 건강 지표
+        accuracy = self.current_metrics.get('accuracy', 0)
+        active_clients = self.current_metrics.get('active_clients', 0)
+
+        if accuracy > 0.9 and active_clients > 100:
+            return 'healthy'
+        elif accuracy > 0.8 and active_clients > 50:
+            return 'warning'
+        else:
+            return 'critical'
+
+    def _get_active_alerts(self) -> List[str]:
+        """활성 알림 목록"""
+        alerts = []
+
+        if not self.current_metrics:
+            return alerts
+
+        # 정확도 체크
+        if self.current_metrics.get('accuracy', 1.0) < 0.7:
+            alerts.append("경고: 모델 정확도 저하")
+
+        # 클라이언트 체크
+        if self.current_metrics.get('active_clients', 0) < 50:
+            alerts.append("경고: 활성 클라이언트 부족")
+
+        # 손실 체크
+        if len(self.metrics_history) > 2:
+            recent_losses = [m.get('loss', 0) for m in self.metrics_history[-3:]]
+            if all(recent_losses[i] > recent_losses[i-1] for i in range(1, len(recent_losses))):
+                alerts.append("경고: 손실 지속 증가")
+
+        return alerts
+
+    def generate_report(self) -> str:
+        """텍스트 리포트 생성"""
+        data = self.get_dashboard_data()
+
+        report = f"""
+        ╔════════════════════════════════════════════╗
+        ║     연합학습 시스템 모니터링 리포트        ║
+        ╚════════════════════════════════════════════╝
+
+        ⏱️  현재 상태
+        ────────────────────────────────────────────
+        라운드: {data['current']['round']}
+        정확도: {data['current']['accuracy']:.2%}
+        손실: {data['current']['loss']:.4f}
+        활성 클라이언트: {data['current']['active_clients']}
+        총 학습 샘플: {data['current']['total_examples']:,}
+
+        📊 추세
+        ────────────────────────────────────────────
+        정확도: {data['trends'].get('accuracy', {}).get('direction', 'unknown')}
+        손실: {data['trends'].get('loss', {}).get('direction', 'unknown')}
+
+        🏥 시스템 건강
+        ────────────────────────────────────────────
+        상태: {data['health_status'].upper()}
+
+        🚨 알림
+        ────────────────────────────────────────────
+        """
+
+        if data['alerts']:
+            for alert in data['alerts']:
+                report += f"\n- {alert}"
+        else:
+            report += "\n정상 (알림 없음)"
+
+        return report
+
+
+# 예시 사용
+dashboard = MonitoringDashboard()
+
+# 시뮬레이션: 메트릭 업데이트
+for i in range(10):
+    dashboard.update_metrics(
+        round_num=i,
+        metrics={
+            'accuracy': 0.7 + i * 0.02,
+            'loss': 0.5 - i * 0.03,
+            'active_clients': 100 + i * 10,
+            'total_examples': 10000 + i * 5000
+        }
+    )
+
+print(dashboard.generate_report())</code></pre>
+
+        <h2>성능 최적화</h2>
+
+        <h3>통신 최적화</h3>
+        <p>
+            대역폭과 지연시간을 줄이는 기법들:
+        </p>
+
+        <pre><code>class CommunicationOptimizer:
+    """
+    통신 최적화 기법
+    """
+
+    @staticmethod
+    def compress_model(model: Dict, method: str = 'gzip') -> bytes:
+        """
+        모델 압축
+
+        인자:
+            model: 모델 딕셔너리
+            method: 압축 방법 ('gzip', 'zlib', 'lz4')
+
+        반환:
+            압축된 바이트
+        """
+        import gzip
+        import pickle
+
+        serialized = pickle.dumps(model)
+
+        if method == 'gzip':
+            compressed = gzip.compress(serialized, compresslevel=6)
+        else:
+            compressed = serialized
+
+        compression_ratio = len(serialized) / len(compressed)
+        print(f"압축률: {compression_ratio:.2f}x")
+
+        return compressed
+
+    @staticmethod
+    def delta_compression(old_model: Dict, new_model: Dict) -> Dict:
+        """
+        델타 압축: 변경 사항만 전송
+
+        인자:
+            old_model: 이전 모델
+            new_model: 새 모델
+
+        반환:
+            델타 (변경 사항만)
+        """
+        delta = {}
+
+        for key in new_model:
+            if key in old_model:
+                # 차이만 저장
+                diff = new_model[key] - old_model[key]
+
+                # 작은 변화는 무시 (임계값)
+                if np.linalg.norm(diff) > 0.001:
+                    delta[key] = diff
+            else:
+                delta[key] = new_model[key]
+
+        # 델타 크기
+        delta_size = sum(d.nbytes if isinstance(d, np.ndarray) else 0
+                        for d in delta.values())
+        full_size = sum(v.nbytes if isinstance(v, np.ndarray) else 0
+                       for v in new_model.values())
+
+        print(f"델타 크기: {delta_size / full_size:.1%} (원본 대비)")
+
+        return delta
+
+    @staticmethod
+    def batch_updates(updates: List[Dict], max_batch_size: int = 10) -> List[List[Dict]]:
+        """
+        업데이트를 배치로 그룹화
+
+        인자:
+            updates: 클라이언트 업데이트 목록
+            max_batch_size: 배치당 최대 업데이트 수
+
+        반환:
+            배치 목록
+        """
+        batches = []
+        current_batch = []
+
+        for update in updates:
+            current_batch.append(update)
+
+            if len(current_batch) >= max_batch_size:
+                batches.append(current_batch)
+                current_batch = []
+
+        if current_batch:
+            batches.append(current_batch)
+
+        print(f"{len(updates)}개 업데이트 → {len(batches)}개 배치")
+
+        return batches
+
+
+# 예시
+optimizer = CommunicationOptimizer()
+
+# 모델 압축
+model = {'layer1': np.random.randn(1000, 1000)}
+compressed = optimizer.compress_model(model)
+
+# 델타 압축
+old_model = {'layer1': np.random.randn(100)}
+new_model = {'layer1': old_model['layer1'] + np.random.randn(100) * 0.01}
+delta = optimizer.delta_compression(old_model, new_model)</code></pre>
+
+        <h2>테스트 전략</h2>
+
+        <h3>통합 테스트 프레임워크</h3>
+        <p>
+            프로덕션 배포 전 포괄적인 테스트:
+        </p>
+
+        <pre><code>import unittest
+from unittest.mock import Mock, patch
+
+
+class FederatedLearningSystemTest(unittest.TestCase):
+    """
+    연합학습 시스템 통합 테스트
+    """
+
+    def setUp(self):
+        """테스트 설정"""
+        self.orchestrator = OrchestrationService({
+            'min_clients': 10,
+            'max_clients': 100,
+            'round_timeout': 60
+        })
+
+        self.aggregator = AggregationService()
+
+    def test_client_registration(self):
+        """클라이언트 등록 테스트"""
+        client_id = "test_client_1"
+        metadata = ClientMetadata(
+            client_id=client_id,
+            device_type='test',
+            os_version='test',
+            app_version='1.0',
+            registered_at=datetime.now()
+        )
+
+        self.orchestrator.active_clients[client_id] = metadata
+
+        self.assertIn(client_id, self.orchestrator.active_clients)
+
+    async def test_round_completion(self):
+        """라운드 완료 테스트"""
+        # 클라이언트 추가
+        for i in range(50):
+            self.orchestrator.active_clients[f'client_{i}'] = Mock()
+
+        # 라운드 시작
+        round_config = await self.orchestrator.start_round()
+
+        self.assertIsNotNone(round_config)
+        self.assertIn('round_id', round_config)
+
+    async def test_aggregation(self):
+        """집계 테스트"""
+        round_id = 1
+
+        # 업데이트 제출
+        for i in range(10):
+            update = {
+                'model': {'layer1': [1.0] * 100},
+                'num_examples': 100,
+                'loss': 0.5
+            }
+
+            result = await self.aggregator.submit_update(
+                round_id, f'client_{i}', update
+            )
+
+            self.assertEqual(result['status'], 'accepted')
+
+        # 집계
+        aggregated = await self.aggregator.aggregate_round(round_id)
+
+        self.assertIsNotNone(aggregated)
+        self.assertEqual(aggregated['num_clients'], 10)
+
+    def test_model_versioning(self):
+        """모델 버전 관리 테스트"""
+        store = ModelStore('/tmp/test_models')
+
+        # 모델 저장
+        model = {'weights': [1.0, 2.0, 3.0]}
+        asyncio.run(store.save_model(model, version=1, metadata={}))
+
+        # 로드
+        loaded = asyncio.run(store.load_model(version=1))
+
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded['model'], model)
+
+
+class LoadTest(unittest.TestCase):
+    """
+    부하 테스트
+    """
+
+    def test_concurrent_updates(self):
+        """동시 업데이트 처리 테스트"""
+        import concurrent.futures
+
+        aggregator = AggregationService()
+        round_id = 1
+
+        def submit_update(client_id):
+            update = {
+                'model': {'layer': [1.0] * 100},
+                'num_examples': 100,
+                'loss': 0.5
+            }
+            return asyncio.run(aggregator.submit_update(
+                round_id, f'client_{client_id}', update
+            ))
+
+        # 1000개 동시 업데이트
+        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+            futures = [executor.submit(submit_update, i) for i in range(1000)]
+            results = [f.result() for f in futures]
+
+        # 모두 성공했는지 확인
+        self.assertTrue(all(r['status'] == 'accepted' for r in results))
+
+
+# 테스트 실행
+if __name__ == '__main__':
+    unittest.main()</code></pre>
+
+        <h2>배포 체크리스트</h2>
+
+        <table>
+            <tr>
+                <th>카테고리</th>
+                <th>항목</th>
+                <th>상태</th>
+            </tr>
+            <tr>
+                <td rowspan="3"><strong>인프라</strong></td>
+                <td>Kubernetes 클러스터 설정</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>로드 밸런서 구성</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>자동 스케일링 설정</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td rowspan="3"><strong>보안</strong></td>
+                <td>TLS/SSL 인증서</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>API 인증 및 권한 부여</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>차등 프라이버시 구현</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td rowspan="3"><strong>모니터링</strong></td>
+                <td>Prometheus/Grafana 대시보드</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>알림 설정 (PagerDuty, Slack)</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>로그 집계 (ELK Stack)</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td rowspan="2"><strong>테스트</strong></td>
+                <td>통합 테스트 통과</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>부하 테스트 (1000+ 동시 클라이언트)</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td rowspan="2"><strong>문서</strong></td>
+                <td>API 문서 (Swagger/OpenAPI)</td>
+                <td>☐</td>
+            </tr>
+            <tr>
+                <td>운영 매뉴얼</td>
+                <td>☐</td>
+            </tr>
+        </table>
+
+        <div class="warning-box">
+            <h4>⚠️ 프로덕션 배포 주의사항</h4>
+            <ul>
+                <li><strong>점진적 롤아웃:</strong> 작은 사용자 그룹부터 시작하여 단계적으로 확대</li>
+                <li><strong>카나리 배포:</strong> 새 버전을 일부 클라이언트에만 배포하여 테스트</li>
+                <li><strong>롤백 계획:</strong> 문제 발생 시 즉시 이전 버전으로 복구 가능하도록 준비</li>
+                <li><strong>모니터링 알림:</strong> 핵심 메트릭에 대한 실시간 알림 설정</li>
+                <li><strong>정기 백업:</strong> 모델 및 설정 데이터 백업 자동화</li>
+            </ul>
+        </div>
+
+        <h2>트러블슈팅 가이드</h2>
+
+        <h3>일반적인 문제 및 해결책</h3>
+        <pre><code>"""
+연합학습 프로덕션 트러블슈팅 가이드
+
+문제 1: 클라이언트 참여율 낮음
+증상: 라운드당 선택된 클라이언트 수가 목표보다 적음
+원인:
+  - 엄격한 디바이스 선택 기준 (배터리, 네트워크)
+  - 클라이언트 앱이 백그라운드에서 종료됨
+  - 서버 연결 문제
+해결:
+  - 선택 기준 완화 (배터리 > 15% → 10%)
+  - 포그라운드 서비스 또는 Work Manager 사용
+  - 네트워크 재시도 로직 추가
+
+문제 2: 모델 수렴 안 함
+증상: 정확도가 향상되지 않거나 손실이 감소하지 않음
+원인:
+  - 학습률이 부적절함
+  - 비IID 데이터가 심각함
+  - 악의적인 클라이언트 업데이트
+해결:
+  - 학습률 조정 또는 적응형 옵티마이저 사용
+  - FedProx, SCAFFOLD 등 비IID 처리 알고리즘 사용
+  - 견고한 집계 (중앙값, 트리밍) 적용
+
+문제 3: 메모리 부족 (OOM)
+증상: 서버 또는 클라이언트에서 메모리 부족 오류
+원인:
+  - 모델 크기가 너무 큼
+  - 배치 크기가 너무 큼
+  - 메모리 누수
+해결:
+  - 모델 양자화 또는 가지치기
+  - 배치 크기 줄이기
+  - 그래디언트 체크포인팅
+  - 메모리 프로파일링으로 누수 탐지
+
+문제 4: 통신 병목
+증상: 라운드 시간이 너무 길음, 타임아웃 발생
+원인:
+  - 대용량 모델 전송
+  - 네트워크 대역폭 제한
+  - 동시 접속 과다
+해결:
+  - 모델 압축 (gzip, 양자화)
+  - 델타 업데이트 (변경 사항만 전송)
+  - CDN 사용
+  - 부하 분산 (여러 집계 서버)
+
+문제 5: 보안 침해 의심
+증상: 이상한 업데이트 패턴, 정확도 급락
+원인:
+  - 모델 중독 공격
+  - 백도어 삽입
+  - 시빌 공격 (가짜 클라이언트)
+해결:
+  - 이상 탐지 시스템 활성화
+  - 클라이언트 인증 강화
+  - 업데이트 검증 (노름 체크, 통계적 이상값)
+  - 견고한 집계 알고리즘 사용
+"""</code></pre>
+
+        <div class="info-box">
+            <h4>弘益人間의 실현</h4>
+            <p>프로덕션급 연합학습 시스템은 弘益人間(홍익인간)의 실질적 구현입니다. 확장 가능하고 신뢰할 수 있는 시스템을 통해 수백만 명의 사용자가 안전하게 AI 발전에 기여하고, 그 혜택을 공평하게 받을 수 있습니다. 철저한 모니터링과 보안은 모든 참여자의 신뢰를 유지하고, 지속 가능한 협력 생태계를 만드는 기반입니다.</p>
+        </div>
+
+        <div class="summary">
+            <h2>장 요약</h2>
+            <ul>
+                <li>프로덕션 배포는 확장성, 보안, 신뢰성, 모니터링이 핵심</li>
+                <li>마이크로서비스 아키텍처로 조율, 집계, 모델 저장소, 메트릭 서비스 분리</li>
+                <li>클라이언트 SDK는 개발자가 쉽게 통합할 수 있도록 단순하고 명확해야 함</li>
+                <li>실시간 모니터링 대시보드로 시스템 건강 상태 추적</li>
+                <li>통신 최적화 (압축, 델타 업데이트)로 대역폭 및 지연시간 감소</li>
+                <li>포괄적인 테스트 (단위, 통합, 부하)로 배포 전 검증</li>
+                <li>점진적 롤아웃과 카나리 배포로 위험 최소화</li>
+                <li>명확한 트러블슈팅 가이드로 운영 효율성 향상</li>
+                <li>모델 버전 관리와 롤백 메커니즘 필수</li>
+                <li>규제 준수와 감사 가능성은 기업 환경에서 필수</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>프로덕션 연합학습 시스템의 주요 구성 요소를 나열하고 각각의 역할을 설명하세요.</li>
+                <li>마이크로서비스 아키텍처가 모놀리식 아키텍처보다 FL 시스템에 왜 적합합니까?</li>
+                <li>클라이언트 SDK 설계 시 개발자 경험(DX)을 개선하기 위한 원칙은 무엇입니까?</li>
+                <li>모니터링 대시보드에 포함되어야 할 핵심 메트릭을 설명하고, 각 메트릭이 중요한 이유를 논의하세요.</li>
+                <li>델타 압축이 전체 모델 전송보다 어떻게 통신 효율성을 개선합니까?</li>
+                <li>연합학습 시스템의 부하 테스트 전략을 설계하세요. 어떤 시나리오를 테스트하겠습니까?</li>
+                <li>카나리 배포를 사용하여 새 FL 알고리즘을 안전하게 출시하는 방법을 설명하세요.</li>
+                <li>프로덕션에서 모델 중독 공격을 탐지하고 대응하는 전략은 무엇입니까?</li>
+                <li>1000만 개의 모바일 디바이스를 지원하는 FL 시스템의 인프라를 설계하세요. 어떤 기술 스택을 사용하겠습니까?</li>
+                <li>연합학습 시스템의 SLA(Service Level Agreement)를 정의하세요. 어떤 메트릭을 보장하겠습니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-07.html" class="nav-button">← 제7장</a>
+            <a href="index.html" class="nav-button">목차로 →</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 정책 경사 방법 | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box, .warning-box, .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; }
+        .info-box { border-left: 4px solid #3b82f6; }
+        .warning-box { border-left: 4px solid #f59e0b; }
+        .success-box { border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제4장: 정책 경사 방법</h1>
+            <div class="chapter-meta">WIA-AI-025 | 직접 정책 최적화 🎲</div>
+        </header>
+
+        <main>
+            <h2>4.1 정책 경사 소개</h2>
+
+            <p>Q(s,a)를 학습하고 정책을 도출하는 가치 기반 방법과 달리, 정책 경사 방법은 정책 π_θ(a|s)를 직접 매개변수화하고 최적화합니다. 이 접근법은 연속 행동 공간과 확률적 정책에 특히 강력합니다.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">핵심 아이디어:</strong>
+                <p>정책 π_θ(a|s)를 매개변수 θ(예: 신경망 가중치)로 매개변수화하고 경사 상승법을 사용하여 기대 수익 J(θ)를 최대화하도록 θ를 최적화합니다.</p>
+            </div>
+
+            <h3>왜 정책 경사인가?</h3>
+
+            <ul>
+                <li><strong>연속 행동:</strong> 연속 행동 공간에 자연스러움</li>
+                <li><strong>확률적 정책:</strong> 확률적 전략을 학습할 수 있음</li>
+                <li><strong>이론적 보장:</strong> 지역 최적값으로 수렴</li>
+                <li><strong>더 나은 수렴:</strong> θ의 작은 변화 → 정책의 작은 변화</li>
+                <li><strong>함수 근사와 호환:</strong> 딥러닝과 호환됨</li>
+            </ul>
+
+            <h2>4.2 정책 경사 정리</h2>
+
+            <p>정책 경사 정리는 모든 정책 경사 알고리즘의 기초를 제공합니다:</p>
+
+            <pre><code>∇_θ J(θ) = E_π[∇_θ log π_θ(a|s) Q^π(s,a)]
+
+설명: 목적 함수의 경사는 Q-값으로 가중된 로그 확률의 경사의 기댓값과 같습니다.
+
+직관: 좋은 행동(높은 Q)의 확률 증가, 나쁜 행동(낮은 Q)의 확률 감소</code></pre>
+
+            <h3>유도 직관</h3>
+
+            <pre><code>J(θ) = E_π[R]  // 기대 수익
+
+∇_θ J(θ) = ∇_θ E[Σ r_t]
+         = E[Σ ∇_θ log π_θ(a_t|s_t) Σ_{t'≥t} r_t']
+         = E[Σ ∇_θ log π_θ(a_t|s_t) Q^π(s_t,a_t)]
+
+이것이 REINFORCE 경사 추정기입니다.</code></pre>
+
+            <h2>4.3 REINFORCE 알고리즘</h2>
+
+            <p>REINFORCE는 가장 간단한 정책 경사 알고리즘으로, 몬테카를로 수익을 사용하여 Q^π(s,a)를 추정합니다:</p>
+
+            <pre><code>알고리즘: REINFORCE (몬테카를로 정책 경사)
+
+정책 매개변수 θ를 무작위로 초기화
+
+각 에피소드마다:
+    π_θ를 따라 에피소드 생성: s_0, a_0, r_1, s_1, a_1, ..., s_T
+
+    t = 0에서 T-1까지:
+        G_t = Σ_{k=0}^{T-t-1} γ^k r_{t+k+1}  // 시간 t부터의 수익
+
+        θ ← θ + α γ^t G_t ∇_θ log π_θ(a_t|s_t)  // 경사 상승</code></pre>
+
+            <h3>REINFORCE 구현</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+
+class PolicyNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(PolicyNetwork, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim),
+            nn.Softmax(dim=-1)  # 확률 출력
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+def reinforce(env, episodes=1000, gamma=0.99, lr=1e-3):
+    """
+    에피소드 작업을 위한 REINFORCE 알고리즘.
+    """
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    policy = PolicyNetwork(state_dim, action_dim)
+    optimizer = optim.Adam(policy.parameters(), lr=lr)
+
+    for episode in range(episodes):
+        # 에피소드 생성
+        states, actions, rewards = [], [], []
+        state = env.reset()
+        done = False
+
+        while not done:
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+
+            # 정책에서 행동 샘플링
+            with torch.no_grad():
+                action_probs = policy(state_tensor)
+                action_dist = torch.distributions.Categorical(action_probs)
+                action = action_dist.sample()
+
+            next_state, reward, done, _ = env.step(action.item())
+
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+
+            state = next_state
+
+        # 수익 계산
+        returns = []
+        G = 0
+        for r in reversed(rewards):
+            G = r + gamma * G
+            returns.insert(0, G)
+
+        returns = torch.FloatTensor(returns)
+
+        # 수익 정규화 (분산 감소)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+
+        # 정책 경사 계산
+        loss = 0
+        for state, action, G in zip(states, actions, returns):
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            action_probs = policy(state_tensor)
+            action_dist = torch.distributions.Categorical(action_probs)
+
+            # -log π(a|s) * G  (최소화하므로 음수)
+            loss += -action_dist.log_prob(action) * G
+
+        # 정책 업데이트
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if (episode + 1) % 100 == 0:
+            print(f"에피소드 {episode+1}, 총 보상: {sum(rewards)}")
+
+    return policy</code></pre>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">높은 분산:</strong>
+                <p>REINFORCE는 몬테카를로 수익을 사용하기 때문에 높은 분산을 겪습니다. 이것은 수렴을 늦출 수 있습니다. 해결책: 베이스라인, 액터-크리틱 방법.</p>
+            </div>
+
+            <h2>4.4 베이스라인 함수</h2>
+
+            <p>베이스라인 b(s)를 추가하면 편향을 도입하지 않고 분산을 줄일 수 있습니다:</p>
+
+            <pre><code>∇_θ J(θ) = E[∇_θ log π_θ(a|s) (Q^π(s,a) - b(s))]
+
+일반적인 베이스라인:
+1. b(s) = V^π(s)  // 상태 가치 함수
+2. b(s) = 평균 수익
+3. b(s) = 수익의 이동 평균</code></pre>
+
+            <h3>베이스라인을 사용한 REINFORCE</h3>
+
+            <pre><code>def reinforce_with_baseline(env, episodes=1000, gamma=0.99, lr=1e-3):
+    """
+    학습된 가치 함수 베이스라인을 사용한 REINFORCE.
+    """
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    policy = PolicyNetwork(state_dim, action_dim)
+    value_net = ValueNetwork(state_dim)  # 베이스라인
+
+    policy_optimizer = optim.Adam(policy.parameters(), lr=lr)
+    value_optimizer = optim.Adam(value_net.parameters(), lr=lr)
+
+    for episode in range(episodes):
+        states, actions, rewards = generate_episode(env, policy)
+
+        returns = compute_returns(rewards, gamma)
+        returns = torch.FloatTensor(returns)
+
+        # 가치 네트워크 업데이트 (베이스라인)
+        states_tensor = torch.FloatTensor(states)
+        values = value_net(states_tensor).squeeze()
+        value_loss = nn.MSELoss()(values, returns)
+
+        value_optimizer.zero_grad()
+        value_loss.backward()
+        value_optimizer.step()
+
+        # 베이스라인으로 정책 업데이트
+        advantages = returns - values.detach()  # A(s,a) = G - V(s)
+
+        policy_loss = 0
+        for state, action, advantage in zip(states, actions, advantages):
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            action_probs = policy(state_tensor)
+            action_dist = torch.distributions.Categorical(action_probs)
+            policy_loss += -action_dist.log_prob(action) * advantage
+
+        policy_optimizer.zero_grad()
+        policy_loss.backward()
+        policy_optimizer.step()
+
+    return policy</code></pre>
+
+            <h2>4.5 신뢰 영역 정책 최적화 (TRPO)</h2>
+
+            <p>TRPO는 정책 업데이트를 "신뢰 영역"으로 제한하여 안정적인 학습을 보장합니다:</p>
+
+            <pre><code>maximize E[π_θ_new / π_θ_old * A(s,a)]
+subject to E[KL(π_θ_old || π_θ_new)] ≤ δ
+
+여기서:
+- KL 발산은 정책이 얼마나 변경될 수 있는지 제약
+- δ는 신뢰 영역 크기
+- 이것은 파국적 정책 업데이트를 방지</code></pre>
+
+            <h3>자연 정책 경사</h3>
+
+            <p>TRPO는 정책 공간의 기하학을 고려하는 자연 경사를 사용합니다:</p>
+
+            <pre><code>자연 경사: ∇̃_θ J = F^{-1} ∇_θ J
+
+여기서 F는 피셔 정보 행렬:
+F = E[∇_θ log π(a|s) ∇_θ log π(a|s)^T]
+
+자연 경사는 매개변수 공간이 아닌 확률 공간에서 가장 가파른 상승 방향을 가리킵니다.</code></pre>
+
+            <h2>4.6 근위 정책 최적화 (PPO)</h2>
+
+            <p>PPO는 클리핑된 목적 함수를 통해 TRPO를 단순화하면서 그 이점을 유지합니다:</p>
+
+            <pre><code>L^CLIP(θ) = E[min(r_t(θ) Â_t, clip(r_t(θ), 1-ε, 1+ε) Â_t)]
+
+여기서:
+r_t(θ) = π_θ(a_t|s_t) / π_θ_old(a_t|s_t)  // 확률 비율
+Â_t = 추정된 어드밴티지
+ε = 클리핑 파라미터 (일반적으로 0.1 또는 0.2)</code></pre>
+
+            <h3>PPO 알고리즘</h3>
+
+            <pre><code>class PPO:
+    def __init__(self, state_dim, action_dim, lr=3e-4, gamma=0.99,
+                 epsilon=0.2, epochs=10, batch_size=64):
+        self.policy = PolicyNetwork(state_dim, action_dim)
+        self.old_policy = PolicyNetwork(state_dim, action_dim)
+        self.old_policy.load_state_dict(self.policy.state_dict())
+
+        self.value_net = ValueNetwork(state_dim)
+
+        self.optimizer = optim.Adam([
+            {'params': self.policy.parameters()},
+            {'params': self.value_net.parameters()}
+        ], lr=lr)
+
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epochs = epochs
+        self.batch_size = batch_size
+
+    def select_action(self, state):
+        state = torch.FloatTensor(state).unsqueeze(0)
+        with torch.no_grad():
+            action_probs = self.policy(state)
+            dist = torch.distributions.Categorical(action_probs)
+            action = dist.sample()
+        return action.item()
+
+    def update(self, states, actions, rewards, next_states, dones):
+        """
+        PPO를 사용하여 정책 업데이트.
+        """
+        states = torch.FloatTensor(states)
+        actions = torch.LongTensor(actions)
+        rewards = torch.FloatTensor(rewards)
+        next_states = torch.FloatTensor(next_states)
+        dones = torch.FloatTensor(dones)
+
+        # 수익과 어드밴티지 계산
+        with torch.no_grad():
+            values = self.value_net(states).squeeze()
+            next_values = self.value_net(next_states).squeeze()
+
+            # GAE (일반화된 어드밴티지 추정)
+            advantages = rewards + self.gamma * next_values * (1 - dones) - values
+            returns = advantages + values
+
+        # 어드밴티지 정규화
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        # 이전 행동 확률 얻기
+        with torch.no_grad():
+            old_probs = self.old_policy(states)
+            old_dist = torch.distributions.Categorical(old_probs)
+            old_log_probs = old_dist.log_prob(actions)
+
+        # 여러 에폭 동안 PPO 업데이트
+        for _ in range(self.epochs):
+            # 현재 정책 확률
+            new_probs = self.policy(states)
+            new_dist = torch.distributions.Categorical(new_probs)
+            new_log_probs = new_dist.log_prob(actions)
+
+            # 새 확률과 이전 확률의 비율
+            ratio = torch.exp(new_log_probs - old_log_probs)
+
+            # 클리핑된 대리 목적 함수
+            surr1 = ratio * advantages
+            surr2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * advantages
+            policy_loss = -torch.min(surr1, surr2).mean()
+
+            # 가치 손실
+            new_values = self.value_net(states).squeeze()
+            value_loss = nn.MSELoss()(new_values, returns)
+
+            # 엔트로피 보너스 (탐색 장려)
+            entropy = new_dist.entropy().mean()
+
+            # 총 손실
+            loss = policy_loss + 0.5 * value_loss - 0.01 * entropy
+
+            # 네트워크 업데이트
+            self.optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
+            self.optimizer.step()
+
+        # 이전 정책 업데이트
+        self.old_policy.load_state_dict(self.policy.state_dict())</code></pre>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">PPO가 인기 있는 이유:</strong>
+                <ul>
+                    <li>구현하기 간단함 (TRPO에 비해)</li>
+                    <li>좋은 샘플 효율성</li>
+                    <li>안정적인 학습</li>
+                    <li>많은 작업에서 잘 작동</li>
+                    <li>ChatGPT의 RLHF 학습에 사용됨</li>
+                </ul>
+            </div>
+
+            <h2>4.7 연속 행동 공간</h2>
+
+            <p>정책 경사 방법은 연속 제어에서 탁월합니다. 정책을 가우시안으로 매개변수화합니다:</p>
+
+            <pre><code>π_θ(a|s) = N(μ_θ(s), σ_θ(s))
+
+여기서:
+- μ_θ(s): 평균 행동 (신경망 출력)
+- σ_θ(s): 표준 편차 (학습되거나 고정될 수 있음)</code></pre>
+
+            <h3>연속 행동 정책 네트워크</h3>
+
+            <pre><code>class ContinuousPolicyNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        super(ContinuousPolicyNetwork, self).__init__()
+
+        self.shared = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        # 행동 분포의 평균
+        self.mean = nn.Linear(hidden_dim, action_dim)
+
+        # 행동 분포의 로그 표준편차
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
+
+    def forward(self, state):
+        features = self.shared(state)
+        mean = self.mean(features)
+        std = torch.exp(self.log_std)
+        return mean, std
+
+    def sample_action(self, state):
+        mean, std = self.forward(state)
+        dist = torch.distributions.Normal(mean, std)
+        action = dist.sample()
+        log_prob = dist.log_prob(action).sum(dim=-1)
+        return action, log_prob
+
+# 연속 제어를 위한 사용법 (예: MuJoCo)
+policy = ContinuousPolicyNetwork(state_dim=17, action_dim=6)
+state = torch.FloatTensor(state)
+action, log_prob = policy.sample_action(state)</code></pre>
+
+            <h2>4.8 일반화된 어드밴티지 추정 (GAE)</h2>
+
+            <p>GAE는 어드밴티지 추정에서 편향과 분산의 균형을 맞춥니다:</p>
+
+            <pre><code>A^GAE(λ)_t = Σ_{l=0}^∞ (γλ)^l δ_{t+l}
+
+여기서:
+δ_t = r_t + γV(s_{t+1}) - V(s_t)  // TD 오차
+
+λ ∈ [0, 1]은 편향-분산 트레이드오프를 제어:
+- λ = 0: A = δ_t (높은 편향, 낮은 분산, TD처럼)
+- λ = 1: A = Σ r_t - V(s_t) (낮은 편향, 높은 분산, MC처럼)</code></pre>
+
+            <h3>GAE 구현</h3>
+
+            <pre><code>def compute_gae(rewards, values, next_values, dones, gamma=0.99, lambda_=0.95):
+    """
+    일반화된 어드밴티지 추정을 계산합니다.
+
+    Args:
+        rewards: 보상 리스트
+        values: 가치 추정 V(s_t) 리스트
+        next_values: 가치 추정 V(s_{t+1}) 리스트
+        dones: 완료 플래그 리스트
+        gamma: 할인 계수
+        lambda_: GAE 파라미터
+    """
+    advantages = []
+    gae = 0
+
+    for t in reversed(range(len(rewards))):
+        # TD 오차
+        delta = rewards[t] + gamma * next_values[t] * (1 - dones[t]) - values[t]
+
+        # GAE
+        gae = delta + gamma * lambda_ * (1 - dones[t]) * gae
+        advantages.insert(0, gae)
+
+    return advantages</code></pre>
+
+            <h2>4.9 실전 고려사항</h2>
+
+            <h3>하이퍼파라미터</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>파라미터</th>
+                        <th>일반적인 값</th>
+                        <th>효과</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>학습률</td>
+                        <td>3e-4</td>
+                        <td>업데이트의 단계 크기</td>
+                    </tr>
+                    <tr>
+                        <td>PPO 클립 ε</td>
+                        <td>0.1 - 0.2</td>
+                        <td>신뢰 영역 크기</td>
+                    </tr>
+                    <tr>
+                        <td>GAE λ</td>
+                        <td>0.95 - 0.99</td>
+                        <td>편향-분산 트레이드오프</td>
+                    </tr>
+                    <tr>
+                        <td>엔트로피 계수</td>
+                        <td>0.01</td>
+                        <td>탐색 보너스</td>
+                    </tr>
+                    <tr>
+                        <td>가치 손실 계수</td>
+                        <td>0.5</td>
+                        <td>가치 함수 중요도</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>성공을 위한 팁</h3>
+
+            <ul>
+                <li><strong>관찰 정규화:</strong> 이동 평균/표준편차 사용</li>
+                <li><strong>수익 정규화:</strong> 분산 감소</li>
+                <li><strong>그래디언트 클리핑:</strong> 폭발 방지</li>
+                <li><strong>직교 초기화 사용:</strong> 깊은 네트워크에 더 좋음</li>
+                <li><strong>엔트로피 보너스 조정:</strong> 탐색 균형</li>
+                <li><strong>KL 발산 모니터링:</strong> 불안정한 업데이트 감지</li>
+            </ul>
+
+            <h2>4.10 비교: 정책 경사 vs 가치 기반</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>측면</th>
+                        <th>정책 경사</th>
+                        <th>가치 기반 (DQN)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>행동 공간</td>
+                        <td>연속 + 이산</td>
+                        <td>이산만</td>
+                    </tr>
+                    <tr>
+                        <td>정책 유형</td>
+                        <td>확률적 자연스러움</td>
+                        <td>결정적 (ε-탐욕)</td>
+                    </tr>
+                    <tr>
+                        <td>수렴</td>
+                        <td>지역 최적 보장</td>
+                        <td>진동/발산 가능</td>
+                    </tr>
+                    <tr>
+                        <td>샘플 효율성</td>
+                        <td>낮음 (온-정책)</td>
+                        <td>높음 (오프-정책 + 재생)</td>
+                    </tr>
+                    <tr>
+                        <td>안정성</td>
+                        <td>일반적으로 더 안정적</td>
+                        <td>불안정할 수 있음</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>정책 경사 방법은 정책 매개변수 θ를 직접 최적화합니다</li>
+                    <li>정책 경사 정리는 경사 기반 최적화를 가능하게 합니다</li>
+                    <li>REINFORCE는 몬테카를로 수익을 사용하지만 높은 분산을 겪습니다</li>
+                    <li>베이스라인은 편향을 도입하지 않고 분산을 줄입니다</li>
+                    <li>TRPO는 KL 발산을 사용하여 정책 업데이트를 제약합니다</li>
+                    <li>PPO는 클리핑된 대리 목적 함수로 TRPO를 단순화합니다</li>
+                    <li>정책 경사는 연속 행동 공간에서 탁월합니다</li>
+                    <li>GAE는 어드밴티지 추정에서 편향과 분산의 균형을 맞춥니다</li>
+                    <li>PPO는 실전에서 널리 사용됩니다 (RLHF, 로보틱스, 게임)</li>
+                    <li>핵심 트레이드오프: 안정성 vs 샘플 효율성</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>복습 문제</h3>
+                <div class="quiz-question">
+                    <strong>1. 정책 경사가 가치 기반 방법에 비해 가지는 주요 장점은 무엇인가요?</strong>
+                    <p style="color: #94a3b8;">답변: 정책 경사 방법은 연속 행동 공간을 처리할 수 있고, 자연스럽게 확률적 정책을 학습하며, 지역 최적값으로의 수렴이 보장되고, 함수 근사와 더 안정적입니다.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. REINFORCE는 왜 높은 분산을 가지나요?</strong>
+                    <p style="color: #94a3b8;">답변: 에피소드 전체에 걸친 많은 무작위 행동과 전이에 의존하는 완전한 몬테카를로 수익을 사용하기 때문입니다.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. PPO는 TRPO와 어떻게 다른가요?</strong>
+                    <p style="color: #94a3b8;">답변: PPO는 하드 KL 제약 대신 클리핑된 목적 함수를 사용하여 유사한 이점을 유지하면서 구현을 더 간단하게 만듭니다.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>4. GAE의 λ 파라미터의 목적은 무엇인가요?</strong>
+                    <p style="color: #94a3b8;">답변: λ는 어드밴티지 추정에서 편향-분산 트레이드오프를 제어합니다. λ=0은 높은 편향/낮은 분산(TD), λ=1은 낮은 편향/높은 분산(MC)입니다.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

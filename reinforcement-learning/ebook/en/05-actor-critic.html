@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Actor-Critic Methods | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box, .warning-box, .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; }
+        .info-box { border-left: 4px solid #3b82f6; }
+        .warning-box { border-left: 4px solid #f59e0b; }
+        .success-box { border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 5: Actor-Critic Methods</h1>
+            <div class="chapter-meta">WIA-AI-025 | Best of Both Worlds 🎭</div>
+        </header>
+
+        <main>
+            <h2>5.1 Introduction to Actor-Critic</h2>
+
+            <p>Actor-Critic methods combine the best of policy gradient and value-based approaches. The "actor" updates the policy while the "critic" evaluates actions by estimating the value function.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Key Insight:</strong>
+                <p><strong>Actor:</strong> Policy π_θ(a|s) - decides which action to take<br>
+                <strong>Critic:</strong> Value function V_w(s) or Q_w(s,a) - evaluates how good the action is</p>
+            </div>
+
+            <h3>Advantages of Actor-Critic</h3>
+
+            <ul>
+                <li><strong>Lower Variance:</strong> Critic provides lower-variance estimates than Monte Carlo</li>
+                <li><strong>Online Learning:</strong> Can learn from incomplete episodes</li>
+                <li><strong>Continuous Actions:</strong> Works with continuous action spaces</li>
+                <li><strong>Better Sample Efficiency:</strong> Bootstrapping speeds learning</li>
+            </ul>
+
+            <h2>5.2 Basic Actor-Critic Algorithm</h2>
+
+            <p>The simplest actor-critic uses a learned value function as the baseline:</p>
+
+            <pre><code>Algorithm: One-Step Actor-Critic
+
+Initialize actor π_θ and critic V_w
+
+For each episode:
+    s = env.reset()
+
+    while not done:
+        a ~ π_θ(·|s)  // Actor chooses action
+        s', r, done = env.step(a)
+
+        δ = r + γ V_w(s') - V_w(s)  // TD error (Critic)
+
+        w ← w + α_w δ ∇_w V_w(s)       // Update Critic
+        θ ← θ + α_θ δ ∇_θ log π_θ(a|s) // Update Actor
+
+        s ← s'</code></pre>
+
+            <h3>Implementation</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+import torch.optim as optim
+
+class Actor(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(Actor, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim),
+            nn.Softmax(dim=-1)
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+class Critic(nn.Module):
+    def __init__(self, state_dim, hidden_dim=128):
+        super(Critic, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+class ActorCritic:
+    def __init__(self, state_dim, action_dim, lr_actor=1e-3, lr_critic=1e-3, gamma=0.99):
+        self.actor = Actor(state_dim, action_dim)
+        self.critic = Critic(state_dim)
+
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
+
+        self.gamma = gamma
+
+    def select_action(self, state):
+        state = torch.FloatTensor(state).unsqueeze(0)
+        probs = self.actor(state)
+        dist = torch.distributions.Categorical(probs)
+        action = dist.sample()
+        return action.item(), dist.log_prob(action)
+
+    def update(self, state, action_log_prob, reward, next_state, done):
+        state = torch.FloatTensor(state).unsqueeze(0)
+        next_state = torch.FloatTensor(next_state).unsqueeze(0)
+
+        # Compute TD error
+        value = self.critic(state)
+        next_value = self.critic(next_state)
+        td_target = reward + self.gamma * next_value * (1 - done)
+        td_error = td_target - value
+
+        # Update Critic
+        critic_loss = td_error.pow(2)
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # Update Actor
+        actor_loss = -action_log_prob * td_error.detach()
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()</code></pre>
+
+            <h2>5.3 Advantage Actor-Critic (A2C)</h2>
+
+            <p>A2C uses the advantage function instead of Q-values:</p>
+
+            <pre><code>A(s,a) = Q(s,a) - V(s)
+       = r + γV(s') - V(s)  // Using TD(0)
+
+Advantage tells us how much better action a is compared to the average action in state s.</code></pre>
+
+            <h3>Why Advantages?</h3>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">Benefits of Advantage Functions:</strong>
+                <ul>
+                    <li>Reduces variance by subtracting baseline V(s)</li>
+                    <li>Centers values around zero (positive = good, negative = bad)</li>
+                    <li>More stable gradients for policy updates</li>
+                    <li>Only need to learn V(s), not Q(s,a)</li>
+                </ul>
+            </div>
+
+            <h3>A2C with Multiple Workers</h3>
+
+            <pre><code>def train_a2c(env, num_workers=4, steps_per_update=5):
+    """
+    A2C with parallel environment workers.
+    """
+    agent = ActorCritic(state_dim, action_dim)
+
+    # Create multiple environment instances
+    envs = [make_env() for _ in range(num_workers)]
+
+    for update in range(num_updates):
+        states_list = []
+        actions_list = []
+        rewards_list = []
+        next_states_list = []
+        dones_list = []
+
+        # Collect experience from all workers
+        for env in envs:
+            state = env.reset()
+
+            for step in range(steps_per_update):
+                action, log_prob = agent.select_action(state)
+                next_state, reward, done, _ = env.step(action)
+
+                states_list.append(state)
+                actions_list.append(log_prob)
+                rewards_list.append(reward)
+                next_states_list.append(next_state)
+                dones_list.append(done)
+
+                state = next_state if not done else env.reset()
+
+        # Batch update
+        states = torch.FloatTensor(states_list)
+        actions = torch.stack(actions_list)
+        rewards = torch.FloatTensor(rewards_list)
+        next_states = torch.FloatTensor(next_states_list)
+        dones = torch.FloatTensor(dones_list)
+
+        # Compute advantages
+        values = agent.critic(states)
+        next_values = agent.critic(next_states)
+        advantages = rewards + agent.gamma * next_values * (1 - dones) - values
+
+        # Update networks
+        critic_loss = advantages.pow(2).mean()
+        actor_loss = -(actions * advantages.detach()).mean()
+
+        total_loss = actor_loss + 0.5 * critic_loss
+
+        agent.actor_optimizer.zero_grad()
+        agent.critic_optimizer.zero_grad()
+        total_loss.backward()
+        agent.actor_optimizer.step()
+        agent.critic_optimizer.step()
+
+    return agent</code></pre>
+
+            <h2>5.4 Asynchronous Advantage Actor-Critic (A3C)</h2>
+
+            <p>A3C parallelizes learning across multiple CPU threads, each running its own environment:</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Key Innovation:</strong>
+                <p>Each worker independently updates a shared global network asynchronously. This provides diverse experience and stabilizes learning without needing experience replay.</p>
+            </div>
+
+            <h3>A3C Architecture</h3>
+
+            <pre><code>import threading
+import torch.multiprocessing as mp
+
+class A3C:
+    def __init__(self, state_dim, action_dim, num_workers=4):
+        # Shared global network
+        self.global_actor = Actor(state_dim, action_dim).share_memory()
+        self.global_critic = Critic(state_dim).share_memory()
+
+        self.num_workers = num_workers
+
+    def train(self, env_fn, max_episodes=1000):
+        # Shared optimizer
+        optimizer = torch.optim.Adam([
+            {'params': self.global_actor.parameters()},
+            {'params': self.global_critic.parameters()}
+        ])
+
+        # Create worker processes
+        processes = []
+        for rank in range(self.num_workers):
+            p = mp.Process(target=self.worker_process,
+                          args=(rank, env_fn, optimizer, max_episodes))
+            p.start()
+            processes.append(p)
+
+        for p in processes:
+            p.join()
+
+    def worker_process(self, rank, env_fn, optimizer, max_episodes):
+        env = env_fn()
+
+        # Local networks
+        local_actor = Actor(state_dim, action_dim)
+        local_critic = Critic(state_dim)
+
+        for episode in range(max_episodes):
+            # Sync with global
+            local_actor.load_state_dict(self.global_actor.state_dict())
+            local_critic.load_state_dict(self.global_critic.state_dict())
+
+            # Collect trajectory
+            states, actions, rewards = [], [], []
+            state = env.reset()
+            done = False
+
+            while not done:
+                action, log_prob = self.select_action(state, local_actor)
+                next_state, reward, done, _ = env.step(action)
+
+                states.append(state)
+                actions.append(log_prob)
+                rewards.append(reward)
+
+                state = next_state
+
+            # Compute returns
+            returns = self.compute_returns(rewards)
+
+            # Compute gradients
+            actor_loss = 0
+            critic_loss = 0
+
+            for s, a, R in zip(states, actions, returns):
+                s = torch.FloatTensor(s).unsqueeze(0)
+                value = local_critic(s)
+                advantage = R - value.item()
+
+                actor_loss += -a * advantage
+                critic_loss += (R - value).pow(2)
+
+            total_loss = actor_loss + 0.5 * critic_loss
+
+            # Update global networks
+            optimizer.zero_grad()
+            total_loss.backward()
+
+            # Copy gradients to global
+            for local_param, global_param in zip(local_actor.parameters(),
+                                                 self.global_actor.parameters()):
+                global_param._grad = local_param.grad
+
+            for local_param, global_param in zip(local_critic.parameters(),
+                                                 self.global_critic.parameters()):
+                global_param._grad = local_param.grad
+
+            optimizer.step()</code></pre>
+
+            <h2>5.5 Soft Actor-Critic (SAC)</h2>
+
+            <p>SAC is an off-policy actor-critic algorithm that maximizes both reward and entropy:</p>
+
+            <pre><code>J(π) = E[Σ γ^t (r_t + α H(π(·|s_t)))]
+
+where:
+- H(π) = -E[log π(a|s)] is the entropy
+- α is the temperature parameter
+- Higher entropy → more exploration</code></pre>
+
+            <h3>SAC Key Features</h3>
+
+            <ul>
+                <li><strong>Maximum Entropy:</strong> Encourages exploration while maximizing reward</li>
+                <li><strong>Off-Policy:</strong> Sample efficient with replay buffer</li>
+                <li><strong>Stochastic Policy:</strong> Naturally explores</li>
+                <li><strong>Stable:</strong> Works well across tasks without much tuning</li>
+            </ul>
+
+            <h3>SAC Implementation</h3>
+
+            <pre><code>class SAC:
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        # Actor (stochastic policy)
+        self.actor = GaussianPolicy(state_dim, action_dim, hidden_dim)
+
+        # Two Q-functions (critics) to reduce overestimation
+        self.critic1 = QNetwork(state_dim, action_dim, hidden_dim)
+        self.critic2 = QNetwork(state_dim, action_dim, hidden_dim)
+
+        # Target critics
+        self.critic1_target = QNetwork(state_dim, action_dim, hidden_dim)
+        self.critic2_target = QNetwork(state_dim, action_dim, hidden_dim)
+
+        self.critic1_target.load_state_dict(self.critic1.state_dict())
+        self.critic2_target.load_state_dict(self.critic2.state_dict())
+
+        # Automatic entropy tuning
+        self.target_entropy = -action_dim
+        self.log_alpha = torch.zeros(1, requires_grad=True)
+        self.alpha = self.log_alpha.exp()
+
+        # Optimizers
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=3e-4)
+        self.critic1_optimizer = optim.Adam(self.critic1.parameters(), lr=3e-4)
+        self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=3e-4)
+        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=3e-4)
+
+        self.replay_buffer = ReplayBuffer(capacity=1000000)
+
+    def select_action(self, state, evaluate=False):
+        state = torch.FloatTensor(state).unsqueeze(0)
+        if evaluate:
+            _, _, action = self.actor.sample(state)
+        else:
+            action, _, _ = self.actor.sample(state)
+        return action.detach().cpu().numpy()[0]
+
+    def update(self, batch_size=256):
+        # Sample from replay buffer
+        state, action, reward, next_state, done = \
+            self.replay_buffer.sample(batch_size)
+
+        with torch.no_grad():
+            # Sample next action from current policy
+            next_action, next_log_prob, _ = self.actor.sample(next_state)
+
+            # Compute target Q-value
+            target_q1 = self.critic1_target(next_state, next_action)
+            target_q2 = self.critic2_target(next_state, next_action)
+            target_q = torch.min(target_q1, target_q2) - self.alpha * next_log_prob
+            target_q = reward + (1 - done) * 0.99 * target_q
+
+        # Update Q-functions
+        current_q1 = self.critic1(state, action)
+        current_q2 = self.critic2(state, action)
+
+        critic1_loss = F.mse_loss(current_q1, target_q)
+        critic2_loss = F.mse_loss(current_q2, target_q)
+
+        self.critic1_optimizer.zero_grad()
+        critic1_loss.backward()
+        self.critic1_optimizer.step()
+
+        self.critic2_optimizer.zero_grad()
+        critic2_loss.backward()
+        self.critic2_optimizer.step()
+
+        # Update policy
+        new_action, log_prob, _ = self.actor.sample(state)
+        q1_new = self.critic1(state, new_action)
+        q2_new = self.critic2(state, new_action)
+        q_new = torch.min(q1_new, q2_new)
+
+        actor_loss = (self.alpha * log_prob - q_new).mean()
+
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
+        # Update temperature (alpha)
+        alpha_loss = -(self.log_alpha * (log_prob + self.target_entropy).detach()).mean()
+
+        self.alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()
+
+        self.alpha = self.log_alpha.exp()
+
+        # Soft update target networks
+        self.soft_update(self.critic1_target, self.critic1, tau=0.005)
+        self.soft_update(self.critic2_target, self.critic2, tau=0.005)
+
+    def soft_update(self, target, source, tau):
+        for target_param, param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)</code></pre>
+
+            <h2>5.6 Twin Delayed DDPG (TD3)</h2>
+
+            <p>TD3 improves DDPG with three key modifications:</p>
+
+            <ol>
+                <li><strong>Twin Critics:</strong> Two Q-networks, use minimum for updates</li>
+                <li><strong>Delayed Policy Updates:</strong> Update policy less frequently than critics</li>
+                <li><strong>Target Policy Smoothing:</strong> Add noise to target actions</li>
+            </ol>
+
+            <h3>TD3 Algorithm</h3>
+
+            <pre><code>class TD3:
+    def __init__(self, state_dim, action_dim, max_action):
+        # Actor
+        self.actor = DeterministicActor(state_dim, action_dim, max_action)
+        self.actor_target = DeterministicActor(state_dim, action_dim, max_action)
+        self.actor_target.load_state_dict(self.actor.state_dict())
+
+        # Twin critics
+        self.critic1 = Critic(state_dim, action_dim)
+        self.critic2 = Critic(state_dim, action_dim)
+        self.critic1_target = Critic(state_dim, action_dim)
+        self.critic2_target = Critic(state_dim, action_dim)
+
+        self.critic1_target.load_state_dict(self.critic1.state_dict())
+        self.critic2_target.load_state_dict(self.critic2.state_dict())
+
+        self.max_action = max_action
+        self.policy_delay = 2
+        self.total_it = 0
+
+    def update(self, replay_buffer, batch_size=256):
+        self.total_it += 1
+
+        state, action, reward, next_state, done = replay_buffer.sample(batch_size)
+
+        with torch.no_grad():
+            # Target policy smoothing
+            noise = (torch.randn_like(action) * 0.2).clamp(-0.5, 0.5)
+            next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
+
+            # Compute target Q
+            target_q1 = self.critic1_target(next_state, next_action)
+            target_q2 = self.critic2_target(next_state, next_action)
+            target_q = torch.min(target_q1, target_q2)
+            target_q = reward + (1 - done) * 0.99 * target_q
+
+        # Update critics
+        current_q1 = self.critic1(state, action)
+        current_q2 = self.critic2(state, action)
+
+        critic1_loss = F.mse_loss(current_q1, target_q)
+        critic2_loss = F.mse_loss(current_q2, target_q)
+
+        self.critic1_optimizer.zero_grad()
+        critic1_loss.backward()
+        self.critic1_optimizer.step()
+
+        self.critic2_optimizer.zero_grad()
+        critic2_loss.backward()
+        self.critic2_optimizer.step()
+
+        # Delayed policy updates
+        if self.total_it % self.policy_delay == 0:
+            # Update actor
+            actor_loss = -self.critic1(state, self.actor(state)).mean()
+
+            self.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_optimizer.step()
+
+            # Soft update targets
+            for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+                target_param.data.copy_(0.005 * param.data + 0.995 * target_param.data)
+
+            for param, target_param in zip(self.critic1.parameters(), self.critic1_target.parameters()):
+                target_param.data.copy_(0.005 * param.data + 0.995 * target_param.data)
+
+            for param, target_param in zip(self.critic2.parameters(), self.critic2_target.parameters()):
+                target_param.data.copy_(0.005 * param.data + 0.995 * target_param.data)</code></pre>
+
+            <h2>5.7 Comparison of Actor-Critic Methods</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Algorithm</th>
+                        <th>On/Off-Policy</th>
+                        <th>Action Space</th>
+                        <th>Key Feature</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>A2C</td>
+                        <td>On-policy</td>
+                        <td>Discrete/Continuous</td>
+                        <td>Synchronous parallel workers</td>
+                    </tr>
+                    <tr>
+                        <td>A3C</td>
+                        <td>On-policy</td>
+                        <td>Discrete/Continuous</td>
+                        <td>Asynchronous workers</td>
+                    </tr>
+                    <tr>
+                        <td>DDPG</td>
+                        <td>Off-policy</td>
+                        <td>Continuous</td>
+                        <td>Deterministic policy + replay</td>
+                    </tr>
+                    <tr>
+                        <td>TD3</td>
+                        <td>Off-policy</td>
+                        <td>Continuous</td>
+                        <td>Twin critics + delayed updates</td>
+                    </tr>
+                    <tr>
+                        <td>SAC</td>
+                        <td>Off-policy</td>
+                        <td>Continuous</td>
+                        <td>Maximum entropy + auto-tuning</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.8 Practical Tips</h2>
+
+            <h3>Choosing an Algorithm</h3>
+
+            <ul>
+                <li><strong>Discrete Actions:</strong> A2C, PPO (from Ch. 4)</li>
+                <li><strong>Continuous Actions:</strong> SAC, TD3, DDPG</li>
+                <li><strong>Sample Efficiency:</strong> SAC, TD3 (off-policy with replay)</li>
+                <li><strong>Stability:</strong> SAC, PPO</li>
+                <li><strong>Simplicity:</strong> A2C, basic Actor-Critic</li>
+            </ul>
+
+            <h3>Common Pitfalls</h3>
+
+            <ul>
+                <li><strong>Critic Learning Too Slowly:</strong> Use higher learning rate for critic</li>
+                <li><strong>Policy Collapse:</strong> Add entropy bonus or use SAC</li>
+                <li><strong>Overestimation:</strong> Use twin critics (TD3, SAC)</li>
+                <li><strong>Instability:</strong> Clip gradients, tune learning rates</li>
+            </ul>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Actor-Critic combines policy gradient (actor) and value function (critic)</li>
+                    <li>Advantages reduce variance compared to pure policy gradient</li>
+                    <li>A2C uses synchronous parallel workers for data collection</li>
+                    <li>A3C uses asynchronous updates without experience replay</li>
+                    <li>SAC maximizes entropy for exploration and is highly sample efficient</li>
+                    <li>TD3 improves DDPG with twin critics and delayed updates</li>
+                    <li>Off-policy methods (SAC, TD3) are more sample efficient</li>
+                    <li>On-policy methods (A2C, A3C) are simpler but need more samples</li>
+                    <li>Choice depends on action space, sample efficiency needs, and stability requirements</li>
+                    <li>Actor-critic is the foundation for many modern RL successes</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>Review Questions</h3>
+                <div class="quiz-question">
+                    <strong>1. What are the roles of the actor and critic?</strong>
+                    <p style="color: #94a3b8;">Answer: The actor learns the policy π(a|s) and decides actions. The critic learns the value function V(s) or Q(s,a) and evaluates how good actions are.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. Why use advantage functions instead of Q-values?</strong>
+                    <p style="color: #94a3b8;">Answer: Advantages reduce variance by subtracting a baseline V(s), provide centered values, and enable learning only V(s) instead of Q(s,a) for all actions.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. What makes SAC different from other actor-critic methods?</strong>
+                    <p style="color: #94a3b8;">Answer: SAC maximizes both reward and entropy, is off-policy with replay buffer, uses twin critics, and automatically tunes the temperature parameter.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

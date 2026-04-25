@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 통신 프로토콜 | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #f59e0b; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning-box h4 { color: #f59e0b; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제3장: 통신 프로토콜</h1>
+        <p class="chapter-meta">분산 학습에서 대역폭 최적화 및 통신 오버헤드 최소화</p>
+
+        <h2>통신 병목현상</h2>
+        <p>
+            연합학습에서 통신 비용은 종종 계산 비용을 지배합니다. 일반적인 딥 뉴럴 네트워크는 수백만 또는 수십억 개의 파라미터를 가질 수 있어 전송에 상당한 대역폭이 필요합니다. 모바일 클라이언트를 사용하는 크로스-디바이스 연합학습의 경우, 대역폭, 지연 시간, 에너지 소비 및 금전적 비용 측면에서 상당한 도전과제가 발생합니다.
+        </p>
+
+        <div class="warning-box">
+            <h4>핵심 통찰</h4>
+            <p>100MB 모델과 1000개 클라이언트를 사용한 단일 통신 라운드는 200GB의 대역폭이 필요합니다(100MB 업로드 × 1000 + 100MB 다운로드 × 1000). 수백 번의 학습 라운드를 거치면 압축 없이는 금지적이 됩니다.</p>
+        </div>
+
+        <h2>모델 압축 기술</h2>
+
+        <h3>양자화</h3>
+        <p>
+            양자화는 모델 파라미터 또는 그래디언트의 정밀도를 줄여 통신 크기를 극적으로 감소시킵니다:
+        </p>
+
+        <pre><code>import numpy as np
+
+def quantize_gradient(gradient, num_bits=8):
+    """
+    그래디언트를 고정 소수점 표현으로 양자화
+
+    인자:
+        gradient: Float32 그래디언트 배열
+        num_bits: 양자화를 위한 비트 수 (일반적으로 8 또는 16)
+
+    반환:
+        양자화된 그래디언트 및 역양자화를 위한 메타데이터
+    """
+    # 범위를 위한 최소값 및 최대값 찾기
+    min_val = np.min(gradient)
+    max_val = np.max(gradient)
+
+    # 양자화 레벨 수
+    num_levels = 2 ** num_bits
+
+    # 정수 범위로 양자화
+    scale = (max_val - min_val) / num_levels
+    zero_point = -min_val / scale
+
+    quantized = np.round(gradient / scale + zero_point)
+    quantized = np.clip(quantized, 0, num_levels - 1).astype(np.uint8)
+
+    return {
+        'quantized': quantized,
+        'scale': scale,
+        'zero_point': zero_point,
+        'shape': gradient.shape
+    }
+
+
+def dequantize_gradient(quantized_data):
+    """양자화된 표현에서 근사 그래디언트 재구성"""
+    quantized = quantized_data['quantized']
+    scale = quantized_data['scale']
+    zero_point = quantized_data['zero_point']
+
+    dequantized = (quantized.astype(np.float32) - zero_point) * scale
+    return dequantized.reshape(quantized_data['shape'])
+
+
+# 사용 예시
+original_gradient = np.random.randn(10000)  # 40KB (float32)
+quantized_data = quantize_gradient(original_gradient, num_bits=8)
+print(f"원본 크기: {original_gradient.nbytes} bytes")
+print(f"양자화 크기: {quantized_data['quantized'].nbytes} bytes")
+print(f"압축 비율: {original_gradient.nbytes / quantized_data['quantized'].nbytes}x")
+
+# 40KB → 10KB (4배 압축)</code></pre>
+
+        <h3>희소화 (Top-K)</h3>
+        <p>
+            가장 큰 크기의 그래디언트 k개만 전송하고 나머지는 0으로 설정:
+        </p>
+
+        <pre><code>def sparsify_gradient(gradient, sparsity=0.1):
+    """
+    가장 큰 크기의 상위 k% 그래디언트만 유지
+
+    인자:
+        gradient: 전체 그래디언트 배열
+        sparsity: 유지할 그래디언트의 비율 (0.1 = 10%)
+
+    반환:
+        인덱스와 값이 있는 희소 표현
+    """
+    flat_gradient = gradient.flatten()
+    k = int(len(flat_gradient) * sparsity)
+
+    # 상위 k 인덱스 찾기
+    top_k_indices = np.argpartition(np.abs(flat_gradient), -k)[-k:]
+    top_k_values = flat_gradient[top_k_indices]
+
+    return {
+        'indices': top_k_indices,
+        'values': top_k_values,
+        'shape': gradient.shape,
+        'sparsity': sparsity
+    }
+
+
+def densify_gradient(sparse_data):
+    """희소 표현에서 그래디언트 재구성"""
+    gradient = np.zeros(np.prod(sparse_data['shape']))
+    gradient[sparse_data['indices']] = sparse_data['values']
+    return gradient.reshape(sparse_data['shape'])
+
+
+# 예시
+gradient = np.random.randn(10000)  # 40KB
+sparse = sparsify_gradient(gradient, sparsity=0.1)
+
+# 값의 10%만 전송 + 인덱스
+# ~4KB 값 + ~4KB 인덱스 = 총 8KB (5배 압축)</code></pre>
+
+        <h3>저랭크 분해</h3>
+        <p>
+            저랭크 인수분해를 사용하여 가중치 행렬을 근사화:
+        </p>
+
+        <pre><code>def low_rank_compression(weight_matrix, rank=10):
+    """
+    SVD 저랭크 근사를 사용한 가중치 행렬 압축
+
+    인자:
+        weight_matrix: 2D 가중치 행렬 (예: 1000x1000)
+        rank: 근사를 위한 목표 랭크
+
+    반환:
+        W ≈ U @ V^T인 저랭크 인수 U와 V
+    """
+    U, s, Vt = np.linalg.svd(weight_matrix, full_matrices=False)
+
+    # 상위 랭크 특이값만 유지
+    U_compressed = U[:, :rank]
+    s_compressed = s[:rank]
+    Vt_compressed = Vt[:rank, :]
+
+    # 특이값을 U에 통합
+    U_compressed = U_compressed @ np.diag(s_compressed)
+
+    return {
+        'U': U_compressed,
+        'V': Vt_compressed.T,
+        'original_shape': weight_matrix.shape
+    }
+
+
+def reconstruct_from_low_rank(compressed):
+    """근사 가중치 행렬 재구성"""
+    return compressed['U'] @ compressed['V'].T
+
+
+# 예시: 1000x1000 행렬
+W = np.random.randn(1000, 1000)  # 4MB (float32)
+compressed = low_rank_compression(W, rank=10)
+
+# 1,000,000 대신 1000×10 + 1000×10 = 20,000 값 전송
+# 4MB 대신 80KB (50배 압축)</code></pre>
+
+        <h2>그래디언트 누적 및 배칭</h2>
+
+        <h3>로컬 SGD</h3>
+        <p>
+            통신 전에 여러 로컬 업데이트 단계를 수행하여 통신 빈도 감소:
+        </p>
+
+        <pre><code>class LocalSGD:
+    def __init__(self, model, local_steps=10):
+        self.model = model
+        self.local_steps = local_steps
+        self.step_count = 0
+
+    def train_step(self, batch):
+        """하나의 학습 단계 수행"""
+        loss = self.model.forward(batch)
+        gradients = self.model.backward()
+        self.model.update(gradients)
+        self.step_count += 1
+
+        # local_steps 반복마다만 통신
+        if self.step_count % self.local_steps == 0:
+            return self.model.get_weights()  # 통신
+        else:
+            return None  # 통신 없음
+
+
+# 통신 감소 = local_steps 배
+# 예: local_steps=10 → 통신 라운드 10배 감소</code></pre>
+
+        <h3>그래디언트 압축 파이프라인</h3>
+        <p>
+            여러 압축 기술 결합:
+        </p>
+
+        <pre><code>class GradientCompressionPipeline:
+    def __init__(self, quantization_bits=8, sparsity=0.1, use_error_feedback=True):
+        self.quantization_bits = quantization_bits
+        self.sparsity = sparsity
+        self.use_error_feedback = use_error_feedback
+        self.error_accumulator = None
+
+    def compress(self, gradient):
+        """여러 압축 기술 적용"""
+
+        # 1. 오류 피드백: 이전 라운드의 누적 오류 추가
+        if self.use_error_feedback and self.error_accumulator is not None:
+            gradient = gradient + self.error_accumulator
+
+        # 2. 희소화 (top-k)
+        sparse_data = sparsify_gradient(gradient, self.sparsity)
+
+        # 3. 희소 값의 양자화
+        quantized = quantize_gradient(sparse_data['values'], self.quantization_bits)
+
+        # 4. 압축 오류 계산 및 저장
+        reconstructed = densify_gradient({
+            'indices': sparse_data['indices'],
+            'values': dequantize_gradient(quantized),
+            'shape': gradient.shape
+        })
+        self.error_accumulator = gradient - reconstructed
+
+        return {
+            'indices': sparse_data['indices'],
+            'quantized_values': quantized,
+            'shape': gradient.shape
+        }
+
+    def decompress(self, compressed_data):
+        """근사 그래디언트 재구성"""
+        dequantized_values = dequantize_gradient(compressed_data['quantized_values'])
+
+        return densify_gradient({
+            'indices': compressed_data['indices'],
+            'values': dequantized_values,
+            'shape': compressed_data['shape']
+        })
+
+
+# 정확도 손실을 최소화하면서 50-100배 압축 달성</code></pre>
+
+        <h2>적응형 통신 전략</h2>
+
+        <h3>중요도 기반 샘플링</h3>
+        <p>
+            크기 또는 기타 기준에 따라 중요한 그래디언트의 통신 우선순위 지정:
+        </p>
+
+        <pre><code>def importance_sampling(gradient, budget=0.1):
+    """
+    크기에 비례하는 확률로 그래디언트 샘플링
+
+    예산 비율만 통신하면서 불편향 추정량 보장
+    """
+    flat_grad = gradient.flatten()
+    importance = np.abs(flat_grad)
+
+    # 확률 분포로 정규화
+    probabilities = importance / np.sum(importance)
+
+    # 중요도에 따라 인덱스 샘플링
+    num_samples = int(len(flat_grad) * budget)
+    sampled_indices = np.random.choice(
+        len(flat_grad),
+        size=num_samples,
+        replace=False,
+        p=probabilities
+    )
+
+    # 샘플링 편향 수정
+    sampled_values = flat_grad[sampled_indices] / (probabilities[sampled_indices] * num_samples)
+
+    return {
+        'indices': sampled_indices,
+        'values': sampled_values,
+        'shape': gradient.shape
+    }</code></pre>
+
+        <h3>적응형 압축</h3>
+        <p>
+            네트워크 조건 및 학습 진행에 따라 압축률을 동적으로 조정:
+        </p>
+
+        <pre><code>class AdaptiveCompressor:
+    def __init__(self, initial_sparsity=0.1):
+        self.sparsity = initial_sparsity
+
+    def compress(self, gradient, bandwidth_available, training_progress):
+        """
+        조건에 따라 압축 조정
+
+        - 낮은 대역폭 → 더 높은 압축
+        - 초기 학습 → 더 많은 압축 가능
+        - 수렴 근처 → 정확도를 위해 압축 감소
+        """
+
+        # 대역폭에 따라 희소성 조정
+        if bandwidth_available < 1_000_000:  # < 1 Mbps
+            target_sparsity = 0.05  # 매우 공격적
+        elif bandwidth_available < 10_000_000:  # < 10 Mbps
+            target_sparsity = 0.1
+        else:
+            target_sparsity = 0.2
+
+        # 수렴 근처에서 압축 감소
+        if training_progress > 0.9:  # 90% 완료
+            target_sparsity = min(target_sparsity * 2, 0.5)
+
+        # 부드러운 전환
+        self.sparsity = 0.9 * self.sparsity + 0.1 * target_sparsity
+
+        return sparsify_gradient(gradient, self.sparsity)</code></pre>
+
+        <h2>구조화된 업데이트</h2>
+
+        <h3>스케칭 및 무작위 투영</h3>
+        <p>
+            무작위 투영을 사용하여 그래디언트 차원 축소:
+        </p>
+
+        <pre><code>class RandomProjectionCompressor:
+    def __init__(self, original_dim, compressed_dim):
+        """
+        무작위 투영 행렬 초기화
+
+        original_dim에서 compressed_dim으로 압축
+        """
+        self.original_dim = original_dim
+        self.compressed_dim = compressed_dim
+
+        # 무작위 투영 행렬 생성 (라운드 전체에서 고정)
+        self.projection_matrix = np.random.randn(
+            compressed_dim, original_dim
+        ) / np.sqrt(compressed_dim)
+
+    def compress(self, gradient):
+        """그래디언트를 낮은 차원으로 투영"""
+        flat_grad = gradient.flatten()
+        compressed = self.projection_matrix @ flat_grad
+
+        return {
+            'compressed': compressed,
+            'original_shape': gradient.shape
+        }
+
+    def decompress(self, compressed_data):
+        """전치를 사용한 근사 재구성"""
+        compressed = compressed_data['compressed']
+        reconstructed = self.projection_matrix.T @ compressed
+
+        return reconstructed.reshape(compressed_data['original_shape'])
+
+
+# 예시: 100,000 → 1,000 압축 (100배 감소)</code></pre>
+
+        <h2>차등 압축</h2>
+
+        <h3>델타 인코딩</h3>
+        <p>
+            이전 모델과의 차이만 전송:
+        </p>
+
+        <pre><code>class DeltaEncoder:
+    def __init__(self):
+        self.previous_model = None
+
+    def encode(self, current_model):
+        """이전 모델과의 차이만 전송"""
+        if self.previous_model is None:
+            # 첫 번째 라운드: 전체 모델 전송
+            self.previous_model = current_model.copy()
+            return {'type': 'full', 'model': current_model}
+
+        # 후속 라운드: 델타 전송
+        delta = current_model - self.previous_model
+        self.previous_model = current_model.copy()
+
+        # 델타는 종종 많은 작은 값을 가지므로 → 잘 압축됨
+        compressed_delta = sparsify_gradient(delta, sparsity=0.1)
+
+        return {'type': 'delta', 'delta': compressed_delta}
+
+    def decode(self, encoded, receiver_model):
+        """델타에서 전체 모델 재구성"""
+        if encoded['type'] == 'full':
+            return encoded['model']
+        else:
+            delta = densify_gradient(encoded['delta'])
+            return receiver_model + delta</code></pre>
+
+        <h2>통신 효율적인 프로토콜</h2>
+
+        <h3>비동기 업데이트</h3>
+        <p>
+            클라이언트가 대기 없이 다른 속도로 통신하도록 허용:
+        </p>
+
+        <pre><code>class AsynchronousFederatedServer:
+    def __init__(self, model):
+        self.global_model = model
+        self.version = 0
+        self.lock = threading.Lock()
+
+    def receive_update(self, client_id, client_model, client_version):
+        """
+        비동기적으로 클라이언트 업데이트 처리
+
+        버전 낙후도 처리
+        """
+        with self.lock:
+            # 낙후도 계산
+            staleness = self.version - client_version
+
+            # 낙후도 인식 가중치 적용
+            alpha = 1.0 / (1.0 + staleness)
+
+            # 전역 모델 업데이트
+            self.global_model = (
+                (1 - alpha) * self.global_model +
+                alpha * client_model
+            )
+
+            self.version += 1
+
+        return self.global_model, self.version
+
+    def send_model(self, client_id):
+        """현재 전역 모델을 클라이언트에게 전송"""
+        with self.lock:
+            return self.global_model.copy(), self.version</code></pre>
+
+        <h3>계층적 집계</h3>
+        <p>
+            엣지 서버를 사용하여 중앙 서버로의 통신 감소:
+        </p>
+
+        <pre><code>class HierarchicalFederatedLearning:
+    """
+    3계층 아키텍처:
+    클라이언트 장치 → 엣지 서버 → 중앙 서버
+    """
+
+    def __init__(self, num_edge_servers):
+        self.edge_servers = [EdgeServer(i) for i in range(num_edge_servers)]
+        self.central_server = CentralServer()
+
+    def training_round(self, clients_per_edge=10):
+        """
+        계층적 집계로 하나의 학습 라운드 실행
+        """
+
+        # 단계 1: 클라이언트 → 엣지 서버
+        edge_models = []
+        for edge_server in self.edge_servers:
+            # 각 엣지 서버가 로컬 클라이언트 집계
+            edge_model = edge_server.aggregate_clients(
+                num_clients=clients_per_edge
+            )
+            edge_models.append(edge_model)
+
+        # 단계 2: 엣지 서버 → 중앙 서버
+        # 중앙으로의 통신 라운드 훨씬 적음
+        global_model = self.central_server.aggregate_edges(edge_models)
+
+        # 단계 3: 계층 구조를 통해 전역 모델 브로드캐스트
+        for edge_server in self.edge_servers:
+            edge_server.update_model(global_model)
+
+        return global_model
+
+
+# 중앙 서버 통신을 ~clients_per_edge 배 감소</code></pre>
+
+        <h2>대역폭 최적화 전략</h2>
+
+        <h3>통신 스케줄링</h3>
+        <p>
+            오프피크 시간 또는 WiFi 연결 시 업데이트 예약:
+        </p>
+
+        <pre><code>class CommunicationScheduler:
+    def __init__(self):
+        self.pending_updates = []
+
+    def should_communicate(self, device_state):
+        """
+        장치 조건에 따라 통신 여부 결정
+
+        인자:
+            device_state: 배터리, 네트워크, 시간 정보가 있는 딕셔너리
+
+        반환:
+            지금 통신할지 여부를 나타내는 부울
+        """
+        # 배터리 레벨 확인
+        if device_state['battery_level'] < 0.3 and not device_state['charging']:
+            return False  # 배터리 소모 방지
+
+        # 셀룰러보다 WiFi 선호
+        if device_state['network_type'] == 'cellular':
+            # 중요하고 신호가 좋을 때만
+            if device_state['signal_strength'] < 0.7:
+                return False
+            # 데이터 허용량 확인
+            if device_state['data_used_mb'] > device_state['data_limit_mb'] * 0.9:
+                return False
+
+        # 오프피크 시간 선호
+        hour = device_state['current_hour']
+        if 9 <= hour <= 17:  # 피크 시간
+            return device_state['network_type'] == 'wifi'
+
+        return True  # 통신 가능</code></pre>
+
+        <h3>점진적 모델 업데이트</h3>
+        <p>
+            조잡한 것부터 세밀한 것까지 점진적으로 모델 업데이트 전송:
+        </p>
+
+        <pre><code>def progressive_update(model, num_stages=3):
+    """
+    증가하는 세부 정보로 여러 단계에 걸쳐 모델 전송
+
+    단계 1: 저랭크 근사
+    단계 2: + Top-k 희소 수정
+    단계 3: + 나머지 작은 수정
+    """
+
+    stages = []
+
+    # 단계 1: 저랭크 근사 (가장 작음)
+    low_rank = low_rank_compression(model, rank=10)
+    stages.append({
+        'stage': 1,
+        'type': 'low_rank',
+        'data': low_rank,
+        'size_kb': calculate_size(low_rank)
+    })
+
+    # 재구성 및 오류 계산
+    approx_1 = reconstruct_from_low_rank(low_rank)
+    error_1 = model - approx_1
+
+    # 단계 2: 오류의 상위 10%
+    top_errors = sparsify_gradient(error_1, sparsity=0.1)
+    stages.append({
+        'stage': 2,
+        'type': 'sparse_correction',
+        'data': top_errors,
+        'size_kb': calculate_size(top_errors)
+    })
+
+    # 단계 3: 나머지 오류 (선택 사항, 대역폭이 허용하는 경우)
+    approx_2 = approx_1 + densify_gradient(top_errors)
+    error_2 = model - approx_2
+    remaining = sparsify_gradient(error_2, sparsity=0.05)
+    stages.append({
+        'stage': 3,
+        'type': 'final_correction',
+        'data': remaining,
+        'size_kb': calculate_size(remaining)
+    })
+
+    return stages
+
+# 클라이언트는 대역폭에 따라 어느 단계에서든 다운로드 중지 가능</code></pre>
+
+        <div class="info-box">
+            <h4>弘益人間의 실현</h4>
+            <p>효율적인 통신 프로토콜은 연합학습을 전 세계 수십억 명의 사람들이 접근할 수 있게 만듭니다. 대역폭 요구사항을 최소화함으로써 제한된 인터넷 연결을 가진 사람들도 AI 발전에 기여하고 혜택을 받을 수 있어, 진정으로 弘익人間(홍익인간)의 원칙을 실현합니다.</p>
+        </div>
+
+        <div class="summary">
+            <h2>장 요약</h2>
+            <ul>
+                <li>통신 비용이 연합학습을 지배하며 압축이 필수적</li>
+                <li>양자화는 정밀도를 줄임 (최소 정확도 손실로 4-32배 압축)</li>
+                <li>희소화는 상위 k 그래디언트만 전송 (10-100배 압축)</li>
+                <li>저랭크 분해는 더 적은 파라미터로 행렬 근사</li>
+                <li>로컬 SGD는 여러 로컬 단계를 수행하여 통신 빈도 감소</li>
+                <li>오류 피드백 누적은 압축에도 불구하고 정확도 유지</li>
+                <li>적응형 전략은 네트워크 및 학습 조건에 따라 압축 조정</li>
+                <li>비동기 업데이트는 클라이언트가 다른 속도로 통신하도록 허용</li>
+                <li>계층적 집계는 엣지 서버를 사용하여 중앙 통신 감소</li>
+                <li>스마트 스케줄링은 최적의 시간(WiFi, 오프피크, 충전)으로 통신 연기</li>
+                <li>기술 결합으로 모델 품질을 유지하면서 100배 이상 압축 달성 가능</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>연합학습에서 통신이 병목현상이 되는 이유는 무엇입니까? 100MB 모델과 1000개 클라이언트의 대역폭을 계산하세요.</li>
+                <li>양자화가 어떻게 작동하는지 설명하세요. num_bits와 정확도 사이의 트레이드오프는 무엇입니까?</li>
+                <li>희소화(top-k)가 통신을 어떻게 줄입니까? 전송되지 않은 그래디언트는 어떻게 됩니까?</li>
+                <li>오류 피드백 누적이란 무엇입니까? 압축에도 불구하고 정확도를 어떻게 유지합니까?</li>
+                <li>동기식과 비동기식 연합학습을 비교하세요. 낙후도 문제는 무엇입니까?</li>
+                <li>계층적 집계가 중앙 서버로의 통신을 어떻게 줄입니까?</li>
+                <li>양자화, 희소화 및 오류 피드백을 결합하는 압축 파이프라인을 설계하세요.</li>
+                <li>통신 스케줄러가 업데이트 전송 여부를 결정할 때 고려해야 할 요인은 무엇입니까?</li>
+                <li>점진적 모델 업데이트가 다양한 대역폭 조건에 어떻게 적응합니까?</li>
+                <li>1억 명의 사용자가 있는 모바일 키보드 앱을 위한 효율적인 통신 전략을 설계하세요.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← 제2장</a>
+            <a href="chapter-04.html" class="nav-button">제4장 →</a>
+        </div>
+    </div>
+</body>
+</html>

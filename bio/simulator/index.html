@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Bio - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #14B8A6;
+            --primary-dark: #0D9488;
+            --secondary: #3B82F6;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #2DD4BF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sequence-viewer { background: #000; border-radius: 8px; padding: 20px; font-family: 'Monaco', 'Menlo', monospace; margin: 20px 0; overflow-x: auto; }
+        .sequence-line { display: flex; margin: 5px 0; }
+        .sequence-num { color: var(--text-muted); width: 60px; text-align: right; margin-right: 15px; }
+        .sequence-data { letter-spacing: 2px; }
+        .base-A { color: #22c55e; }
+        .base-T { color: #ef4444; }
+        .base-G { color: #f59e0b; }
+        .base-C { color: #3b82f6; }
+        .base-U { color: #a855f7; }
+
+        .crispr-editor { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .crispr-target { background: #000; padding: 15px; border-radius: 6px; font-family: monospace; margin: 15px 0; }
+        .crispr-pam { color: #ef4444; font-weight: bold; }
+        .crispr-guide { color: #22c55e; text-decoration: underline; }
+
+        .protein-3d { background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 12px; padding: 40px; text-align: center; margin: 20px 0; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .protein-structure { font-size: 4rem; margin-bottom: 15px; animation: rotate 10s linear infinite; }
+        @keyframes rotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+
+        .parts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .part-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .part-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .part-card.promoter { border-left: 4px solid #22c55e; }
+        .part-card.rbs { border-left: 4px solid #3b82f6; }
+        .part-card.cds { border-left: 4px solid #f59e0b; }
+        .part-card.terminator { border-left: 4px solid #ef4444; }
+        .part-icon { font-size: 2rem; margin-bottom: 10px; }
+        .part-name { font-weight: 600; }
+        .part-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
+        .stat-value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .input-group { margin: 15px 0; }
+        .input-group label { display: block; margin-bottom: 8px; color: var(--text-muted); }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 6px; font-family: inherit; }
+        .input-group textarea { min-height: 100px; font-family: monospace; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Bio</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🧬 WIA Bio</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Biotech Data Standard" data-ko="바이오테크 데이터 표준">Biotech Data Standard</h1>
+            <p data-en="Gene sequences, CRISPR, protein structures" data-ko="유전자 서열, CRISPR, 단백질 구조">Gene, CRISPR, Protein</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🧬 Sequence" data-ko="🧬 서열">🧬 Sequence</div>
+            <div class="tab" onclick="showPanel(1)" data-en="✂️ CRISPR" data-ko="✂️ CRISPR">✂️ CRISPR</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔬 Protein" data-ko="🔬 단백질">🔬 Protein</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🧱 Parts" data-ko="🧱 부품">🧱 Parts</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📊 Analysis" data-ko="📊 분석">📊 Analysis</div>
+        </div>
+
+        <!-- Panel 0: Sequence -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🧬 DNA/RNA Sequence Viewer" data-ko="🧬 DNA/RNA 서열 뷰어">🧬 Sequence Viewer</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="View and analyze genetic sequences" data-ko="유전자 서열 보기 및 분석">View and analyze genetic sequences</p>
+
+            <div class="input-group">
+                <label data-en="Paste FASTA sequence or enter manually" data-ko="FASTA 서열 붙여넣기 또는 직접 입력">Paste FASTA sequence</label>
+                <textarea id="seqInput" placeholder=">Gene_Example&#10;ATGCGATCGATCGATCG...">>WIA_Example_Gene
+ATGCGATCGATCGATCGTAGCTAGCTAGCTAGCATCGATCGATCGATCGTAGCTAGCTAGCTAGC</textarea>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="viewSequence()" data-en="🔍 View Sequence" data-ko="🔍 서열 보기">🔍 View</button>
+                <button class="btn btn-secondary" onclick="generateRandom()" data-en="🎲 Random" data-ko="🎲 랜덤">🎲 Random</button>
+            </div>
+
+            <div class="sequence-viewer" id="seqViewer">
+                <div class="sequence-line"><span class="sequence-num">1</span><span class="sequence-data"><span class="base-A">A</span><span class="base-T">T</span><span class="base-G">G</span><span class="base-C">C</span><span class="base-G">G</span><span class="base-A">A</span><span class="base-T">T</span><span class="base-C">C</span><span class="base-G">G</span><span class="base-A">A</span></span></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="seqLength">64</div>
+                    <div class="stat-label" data-en="Length (bp)" data-ko="길이 (bp)">Length (bp)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="gcContent">50%</div>
+                    <div class="stat-label">GC Content</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="mwValue">19.8k</div>
+                    <div class="stat-label" data-en="MW (Da)" data-ko="분자량">MW (Da)</div>
+                </div>
+            </div>
+            <div class="output" id="seqOutput"></div>
+        </div>
+
+        <!-- Panel 1: CRISPR -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="✂️ CRISPR Editor" data-ko="✂️ CRISPR 편집기">✂️ CRISPR Editor</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Design guide RNA and simulate gene editing" data-ko="가이드 RNA 설계 및 유전자 편집 시뮬레이션">Design gRNA and simulate editing</p>
+
+            <div class="crispr-editor">
+                <div class="input-group">
+                    <label data-en="Target Gene Sequence" data-ko="타겟 유전자 서열">Target Gene Sequence</label>
+                    <input type="text" id="crisprTarget" value="ATGCGATCGATCGATCGTAGCTAGCTAGCNGG" placeholder="Enter target sequence with PAM (NGG)">
+                </div>
+
+                <div class="crispr-target" id="crisprPreview">
+                    5'- ATGCGATCGATCGATCGTAG<span class="crispr-guide">CTAGCTAGC</span><span class="crispr-pam">NGG</span> -3'<br>
+                    3'- TACGCTAGCTAGCTAGCATC<span class="crispr-guide">GATCGATCG</span><span class="crispr-pam">NCC</span> -5'
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">20nt</div>
+                        <div class="stat-label">gRNA Length</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">NGG</div>
+                        <div class="stat-label">PAM Site</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">85%</div>
+                        <div class="stat-label" data-en="Efficiency" data-ko="효율">Efficiency</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">Low</div>
+                        <div class="stat-label" data-en="Off-target" data-ko="비표적">Off-target</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="designGRNA()" data-en="✂️ Design gRNA" data-ko="✂️ gRNA 설계">✂️ Design gRNA</button>
+                <button class="btn btn-secondary" onclick="simulateEdit()" data-en="🧪 Simulate Edit" data-ko="🧪 편집 시뮬레이션">🧪 Simulate</button>
+            </div>
+            <div class="output" id="crisprOutput"></div>
+        </div>
+
+        <!-- Panel 2: Protein -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🔬 Protein Structure" data-ko="🔬 단백질 구조">🔬 Protein Structure</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Visualize and analyze protein structures" data-ko="단백질 구조 시각화 및 분석">Visualize protein structures</p>
+
+            <div class="protein-3d">
+                <div class="protein-structure">🧬</div>
+                <p style="color: var(--text-muted);" data-en="3D Structure Viewer" data-ko="3D 구조 뷰어">3D Structure Viewer</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">AlphaFold2 Prediction</p>
+            </div>
+
+            <div class="input-group">
+                <label data-en="Protein Sequence (Amino Acids)" data-ko="단백질 서열 (아미노산)">Protein Sequence</label>
+                <textarea id="proteinSeq" placeholder="MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSH...">MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSH</textarea>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="proteinLen">51</div>
+                    <div class="stat-label" data-en="Residues" data-ko="잔기">Residues</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">92.5</div>
+                    <div class="stat-label">pLDDT Score</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">α/β</div>
+                    <div class="stat-label" data-en="Fold Type" data-ko="접힘 유형">Fold Type</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="predictStructure()" data-en="🔬 Predict Structure" data-ko="🔬 구조 예측">🔬 Predict</button>
+            </div>
+            <div class="output" id="proteinOutput"></div>
+        </div>
+
+        <!-- Panel 3: Parts -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🧱 Synthetic Biology Parts" data-ko="🧱 합성생물학 부품">🧱 BioBrick Parts</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Browse and assemble genetic parts" data-ko="유전자 부품 탐색 및 조립">Browse and assemble genetic parts</p>
+
+            <div class="parts-grid">
+                <div class="part-card promoter" onclick="selectPart('promoter')">
+                    <div class="part-icon">▶️</div>
+                    <div class="part-name">Promoter</div>
+                    <div class="part-desc" data-en="Transcription start" data-ko="전사 시작">Transcription start</div>
+                </div>
+                <div class="part-card rbs" onclick="selectPart('rbs')">
+                    <div class="part-icon">🔘</div>
+                    <div class="part-name">RBS</div>
+                    <div class="part-desc" data-en="Ribosome binding" data-ko="리보솜 결합">Ribosome binding</div>
+                </div>
+                <div class="part-card cds" onclick="selectPart('cds')">
+                    <div class="part-icon">📦</div>
+                    <div class="part-name">CDS</div>
+                    <div class="part-desc" data-en="Coding sequence" data-ko="코딩 서열">Coding sequence</div>
+                </div>
+                <div class="part-card terminator" onclick="selectPart('terminator')">
+                    <div class="part-icon">⏹️</div>
+                    <div class="part-name">Terminator</div>
+                    <div class="part-desc" data-en="Transcription stop" data-ko="전사 종결">Transcription stop</div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg); border: 2px dashed var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+                <p style="color: var(--text-muted); margin-bottom: 10px;" data-en="Assembly Preview" data-ko="조립 미리보기">Assembly Preview</p>
+                <div id="assemblyPreview" style="font-size: 1.5rem;">▶️ → 🔘 → 📦 → ⏹️</div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="assembleCircuit()" data-en="🔧 Assemble Circuit" data-ko="🔧 회로 조립">🔧 Assemble</button>
+            </div>
+            <div class="output" id="partsOutput"></div>
+        </div>
+
+        <!-- Panel 4: Analysis -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📊 Data Analysis" data-ko="📊 데이터 분석">📊 Data Analysis</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Analyze and visualize biotech data" data-ko="바이오테크 데이터 분석 및 시각화">Analyze biotech data</p>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">156</div>
+                    <div class="stat-label" data-en="Sequences" data-ko="서열">Sequences</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">42</div>
+                    <div class="stat-label" data-en="Experiments" data-ko="실험">Experiments</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">89%</div>
+                    <div class="stat-label" data-en="Success Rate" data-ko="성공률">Success Rate</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">2.3GB</div>
+                    <div class="stat-label" data-en="Data Size" data-ko="데이터 크기">Data Size</div>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label data-en="Analysis Type" data-ko="분석 유형">Analysis Type</label>
+                <select id="analysisType">
+                    <option value="alignment">Sequence Alignment</option>
+                    <option value="phylo">Phylogenetic Tree</option>
+                    <option value="motif">Motif Discovery</option>
+                    <option value="expression">Gene Expression</option>
+                </select>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runAnalysis()" data-en="▶️ Run Analysis" data-ko="▶️ 분석 실행">▶️ Run Analysis</button>
+                <button class="btn btn-secondary" onclick="exportData()" data-en="📥 Export" data-ko="📥 내보내기">📥 Export</button>
+            </div>
+            <div class="output" id="analysisOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Bio: Advancing life sciences together" data-ko="WIA Bio: 함께 생명과학을 발전시키다">WIA Bio: Advancing life sciences</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        const bases = ['A', 'T', 'G', 'C'];
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function viewSequence() {
+            const input = document.getElementById('seqInput').value;
+            const seq = input.split('\n').filter(l => !l.startsWith('>')).join('').toUpperCase().replace(/[^ATGCU]/g, '');
+            renderSequence(seq);
+        }
+
+        function renderSequence(seq) {
+            const viewer = document.getElementById('seqViewer');
+            let html = '';
+            for (let i = 0; i < seq.length; i += 60) {
+                const chunk = seq.slice(i, i + 60);
+                html += `<div class="sequence-line"><span class="sequence-num">${i + 1}</span><span class="sequence-data">`;
+                for (const base of chunk) {
+                    html += `<span class="base-${base}">${base}</span>`;
+                }
+                html += '</span></div>';
+            }
+            viewer.innerHTML = html;
+            
+            const gc = (seq.match(/[GC]/g) || []).length / seq.length * 100;
+            document.getElementById('seqLength').textContent = seq.length;
+            document.getElementById('gcContent').textContent = gc.toFixed(1) + '%';
+            document.getElementById('mwValue').textContent = (seq.length * 330 / 1000).toFixed(1) + 'k';
+            
+            document.getElementById('seqOutput').textContent = JSON.stringify({
+                length: seq.length, gcContent: gc.toFixed(1) + '%',
+                format: 'FASTA', type: seq.includes('U') ? 'RNA' : 'DNA'
+            }, null, 2);
+        }
+
+        function generateRandom() {
+            let seq = '';
+            for (let i = 0; i < 120; i++) seq += bases[Math.floor(Math.random() * 4)];
+            document.getElementById('seqInput').value = '>Random_Sequence\n' + seq;
+            renderSequence(seq);
+        }
+
+        function designGRNA() {
+            document.getElementById('crisprOutput').textContent = JSON.stringify({
+                gRNA: 'CTAGCTAGCTAGCTAGCTAG', pamSite: 'NGG', length: '20nt',
+                efficiency: '85%', offTargetScore: 'Low (0.12)',
+                message: currentLang === 'ko' ? 'gRNA 설계 완료' : 'gRNA design complete'
+            }, null, 2);
+        }
+
+        function simulateEdit() {
+            document.getElementById('crisprOutput').textContent = JSON.stringify({
+                editType: 'Knockout', targetGene: 'GENE_X',
+                outcome: { insertion: '15%', deletion: '75%', noEdit: '10%' },
+                message: currentLang === 'ko' ? '편집 시뮬레이션 완료' : 'Edit simulation complete'
+            }, null, 2);
+        }
+
+        function predictStructure() {
+            const seq = document.getElementById('proteinSeq').value;
+            document.getElementById('proteinLen').textContent = seq.length;
+            document.getElementById('proteinOutput').textContent = JSON.stringify({
+                residues: seq.length, model: 'AlphaFold2', pLDDT: 92.5,
+                secondaryStructure: { helix: '45%', sheet: '25%', coil: '30%' },
+                message: currentLang === 'ko' ? '구조 예측 완료' : 'Structure prediction complete'
+            }, null, 2);
+        }
+
+        function selectPart(type) {
+            document.getElementById('partsOutput').textContent = JSON.stringify({
+                partType: type, registry: 'iGEM', format: 'SBOL3',
+                message: currentLang === 'ko' ? type + ' 부품 선택됨' : type + ' part selected'
+            }, null, 2);
+        }
+
+        function assembleCircuit() {
+            document.getElementById('partsOutput').textContent = JSON.stringify({
+                circuit: ['Promoter', 'RBS', 'CDS', 'Terminator'],
+                format: 'SBOL3', compatible: true,
+                message: currentLang === 'ko' ? '회로 조립 완료' : 'Circuit assembly complete'
+            }, null, 2);
+        }
+
+        function runAnalysis() {
+            const type = document.getElementById('analysisType').value;
+            document.getElementById('analysisOutput').textContent = JSON.stringify({
+                analysisType: type, status: 'completed', runtime: '2.3s',
+                message: currentLang === 'ko' ? type + ' 분석 완료' : type + ' analysis complete'
+            }, null, 2);
+        }
+
+        function exportData() {
+            document.getElementById('analysisOutput').textContent = JSON.stringify({
+                format: 'WIA-BIO-1.0', exported: true,
+                files: ['project.json', 'sequences.fasta', 'results.json'],
+                message: currentLang === 'ko' ? '데이터 내보내기 준비됨' : 'Data export ready'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setLang('en'));
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

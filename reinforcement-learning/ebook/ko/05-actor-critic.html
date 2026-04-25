@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: Actor-Critic 방법 | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.2rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        h2 { color: #10B981; font-size: 1.6rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        code { color: #10B981; font-family: 'Courier New', monospace; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제5장: Actor-Critic 방법</h1>
+            <div class="chapter-meta">WIA-AI-025 | 두 세계의 장점 결합</div>
+        </header>
+
+        <main>
+            <h2>5.1 Actor-Critic 소개</h2>
+
+            <p>Actor-Critic 방법은 정책 경사법과 가치 기반 접근법의 장점을 결합합니다. "Actor"(행위자)는 정책을 업데이트하고 "Critic"(비평가)은 가치 함수를 추정하여 행동을 평가합니다.</p>
+
+            <div class="info-box">
+                <strong>핵심 개념:</strong>
+                <p><strong>Actor:</strong> 정책 π_θ(a|s) - 어떤 행동을 취할지 결정</p>
+                <p><strong>Critic:</strong> 가치 함수 V_w(s) 또는 Q_w(s,a) - 행동이 얼마나 좋은지 평가</p>
+            </div>
+
+            <h3>Actor-Critic의 장점</h3>
+
+            <ul>
+                <li><strong>낮은 분산:</strong> Critic이 Monte Carlo보다 낮은 분산 추정치 제공</li>
+                <li><strong>온라인 학습:</strong> 불완전한 에피소드에서도 학습 가능</li>
+                <li><strong>연속 행동:</strong> 연속 행동 공간에서 작동</li>
+                <li><strong>샘플 효율성:</strong> 부트스트래핑으로 학습 가속화</li>
+            </ul>
+
+            <h2>5.2 기본 Actor-Critic 알고리즘</h2>
+
+            <pre><code>알고리즘: 1단계 Actor-Critic
+
+actor π_θ와 critic V_w 초기화
+
+각 에피소드에 대해:
+    s = env.reset()
+    
+    while not done:
+        a ~ π_θ(·|s)  // Actor가 행동 선택
+        s', r, done = env.step(a)
+        
+        δ = r + γ V_w(s') - V_w(s)  // TD 오차 (Critic)
+        
+        w ← w + α_w δ ∇_w V_w(s)       // Critic 업데이트
+        θ ← θ + α_θ δ ∇_θ log π_θ(a|s) // Actor 업데이트
+        
+        s ← s'</code></pre>
+
+            <h3>구현</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+
+class Actor(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(Actor, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim),
+            nn.Softmax(dim=-1)
+        )
+    
+    def forward(self, state):
+        return self.network(state)
+
+class Critic(nn.Module):
+    def __init__(self, state_dim, hidden_dim=128):
+        super(Critic, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+    
+    def forward(self, state):
+        return self.network(state)</code></pre>
+
+            <h2>5.3 Advantage Actor-Critic (A2C)</h2>
+
+            <p>A2C는 Q값 대신 어드밴티지 함수를 사용합니다:</p>
+
+            <pre><code>A(s,a) = Q(s,a) - V(s)
+       = r + γV(s') - V(s)  // TD(0) 사용
+
+어드밴티지는 상태 s에서 평균 행동과 비교하여 
+행동 a가 얼마나 더 좋은지를 알려줍니다.</code></pre>
+
+            <h3>어드밴티지를 사용하는 이유</h3>
+
+            <ul>
+                <li>기준선 V(s)를 빼서 분산 감소</li>
+                <li>값을 0 주위로 중심화 (양수 = 좋음, 음수 = 나쁨)</li>
+                <li>정책 업데이트에 더 안정적인 그래디언트</li>
+                <li>Q(s,a)가 아닌 V(s)만 학습하면 됨</li>
+            </ul>
+
+            <h2>5.4 A3C (Asynchronous Advantage Actor-Critic)</h2>
+
+            <p>A3C는 여러 CPU 스레드에서 학습을 병렬화합니다. 각 스레드가 자체 환경을 실행합니다:</p>
+
+            <div class="info-box">
+                <strong>핵심 혁신:</strong>
+                <p>각 워커가 독립적으로 공유 글로벌 네트워크를 비동기적으로 업데이트합니다. 이는 경험 재생 없이도 다양한 경험을 제공하고 학습을 안정화합니다.</p>
+            </div>
+
+            <h2>5.5 Soft Actor-Critic (SAC)</h2>
+
+            <p>SAC는 보상과 엔트로피를 모두 최대화하는 off-policy actor-critic 알고리즘입니다:</p>
+
+            <pre><code>J(π) = E[Σ γ^t (r_t + α H(π(·|s_t)))]
+
+여기서:
+- H(π) = -E[log π(a|s)]는 엔트로피
+- α는 온도 파라미터
+- 높은 엔트로피 → 더 많은 탐색</code></pre>
+
+            <h3>SAC 주요 특징</h3>
+
+            <ul>
+                <li><strong>최대 엔트로피:</strong> 보상을 최대화하면서 탐색 장려</li>
+                <li><strong>Off-Policy:</strong> 리플레이 버퍼로 샘플 효율적</li>
+                <li><strong>확률적 정책:</strong> 자연스러운 탐색</li>
+                <li><strong>안정적:</strong> 많은 튜닝 없이 다양한 태스크에서 잘 작동</li>
+            </ul>
+
+            <h2>5.6 TD3 (Twin Delayed DDPG)</h2>
+
+            <p>TD3는 세 가지 주요 수정으로 DDPG를 개선합니다:</p>
+
+            <ol>
+                <li><strong>트윈 Critic:</strong> 두 개의 Q 네트워크, 최솟값 사용</li>
+                <li><strong>지연 정책 업데이트:</strong> Critic보다 덜 자주 정책 업데이트</li>
+                <li><strong>타겟 정책 스무딩:</strong> 타겟 행동에 노이즈 추가</li>
+            </ol>
+
+            <h2>5.7 Actor-Critic 방법 비교</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>알고리즘</th>
+                        <th>On/Off-Policy</th>
+                        <th>행동 공간</th>
+                        <th>핵심 특징</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>A2C</td>
+                        <td>On-policy</td>
+                        <td>이산/연속</td>
+                        <td>동기식 병렬 워커</td>
+                    </tr>
+                    <tr>
+                        <td>A3C</td>
+                        <td>On-policy</td>
+                        <td>이산/연속</td>
+                        <td>비동기식 워커</td>
+                    </tr>
+                    <tr>
+                        <td>DDPG</td>
+                        <td>Off-policy</td>
+                        <td>연속</td>
+                        <td>결정적 정책 + 리플레이</td>
+                    </tr>
+                    <tr>
+                        <td>TD3</td>
+                        <td>Off-policy</td>
+                        <td>연속</td>
+                        <td>트윈 critic + 지연 업데이트</td>
+                    </tr>
+                    <tr>
+                        <td>SAC</td>
+                        <td>Off-policy</td>
+                        <td>연속</td>
+                        <td>최대 엔트로피 + 자동 튜닝</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>5.8 실용적 팁</h2>
+
+            <h3>알고리즘 선택</h3>
+
+            <ul>
+                <li><strong>이산 행동:</strong> A2C, PPO</li>
+                <li><strong>연속 행동:</strong> SAC, TD3, DDPG</li>
+                <li><strong>샘플 효율성:</strong> SAC, TD3 (리플레이 있는 off-policy)</li>
+                <li><strong>안정성:</strong> SAC, PPO</li>
+                <li><strong>단순성:</strong> A2C, 기본 Actor-Critic</li>
+            </ul>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>Actor-Critic은 정책 경사(actor)와 가치 함수(critic)를 결합</li>
+                    <li>어드밴티지는 순수 정책 경사에 비해 분산 감소</li>
+                    <li>A2C는 동기식 병렬 워커를 사용한 데이터 수집</li>
+                    <li>A3C는 경험 재생 없이 비동기 업데이트</li>
+                    <li>SAC는 탐색을 위한 엔트로피 최대화, 높은 샘플 효율성</li>
+                    <li>TD3는 트윈 critic과 지연 업데이트로 DDPG 개선</li>
+                    <li>Off-policy 방법(SAC, TD3)이 더 샘플 효율적</li>
+                    <li>선택은 행동 공간, 샘플 효율성, 안정성 요구에 따라 결정</li>
+                </ul>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

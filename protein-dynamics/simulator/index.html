@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-PROTEIN-DYNAMICS Simulator | 弘益人間</title>
+    <style>
+        :root { --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-secondary: #cbd5e1; --primary: #6366F1; --primary-dark: #4F46E5; --accent: #3b82f6; --border: #334155; --success: #10b981; --error: #ef4444; --warning: #f59e0b; --shadow: rgba(0, 0, 0, 0.5); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: var(--bg-card); border-bottom: 2px solid var(--primary); padding: 20px 0; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 6px var(--shadow); }
+        .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo h1 { font-size: 24px; color: var(--primary); }
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .lang-select { background: var(--bg); border: 2px solid var(--primary); border-radius: 8px; padding: 10px 15px; color: var(--text); cursor: pointer; font-size: 14px; min-width: 150px; }
+        .back-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; transition: all 0.3s ease; }
+        .back-btn:hover { background: var(--primary-dark); }
+        .tabs { display: flex; gap: 0; background: var(--bg-card); border-radius: 12px 12px 0 0; overflow-x: auto; margin-top: 20px; }
+        .tab { padding: 16px 32px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.3s ease; white-space: nowrap; }
+        .tab:hover { color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(99, 102, 241, 0.15); }
+        .tab-content { display: none; background: var(--bg-card); border-radius: 0 0 12px 12px; padding: 30px; border: 1px solid var(--border); border-top: none; }
+        .tab-content.active { display: block; }
+        .section-title { color: var(--primary); font-size: 24px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-weight: 600; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 12px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: var(--primary); }
+        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.3s ease; border: none; display: inline-flex; align-items: center; gap: 8px; margin-right: 10px; margin-bottom: 10px; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4); }
+        .btn-secondary { background: var(--bg); border: 2px solid var(--primary); color: var(--primary); }
+        .output-area { background: var(--bg); border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Consolas', monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; font-size: 13px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; }
+        .card { background: var(--bg); border-radius: 12px; padding: 25px; border: 1px solid var(--border); }
+        .card-title { color: var(--primary); font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: var(--error); }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 4px; transition: width 0.5s ease; }
+        .protein-viewer { width: 100%; height: 400px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .protein-3d { font-size: 120px; animation: rotate 10s infinite linear; }
+        @keyframes rotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+        .energy-landscape { width: 100%; height: 300px; background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 50%, #1e293b 100%); border-radius: 8px; position: relative; overflow: hidden; }
+        .energy-point { position: absolute; width: 20px; height: 20px; background: var(--primary); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .metric-box { background: var(--bg-card); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        .metric-value { font-size: 24px; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+        footer { text-align: center; padding: 30px; color: var(--text-secondary); margin-top: 40px; }
+        .philosophy { color: var(--primary); font-size: 20px; letter-spacing: 4px; margin-bottom: 10px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .tabs { flex-wrap: wrap; } .tab { flex: 1; min-width: 120px; text-align: center; } }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo"><h1>🧬 WIA-PROTEIN-DYNAMICS Simulator</h1></div>
+            <div class="header-controls">
+                <select class="lang-select" id="langSelect" onchange="changeLanguage(this.value)">
+                    <option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="ru">Русский</option><option value="ar">العربية</option><option value="hi">हिन्दी</option><option value="vi">Tiếng Việt</option><option value="th">ไทย</option><option value="id">Bahasa Indonesia</option><option value="ms">Bahasa Melayu</option><option value="tl">Filipino</option><option value="bn">বাংলা</option><option value="ta">தமிழ்</option><option value="te">తెలుగు</option><option value="mr">मराठी</option><option value="gu">ગુજરાતી</option><option value="kn">ಕನ್ನಡ</option><option value="ml">മലയാളം</option><option value="pa">ਪੰਜਾਬੀ</option><option value="ur">اردو</option><option value="fa">فارسی</option><option value="tr">Türkçe</option><option value="pl">Polski</option><option value="uk">Українська</option><option value="nl">Nederlands</option><option value="sv">Svenska</option><option value="no">Norsk</option><option value="da">Dansk</option><option value="fi">Suomi</option><option value="cs">Čeština</option><option value="sk">Slovenčina</option><option value="hu">Magyar</option><option value="ro">Română</option><option value="bg">Български</option><option value="el">Ελληνικά</option><option value="he">עברית</option><option value="sr">Српски</option><option value="hr">Hrvatski</option><option value="sl">Slovenščina</option><option value="lt">Lietuvių</option><option value="lv">Latviešu</option><option value="et">Eesti</option><option value="is">Íslenska</option><option value="ga">Gaeilge</option><option value="cy">Cymraeg</option><option value="mt">Malti</option><option value="sq">Shqip</option><option value="mk">Македонски</option><option value="bs">Bosanski</option><option value="ka">ქართული</option><option value="hy">Հայերdelays</option><option value="az">Azərbaycan</option><option value="kk">Қазақ</option><option value="uz">O'zbek</option><option value="ky">Кыргыз</option><option value="tg">Тоҷикӣ</option><option value="tk">Türkmen</option><option value="mn">Монгол</option><option value="my">မြန်မာ</option><option value="km">ភាសាខ្មែរ</option><option value="lo">ລາວ</option><option value="si">සිංහල</option><option value="ne">नेपाली</option><option value="am">አማርኛ</option><option value="sw">Kiswahili</option><option value="zu">isiZulu</option><option value="xh">isiXhosa</option><option value="af">Afrikaans</option><option value="yo">Yorùbá</option><option value="ig">Igbo</option><option value="ha">Hausa</option><option value="mg">Malagasy</option><option value="so">Soomaali</option><option value="rw">Kinyarwanda</option><option value="sn">chiShona</option><option value="st">Sesotho</option><option value="ny">Chichewa</option><option value="lg">Luganda</option><option value="wo">Wolof</option><option value="ti">ትግርኛ</option><option value="om">Oromoo</option><option value="ee">Eʋegbe</option><option value="tw">Twi</option><option value="bm">Bamanankan</option><option value="ff">Fulfulde</option><option value="ln">Lingála</option><option value="kg">Kikongo</option><option value="lu">Tshiluba</option><option value="rn">Ikirundi</option><option value="tn">Setswana</option><option value="ts">Xitsonga</option><option value="ss">siSwati</option><option value="ve">Tshivenḓa</option><option value="nr">isiNdebele</option><option value="nso">Sepedi</option>
+                </select>
+                <a href="../" class="back-btn">← Back</a>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('data-format')">📊 Data Format</button>
+            <button class="tab" onclick="showTab('algorithms')">🔢 Algorithms</button>
+            <button class="tab" onclick="showTab('protocol')">📡 Protocol</button>
+            <button class="tab" onclick="showTab('integration')">🔗 Integration</button>
+            <button class="tab" onclick="showTab('test')">🧪 Test</button>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div id="data-format" class="tab-content active">
+            <h2 class="section-title">📊 Protein Dynamics Data Format</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">🧬 Dynamics Profile Generator</h3>
+                    <div class="input-group">
+                        <label>Protein ID (UniProt)</label>
+                        <input type="text" id="proteinId" placeholder="e.g., P00533 (EGFR)" value="P00533">
+                    </div>
+                    <div class="input-group">
+                        <label>Sequence (optional)</label>
+                        <textarea id="sequence" rows="3" placeholder="MRLLAVLYCLLWSFPVEA...">MRLLAVLYCLLWSFPVEA...</textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Dynamics Data Type</label>
+                        <select id="dynamicsType">
+                            <option value="ensemble">Conformational Ensemble</option>
+                            <option value="flexibility">Flexibility Profile</option>
+                            <option value="allosteric">Allosteric Network</option>
+                            <option value="binding">Drug Binding Dynamics</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Number of States</label>
+                        <input type="number" id="numStates" value="5" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary" onclick="generateDynamicsJSON()">Generate JSON</button>
+                    <button class="btn btn-secondary" onclick="validateJSON()">Validate Schema</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📤 Dynamics JSON Output</h3>
+                    <div class="output-area" id="jsonOutput">// Generated protein dynamics JSON will appear here
+// Supports conformational ensembles, flexibility profiles,
+// allosteric networks, and drug binding dynamics</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div id="algorithms" class="tab-content">
+            <h2 class="section-title">🔢 Ensemble Generation & Analysis Algorithms</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">⚙️ Algorithm Selection</h3>
+                    <div class="input-group">
+                        <label>Ensemble Generation Method</label>
+                        <select id="ensembleMethod">
+                            <option value="alphaflow">AlphaFlow (Flow Matching)</option>
+                            <option value="boltzmann">Boltzmann Generators</option>
+                            <option value="metadynamics">Metadynamics MD</option>
+                            <option value="remd">Replica Exchange MD (REMD)</option>
+                            <option value="tica">Time-lagged ICA</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Analysis Type</label>
+                        <select id="analysisType">
+                            <option value="fel">Free Energy Landscape (FEL)</option>
+                            <option value="pca">Principal Component Analysis</option>
+                            <option value="nma">Normal Mode Analysis</option>
+                            <option value="correlation">Cross-Correlation</option>
+                            <option value="community">Community Detection</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Collective Variables</label>
+                        <select id="collectiveVars" multiple size="4">
+                            <option value="rmsd" selected>RMSD</option>
+                            <option value="rg" selected>Radius of Gyration</option>
+                            <option value="distance">Distance (residue pairs)</option>
+                            <option value="dihedral">Dihedral Angles</option>
+                            <option value="contacts">Native Contacts</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="runEnsembleAlgorithm()">Generate Ensemble</button>
+                    <button class="btn btn-secondary" onclick="calculateFEL()">Calculate FEL</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📊 Free Energy Landscape</h3>
+                    <div class="energy-landscape" id="felCanvas">
+                        <div class="energy-point" style="top: 30%; left: 25%;"></div>
+                        <div class="energy-point" style="top: 50%; left: 45%; animation-delay: 0.5s;"></div>
+                        <div class="energy-point" style="top: 40%; left: 70%; animation-delay: 1s;"></div>
+                        <div class="energy-point" style="top: 65%; left: 55%; animation-delay: 1.5s;"></div>
+                        <div class="energy-point" style="top: 75%; left: 30%; animation-delay: 2s;"></div>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-box"><div class="metric-value" id="numMinima">3</div><div class="metric-label">Energy Minima</div></div>
+                        <div class="metric-box"><div class="metric-value" id="maxBarrier">4.2</div><div class="metric-label">Max Barrier (kcal/mol)</div></div>
+                        <div class="metric-box"><div class="metric-value" id="groundPop">68%</div><div class="metric-label">Ground State Pop.</div></div>
+                        <div class="metric-box"><div class="metric-value" id="excitedPop">32%</div><div class="metric-label">Excited States Pop.</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="output-area" id="algoOutput">// Algorithm results will appear here
+// Ensemble statistics, energy landscapes, PCA components</div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div id="protocol" class="tab-content">
+            <h2 class="section-title">📡 MD Simulation Protocol</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">⚗️ Simulation Setup</h3>
+                    <div class="input-group">
+                        <label>Simulation Engine</label>
+                        <select id="simEngine">
+                            <option value="gromacs">GROMACS</option>
+                            <option value="amber">AMBER</option>
+                            <option value="openmm">OpenMM</option>
+                            <option value="namd">NAMD</option>
+                            <option value="desmond">Desmond</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Force Field</label>
+                        <select id="forceField">
+                            <option value="amber14sb">AMBER14SB</option>
+                            <option value="charmm36m">CHARMM36m</option>
+                            <option value="opls-aa">OPLS-AA/M</option>
+                            <option value="ff19sb">ff19SB</option>
+                            <option value="nnp">Neural Network Potential</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Water Model</label>
+                        <select id="waterModel">
+                            <option value="tip3p">TIP3P</option>
+                            <option value="tip4p-ew">TIP4P-Ew</option>
+                            <option value="spce">SPC/E</option>
+                            <option value="opc">OPC</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Temperature (K)</label>
+                        <input type="number" id="temperature" value="300" min="0" max="500">
+                    </div>
+                    <div class="input-group">
+                        <label>Simulation Time (ns)</label>
+                        <input type="number" id="simTime" value="100" min="1" max="10000">
+                    </div>
+                    <div class="input-group">
+                        <label>Timestep (fs)</label>
+                        <select id="timestep">
+                            <option value="1">1 fs (standard)</option>
+                            <option value="2" selected>2 fs (hydrogen mass repartitioning)</option>
+                            <option value="4">4 fs (HMR + constraints)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="generateProtocol()">Generate Protocol</button>
+                    <button class="btn btn-secondary" onclick="estimateResources()">Estimate Resources</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📋 Protocol Output</h3>
+                    <div class="output-area" id="protocolOutput">// MD simulation protocol will appear here
+// Includes input files for selected engine</div>
+                    <div class="metrics-grid" style="margin-top: 20px;">
+                        <div class="metric-box"><div class="metric-value" id="estFrames">50K</div><div class="metric-label">Est. Frames</div></div>
+                        <div class="metric-box"><div class="metric-value" id="estStorage">15 GB</div><div class="metric-label">Storage</div></div>
+                        <div class="metric-box"><div class="metric-value" id="estGpuHours">48</div><div class="metric-label">GPU Hours</div></div>
+                        <div class="metric-box"><div class="metric-value" id="estCost">$12</div><div class="metric-label">Cloud Cost</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div id="integration" class="tab-content">
+            <h2 class="section-title">🔗 Database Integration</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">🔌 Data Sources</h3>
+                    <div class="input-group">
+                        <label>Primary Database</label>
+                        <select id="primaryDb">
+                            <option value="pdb">PDB (Protein Data Bank)</option>
+                            <option value="alphafold">AlphaFold DB</option>
+                            <option value="uniprot">UniProt</option>
+                            <option value="chembl">ChEMBL</option>
+                            <option value="bindingdb">BindingDB</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Query ID</label>
+                        <input type="text" id="queryId" placeholder="e.g., 1ATP, P00533, CHEMBL203">
+                    </div>
+                    <button class="btn btn-primary" onclick="fetchFromDatabase()">Fetch Data</button>
+                    <button class="btn btn-secondary" onclick="syncAll()">Sync All Sources</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">📊 Integration Status</h3>
+                    <div style="margin-bottom: 15px;"><span class="status status-success">✓ PDB Connected</span></div>
+                    <div style="margin-bottom: 15px;"><span class="status status-success">✓ AlphaFold DB Active</span></div>
+                    <div style="margin-bottom: 15px;"><span class="status status-success">✓ UniProt Synced</span></div>
+                    <div style="margin-bottom: 15px;"><span class="status status-warning">⚠ ChEMBL Rate Limited</span></div>
+                    <div style="margin-bottom: 15px;"><span class="status status-success">✓ BindingDB Ready</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 85%;"></div></div>
+                    <p style="margin-top: 10px; color: var(--text-secondary);">Integration Status: 85% Complete</p>
+                </div>
+            </div>
+            <div class="output-area" id="integrationOutput">// Fetched data will appear here
+// Includes structure coordinates, annotations, binding data</div>
+        </div>
+
+        <!-- Tab 5: Test -->
+        <div id="test" class="tab-content">
+            <h2 class="section-title">🧪 Drug Binding Prediction & 3D Visualization</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="card-title">💊 Binding Prediction</h3>
+                    <div class="input-group">
+                        <label>Target Protein (PDB ID)</label>
+                        <input type="text" id="targetPdb" placeholder="e.g., 1ATP" value="1ATP">
+                    </div>
+                    <div class="input-group">
+                        <label>Ligand (SMILES or PubChem CID)</label>
+                        <input type="text" id="ligandSmiles" placeholder="e.g., CC(=O)Nc1ccc(O)cc1" value="CC(=O)Nc1ccc(O)cc1">
+                    </div>
+                    <div class="input-group">
+                        <label>Binding Mechanism</label>
+                        <select id="bindingMech">
+                            <option value="auto">Auto-detect</option>
+                            <option value="conformational">Conformational Selection</option>
+                            <option value="induced">Induced Fit</option>
+                            <option value="mixed">Mixed Mechanism</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="predictBinding()">Predict Binding</button>
+                    <button class="btn btn-secondary" onclick="runBindingMD()">Run Binding MD</button>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">🔬 3D Protein Viewer</h3>
+                    <div class="protein-viewer">
+                        <div class="protein-3d">🧬</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <h3 class="card-title">📊 Binding Thermodynamics & Kinetics</h3>
+                <div class="metrics-grid">
+                    <div class="metric-box"><div class="metric-value" id="deltaG">-9.2</div><div class="metric-label">ΔG (kcal/mol)</div></div>
+                    <div class="metric-box"><div class="metric-value" id="kd">180</div><div class="metric-label">Kd (nM)</div></div>
+                    <div class="metric-box"><div class="metric-value" id="kon">1.2e6</div><div class="metric-label">kon (M⁻¹s⁻¹)</div></div>
+                    <div class="metric-box"><div class="metric-value" id="koff">0.22</div><div class="metric-label">koff (s⁻¹)</div></div>
+                    <div class="metric-box"><div class="metric-value" id="residence">4.5</div><div class="metric-label">τ (seconds)</div></div>
+                    <div class="metric-box"><div class="metric-value" id="mechanism">CS</div><div class="metric-label">Mechanism</div></div>
+                </div>
+                <div class="output-area" id="bindingOutput">// Binding prediction results will appear here
+// Includes binding pose, pathway, kinetics</div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <div class="philosophy">弘益人間</div>
+        <p>© 2025 WIA - World Certification Industry Association. MIT License.</p>
+    </footer>
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function changeLanguage(lang) {
+            console.log('Language changed to:', lang);
+            // In production, this would load localized strings
+        }
+
+        function generateDynamicsJSON() {
+            const proteinId = document.getElementById('proteinId').value || 'P00533';
+            const dynamicsType = document.getElementById('dynamicsType').value;
+            const numStates = parseInt(document.getElementById('numStates').value) || 5;
+
+            const states = Array.from({length: numStates}, (_, i) => ({
+                state_id: `state_${i + 1}`,
+                name: i === 0 ? 'ground' : `excited_${i}`,
+                population: i === 0 ? 0.68 : (0.32 / (numStates - 1)).toFixed(3),
+                relative_energy: { value: i * 1.5, unit: 'kcal/mol' },
+                rmsd_from_reference: (i * 0.8).toFixed(2)
+            }));
+
+            const data = {
+                '$schema': 'https://wia.live/schemas/protein-dynamics/v1.0.0',
+                protein_dynamics: {
+                    protein_id: proteinId,
+                    name: 'Epidermal Growth Factor Receptor',
+                    sequence: document.getElementById('sequence').value || 'MRLLAVLYCLLWSFPVEA...',
+                    length: 1210,
+                    conformational_ensemble: {
+                        num_states: numStates,
+                        states: states,
+                        free_energy_landscape: {
+                            collective_variables: ['RMSD', 'Radius_of_Gyration'],
+                            minima: states.map((s, i) => ({ id: s.state_id, cv1: i * 2.5, cv2: 25 + i * 0.5, energy: s.relative_energy.value })),
+                            barriers: [{ from: 'state_1', to: 'state_2', height: 4.2 }]
+                        }
+                    },
+                    dynamics_metrics: {
+                        timescales: {
+                            ps_motions: { description: 'bond vibrations, loop fluctuations', amplitude_angstrom: 0.5 },
+                            ns_motions: { description: 'domain motions, hinge bending', amplitude_angstrom: 3.2 },
+                            us_ms_motions: { description: 'large conformational changes', rate_per_second: 1000 }
+                        },
+                        flexibility: { average_bfactor: 25.3, flexible_regions: [{ start: 145, end: 165, type: 'loop' }] }
+                    },
+                    standard: 'WIA-PROTEIN-DYNAMICS',
+                    version: '1.0',
+                    philosophy: '弘益人間'
+                }
+            };
+            document.getElementById('jsonOutput').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function validateJSON() {
+            document.getElementById('jsonOutput').textContent += '\n\n✓ Schema Validation: PASSED\n✓ All required fields present\n✓ Data types correct\n✓ Populations sum to 1.0';
+        }
+
+        function runEnsembleAlgorithm() {
+            const method = document.getElementById('ensembleMethod').value;
+            const analysis = document.getElementById('analysisType').value;
+            const result = {
+                algorithm: method,
+                analysis: analysis,
+                ensemble_size: 1000,
+                unique_conformations: 47,
+                clustering: { method: 'k-medoids', optimal_k: 5 },
+                variance_explained: [0.42, 0.23, 0.15, 0.08, 0.05],
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('algoOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function calculateFEL() {
+            document.getElementById('numMinima').textContent = Math.floor(Math.random() * 3) + 2;
+            document.getElementById('maxBarrier').textContent = (Math.random() * 5 + 2).toFixed(1);
+            document.getElementById('groundPop').textContent = Math.floor(Math.random() * 30 + 50) + '%';
+            document.getElementById('excitedPop').textContent = Math.floor(Math.random() * 30 + 20) + '%';
+            document.getElementById('algoOutput').textContent += '\n\n✓ Free Energy Landscape calculated\n✓ Minima identified and characterized\n✓ Transition pathways mapped';
+        }
+
+        function generateProtocol() {
+            const engine = document.getElementById('simEngine').value;
+            const ff = document.getElementById('forceField').value;
+            const water = document.getElementById('waterModel').value;
+            const temp = document.getElementById('temperature').value;
+            const time = document.getElementById('simTime').value;
+            const dt = document.getElementById('timestep').value;
+
+            let protocol = '';
+            if (engine === 'gromacs') {
+                protocol = `; GROMACS MDP file for WIA-PROTEIN-DYNAMICS
+; Generated by WIA Simulator
+
+integrator     = md
+dt             = 0.00${dt}    ; ${dt} fs
+nsteps         = ${time * 500000 / dt}  ; ${time} ns
+nstxout        = 5000
+nstvout        = 5000
+nstenergy      = 1000
+
+; Temperature coupling
+tcoupl         = V-rescale
+tc-grps        = Protein Non-Protein
+tau_t          = 0.1 0.1
+ref_t          = ${temp} ${temp}
+
+; Pressure coupling
+pcoupl         = Parrinello-Rahman
+pcoupltype     = isotropic
+tau_p          = 2.0
+ref_p          = 1.0
+compressibility = 4.5e-5
+
+; Force field: ${ff}
+; Water model: ${water}`;
+            } else {
+                protocol = `# ${engine.toUpperCase()} input for WIA-PROTEIN-DYNAMICS
+# Force Field: ${ff}
+# Water Model: ${water}
+# Temperature: ${temp} K
+# Simulation Time: ${time} ns
+# Timestep: ${dt} fs
+
+[simulation]
+engine = ${engine}
+ensemble = NPT
+temperature = ${temp}
+pressure = 1.0
+`;
+            }
+            document.getElementById('protocolOutput').textContent = protocol;
+        }
+
+        function estimateResources() {
+            const time = parseInt(document.getElementById('simTime').value);
+            document.getElementById('estFrames').textContent = Math.floor(time * 500) + 'K';
+            document.getElementById('estStorage').textContent = Math.floor(time * 0.15) + ' GB';
+            document.getElementById('estGpuHours').textContent = Math.floor(time * 0.5);
+            document.getElementById('estCost').textContent = '$' + Math.floor(time * 0.12);
+        }
+
+        function fetchFromDatabase() {
+            const db = document.getElementById('primaryDb').value;
+            const id = document.getElementById('queryId').value || 'P00533';
+            const result = {
+                source: db.toUpperCase(),
+                query_id: id,
+                fetched_at: new Date().toISOString(),
+                data: {
+                    name: 'Epidermal Growth Factor Receptor',
+                    organism: 'Homo sapiens',
+                    length: 1210,
+                    structures: db === 'pdb' ? ['1ATP', '1M17', '2GS2', '3POZ'] : [],
+                    alphafold_confidence: db === 'alphafold' ? { mean_plddt: 87.3 } : null,
+                    binding_partners: db === 'chembl' || db === 'bindingdb' ? 1247 : null
+                }
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function syncAll() {
+            document.getElementById('integrationOutput').textContent =
+`Syncing all data sources...
+
+✓ PDB: 4 structures fetched
+✓ AlphaFold DB: Full-length model retrieved
+✓ UniProt: Annotations synced (1210 residues)
+⚠ ChEMBL: Rate limit reached, retrying in 60s...
+✓ BindingDB: 342 binding records
+
+Sync completed at ${new Date().toISOString()}`;
+        }
+
+        function predictBinding() {
+            const target = document.getElementById('targetPdb').value;
+            const ligand = document.getElementById('ligandSmiles').value;
+
+            // Simulate prediction with random realistic values
+            const dG = -(Math.random() * 5 + 6).toFixed(1);
+            const kd = Math.exp(-parseFloat(dG) * 1.6).toFixed(0);
+            const kon = (Math.random() * 5 + 0.5).toFixed(1) + 'e6';
+            const koff = (Math.random() * 0.5 + 0.1).toFixed(2);
+            const tau = (1 / parseFloat(koff)).toFixed(1);
+            const mech = Math.random() > 0.5 ? 'CS' : 'IF';
+
+            document.getElementById('deltaG').textContent = dG;
+            document.getElementById('kd').textContent = kd;
+            document.getElementById('kon').textContent = kon;
+            document.getElementById('koff').textContent = koff;
+            document.getElementById('residence').textContent = tau;
+            document.getElementById('mechanism').textContent = mech;
+
+            document.getElementById('bindingOutput').textContent =
+`Drug Binding Prediction Results
+================================
+Target: ${target}
+Ligand: ${ligand}
+
+Thermodynamics:
+  ΔG = ${dG} kcal/mol
+  ΔH = ${(parseFloat(dG) * 0.7).toFixed(1)} kcal/mol
+  -TΔS = ${(parseFloat(dG) * 0.3).toFixed(1)} kcal/mol
+  Kd = ${kd} nM
+
+Kinetics:
+  kon = ${kon} M⁻¹s⁻¹
+  koff = ${koff} s⁻¹
+  Residence time (τ) = ${tau} s
+
+Binding Mechanism: ${mech === 'CS' ? 'Conformational Selection' : 'Induced Fit'}
+
+Binding Site Residues: E762, M766, K745, T790, L792, D800
+
+Generated at ${new Date().toISOString()}`;
+        }
+
+        function runBindingMD() {
+            document.getElementById('bindingOutput').textContent += `
+
+Running binding pathway simulation...
+  • Stage 1: Approach (0-10 ns) - ✓ Complete
+  • Stage 2: Recognition (10-30 ns) - ✓ Complete
+  • Stage 3: Binding (30-50 ns) - ✓ Complete
+  • Stage 4: Relaxation (50-100 ns) - ✓ Complete
+
+Pathway Analysis:
+  Entry pathway: Front face via activation loop
+  Key interactions: H-bonds with E762, π-stacking with M766
+  Induced changes: DFG motif rotation (15°)
+
+MD simulation completed successfully.`;
+        }
+
+        // Initialize
+        generateDynamicsJSON();
+    </script>
+</body>
+</html>

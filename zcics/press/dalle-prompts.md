@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-AUTO-026 Press Materials
+
+## Prompt 1: Hero Image - Zero-Chemical Intelligent Cleaning
+A modern eco-friendly car wash facility with orange (#F97316) technology accents: electrolyzed water system converting H2O into powerful cleaning agents through electrolysis, UV-C sterilization lamps eliminating 99.9% of pathogens without chemicals, plasma cleaning system using ionized gas for advanced decontamination, ozone treatment naturally oxidizing dirt and odors, all controlled by AI optimization system. Pristine vehicle being cleaned with crystal-clear water, no harsh chemicals. Clean, sustainable automotive care photography, environmental technology aesthetic.
+
+## Prompt 2: Problem Scenario - Harmful Chemical Car Washing
+An environmental disaster scene from traditional car washing: toxic chemical runoff polluting waterways with phosphates and surfactants harming aquatic life, workers exposed to harsh cleaning solvents causing health issues, massive water waste with 150+ liters per wash, chemical residue on vehicles creating health concerns for passengers especially children, and environmental damage from non-biodegradable detergents. Polluted drainage, dead fish, concerned parents. Documentary environmental photography emphasizing the harmful impact of chemical-based vehicle cleaning.
+
+## Prompt 3: Solution Visualization - Sustainable Zero-Chemical Cleaning
+A beautiful sustainable car care scene powered by WIA-AUTO-026: family's vehicle being cleaned with electrolyzed water achieving 95-98% cleaning efficiency with zero toxic chemicals, UV-C sterilization ensuring interior is 99.9% pathogen-free, water recycling system reducing usage by 75% to only 10-20 liters, cleaning byproducts being completely biodegradable, and happy customers knowing their car is clean and safe for children. Dashboard shows zero chemical waste, 90% carbon footprint reduction, 80% water conservation, cost savings from eliminating detergent purchases. Clean, safe, eco-friendly vehicle care. Sustainable technology photography celebrating environmental responsibility.

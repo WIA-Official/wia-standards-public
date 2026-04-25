@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 03: Communication Protocols | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        .back-link:hover { background: #334155; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #f59e0b; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning-box h4 { color: #f59e0b; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Contents</a>
+
+        <h1>Chapter 03: Communication Protocols</h1>
+        <p class="chapter-meta">Optimize bandwidth and minimize communication overhead in distributed training</p>
+
+        <h2>The Communication Bottleneck</h2>
+        <p>
+            In federated learning, communication costs often dominate computation costs. A typical deep neural network might have millions or billions of parameters, requiring substantial bandwidth to transmit. For cross-device federated learning with mobile clients, this creates significant challenges in terms of bandwidth, latency, energy consumption, and monetary costs.
+        </p>
+
+        <div class="warning-box">
+            <h4>Critical Insight</h4>
+            <p>A single communication round for a 100MB model with 1000 clients requires 200GB of bandwidth (100MB upload × 1000 + 100MB download × 1000). With hundreds of training rounds, this becomes prohibitive without compression.</p>
+        </div>
+
+        <h2>Model Compression Techniques</h2>
+
+        <h3>Quantization</h3>
+        <p>
+            Quantization reduces the precision of model parameters or gradients, dramatically reducing communication size:
+        </p>
+
+        <pre><code>import numpy as np
+
+def quantize_gradient(gradient, num_bits=8):
+    """
+    Quantize gradient to fixed-point representation
+
+    Args:
+        gradient: Float32 gradient array
+        num_bits: Number of bits for quantization (typically 8 or 16)
+
+    Returns:
+        Quantized gradient and metadata for dequantization
+    """
+    # Find min and max for range
+    min_val = np.min(gradient)
+    max_val = np.max(gradient)
+
+    # Number of quantization levels
+    num_levels = 2 ** num_bits
+
+    # Quantize to integer range
+    scale = (max_val - min_val) / num_levels
+    zero_point = -min_val / scale
+
+    quantized = np.round(gradient / scale + zero_point)
+    quantized = np.clip(quantized, 0, num_levels - 1).astype(np.uint8)
+
+    return {
+        'quantized': quantized,
+        'scale': scale,
+        'zero_point': zero_point,
+        'shape': gradient.shape
+    }
+
+
+def dequantize_gradient(quantized_data):
+    """Reconstruct approximate gradient from quantized representation"""
+    quantized = quantized_data['quantized']
+    scale = quantized_data['scale']
+    zero_point = quantized_data['zero_point']
+
+    dequantized = (quantized.astype(np.float32) - zero_point) * scale
+    return dequantized.reshape(quantized_data['shape'])
+
+
+# Example usage
+original_gradient = np.random.randn(10000)  # 40KB (float32)
+quantized_data = quantize_gradient(original_gradient, num_bits=8)
+print(f"Original size: {original_gradient.nbytes} bytes")
+print(f"Quantized size: {quantized_data['quantized'].nbytes} bytes")
+print(f"Compression ratio: {original_gradient.nbytes / quantized_data['quantized'].nbytes}x")
+
+# 40KB → 10KB (4x compression)</code></pre>
+
+        <h3>Sparsification (Top-K)</h3>
+        <p>
+            Send only the k largest magnitude gradients, setting the rest to zero:
+        </p>
+
+        <pre><code>def sparsify_gradient(gradient, sparsity=0.1):
+    """
+    Keep only top-k% of largest magnitude gradients
+
+    Args:
+        gradient: Full gradient array
+        sparsity: Fraction of gradients to keep (0.1 = 10%)
+
+    Returns:
+        Sparse representation with indices and values
+    """
+    flat_gradient = gradient.flatten()
+    k = int(len(flat_gradient) * sparsity)
+
+    # Find top-k indices
+    top_k_indices = np.argpartition(np.abs(flat_gradient), -k)[-k:]
+    top_k_values = flat_gradient[top_k_indices]
+
+    return {
+        'indices': top_k_indices,
+        'values': top_k_values,
+        'shape': gradient.shape,
+        'sparsity': sparsity
+    }
+
+
+def densify_gradient(sparse_data):
+    """Reconstruct gradient from sparse representation"""
+    gradient = np.zeros(np.prod(sparse_data['shape']))
+    gradient[sparse_data['indices']] = sparse_data['values']
+    return gradient.reshape(sparse_data['shape'])
+
+
+# Example
+gradient = np.random.randn(10000)  # 40KB
+sparse = sparsify_gradient(gradient, sparsity=0.1)
+
+# Only send 10% of values + indices
+# ~4KB values + ~4KB indices = 8KB total (5x compression)</code></pre>
+
+        <h3>Low-Rank Decomposition</h3>
+        <p>
+            Approximate weight matrices using low-rank factorization:
+        </p>
+
+        <pre><code>def low_rank_compression(weight_matrix, rank=10):
+    """
+    Compress weight matrix using SVD low-rank approximation
+
+    Args:
+        weight_matrix: 2D weight matrix (e.g., 1000x1000)
+        rank: Target rank for approximation
+
+    Returns:
+        Low-rank factors U and V where W ≈ U @ V^T
+    """
+    U, s, Vt = np.linalg.svd(weight_matrix, full_matrices=False)
+
+    # Keep only top-rank singular values
+    U_compressed = U[:, :rank]
+    s_compressed = s[:rank]
+    Vt_compressed = Vt[:rank, :]
+
+    # Incorporate singular values into U
+    U_compressed = U_compressed @ np.diag(s_compressed)
+
+    return {
+        'U': U_compressed,
+        'V': Vt_compressed.T,
+        'original_shape': weight_matrix.shape
+    }
+
+
+def reconstruct_from_low_rank(compressed):
+    """Reconstruct approximate weight matrix"""
+    return compressed['U'] @ compressed['V'].T
+
+
+# Example: 1000x1000 matrix
+W = np.random.randn(1000, 1000)  # 4MB (float32)
+compressed = low_rank_compression(W, rank=10)
+
+# Send 1000×10 + 1000×10 = 20,000 values instead of 1,000,000
+# 80KB instead of 4MB (50x compression)</code></pre>
+
+        <h2>Gradient Accumulation and Batching</h2>
+
+        <h3>Local SGD</h3>
+        <p>
+            Perform multiple local update steps before communicating, reducing communication frequency:
+        </p>
+
+        <pre><code>class LocalSGD:
+    def __init__(self, model, local_steps=10):
+        self.model = model
+        self.local_steps = local_steps
+        self.step_count = 0
+
+    def train_step(self, batch):
+        """Perform one training step"""
+        loss = self.model.forward(batch)
+        gradients = self.model.backward()
+        self.model.update(gradients)
+        self.step_count += 1
+
+        # Only communicate every local_steps iterations
+        if self.step_count % self.local_steps == 0:
+            return self.model.get_weights()  # Communicate
+        else:
+            return None  # No communication
+
+
+# Communication reduction = local_steps times
+# e.g., local_steps=10 → 10x fewer communication rounds</code></pre>
+
+        <h3>Gradient Compression Pipeline</h3>
+        <p>
+            Combine multiple compression techniques:
+        </p>
+
+        <pre><code>class GradientCompressionPipeline:
+    def __init__(self, quantization_bits=8, sparsity=0.1, use_error_feedback=True):
+        self.quantization_bits = quantization_bits
+        self.sparsity = sparsity
+        self.use_error_feedback = use_error_feedback
+        self.error_accumulator = None
+
+    def compress(self, gradient):
+        """Apply multiple compression techniques"""
+
+        # 1. Error feedback: add accumulated error from previous round
+        if self.use_error_feedback and self.error_accumulator is not None:
+            gradient = gradient + self.error_accumulator
+
+        # 2. Sparsification (top-k)
+        sparse_data = sparsify_gradient(gradient, self.sparsity)
+
+        # 3. Quantization of sparse values
+        quantized = quantize_gradient(sparse_data['values'], self.quantization_bits)
+
+        # 4. Calculate and store compression error
+        reconstructed = densify_gradient({
+            'indices': sparse_data['indices'],
+            'values': dequantize_gradient(quantized),
+            'shape': gradient.shape
+        })
+        self.error_accumulator = gradient - reconstructed
+
+        return {
+            'indices': sparse_data['indices'],
+            'quantized_values': quantized,
+            'shape': gradient.shape
+        }
+
+    def decompress(self, compressed_data):
+        """Reconstruct approximate gradient"""
+        dequantized_values = dequantize_gradient(compressed_data['quantized_values'])
+
+        return densify_gradient({
+            'indices': compressed_data['indices'],
+            'values': dequantized_values,
+            'shape': compressed_data['shape']
+        })
+
+
+# Achieve 50-100x compression with minimal accuracy loss</code></pre>
+
+        <h2>Adaptive Communication Strategies</h2>
+
+        <h3>Importance-Based Sampling</h3>
+        <p>
+            Prioritize communication of important gradients based on magnitude or other criteria:
+        </p>
+
+        <pre><code>def importance_sampling(gradient, budget=0.1):
+    """
+    Sample gradients with probability proportional to magnitude
+
+    Ensures unbiased estimator while communicating only budget fraction
+    """
+    flat_grad = gradient.flatten()
+    importance = np.abs(flat_grad)
+
+    # Normalize to probability distribution
+    probabilities = importance / np.sum(importance)
+
+    # Sample indices based on importance
+    num_samples = int(len(flat_grad) * budget)
+    sampled_indices = np.random.choice(
+        len(flat_grad),
+        size=num_samples,
+        replace=False,
+        p=probabilities
+    )
+
+    # Correct for sampling bias
+    sampled_values = flat_grad[sampled_indices] / (probabilities[sampled_indices] * num_samples)
+
+    return {
+        'indices': sampled_indices,
+        'values': sampled_values,
+        'shape': gradient.shape
+    }</code></pre>
+
+        <h3>Adaptive Compression</h3>
+        <p>
+            Dynamically adjust compression rate based on network conditions and training progress:
+        </p>
+
+        <pre><code>class AdaptiveCompressor:
+    def __init__(self, initial_sparsity=0.1):
+        self.sparsity = initial_sparsity
+        self.convergence_monitor = ConvergenceMonitor()
+
+    def compress(self, gradient, bandwidth_available, training_progress):
+        """
+        Adapt compression based on conditions
+
+        - Low bandwidth → higher compression
+        - Early training → can use more compression
+        - Near convergence → use less compression for accuracy
+        """
+
+        # Adjust sparsity based on bandwidth
+        if bandwidth_available < 1_000_000:  # < 1 Mbps
+            target_sparsity = 0.05  # Very aggressive
+        elif bandwidth_available < 10_000_000:  # < 10 Mbps
+            target_sparsity = 0.1
+        else:
+            target_sparsity = 0.2
+
+        # Reduce compression near convergence
+        if training_progress > 0.9:  # 90% complete
+            target_sparsity = min(target_sparsity * 2, 0.5)
+
+        # Smooth transition
+        self.sparsity = 0.9 * self.sparsity + 0.1 * target_sparsity
+
+        return sparsify_gradient(gradient, self.sparsity)</code></pre>
+
+        <h2>Structured Updates</h2>
+
+        <h3>Sketching and Random Projections</h3>
+        <p>
+            Use random projections to reduce gradient dimensionality:
+        </p>
+
+        <pre><code>class RandomProjectionCompressor:
+    def __init__(self, original_dim, compressed_dim):
+        """
+        Initialize random projection matrix
+
+        Compresses from original_dim to compressed_dim
+        """
+        self.original_dim = original_dim
+        self.compressed_dim = compressed_dim
+
+        # Generate random projection matrix (fixed across rounds)
+        self.projection_matrix = np.random.randn(
+            compressed_dim, original_dim
+        ) / np.sqrt(compressed_dim)
+
+    def compress(self, gradient):
+        """Project gradient to lower dimension"""
+        flat_grad = gradient.flatten()
+        compressed = self.projection_matrix @ flat_grad
+
+        return {
+            'compressed': compressed,
+            'original_shape': gradient.shape
+        }
+
+    def decompress(self, compressed_data):
+        """Approximate reconstruction using transpose"""
+        compressed = compressed_data['compressed']
+        reconstructed = self.projection_matrix.T @ compressed
+
+        return reconstructed.reshape(compressed_data['original_shape'])
+
+
+# Example: Compress 100,000 → 1,000 (100x reduction)</code></pre>
+
+        <h2>Differential Compression</h2>
+
+        <h3>Delta Encoding</h3>
+        <p>
+            Send only the difference from the previous model:
+        </p>
+
+        <pre><code>class DeltaEncoder:
+    def __init__(self):
+        self.previous_model = None
+
+    def encode(self, current_model):
+        """Send only difference from previous model"""
+        if self.previous_model is None:
+            # First round: send full model
+            self.previous_model = current_model.copy()
+            return {'type': 'full', 'model': current_model}
+
+        # Subsequent rounds: send delta
+        delta = current_model - self.previous_model
+        self.previous_model = current_model.copy()
+
+        # Delta often has many small values → compress well
+        compressed_delta = sparsify_gradient(delta, sparsity=0.1)
+
+        return {'type': 'delta', 'delta': compressed_delta}
+
+    def decode(self, encoded, receiver_model):
+        """Reconstruct full model from delta"""
+        if encoded['type'] == 'full':
+            return encoded['model']
+        else:
+            delta = densify_gradient(encoded['delta'])
+            return receiver_model + delta</code></pre>
+
+        <h2>Communication-Efficient Protocols</h2>
+
+        <h3>Asynchronous Updates</h3>
+        <p>
+            Allow clients to communicate at different rates without waiting:
+        </p>
+
+        <pre><code>class AsynchronousFederatedServer:
+    def __init__(self, model):
+        self.global_model = model
+        self.version = 0
+        self.lock = threading.Lock()
+
+    def receive_update(self, client_id, client_model, client_version):
+        """
+        Process client update asynchronously
+
+        Handles version staleness
+        """
+        with self.lock:
+            # Calculate staleness
+            staleness = self.version - client_version
+
+            # Apply staleness-aware weighting
+            alpha = 1.0 / (1.0 + staleness)
+
+            # Update global model
+            self.global_model = (
+                (1 - alpha) * self.global_model +
+                alpha * client_model
+            )
+
+            self.version += 1
+
+        return self.global_model, self.version
+
+    def send_model(self, client_id):
+        """Send current global model to client"""
+        with self.lock:
+            return self.global_model.copy(), self.version</code></pre>
+
+        <h3>Hierarchical Aggregation</h3>
+        <p>
+            Use edge servers to reduce communication to central server:
+        </p>
+
+        <pre><code>class HierarchicalFederatedLearning:
+    """
+    Three-tier architecture:
+    Client Devices → Edge Servers → Central Server
+    """
+
+    def __init__(self, num_edge_servers):
+        self.edge_servers = [EdgeServer(i) for i in range(num_edge_servers)]
+        self.central_server = CentralServer()
+
+    def training_round(self, clients_per_edge=10):
+        """
+        Execute one training round with hierarchical aggregation
+        """
+
+        # Phase 1: Clients → Edge Servers
+        edge_models = []
+        for edge_server in self.edge_servers:
+            # Each edge server aggregates local clients
+            edge_model = edge_server.aggregate_clients(
+                num_clients=clients_per_edge
+            )
+            edge_models.append(edge_model)
+
+        # Phase 2: Edge Servers → Central Server
+        # Much fewer communication rounds to central
+        global_model = self.central_server.aggregate_edges(edge_models)
+
+        # Phase 3: Broadcast global model back down hierarchy
+        for edge_server in self.edge_servers:
+            edge_server.update_model(global_model)
+
+        return global_model
+
+
+# Reduces central server communication by ~clients_per_edge times</code></pre>
+
+        <h2>Bandwidth Optimization Strategies</h2>
+
+        <h3>Communication Scheduling</h3>
+        <p>
+            Schedule updates during off-peak hours or when connected to WiFi:
+        </p>
+
+        <pre><code>class CommunicationScheduler:
+    def __init__(self):
+        self.pending_updates = []
+
+    def should_communicate(self, device_state):
+        """
+        Decide whether to communicate based on device conditions
+
+        Args:
+            device_state: Dict with battery, network, time info
+
+        Returns:
+            Boolean indicating whether to communicate now
+        """
+        # Check battery level
+        if device_state['battery_level'] < 0.3 and not device_state['charging']:
+            return False  # Don't drain battery
+
+        # Prefer WiFi over cellular
+        if device_state['network_type'] == 'cellular':
+            # Only if critical and good signal
+            if device_state['signal_strength'] < 0.7:
+                return False
+            # Check data allowance
+            if device_state['data_used_mb'] > device_state['data_limit_mb'] * 0.9:
+                return False
+
+        # Prefer off-peak hours
+        hour = device_state['current_hour']
+        if 9 <= hour <= 17:  # Peak hours
+            return device_state['network_type'] == 'wifi'
+
+        return True  # Good to communicate</code></pre>
+
+        <h3>Progressive Model Updates</h3>
+        <p>
+            Send model updates progressively from coarse to fine:
+        </p>
+
+        <pre><code>def progressive_update(model, num_stages=3):
+    """
+    Send model in multiple stages with increasing detail
+
+    Stage 1: Low-rank approximation
+    Stage 2: + Top-k sparse corrections
+    Stage 3: + Remaining small corrections
+    """
+
+    stages = []
+
+    # Stage 1: Low-rank approximation (smallest)
+    low_rank = low_rank_compression(model, rank=10)
+    stages.append({
+        'stage': 1,
+        'type': 'low_rank',
+        'data': low_rank,
+        'size_kb': calculate_size(low_rank)
+    })
+
+    # Reconstruct and calculate error
+    approx_1 = reconstruct_from_low_rank(low_rank)
+    error_1 = model - approx_1
+
+    # Stage 2: Top 10% of errors
+    top_errors = sparsify_gradient(error_1, sparsity=0.1)
+    stages.append({
+        'stage': 2,
+        'type': 'sparse_correction',
+        'data': top_errors,
+        'size_kb': calculate_size(top_errors)
+    })
+
+    # Stage 3: Remaining errors (optional, if bandwidth allows)
+    approx_2 = approx_1 + densify_gradient(top_errors)
+    error_2 = model - approx_2
+    remaining = sparsify_gradient(error_2, sparsity=0.05)
+    stages.append({
+        'stage': 3,
+        'type': 'final_correction',
+        'data': remaining,
+        'size_kb': calculate_size(remaining)
+    })
+
+    return stages
+
+# Client can stop downloading at any stage based on bandwidth</code></pre>
+
+        <h2>Practical Implementation Example</h2>
+
+        <pre><code>class EfficientFederatedClient:
+    """
+    Complete client implementation with communication optimization
+    """
+
+    def __init__(self, model, device_profile):
+        self.model = model
+        self.device_profile = device_profile
+
+        # Initialize compressor based on device capability
+        if device_profile['tier'] == 'high_end':
+            self.compressor = GradientCompressionPipeline(
+                quantization_bits=16,
+                sparsity=0.2,
+                use_error_feedback=True
+            )
+        else:
+            self.compressor = GradientCompressionPipeline(
+                quantization_bits=8,
+                sparsity=0.05,  # Aggressive compression
+                use_error_feedback=True
+            )
+
+        self.scheduler = CommunicationScheduler()
+
+    def training_round(self, local_data, global_model):
+        """Execute one federated learning round"""
+
+        # 1. Download global model (compressed)
+        self.model.set_weights(global_model)
+
+        # 2. Train locally (no communication)
+        for epoch in range(self.device_profile['local_epochs']):
+            for batch in local_data:
+                loss = self.model.train_step(batch)
+
+        # 3. Compute model update (delta from global)
+        model_update = self.model.get_weights() - global_model
+
+        # 4. Compress update
+        compressed_update = self.compressor.compress(model_update)
+
+        # 5. Check if should communicate now
+        if not self.scheduler.should_communicate(self.get_device_state()):
+            # Defer communication
+            return None
+
+        # 6. Send compressed update
+        return compressed_update
+
+    def get_device_state(self):
+        """Get current device state for scheduling"""
+        return {
+            'battery_level': get_battery_level(),
+            'charging': is_charging(),
+            'network_type': get_network_type(),
+            'signal_strength': get_signal_strength(),
+            'data_used_mb': get_data_usage(),
+            'data_limit_mb': self.device_profile['data_limit'],
+            'current_hour': datetime.now().hour
+        }</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Communication costs dominate federated learning; compression is essential</li>
+                <li>Quantization reduces precision (4-32x compression with minimal accuracy loss)</li>
+                <li>Sparsification sends only top-k gradients (10-100x compression)</li>
+                <li>Low-rank decomposition approximates matrices with fewer parameters</li>
+                <li>Local SGD reduces communication frequency by doing multiple local steps</li>
+                <li>Error feedback accumulation maintains accuracy despite compression</li>
+                <li>Adaptive strategies adjust compression based on network and training conditions</li>
+                <li>Asynchronous updates allow clients to communicate at different rates</li>
+                <li>Hierarchical aggregation uses edge servers to reduce central communication</li>
+                <li>Smart scheduling defers communication to optimal times (WiFi, off-peak, charging)</li>
+                <li>Combining techniques can achieve 100x+ compression while maintaining model quality</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Why is communication often the bottleneck in federated learning? Calculate bandwidth for 1000 clients with a 100MB model.</li>
+                <li>Explain how quantization works. What is the trade-off between num_bits and accuracy?</li>
+                <li>How does sparsification (top-k) reduce communication? What happens to gradients that aren't sent?</li>
+                <li>What is error feedback accumulation? How does it maintain accuracy despite compression?</li>
+                <li>Compare synchronous and asynchronous federated learning. What is the staleness problem?</li>
+                <li>How does hierarchical aggregation reduce communication to the central server?</li>
+                <li>Design a compression pipeline that combines quantization, sparsification, and error feedback.</li>
+                <li>What factors should a communication scheduler consider when deciding whether to transmit updates?</li>
+                <li>How can progressive model updates adapt to varying bandwidth conditions?</li>
+                <li>For a mobile keyboard app with 100M users, design an efficient communication strategy.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← Chapter 02</a>
+            <a href="chapter-04.html" class="nav-button">Chapter 04 →</a>
+        </div>
+    </div>
+</body>
+</html>

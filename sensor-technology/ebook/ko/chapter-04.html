@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 환경 센서 | WIA-SENSOR-001</title>
+    <meta name="description" content="가스 센서, 온도 센서, 습도 센서 등 환경 모니터링을 위한 센서 기술 종합 가이드">
+    <meta name="keywords" content="환경 센서, 가스 센서, 온도 센서, 습도 센서, 대기질 모니터링, WIA 표준">
+    <meta name="author" content="World Industry Association">
+    <style>
+        :root {
+            --bg-primary: #0a0b0d;
+            --bg-secondary: #12141a;
+            --bg-tertiary: #1a1d25;
+            --bg-card: #1e2128;
+            --text-primary: #f0f2f5;
+            --text-secondary: #a8b0bc;
+            --text-muted: #6b7280;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #00b894;
+            --accent-tertiary: #0984e3;
+            --accent-sensor: #e17055;
+            --accent-gradient: linear-gradient(135deg, #00d4aa 0%, #00b894 50%, #0984e3 100%);
+            --border-color: #2d3139;
+            --shadow-color: rgba(0, 212, 170, 0.1);
+            --code-bg: #0d0e10;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans KR', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .sensor-wave {
+            position: absolute;
+            border-radius: 50%;
+            animation: sensorPulse 4s ease-in-out infinite;
+            border: 1px solid rgba(0, 212, 170, 0.1);
+        }
+
+        .sensor-wave:nth-child(1) { width: 300px; height: 300px; top: 10%; left: 5%; animation-delay: 0s; }
+        .sensor-wave:nth-child(2) { width: 400px; height: 400px; top: 60%; right: 10%; animation-delay: 1s; }
+        .sensor-wave:nth-child(3) { width: 250px; height: 250px; bottom: 20%; left: 20%; animation-delay: 2s; }
+
+        @keyframes sensorPulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.3); opacity: 0.1; }
+        }
+
+        header {
+            position: relative;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            z-index: 10;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 50px; height: 50px;
+            background: var(--accent-gradient);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .logo-text h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-text span { font-size: 0.8rem; color: var(--text-secondary); }
+
+        nav { display: flex; gap: 1rem; align-items: center; }
+
+        nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        nav a:hover {
+            color: var(--accent-primary);
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .chapter-hero {
+            position: relative;
+            padding: 4rem 2rem;
+            background: radial-gradient(ellipse at center, var(--bg-secondary) 0%, var(--bg-primary) 70%);
+            text-align: center;
+            z-index: 5;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chapter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(0, 212, 170, 0.15);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .chapter-hero h2 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .chapter-hero h2 span {
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .chapter-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 1.5rem;
+        }
+
+        main {
+            position: relative;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            z-index: 5;
+        }
+
+        .content-section { margin-bottom: 4rem; }
+
+        .content-section h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .content-section h4 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem;
+            color: var(--text-primary);
+        }
+
+        .content-section p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-size: 1.05rem;
+        }
+
+        .content-section ul, .content-section ol {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            padding-left: 2rem;
+        }
+
+        .content-section li { margin-bottom: 0.75rem; }
+
+        .info-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .info-box.highlight { border-left: 4px solid var(--accent-primary); }
+        .info-box.warning { border-left: 4px solid var(--accent-sensor); }
+
+        .info-box h5 {
+            color: var(--accent-primary);
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-box p { color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem; }
+
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            color: var(--text-primary);
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .code-block .comment { color: #6b7280; }
+        .code-block .keyword { color: #c792ea; }
+        .code-block .string { color: #c3e88d; }
+        .code-block .number { color: #f78c6c; }
+        .code-block .function { color: #82aaff; }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table th, .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: var(--bg-tertiary);
+            color: var(--accent-primary);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .data-table td { color: var(--text-secondary); font-size: 0.95rem; }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover td { background: rgba(0, 212, 170, 0.05); }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-3px);
+        }
+
+        .feature-card .icon { font-size: 2rem; margin-bottom: 1rem; }
+        .feature-card h5 { color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .feature-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; }
+
+        .gas-indicator {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+        }
+
+        .gas-level {
+            width: 60px;
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .gas-level-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .gas-level-fill.safe { background: var(--accent-primary); }
+        .gas-level-fill.caution { background: #f1c40f; }
+        .gas-level-fill.danger { background: var(--accent-sensor); }
+
+        .chapter-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            margin-top: 4rem;
+        }
+
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--accent-primary);
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .nav-btn .direction { font-size: 0.8rem; color: var(--text-muted); }
+        .nav-btn .title { font-weight: 600; }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        footer p { color: var(--text-muted); font-size: 0.85rem; }
+        .philosophy { color: var(--accent-primary); font-style: italic; margin-top: 0.5rem; }
+
+        @media (max-width: 768px) {
+            .chapter-hero h2 { font-size: 2rem; }
+            .chapter-meta { flex-direction: column; gap: 0.5rem; }
+            .header-content { flex-direction: column; gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="sensor-wave"></div>
+        <div class="sensor-wave"></div>
+        <div class="sensor-wave"></div>
+    </div>
+
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">🌡️</div>
+                <div class="logo-text">
+                    <h1>WIA-SENSOR-001</h1>
+                    <span>센서 기술 표준</span>
+                </div>
+            </a>
+            </div>
+    </header>
+
+    <section class="chapter-hero">
+        <div class="chapter-badge">
+            <span>📖</span>
+            <span>제4장 / 전체 8장</span>
+        </div>
+        <h2><span>환경 센서</span> (가스, 온도, 습도)</h2>
+        <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto;">대기질 모니터링, 산업 안전, 스마트 빌딩을 위한 환경 센서 기술을 탐구합니다.</p>
+        <div class="chapter-meta">
+            <span>⏱️ 읽기 시간 30분</span>
+            <span>📊 중급 수준</span>
+            <span>📅 2025년 1월 업데이트</span>
+        </div>
+    </section>
+
+    <main>
+        <section class="content-section">
+            <h3>🌬️ 가스 센서 개요</h3>
+            <p>가스 센서는 공기 중의 특정 가스 농도를 측정하는 센서입니다. 산업 안전, 대기질 모니터링, 자동차 배기가스 분석, 실내 공기질 관리 등 다양한 분야에서 필수적인 역할을 합니다.</p>
+
+            <p>가스 센서의 선택은 감지하려는 가스의 종류, 필요한 정확도, 작동 환경, 전력 소비량 등을 고려해야 합니다. 각 센싱 방식은 고유한 장단점을 가지고 있어 응용 분야에 따라 적합한 기술을 선택해야 합니다.</p>
+
+            <h4>가스 센서 유형</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">⚡</div>
+                    <h5>전기화학 센서</h5>
+                    <p>가스가 전극에서 산화/환원 반응을 일으켜 전류 발생. CO, NO2, O3 등 유독 가스 측정에 적합.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔥</div>
+                    <h5>촉매 연소식</h5>
+                    <p>가연성 가스가 촉매 표면에서 연소하여 열 발생. 메탄, 프로판 등 가연성 가스 탐지.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">💎</div>
+                    <h5>반도체 (MOS)</h5>
+                    <p>금속 산화물 표면의 저항 변화 측정. SnO2, ZnO 등. 저비용, VOC 감지에 널리 사용.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🌈</div>
+                    <h5>적외선 (NDIR)</h5>
+                    <p>가스의 적외선 흡수 특성 이용. CO2, CH4 등. 높은 선택성과 안정성.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📡</div>
+                    <h5>광이온화 (PID)</h5>
+                    <p>UV광으로 가스 분자 이온화. ppb 수준 VOC 감지 가능. 산업 안전용.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔬</div>
+                    <h5>레이저 분광</h5>
+                    <p>가스 분자의 특정 흡수선 측정. 극고정밀 측정, 연구 및 환경 모니터링.</p>
+                </div>
+            </div>
+
+            <h4>주요 감지 가스 및 응용</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>가스</th>
+                        <th>센서 유형</th>
+                        <th>측정 범위</th>
+                        <th>응용 분야</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>CO (일산화탄소)</strong></td>
+                        <td>전기화학, MOS</td>
+                        <td>0-1000 ppm</td>
+                        <td>가정 안전, 주차장, 터널</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CO2 (이산화탄소)</strong></td>
+                        <td>NDIR</td>
+                        <td>0-10,000 ppm</td>
+                        <td>실내 공기질, HVAC, 농업</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CH4 (메탄)</strong></td>
+                        <td>촉매 연소, NDIR</td>
+                        <td>0-100% LEL</td>
+                        <td>가스 누출 감지, 광산</td>
+                    </tr>
+                    <tr>
+                        <td><strong>VOCs</strong></td>
+                        <td>PID, MOS</td>
+                        <td>0-1000 ppb</td>
+                        <td>실내 공기질, 산업 위생</td>
+                    </tr>
+                    <tr>
+                        <td><strong>O3 (오존)</strong></td>
+                        <td>전기화학</td>
+                        <td>0-1 ppm</td>
+                        <td>대기질 모니터링</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NH3 (암모니아)</strong></td>
+                        <td>전기화학, MOS</td>
+                        <td>0-100 ppm</td>
+                        <td>냉동 시설, 축산업</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h3>🌡️ 온도 센서</h3>
+            <p>온도 센서는 가장 널리 사용되는 센서 중 하나로, 산업 공정, HVAC, 의료 기기, 가전제품, 자동차 등 거의 모든 분야에서 사용됩니다. 다양한 측정 원리와 범위를 가진 센서들이 있습니다.</p>
+
+            <h4>온도 센서 유형</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">🔴</div>
+                    <h5>열전대 (Thermocouple)</h5>
+                    <p>두 금속 접합부의 제벡 효과 이용. -200°C~2000°C 광범위. 산업용 표준.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🟡</div>
+                    <h5>RTD (저항 온도 감지기)</h5>
+                    <p>백금 등 금속의 저항 변화 측정. Pt100, Pt1000. 높은 정확도, -200°C~850°C.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🟢</div>
+                    <h5>서미스터 (NTC/PTC)</h5>
+                    <p>세라믹 반도체의 저항 변화. 높은 감도, 저비용. -40°C~125°C 일반적.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔵</div>
+                    <h5>반도체 온도 센서</h5>
+                    <p>PN 접합의 온도 특성 이용. 디지털 출력, 쉬운 인터페이스. LM35, DS18B20.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🟣</div>
+                    <h5>적외선 온도계</h5>
+                    <p>물체가 방출하는 적외선 측정. 비접촉, 고온 측정, 이동 물체.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⚪</div>
+                    <h5>광섬유 온도 센서</h5>
+                    <p>광섬유의 광학적 특성 변화 이용. EMI 면역, 위험 환경용.</p>
+                </div>
+            </div>
+
+            <h4>열전대 유형 비교</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>유형</th>
+                        <th>재료</th>
+                        <th>온도 범위</th>
+                        <th>특징</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>K형</strong></td>
+                        <td>크로멜-알루멜</td>
+                        <td>-200°C ~ 1250°C</td>
+                        <td>가장 널리 사용, 범용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>J형</strong></td>
+                        <td>철-콘스탄탄</td>
+                        <td>-40°C ~ 750°C</td>
+                        <td>환원 분위기에 적합</td>
+                    </tr>
+                    <tr>
+                        <td><strong>T형</strong></td>
+                        <td>구리-콘스탄탄</td>
+                        <td>-200°C ~ 350°C</td>
+                        <td>저온용, 높은 정확도</td>
+                    </tr>
+                    <tr>
+                        <td><strong>S형</strong></td>
+                        <td>백금-로듐/백금</td>
+                        <td>0°C ~ 1450°C</td>
+                        <td>고온 정밀 측정</td>
+                    </tr>
+                    <tr>
+                        <td><strong>R형</strong></td>
+                        <td>백금-로듐/백금</td>
+                        <td>0°C ~ 1450°C</td>
+                        <td>S형과 유사, 더 높은 출력</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">
+                <pre><span class="comment">// NTC 서미스터 온도 계산 (Steinhart-Hart 방정식)</span>
+<span class="keyword">function</span> <span class="function">calculateTemperature</span>(resistance: <span class="keyword">number</span>): <span class="keyword">number</span> {
+    <span class="comment">// 10kΩ NTC 서미스터 (B=3950K)</span>
+    <span class="keyword">const</span> R0 = <span class="number">10000</span>;  <span class="comment">// 25°C에서의 저항</span>
+    <span class="keyword">const</span> T0 = <span class="number">298.15</span>; <span class="comment">// 25°C in Kelvin</span>
+    <span class="keyword">const</span> B = <span class="number">3950</span>;    <span class="comment">// B 상수</span>
+    
+    <span class="comment">// 간소화된 B-방정식</span>
+    <span class="keyword">const</span> tempKelvin = <span class="number">1</span> / ((<span class="number">1</span> / T0) + (<span class="number">1</span> / B) * Math.log(resistance / R0));
+    <span class="keyword">const</span> tempCelsius = tempKelvin - <span class="number">273.15</span>;
+    
+    <span class="keyword">return</span> tempCelsius;
+}
+
+<span class="comment">// DS18B20 디지털 온도 센서 읽기</span>
+<span class="keyword">async function</span> <span class="function">readDS18B20</span>(): Promise&lt;<span class="keyword">number</span>&gt; {
+    <span class="keyword">const</span> rawData = <span class="keyword">await</span> oneWire.read(DS18B20_ADDRESS);
+    <span class="keyword">const</span> temp = (rawData[<span class="number">1</span>] << <span class="number">8</span> | rawData[<span class="number">0</span>]) * <span class="number">0.0625</span>;
+    <span class="keyword">return</span> temp;
+}</pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>💧 습도 센서</h3>
+            <p>습도 센서는 공기 중의 수분 함량을 측정합니다. 상대 습도(RH), 절대 습도, 이슬점 등 다양한 형태로 표현됩니다. HVAC, 기상 관측, 산업 공정, 저장 시설 등에서 중요합니다.</p>
+
+            <h4>습도 센서 유형</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">🔋</div>
+                    <h5>용량형 습도 센서</h5>
+                    <p>흡습성 폴리머 유전체의 정전용량 변화 측정. 넓은 측정 범위, 선형 응답.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⚡</div>
+                    <h5>저항형 습도 센서</h5>
+                    <p>흡습성 재료의 저항 변화 측정. 저비용, 빠른 응답. 고습도에서 비선형.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🌡️</div>
+                    <h5>이슬점 센서</h5>
+                    <p>거울 냉각하여 결로점 측정. 높은 정확도. 기준 센서로 사용.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h5>복합 센서</h5>
+                    <p>온도와 습도 동시 측정. DHT22, SHT40, BME280 등.</p>
+                </div>
+            </div>
+
+            <h4>주요 습도 센서 제품</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>제품</th>
+                        <th>제조사</th>
+                        <th>정확도</th>
+                        <th>인터페이스</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SHT40</strong></td>
+                        <td>Sensirion</td>
+                        <td>±1.8% RH</td>
+                        <td>I2C</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BME280</strong></td>
+                        <td>Bosch</td>
+                        <td>±3% RH</td>
+                        <td>I2C/SPI</td>
+                    </tr>
+                    <tr>
+                        <td><strong>HDC2080</strong></td>
+                        <td>Texas Instruments</td>
+                        <td>±2% RH</td>
+                        <td>I2C</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DHT22</strong></td>
+                        <td>Aosong</td>
+                        <td>±2-5% RH</td>
+                        <td>단선 디지털</td>
+                    </tr>
+                    <tr>
+                        <td><strong>HIH-6130</strong></td>
+                        <td>Honeywell</td>
+                        <td>±4% RH</td>
+                        <td>I2C</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box highlight">
+                <h5>💡 습도 측정 단위</h5>
+                <p><strong>상대 습도 (RH):</strong> 현재 수증기량 / 최대 수증기량 × 100%</p>
+                <p><strong>절대 습도:</strong> 단위 부피당 수증기 질량 (g/m³)</p>
+                <p><strong>이슬점:</strong> 수증기가 응결되기 시작하는 온도 (°C)</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>🏭 통합 환경 센서</h3>
+            <p>현대 환경 센서는 여러 측정 기능을 하나의 칩에 통합합니다. Bosch BME680/688, Sensirion SGP40 등은 온도, 습도, 기압, 가스를 동시에 측정할 수 있습니다.</p>
+
+            <h4>대표 통합 센서</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">🔷</div>
+                    <h5>Bosch BME688</h5>
+                    <p>온도, 습도, 기압, VOC 가스 4-in-1. AI 기능 탑재로 가스 분류 가능.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🟢</div>
+                    <h5>Sensirion SEN55</h5>
+                    <p>PM1.0/2.5/4/10, VOC, NOx, 온도, 습도 통합. 대기질 종합 측정.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🟣</div>
+                    <h5>ScioSense ENS160</h5>
+                    <p>다중 가스 센서로 TVOC, eCO2 측정. 실내 공기질 인덱스 제공.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔴</div>
+                    <h5>AMS AS7341</h5>
+                    <p>11채널 스펙트럼 센서. 환경광 분석, 색상 측정에 활용.</p>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <pre><span class="comment">// BME688 센서 통합 읽기</span>
+<span class="keyword">interface</span> EnvironmentData {
+    temperature: <span class="keyword">number</span>;     <span class="comment">// °C</span>
+    humidity: <span class="keyword">number</span>;        <span class="comment">// %RH</span>
+    pressure: <span class="keyword">number</span>;        <span class="comment">// hPa</span>
+    gasResistance: <span class="keyword">number</span>;   <span class="comment">// Ω</span>
+    iaq: <span class="keyword">number</span>;             <span class="comment">// 공기질 지수 (0-500)</span>
+    co2Equivalent: <span class="keyword">number</span>;   <span class="comment">// ppm</span>
+    breathVoc: <span class="keyword">number</span>;       <span class="comment">// ppm</span>
+}
+
+<span class="keyword">async function</span> <span class="function">readBME688</span>(): Promise&lt;EnvironmentData&gt; {
+    <span class="comment">// 강제 측정 모드로 전환</span>
+    <span class="keyword">await</span> i2c.write(BME688_ADDR, CTRL_MEAS, <span class="number">0x25</span>);
+    
+    <span class="comment">// 측정 완료 대기</span>
+    <span class="keyword">await</span> delay(<span class="number">100</span>);
+    
+    <span class="comment">// 데이터 레지스터 읽기</span>
+    <span class="keyword">const</span> rawData = <span class="keyword">await</span> i2c.readBlock(BME688_ADDR, DATA_REG, <span class="number">17</span>);
+    
+    <span class="comment">// 보정 계수 적용 및 값 계산</span>
+    <span class="keyword">return</span> {
+        temperature: compensateTemp(rawData),
+        humidity: compensateHumidity(rawData),
+        pressure: compensatePressure(rawData),
+        gasResistance: calculateGasResistance(rawData),
+        iaq: calculateIAQ(rawData),
+        co2Equivalent: calculateCO2(rawData),
+        breathVoc: calculateVOC(rawData)
+    };
+}</pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>📊 대기질 지수 (AQI)</h3>
+            <p>대기질 지수(Air Quality Index, AQI)는 대기 오염 수준을 이해하기 쉬운 숫자로 표현합니다. 각 국가마다 기준이 다르며, 주로 PM2.5, PM10, O3, NO2, SO2, CO 등의 농도를 기반으로 계산합니다.</p>
+
+            <h4>AQI 수준별 의미</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>AQI</th>
+                        <th>수준</th>
+                        <th>건강 영향</th>
+                        <th>권장 조치</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>0-50</strong></td>
+                        <td style="color: #00d4aa;">좋음</td>
+                        <td>공기질이 만족스럽고 건강 위험이 낮음</td>
+                        <td>정상적인 야외 활동</td>
+                    </tr>
+                    <tr>
+                        <td><strong>51-100</strong></td>
+                        <td style="color: #f1c40f;">보통</td>
+                        <td>민감한 그룹에게 약간의 영향</td>
+                        <td>민감군 장시간 야외활동 자제</td>
+                    </tr>
+                    <tr>
+                        <td><strong>101-150</strong></td>
+                        <td style="color: #e67e22;">민감군 나쁨</td>
+                        <td>민감한 그룹에게 건강 영향</td>
+                        <td>민감군 야외활동 제한</td>
+                    </tr>
+                    <tr>
+                        <td><strong>151-200</strong></td>
+                        <td style="color: #e74c3c;">나쁨</td>
+                        <td>일반인도 건강 영향 시작</td>
+                        <td>야외 활동 제한, 마스크 착용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>201-300</strong></td>
+                        <td style="color: #9b59b6;">매우 나쁨</td>
+                        <td>모든 사람에게 건강 영향</td>
+                        <td>야외 활동 자제</td>
+                    </tr>
+                    <tr>
+                        <td><strong>301+</strong></td>
+                        <td style="color: #7f0000;">위험</td>
+                        <td>건강 경보, 심각한 영향</td>
+                        <td>실외 활동 금지</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h3>📚 장 요약</h3>
+            <p>이 장에서는 환경 센서의 다양한 측면을 다루었습니다:</p>
+            
+            <ul>
+                <li><strong>가스 센서:</strong> 전기화학, 촉매 연소, MOS, NDIR 등 다양한 감지 원리</li>
+                <li><strong>온도 센서:</strong> 열전대, RTD, 서미스터, 적외선 등 측정 방식</li>
+                <li><strong>습도 센서:</strong> 용량형, 저항형, 이슬점 센서</li>
+                <li><strong>통합 센서:</strong> BME688, SEN55 등 다기능 환경 센서</li>
+                <li><strong>대기질 지수:</strong> AQI 계산 및 건강 영향</li>
+            </ul>
+
+            <p>다음 장에서는 바이오 및 의료 센서 기술에 대해 자세히 알아봅니다.</p>
+        </section>
+
+        <div class="title">이미지 센서 기술</div>
+                </div>
+            </a>
+            <a href="chapter-05.html" class="nav-btn">
+                <div>
+                    <div class="direction">다음 장</div>
+                    <div class="title">바이오 및 의료 센서</div>
+                </div>
+                <span>→</span>
+            </a>
+        </div>
+    </main>
+</body>
+</html>

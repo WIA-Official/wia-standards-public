@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Apple Watch/HealthKit to WIA-SLEEP Mapping",
+  "version": "1.0.0",
+  "deviceInfo": {
+    "manufacturer": "Apple Inc.",
+    "device": "Apple Watch",
+    "series": ["Series 4+", "Ultra", "SE"],
+    "framework": "HealthKit",
+    "documentation": "https://developer.apple.com/documentation/healthkit"
+  },
+  "dataSource": "consumer_wearable",
+  "healthKitIdentifiers": {
+    "sleepAnalysis": {
+      "identifier": "HKCategoryTypeIdentifierSleepAnalysis",
+      "values": {
+        "inBed": 0,
+        "asleepUnspecified": 1,
+        "awake": 2,
+        "asleepCore": 3,
+        "asleepDeep": 4,
+        "asleepREM": 5
+      }
+    },
+    "heartRateVariability": {
+      "identifier": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+      "unit": "ms"
+    },
+    "respiratoryRate": {
+      "identifier": "HKQuantityTypeIdentifierRespiratoryRate",
+      "unit": "count/min"
+    },
+    "oxygenSaturation": {
+      "identifier": "HKQuantityTypeIdentifierOxygenSaturation",
+      "unit": "%"
+    },
+    "restingHeartRate": {
+      "identifier": "HKQuantityTypeIdentifierRestingHeartRate",
+      "unit": "count/min"
+    }
+  },
+  "sleepArchitecture": {
+    "mappings": {
+      "totalSleepTime_min": {
+        "healthKitQuery": "Sum of HKCategoryTypeIdentifierSleepAnalysis where value in [asleepUnspecified, asleepCore, asleepDeep, asleepREM]",
+        "unit": "seconds",
+        "transform": "value / 60"
+      },
+      "sleepEfficiency_pct": {
+        "derivation": "totalSleepTime / timeInBed * 100",
+        "healthKitQuery": "Calculate from sleep samples",
+        "notes": "Not directly provided; calculate from in-bed vs asleep times"
+      },
+      "sleepOnsetLatency_min": {
+        "derivation": "Time from first inBed to first asleep sample",
+        "notes": "Requires analysis of sample sequence"
+      },
+      "wakeAfterSleepOnset_min": {
+        "healthKitQuery": "Sum of awake samples between sleep onset and final awakening",
+        "unit": "seconds",
+        "transform": "value / 60"
+      },
+      "stages.n1_pct": {
+        "healthKitValue": null,
+        "notes": "watchOS combines N1+N2 as 'Core' sleep"
+      },
+      "stages.n2_pct": {
+        "healthKitValue": "asleepCore",
+        "derivation": "Duration of asleepCore / totalSleepTime * 100",
+        "notes": "Includes both N1 and N2 stages"
+      },
+      "stages.n3_sws_pct": {
+        "healthKitValue": "asleepDeep",
+        "derivation": "Duration of asleepDeep / totalSleepTime * 100"
+      },
+      "stages.rem_pct": {
+        "healthKitValue": "asleepREM",
+        "derivation": "Duration of asleepREM / totalSleepTime * 100"
+      }
+    }
+  },
+  "circadianMarkers": {
+    "mappings": {
+      "heartRateVariability.rmssd": {
+        "healthKitIdentifier": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+        "notes": "HealthKit provides SDNN; RMSSD may require raw data access",
+        "approximation": "RMSSD ≈ SDNN * 1.07 for nighttime measurements"
+      },
+      "heartRateVariability.lf_hf_ratio": {
+        "healthKitIdentifier": null,
+        "notes": "Not directly available; requires frequency domain analysis of raw RR intervals"
+      }
+    }
+  },
+  "sleepDisorders": {
+    "mappings": {
+      "oxygenDesaturationIndex": {
+        "healthKitIdentifier": "HKQuantityTypeIdentifierOxygenSaturation",
+        "derivation": "Count desaturations (>3% drop) per hour",
+        "notes": "Requires analysis of SpO2 samples during sleep"
+      }
+    }
+  },
+  "healthKitQueries": {
+    "sleepAnalysis": {
+      "swift": "let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!\nlet predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)\nlet query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]) { (query, samples, error) in\n    guard let samples = samples as? [HKCategorySample] else { return }\n    // Process samples\n}"
+    },
+    "hrv": {
+      "swift": "let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!\nlet predicate = HKQuery.predicateForSamples(withStart: sleepStart, end: sleepEnd, options: .strictStartDate)\nlet query = HKStatisticsQuery(quantityType: hrvType, quantitySamplePredicate: predicate, options: .discreteAverage) { (query, statistics, error) in\n    let averageHRV = statistics?.averageQuantity()?.doubleValue(for: HKUnit.secondUnit(with: .milli))\n}"
+    }
+  },
+  "dataQuality": {
+    "sleepStaging": {
+      "accuracy": "moderate",
+      "validation": "Validated against PSG with ~70-75% agreement for stage classification",
+      "limitations": [
+        "N1/N2 not differentiated (combined as 'Core')",
+        "Requires watchOS 8+ for stage detection",
+        "May not detect all brief awakenings"
+      ]
+    },
+    "hrv": {
+      "accuracy": "good",
+      "validation": "Validated against clinical ECG",
+      "notes": "SDNN provided; RMSSD not directly available"
+    },
+    "spo2": {
+      "accuracy": "moderate",
+      "limitations": [
+        "Background monitoring only (not continuous)",
+        "Requires Series 6+ or SE 2+ or Ultra"
+      ]
+    }
+  },
+  "transformationFunctions": {
+    "convertToWIASleep": {
+      "description": "Transform HealthKit sleep data to WIA-SLEEP format",
+      "swift": "func convertToWIASleep(samples: [HKCategorySample], hrvSamples: [HKQuantitySample]?) -> SleepRecord {\n    // Calculate total duration by stage\n    var stageDurations: [Int: TimeInterval] = [:]\n    for sample in samples {\n        let duration = sample.endDate.timeIntervalSince(sample.startDate)\n        stageDurations[sample.value, default: 0] += duration\n    }\n    \n    let totalSleep = (stageDurations[1] ?? 0) + (stageDurations[3] ?? 0) + (stageDurations[4] ?? 0) + (stageDurations[5] ?? 0)\n    let timeInBed = (stageDurations[0] ?? 0) + totalSleep + (stageDurations[2] ?? 0)\n    \n    return SleepRecord(\n        sleepArchitecture: SleepArchitecture(\n            summary: SleepArchitectureSummary(\n                totalSleepTime_min: totalSleep / 60,\n                sleepEfficiency_pct: (totalSleep / timeInBed) * 100,\n                ...\n            )\n        )\n    )\n}"
+    }
+  },
+  "permissions": {
+    "required": [
+      "HKCategoryTypeIdentifierSleepAnalysis",
+      "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
+    ],
+    "optional": [
+      "HKQuantityTypeIdentifierOxygenSaturation",
+      "HKQuantityTypeIdentifierRespiratoryRate",
+      "HKQuantityTypeIdentifierRestingHeartRate"
+    ]
+  }
+}

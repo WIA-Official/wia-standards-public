@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 07: 실시간 데이터 시각화 - WIA-DATA_VISUALIZATION</title>
+    <style>:root{--primary:#8B5CF6;--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--border:#334155;--accent:#3b82f6;--code-bg:#1e1e1e;--success:#10b981;}*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;}.container{max-width:1000px;margin:0 auto;padding:40px 20px;}header{background:linear-gradient(135deg,var(--bg-card) 0%,#2d1f4a 100%);padding:40px;border-radius:15px;margin-bottom:40px;border-left:5px solid var(--primary);}h1{color:var(--primary);font-size:2.5em;margin-bottom:15px;}h2{color:var(--primary);font-size:2em;margin:50px 0 25px 0;padding-bottom:10px;border-bottom:2px solid var(--primary);}h3{color:var(--accent);font-size:1.5em;margin:35px 0 20px 0;}p{margin:20px 0;font-size:1.1em;line-height:1.9;}table{width:100%;border-collapse:collapse;margin:30px 0;background:var(--bg-card);border-radius:10px;overflow:hidden;}th{background:var(--primary);color:white;padding:15px;text-align:left;}td{padding:15px;border-bottom:1px solid var(--border);}tr:hover{background:rgba(139,92,246,0.1);}ul,ol{margin:20px 0;padding-left:30px;}li{margin:10px 0;font-size:1.1em;line-height:1.8;}.code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin:25px 0;overflow-x:auto;font-family:Consolas,monospace;font-size:0.95em;}.info-box{background:rgba(59,130,246,0.1);border-left:4px solid var(--accent);padding:25px;margin:30px 0;border-radius:8px;}.warning-box{background:rgba(245,158,11,0.1);border-left:4px solid #f59e0b;padding:25px;margin:30px 0;border-radius:8px;}.success-box{background:rgba(16,185,129,0.1);border-left:4px solid var(--success);padding:25px;margin:30px 0;border-radius:8px;}.key-takeaways{background:linear-gradient(135deg,rgba(139,92,246,0.2) 0%,rgba(59,130,246,0.2) 100%);padding:30px;border-radius:15px;margin:40px 0;}.review-questions{background:var(--bg-card);padding:30px;border-radius:15px;margin:40px 0;}.nav-buttons{display:flex;justify-content:space-between;margin-top:50px;gap:20px;}.btn{padding:15px 30px;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.3s;flex:1;text-align:center;}.btn-primary{background:var(--primary);color:white;}.btn-secondary{background:var(--bg-card);color:var(--primary);border:2px solid var(--primary);}footer{margin-top:60px;padding-top:30px;border-top:2px solid var(--border);text-align:center;color:var(--text-secondary);}</style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 07: 실시간 데이터 시각화</h1>
+            <p style="margin-top:15px;font-size:1.2em;color:var(--text-secondary);">
+                WebSocket, SSE, 스트리밍 차트로 실시간 모니터링 구현
+            </p>
+        </header>
+
+        <h2>1. 실시간 시각화의 필요성</h2>
+        <p>
+            IoT 센서, 금융 거래, 서버 모니터링, 소셜 미디어 스트림 등에서
+            <strong>실시간 데이터 시각화</strong>는 필수입니다. 지연이 1초만 발생해도
+            수백만 원의 손실이나 시스템 장애로 이어질 수 있습니다.
+        </p>
+
+        <div class="info-box">
+            <strong>실시간 시각화 사용 사례</strong><br>
+            • <strong>DevOps 모니터링:</strong> CPU, 메모리, 네트워크 트래픽 (1초 업데이트)<br>
+            • <strong>주식 거래:</strong> 실시간 가격, 거래량 (밀리초 단위)<br>
+            • <strong>IoT 센서:</strong> 온도, 습도, 진동 (10ms ~ 1s)<br>
+            • <strong>소셜 미디어:</strong> 트렌딩 토픽, 감정 분석 (5-60초)<br>
+            • <strong>웹 분석:</strong> 실시간 방문자, 페이지뷰 (1-5초)<br>
+            • <strong>게임 메트릭:</strong> 동시 접속자, 서버 상태 (1초)
+        </div>
+
+        <h3>1.1 실시간 데이터 전송 기술 비교</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>기술</th>
+                    <th>방향</th>
+                    <th>지연시간</th>
+                    <th>오버헤드</th>
+                    <th>최적 사용처</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>WebSocket</strong></td>
+                    <td>양방향</td>
+                    <td>~1ms</td>
+                    <td>낮음</td>
+                    <td>실시간 채팅<br>게임<br>금융 데이터</td>
+                </tr>
+                <tr>
+                    <td><strong>SSE</strong><br>(Server-Sent Events)</td>
+                    <td>단방향<br>(서버→클라이언트)</td>
+                    <td>~5ms</td>
+                    <td>매우 낮음</td>
+                    <td>알림<br>뉴스 피드<br>모니터링</td>
+                </tr>
+                <tr>
+                    <td><strong>Long Polling</strong></td>
+                    <td>단방향</td>
+                    <td>~100ms</td>
+                    <td>높음</td>
+                    <td>레거시 브라우저<br>간단한 알림</td>
+                </tr>
+                <tr>
+                    <td><strong>Short Polling</strong></td>
+                    <td>단방향</td>
+                    <td>1-10s</td>
+                    <td>매우 높음</td>
+                    <td>실시간 불필요<br>간단한 업데이트</td>
+                </tr>
+                <tr>
+                    <td><strong>gRPC Streaming</strong></td>
+                    <td>양방향</td>
+                    <td><1ms</td>
+                    <td>낮음</td>
+                    <td>마이크로서비스<br>고성능 시스템</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2. WebSocket 실시간 차트</h2>
+        <p>
+            WebSocket은 가장 널리 사용되는 실시간 통신 프로토콜입니다.
+            HTTP 핸드셰이크 후 TCP 연결을 유지하여 지연시간을 최소화합니다.
+        </p>
+
+        <h3>2.1 WebSocket 서버 (Node.js)</h3>
+        <div class="code-block">
+// WebSocket 서버 (ws 라이브러리)
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
+
+// 연결된 클라이언트 목록
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+    console.log('클라이언트 연결됨');
+    clients.add(ws);
+
+    // 연결 시 초기 데이터 전송
+    ws.send(JSON.stringify({
+        type: 'init',
+        data: generateInitialData()
+    }));
+
+    // 클라이언트로부터 메시지 수신
+    ws.on('message', (message) => {
+        console.log('수신:', message);
+
+        const data = JSON.parse(message);
+        if (data.type === 'subscribe') {
+            // 구독 처리
+            ws.subscriptions = data.channels;
+        }
+    });
+
+    // 연결 해제
+    ws.on('close', () => {
+        console.log('클라이언트 연결 해제');
+        clients.delete(ws);
+    });
+
+    // 에러 처리
+    ws.on('error', (error) => {
+        console.error('WebSocket 에러:', error);
+    });
+});
+
+// 실시간 데이터 브로드캐스트 (1초마다)
+setInterval(() => {
+    const newData = {
+        type: 'update',
+        timestamp: Date.now(),
+        metrics: {
+            cpu: Math.random() * 100,
+            memory: Math.random() * 16,
+            requests: Math.floor(Math.random() * 1000)
+        }
+    };
+
+    // 모든 연결된 클라이언트에 전송
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(newData));
+        }
+    });
+}, 1000);
+
+console.log('WebSocket 서버 시작: ws://localhost:8080');
+</div>
+
+        <h3>2.2 WebSocket 클라이언트 + Chart.js</h3>
+        <div class="code-block">
+// WebSocket 클라이언트
+const ws = new WebSocket('ws://localhost:8080');
+
+// Chart.js 초기화
+const ctx = document.getElementById('realtimeChart').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: 'CPU (%)',
+                data: [],
+                borderColor: '#8B5CF6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Memory (GB)',
+                data: [],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        animation: {
+            duration: 0  // 실시간에서는 애니메이션 비활성화
+        },
+        scales: {
+            x: {
+                type: 'time',
+                time: {
+                    unit: 'second',
+                    displayFormats: {
+                        second: 'HH:mm:ss'
+                    }
+                },
+                ticks: {
+                    maxRotation: 0,
+                    maxTicksLimit: 10
+                }
+            },
+            y: {
+                type: 'linear',
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'CPU (%)'
+                },
+                min: 0,
+                max: 100
+            },
+            y1: {
+                type: 'linear',
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Memory (GB)'
+                },
+                min: 0,
+                max: 16,
+                grid: {
+                    drawOnChartArea: false
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: true
+            }
+        }
+    }
+});
+
+// 최대 데이터 포인트 수 (10분 = 600초)
+const MAX_DATA_POINTS = 600;
+
+// WebSocket 메시지 수신
+ws.onopen = () => {
+    console.log('WebSocket 연결됨');
+
+    // 채널 구독
+    ws.send(JSON.stringify({
+        type: 'subscribe',
+        channels: ['metrics']
+    }));
+};
+
+ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+
+    if (message.type === 'init') {
+        // 초기 데이터 로드
+        message.data.forEach(point => {
+            addDataPoint(point);
+        });
+    } else if (message.type === 'update') {
+        // 실시간 업데이트
+        addDataPoint(message);
+    }
+};
+
+ws.onerror = (error) => {
+    console.error('WebSocket 에러:', error);
+};
+
+ws.onclose = () => {
+    console.log('WebSocket 연결 종료');
+
+    // 재연결 로직 (5초 후)
+    setTimeout(() => {
+        location.reload();
+    }, 5000);
+};
+
+// 데이터 포인트 추가 함수
+function addDataPoint(data) {
+    const timestamp = new Date(data.timestamp);
+
+    // 레이블 추가
+    chart.data.labels.push(timestamp);
+
+    // 데이터 추가
+    chart.data.datasets[0].data.push(data.metrics.cpu);
+    chart.data.datasets[1].data.push(data.metrics.memory);
+
+    // 최대 포인트 수 초과 시 오래된 데이터 제거
+    if (chart.data.labels.length > MAX_DATA_POINTS) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(dataset => {
+            dataset.data.shift();
+        });
+    }
+
+    // 차트 업데이트 (애니메이션 없음)
+    chart.update('none');
+}
+
+// 연결 상태 표시
+function updateConnectionStatus(connected) {
+    const indicator = document.getElementById('connection-status');
+    indicator.textContent = connected ? '● 연결됨' : '○ 연결 끊김';
+    indicator.style.color = connected ? '#10b981' : '#ef4444';
+}
+</div>
+
+        <h2>3. Server-Sent Events (SSE)</h2>
+        <p>
+            SSE는 서버에서 클라이언트로 단방향 데이터 스트리밍에 최적화되어 있습니다.
+            WebSocket보다 단순하며 HTTP/2를 사용하면 멀티플렉싱도 가능합니다.
+        </p>
+
+        <h3>3.1 SSE 서버 (Express.js)</h3>
+        <div class="code-block">
+// SSE 서버
+const express = require('express');
+const app = express();
+
+app.use(express.static('public'));
+
+// SSE 엔드포인트
+app.get('/events', (req, res) => {
+    // SSE 헤더 설정
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
+
+    // 연결 유지를 위한 핑 (30초마다)
+    const pingInterval = setInterval(() => {
+        res.write(':ping\n\n');
+    }, 30000);
+
+    // 실시간 데이터 전송 (1초마다)
+    const dataInterval = setInterval(() => {
+        const data = {
+            timestamp: Date.now(),
+            temperature: 20 + Math.random() * 10,
+            humidity: 40 + Math.random() * 30,
+            pressure: 1000 + Math.random() * 50
+        };
+
+        // SSE 형식으로 전송
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }, 1000);
+
+    // 클라이언트 연결 종료 시 정리
+    req.on('close', () => {
+        clearInterval(pingInterval);
+        clearInterval(dataInterval);
+        res.end();
+    });
+});
+
+app.listen(3000, () => {
+    console.log('SSE 서버 시작: http://localhost:3000');
+});
+</div>
+
+        <h3>3.2 SSE 클라이언트 + D3.js</h3>
+        <div class="code-block">
+// SSE EventSource
+const eventSource = new EventSource('http://localhost:3000/events');
+
+// D3.js 실시간 라인 차트
+const width = 800;
+const height = 400;
+const margin = { top: 20, right: 80, bottom: 30, left: 50 };
+
+const svg = d3.select('#chart')
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+const g = svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+// 데이터 배열
+const dataBuffer = [];
+const MAX_POINTS = 60;  // 1분 (1초마다 1포인트)
+
+// 스케일
+const xScale = d3.scaleTime()
+    .range([0, width - margin.left - margin.right]);
+
+const yScale = d3.scaleLinear()
+    .range([height - margin.top - margin.bottom, 0])
+    .domain([10, 40]);
+
+// 라인 생성기
+const line = d3.line()
+    .x(d => xScale(d.timestamp))
+    .y(d => yScale(d.temperature))
+    .curve(d3.curveMonotoneX);
+
+// 축
+const xAxis = g.append('g')
+    .attr('transform', `translate(0,${height - margin.top - margin.bottom})`);
+
+const yAxis = g.append('g');
+
+// 라인 경로
+const path = g.append('path')
+    .attr('fill', 'none')
+    .attr('stroke', '#8B5CF6')
+    .attr('stroke-width', 2);
+
+// SSE 메시지 수신
+eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    data.timestamp = new Date(data.timestamp);
+
+    // 데이터 추가
+    dataBuffer.push(data);
+
+    // 버퍼 크기 제한
+    if (dataBuffer.length > MAX_POINTS) {
+        dataBuffer.shift();
+    }
+
+    // 차트 업데이트
+    updateChart();
+};
+
+eventSource.onerror = (error) => {
+    console.error('SSE 에러:', error);
+    eventSource.close();
+};
+
+function updateChart() {
+    // X 스케일 도메인 업데이트
+    xScale.domain(d3.extent(dataBuffer, d => d.timestamp));
+
+    // 축 업데이트
+    xAxis.transition()
+        .duration(500)
+        .call(d3.axisBottom(xScale)
+            .ticks(5)
+            .tickFormat(d3.timeFormat('%H:%M:%S')));
+
+    yAxis.call(d3.axisLeft(yScale));
+
+    // 라인 업데이트
+    path.datum(dataBuffer)
+        .transition()
+        .duration(500)
+        .ease(d3.easeLinear)
+        .attr('d', line);
+}
+</div>
+
+        <h2>4. 스트리밍 최적화 전략</h2>
+
+        <h3>4.1 데이터 샘플링</h3>
+        <div class="code-block">
+// LTTB (Largest-Triangle-Three-Buckets) 샘플링
+function downsample(data, threshold) {
+    if (data.length <= threshold) {
+        return data;
+    }
+
+    const sampled = [];
+    const bucketSize = (data.length - 2) / (threshold - 2);
+
+    // 첫 번째 포인트 유지
+    sampled.push(data[0]);
+
+    for (let i = 0; i < threshold - 2; i++) {
+        const bucketStart = Math.floor(i * bucketSize) + 1;
+        const bucketEnd = Math.floor((i + 1) * bucketSize) + 1;
+
+        const bucket = data.slice(bucketStart, bucketEnd);
+
+        // 다음 버킷의 평균 포인트
+        const nextBucket = data.slice(bucketEnd, Math.floor((i + 2) * bucketSize) + 1);
+        const avgNext = {
+            x: d3.mean(nextBucket, d => d.x),
+            y: d3.mean(nextBucket, d => d.y)
+        };
+
+        // 이전 선택된 포인트
+        const prev = sampled[sampled.length - 1];
+
+        // 가장 큰 삼각형 면적을 만드는 포인트 선택
+        let maxArea = -1;
+        let maxIndex = 0;
+
+        bucket.forEach((point, idx) => {
+            const area = Math.abs(
+                (prev.x - avgNext.x) * (point.y - prev.y) -
+                (prev.x - point.x) * (avgNext.y - prev.y)
+            ) * 0.5;
+
+            if (area > maxArea) {
+                maxArea = area;
+                maxIndex = bucketStart + idx;
+            }
+        });
+
+        sampled.push(data[maxIndex]);
+    }
+
+    // 마지막 포인트 유지
+    sampled.push(data[data.length - 1]);
+
+    return sampled;
+}
+
+// 사용
+const rawData = [];  // 100,000 포인트
+const sampledData = downsample(rawData, 1000);  // 1,000 포인트로 축소
+</div>
+
+        <h3>4.2 증분 업데이트</h3>
+        <div class="code-block">
+// 전체 데이터를 다시 그리지 않고 새 포인트만 추가
+class IncrementalChart {
+    constructor(containerId, maxPoints = 500) {
+        this.maxPoints = maxPoints;
+        this.data = [];
+
+        // ECharts 초기화
+        this.chart = echarts.init(document.getElementById(containerId));
+
+        this.option = {
+            xAxis: {
+                type: 'time',
+                boundaryGap: false
+            },
+            yAxis: {
+                type: 'value',
+                boundaryGap: [0, '10%']
+            },
+            series: [{
+                type: 'line',
+                showSymbol: false,
+                data: []
+            }]
+        };
+
+        this.chart.setOption(this.option);
+    }
+
+    addPoint(timestamp, value) {
+        // 새 포인트 추가
+        this.data.push([timestamp, value]);
+
+        // 최대 포인트 초과 시 제거
+        if (this.data.length > this.maxPoints) {
+            this.data.shift();
+        }
+
+        // 증분 업데이트 (전체 차트 다시 그리지 않음)
+        this.chart.setOption({
+            series: [{
+                data: this.data
+            }]
+        });
+    }
+
+    clear() {
+        this.data = [];
+        this.chart.setOption({
+            series: [{ data: [] }]
+        });
+    }
+}
+
+// 사용
+const chart = new IncrementalChart('chart-container', 1000);
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    chart.addPoint(data.timestamp, data.value);
+};
+</div>
+
+        <h3>4.3 백프레셔 (Backpressure) 처리</h3>
+        <div class="code-block">
+// 클라이언트가 처리할 수 있는 속도로 데이터 제한
+class RateLimitedStream {
+    constructor(maxRate = 60) {  // 초당 최대 60개
+        this.maxRate = maxRate;
+        this.buffer = [];
+        this.lastFlush = Date.now();
+
+        // 주기적으로 버퍼 비우기
+        setInterval(() => this.flush(), 1000 / maxRate);
+    }
+
+    push(data) {
+        this.buffer.push(data);
+
+        // 버퍼가 너무 크면 오래된 데이터 제거
+        if (this.buffer.length > this.maxRate * 2) {
+            this.buffer = this.buffer.slice(-this.maxRate);
+        }
+    }
+
+    flush() {
+        if (this.buffer.length === 0) return;
+
+        const data = this.buffer.shift();
+        this.processData(data);
+    }
+
+    processData(data) {
+        // 차트 업데이트
+        chart.addPoint(data.timestamp, data.value);
+    }
+}
+
+const stream = new RateLimitedStream(60);
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    stream.push(data);
+};
+</div>
+
+        <h2>5. 성능 모니터링 대시보드</h2>
+        <p>
+            실시간 시각화의 가장 흔한 사용 사례는 시스템 성능 모니터링입니다.
+        </p>
+
+        <h3>5.1 완전한 모니터링 대시보드</h3>
+        <div class="code-block">
+// 실시간 모니터링 대시보드
+class MonitoringDashboard {
+    constructor() {
+        this.ws = new WebSocket('ws://localhost:8080/metrics');
+        this.charts = {};
+
+        this.initCharts();
+        this.connectWebSocket();
+    }
+
+    initCharts() {
+        // CPU 차트
+        this.charts.cpu = new Chart(document.getElementById('cpu-chart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: [],
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            callback: (value) => value + '%'
+                        }
+                    }
+                },
+                plugins: {
+                    annotation: {
+                        annotations: {
+                            warningLine: {
+                                type: 'line',
+                                yMin: 80,
+                                yMax: 80,
+                                borderColor: '#f59e0b',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: 'Warning: 80%',
+                                    enabled: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 메모리 차트
+        this.charts.memory = new Chart(document.getElementById('memory-chart'), {
+            type: 'bar',
+            data: {
+                labels: ['Used', 'Free', 'Cached'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#8B5CF6', '#10b981', '#3b82f6']
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => value + ' GB'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 네트워크 차트
+        this.charts.network = new Chart(document.getElementById('network-chart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Inbound (Mbps)',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)'
+                    },
+                    {
+                        label: 'Outbound (Mbps)',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                animation: false
+            }
+        });
+    }
+
+    connectWebSocket() {
+        this.ws.onopen = () => {
+            console.log('모니터링 연결됨');
+            this.updateStatus('connected');
+        };
+
+        this.ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.updateCharts(data);
+            this.updateKPIs(data);
+            this.checkAlerts(data);
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket 에러:', error);
+            this.updateStatus('error');
+        };
+
+        this.ws.onclose = () => {
+            console.log('연결 종료, 5초 후 재연결');
+            this.updateStatus('disconnected');
+
+            setTimeout(() => {
+                this.connectWebSocket();
+            }, 5000);
+        };
+    }
+
+    updateCharts(data) {
+        const now = new Date().toLocaleTimeString();
+
+        // CPU 차트 업데이트
+        this.charts.cpu.data.labels.push(now);
+        this.charts.cpu.data.datasets[0].data.push(data.cpu);
+
+        if (this.charts.cpu.data.labels.length > 60) {
+            this.charts.cpu.data.labels.shift();
+            this.charts.cpu.data.datasets[0].data.shift();
+        }
+
+        this.charts.cpu.update('none');
+
+        // 메모리 차트 업데이트
+        this.charts.memory.data.datasets[0].data = [
+            data.memory.used,
+            data.memory.free,
+            data.memory.cached
+        ];
+        this.charts.memory.update('none');
+
+        // 네트워크 차트 업데이트
+        this.charts.network.data.labels.push(now);
+        this.charts.network.data.datasets[0].data.push(data.network.in);
+        this.charts.network.data.datasets[1].data.push(data.network.out);
+
+        if (this.charts.network.data.labels.length > 60) {
+            this.charts.network.data.labels.shift();
+            this.charts.network.data.datasets.forEach(ds => ds.data.shift());
+        }
+
+        this.charts.network.update('none');
+    }
+
+    updateKPIs(data) {
+        document.getElementById('kpi-cpu').textContent = data.cpu.toFixed(1) + '%';
+        document.getElementById('kpi-memory').textContent =
+            data.memory.used.toFixed(1) + ' GB';
+        document.getElementById('kpi-uptime').textContent =
+            this.formatUptime(data.uptime);
+    }
+
+    checkAlerts(data) {
+        if (data.cpu > 80) {
+            this.showAlert('CPU 사용률이 80%를 초과했습니다!', 'warning');
+        }
+
+        if (data.memory.used / data.memory.total > 0.9) {
+            this.showAlert('메모리 사용률이 90%를 초과했습니다!', 'error');
+        }
+    }
+
+    showAlert(message, level) {
+        const alertDiv = document.getElementById('alerts');
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${level}`;
+        alert.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        alertDiv.prepend(alert);
+
+        // 5초 후 제거
+        setTimeout(() => alert.remove(), 5000);
+    }
+
+    updateStatus(status) {
+        const indicator = document.getElementById('connection-status');
+        const statusMap = {
+            connected: { text: '● 연결됨', color: '#10b981' },
+            disconnected: { text: '○ 연결 끊김', color: '#ef4444' },
+            error: { text: '⚠ 에러', color: '#f59e0b' }
+        };
+
+        indicator.textContent = statusMap[status].text;
+        indicator.style.color = statusMap[status].color;
+    }
+
+    formatUptime(seconds) {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+
+        return `${days}일 ${hours}시간 ${minutes}분`;
+    }
+}
+
+// 초기화
+const dashboard = new MonitoringDashboard();
+</div>
+
+        <div class="key-takeaways">
+            <h3 style="color:var(--primary);margin-top:0;">핵심 요점</h3>
+            <ul>
+                <li><strong>WebSocket vs SSE:</strong> 양방향 vs 단방향, 지연 1ms vs 5ms</li>
+                <li><strong>애니메이션 비활성화:</strong> 실시간 차트에서 animation: false</li>
+                <li><strong>데이터 버퍼 제한:</strong> 60-600 포인트 유지, 오래된 데이터 제거</li>
+                <li><strong>LTTB 샘플링:</strong> 100,000 포인트를 1,000으로 압축</li>
+                <li><strong>증분 업데이트:</strong> 전체 재렌더링 대신 새 포인트만 추가</li>
+                <li><strong>백프레셔:</strong> 초당 60개로 속도 제한하여 과부하 방지</li>
+                <li><strong>재연결 로직:</strong> 연결 끊김 시 5초 후 자동 재연결</li>
+                <li><strong>경고 임계값:</strong> CPU 80%, 메모리 90% 초과 시 알림</li>
+                <li><strong>상태 표시:</strong> 연결/끊김/에러 상태를 시각적으로 표시</li>
+                <li><strong>성능 최적화:</strong> Canvas > SVG, ECharts > Chart.js (대용량)</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3 style="color:var(--primary);margin-top:0;">복습 질문</h3>
+            <ol>
+                <li>WebSocket과 SSE의 주요 차이점과 각각의 최적 사용 사례는?</li>
+                <li>실시간 차트에서 애니메이션을 비활성화해야 하는 이유는?</li>
+                <li>LTTB (Largest-Triangle-Three-Buckets) 샘플링 알고리즘의 원리는?</li>
+                <li>데이터 버퍼 크기를 제한해야 하는 이유와 권장 크기는?</li>
+                <li>증분 업데이트가 전체 재렌더링보다 나은 이유는?</li>
+                <li>백프레셔(Backpressure)가 무엇이고 왜 필요한가요?</li>
+                <li>WebSocket 연결이 끊겼을 때 재연결 전략은?</li>
+                <li>실시간 모니터링 대시보드에서 표시해야 할 핵심 KPI는?</li>
+                <li>CPU 사용률 80% 초과 시 경고를 표시하는 방법은?</li>
+                <li>대용량 실시간 데이터 처리를 위한 최적의 라이브러리는?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

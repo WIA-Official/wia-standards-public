@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-BIO-021 Press Materials
+
+## Prompt 1: Hero Image - Biological Parts Registry Database
+A futuristic biological engineering interface showing synthetic biology parts registry with teal (#14B8A6) accents: standardized BioBrick parts (promoters, RBS, coding sequences, terminators) displayed as modular DNA components with SBOL format visualization, metadata showing characterization data, sequence information in GenBank format, and interoperability connections to iGEM, Addgene, and SynBioHub. Holographic DNA helix structures with standardized parts glowing. Clean biotech laboratory aesthetic, professional molecular biology photography.
+
+## Prompt 2: Problem Scenario - Fragmented Biological Parts
+A frustrated synthetic biologist struggling with incompatible biological part databases: multiple proprietary formats preventing data sharing, lost characterization data from past experiments, inability to find suitable promoters across different registries, version control chaos with no tracking of part modifications, safety information scattered and incomplete. Show messy lab notebooks, conflicting data, wasted time re-characterizing known parts. Documentary research photography emphasizing frustration, data silos, and wasted effort in biological engineering.
+
+## Prompt 3: Solution Visualization - Unified Biological Parts Library
+A collaborative global synthetic biology community using WIA-BIO-021 registry: researchers easily finding and sharing BioBrick parts with complete characterization data, SBOL-compatible formats enabling seamless data exchange, version control tracking all modifications, biosafety levels clearly marked (BSL-1/2/3), and successful genetic circuits being rapidly designed from proven components. Display shows 50,000+ registered parts, 99.9% data compatibility, accelerated research timelines reducing development from months to weeks. Clean, organized, collaborative bioengineering. Modern research photography celebrating open science and standardization.

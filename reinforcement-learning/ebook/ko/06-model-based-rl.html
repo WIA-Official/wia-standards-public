@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 모델 기반 강화학습 | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.2rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        h2 { color: #10B981; font-size: 1.6rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        code { color: #10B981; font-family: 'Courier New', monospace; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제6장: 모델 기반 강화학습</h1>
+            <div class="chapter-meta">WIA-AI-025 | 학습된 모델로 계획하기</div>
+        </header>
+
+        <main>
+            <h2>6.1 모델 기반 RL 소개</h2>
+
+            <p>모델 기반 RL은 환경 역학의 모델을 학습하고 이를 계획에 사용합니다. 이는 명시적 모델 없이 경험에서 직접 가치나 정책을 학습하는 모델 프리 방법과 대조됩니다.</p>
+
+            <div class="info-box">
+                <strong>정의:</strong>
+                <p><strong>모델</strong>은 현재 상태와 행동이 주어졌을 때 환경이 다음에 무엇을 할지 예측합니다:</p>
+                <ul>
+                    <li><strong>전이 모델:</strong> P(s'|s,a) - 다음 상태 예측</li>
+                    <li><strong>보상 모델:</strong> R(s,a) - 보상 예측</li>
+                </ul>
+            </div>
+
+            <h3>모델을 사용하는 이유</h3>
+
+            <ul>
+                <li><strong>샘플 효율성:</strong> 시뮬레이션 경험에서 학습 (실제 환경 상호작용 불필요)</li>
+                <li><strong>계획:</strong> 시행착오 없이 미래 결과에 대해 추론 가능</li>
+                <li><strong>전이:</strong> 모델이 새로운 태스크로 일반화 가능</li>
+                <li><strong>안전성:</strong> 배포 전 시뮬레이션에서 정책 테스트</li>
+                <li><strong>데이터 생성:</strong> 합성 훈련 데이터 생성</li>
+            </ul>
+
+            <h2>6.2 Dyna 아키텍처</h2>
+
+            <p>Dyna는 계획, 행동, 모델 학습을 통합하여 모델 프리와 모델 기반 학습을 결합합니다:</p>
+
+            <pre><code>알고리즘: Dyna-Q
+
+Q(s,a)와 Model(s,a) 초기화
+
+반복:
+    // (a) 행동: 환경과 상호작용
+    s = 현재 상태
+    a = ε-greedy(Q, s)
+    a 실행, r, s' 관찰
+
+    // (b) 모델 프리 학습: 직접 RL
+    Q(s,a) ← Q(s,a) + α[r + γ max Q(s',a') - Q(s,a)]
+
+    // (c) 모델 학습: 전이/보상 모델 업데이트
+    Model(s,a) ← (s', r)
+
+    // (d) 계획: 시뮬레이션 경험에서 학습
+    n번 반복:
+        s_sim = 이전에 방문한 임의 상태
+        a_sim = 이전에 취한 임의 행동
+        s'_sim, r_sim = Model(s_sim, a_sim)
+        Q(s_sim, a_sim) ← Q + α[r_sim + γ max Q(s'_sim, ·) - Q]</code></pre>
+
+            <h3>Dyna의 이점</h3>
+
+            <ul>
+                <li>실제 경험 수집과 동시에 모델에서 계획</li>
+                <li>n개의 시뮬레이션 업데이트가 학습 가속화</li>
+                <li>실제 상호작용과 시뮬레이션 사이의 균형 조정 가능</li>
+            </ul>
+
+            <h2>6.3 학습된 모델</h2>
+
+            <h3>6.3.1 결정론적 모델</h3>
+
+            <pre><code>import torch.nn as nn
+
+class DeterministicModel(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim + action_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, state_dim + 1)  # 다음 상태 + 보상
+        )
+    
+    def forward(self, state, action):
+        x = torch.cat([state, action], dim=-1)
+        output = self.network(x)
+        next_state = output[..., :-1]
+        reward = output[..., -1]
+        return next_state, reward</code></pre>
+
+            <h3>6.3.2 확률론적 모델</h3>
+
+            <p>확률론적 모델은 불확실성을 캡처하기 위해 분포를 출력합니다:</p>
+
+            <pre><code>class ProbabilisticModel(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        super().__init__()
+        self.shared = nn.Sequential(
+            nn.Linear(state_dim + action_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+        self.mean_head = nn.Linear(hidden_dim, state_dim)
+        self.logvar_head = nn.Linear(hidden_dim, state_dim)
+    
+    def forward(self, state, action):
+        x = torch.cat([state, action], dim=-1)
+        h = self.shared(x)
+        mean = self.mean_head(h)
+        logvar = self.logvar_head(h)
+        std = torch.exp(0.5 * logvar)
+        return mean, std</code></pre>
+
+            <h2>6.4 Model Predictive Control (MPC)</h2>
+
+            <p>MPC는 각 시간 단계에서 학습된 모델로 최적화하여 행동을 선택합니다:</p>
+
+            <pre><code>class MPC:
+    def __init__(self, model, horizon=10, num_samples=1000):
+        self.model = model
+        self.horizon = horizon
+        self.num_samples = num_samples
+    
+    def select_action(self, state):
+        best_action = None
+        best_return = -float('inf')
+        
+        for _ in range(self.num_samples):
+            # 임의 행동 시퀀스 샘플
+            actions = sample_random_actions(self.horizon)
+            
+            # 모델에서 롤아웃
+            total_reward = 0
+            s = state.clone()
+            
+            for a in actions:
+                s, r = self.model(s, a)
+                total_reward += r
+            
+            if total_reward > best_return:
+                best_return = total_reward
+                best_action = actions[0]
+        
+        return best_action</code></pre>
+
+            <h2>6.5 MBPO (Model-Based Policy Optimization)</h2>
+
+            <p>MBPO는 실제 데이터로 모델을 훈련하고, 모델 생성 데이터로 정책을 훈련합니다:</p>
+
+            <ol>
+                <li>실제 환경에서 데이터 수집</li>
+                <li>데이터로 앙상블 모델 훈련</li>
+                <li>모델을 사용하여 단기 롤아웃 생성</li>
+                <li>SAC를 사용하여 모델 생성 데이터로 정책 훈련</li>
+                <li>반복</li>
+            </ol>
+
+            <h3>핵심 통찰</h3>
+
+            <ul>
+                <li><strong>단기 롤아웃:</strong> 모델 오류가 누적되기 전 짧은 롤아웃 사용</li>
+                <li><strong>앙상블:</strong> 여러 모델로 불확실성 추정</li>
+                <li><strong>실제 데이터 믹싱:</strong> 모델 편향 방지를 위해 실제 데이터도 사용</li>
+            </ul>
+
+            <h2>6.6 World Models</h2>
+
+            <p>World Models는 생성 모델을 사용하여 환경의 컴팩트한 표현을 학습합니다:</p>
+
+            <pre><code>World Models 구성요소:
+1. Vision (V): 관찰을 잠재 코드로 압축 (VAE)
+2. Memory (M): 잠재 역학 예측 (RNN/MDN)
+3. Controller (C): 잠재 공간에서 행동 (작은 네트워크)
+
+학습 프로세스:
+1. 임의 정책으로 경험 수집
+2. V (VAE) 훈련: 관찰 재구성
+3. M (RNN) 훈련: 잠재 전이 예측
+4. C 훈련: V와 M이 생성한 "꿈" 안에서 진화</code></pre>
+
+            <h2>6.7 모델 기반 vs 모델 프리 비교</h2>
+
+            <div class="info-box">
+                <p><strong>모델 기반:</strong> 샘플 효율적, 계획 가능, 전이 가능. 하지만 모델 오류에 취약.</p>
+                <p><strong>모델 프리:</strong> 더 많은 데이터 필요, 직접 최적화. 복잡한 환경에서도 잘 작동.</p>
+            </div>
+
+            <table style="width:100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b;">
+                <thead>
+                    <tr>
+                        <th style="padding: 1rem; background: #334155; color: #10B981;">측면</th>
+                        <th style="padding: 1rem; background: #334155; color: #10B981;">모델 기반</th>
+                        <th style="padding: 1rem; background: #334155; color: #10B981;">모델 프리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 1rem;">샘플 효율성</td>
+                        <td style="padding: 1rem;">높음 (10-100배)</td>
+                        <td style="padding: 1rem;">낮음</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 1rem;">계산량</td>
+                        <td style="padding: 1rem;">높음 (모델 + 계획)</td>
+                        <td style="padding: 1rem;">낮음</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 1rem;">점근 성능</td>
+                        <td style="padding: 1rem;">모델 오류에 제한</td>
+                        <td style="padding: 1rem;">최적에 수렴 가능</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>모델 기반 RL은 환경 역학 모델을 학습하고 계획에 사용</li>
+                    <li>Dyna는 실제 경험과 모델 시뮬레이션을 결합</li>
+                    <li>MPC는 학습된 모델로 온라인 최적화 수행</li>
+                    <li>MBPO는 단기 모델 롤아웃으로 정책 학습</li>
+                    <li>World Models는 잠재 공간에서 계획</li>
+                    <li>모델 기반 방법은 샘플 효율적이지만 모델 오류에 주의 필요</li>
+                    <li>하이브리드 접근법이 두 패러다임의 장점을 결합</li>
+                </ul>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

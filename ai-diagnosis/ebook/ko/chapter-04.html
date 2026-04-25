@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 의료 영상을 위한 딥러닝 - WIA-MED-009</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #a855f7;">제4장: 의료 영상을 위한 딥러닝</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0;">
+<p style="color: #10b981; font-style: italic;">"딥러닝은 수백만 개의 의료 영상에서 인간이 볼 수 없는 패턴을 발견합니다. CNN은 방사선과 전문의의 눈이 되어, 더 정확하고 더 빠른 진단을 가능하게 합니다."</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.1 의료 영상 분석의 딥러닝</h2>
+
+<p><strong style="color: #a855f7;">딥러닝(Deep Learning)</strong>은 다층 신경망을 사용하여 복잡한 패턴을 학습하는 머신러닝의 하위 분야입니다. 의료 영상에서 딥러닝은 혁명을 일으키고 있습니다.</p>
+
+<h3 style="color: #a855f7;">🎯 주요 응용 분야</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">분류(Classification)</strong> — 영상을 범주로 분류 (정상/비정상)</li>
+    <li><strong style="color: #e2e8f0;">객체 감지(Object Detection)</strong> — 병변 위치 찾기</li>
+    <li><strong style="color: #e2e8f0;">세분화(Segmentation)</strong> — 픽셀 단위로 영역 분리</li>
+    <li><strong style="color: #e2e8f0;">등록(Registration)</strong> — 영상 정렬 및 비교</li>
+</ul>
+
+<h3 style="color: #a855f7;">📊 의료 영상 유형</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">영상 유형</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">특징</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">주요 질환</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>X-ray</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">2D, 흑백, 빠름</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">골절, 폐렴, 결핵</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>CT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">3D, 고해상도</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">암, 뇌출혈, 폐색전</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>MRI</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">3D, 연조직 우수</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">뇌종양, 척수 질환</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>초음파</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">실시간, 안전</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">태아 이상, 갑상선</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>병리 슬라이드</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">현미경, 고배율</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">암 진단, 조직 분석</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.2 합성곱 신경망 (CNN)</h2>
+
+<h3 style="color: #a855f7;">🧠 CNN 아키텍처</h3>
+
+<p>CNN은 영상 인식에 특화된 신경망입니다:</p>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto;">
+입력 영상 (예: 512×512 픽셀 흉부 X-ray)
+    ↓
+합성곱 층 1 (Conv1) — 가장자리, 질감 감지
+    ↓
+풀링 층 1 (Pool1) — 크기 축소 (256×256)
+    ↓
+합성곱 층 2 (Conv2) — 형태 패턴 감지
+    ↓
+풀링 층 2 (Pool2) — 크기 축소 (128×128)
+    ↓
+합성곱 층 3-5 (Conv3-5) — 복잡한 특징
+    ↓
+완전 연결 층 (FC) — 분류 결정
+    ↓
+출력: 폐렴 확률 87%
+</pre>
+
+<h3 style="color: #a855f7;">🔍 CNN 핵심 구성 요소</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">구성 요소</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">기능</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">예시</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>합성곱 층</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">특징 추출 (가장자리, 질감)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">3×3 필터로 종양 윤곽 감지</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>활성화 함수</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">비선형성 추가 (ReLU)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">음수 값을 0으로 변환</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>풀링 층</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">크기 축소, 계산량 감소</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Max Pooling 2×2</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>완전 연결 층</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">최종 분류 결정</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">정상/폐렴 확률 출력</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🏗️ 유명한 CNN 아키텍처</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">ResNet</strong> — 잔차 연결로 매우 깊은 네트워크 (50-152층)</li>
+    <li><strong style="color: #e2e8f0;">Inception</strong> — 다중 스케일 합성곱 병렬 처리</li>
+    <li><strong style="color: #e2e8f0;">DenseNet</strong> — 모든 층 간 밀집 연결</li>
+    <li><strong style="color: #e2e8f0;">U-Net</strong> — 의료 영상 세분화 전용 (인코더-디코더)</li>
+    <li><strong style="color: #e2e8f0;">EfficientNet</strong> — 효율적인 스케일링</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.3 의료 영상 분류</h2>
+
+<h3 style="color: #a855f7;">🩺 사례: 흉부 X-ray 폐렴 진단</h3>
+
+<p><strong>목표:</strong> X-ray 영상에서 폐렴 감지</p>
+
+<p><strong>데이터셋:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>정상: 10,000장</li>
+    <li>폐렴: 10,000장</li>
+    <li>해상도: 512×512 픽셀</li>
+</ul>
+
+<p><strong>모델 아키텍처:</strong> ResNet-50 (사전 훈련된 ImageNet 가중치)</p>
+
+<h3 style="color: #a855f7;">💻 구현 예시 (PyTorch)</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto; font-size: 0.85em;">
+import torch
+import torchvision.models as models
+from torchvision import transforms
+
+# 1. 사전 훈련된 ResNet-50 로드
+model = models.resnet50(pretrained=True)
+model.fc = torch.nn.Linear(2048, 2)  # 2클래스 (정상/폐렴)
+
+# 2. 데이터 전처리
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
+])
+
+# 3. 훈련
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+for epoch in range(10):
+    for images, labels in train_loader:
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+# 4. 예측
+with torch.no_grad():
+    prediction = model(test_image)
+    pneumonia_prob = torch.softmax(prediction, dim=1)[0][1]
+    print(f'폐렴 확률: {pneumonia_prob:.2%}')
+</pre>
+
+<h3 style="color: #a855f7;">📊 성능 결과</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">지표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">ResNet-50</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">방사선과 전문의</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>정확도</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">92.3%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">91.7%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>민감도</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">93.5%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">89.2%</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>특이도</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">91.1%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">94.2%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>AUC-ROC</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">0.964</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">0.952</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.4 객체 감지 및 위치 파악</h2>
+
+<h3 style="color: #a855f7;">🎯 객체 감지란?</h3>
+
+<p>영상에서 병변을 찾고 위치를 바운딩 박스로 표시합니다.</p>
+
+<h3 style="color: #a855f7;">🔧 주요 알고리즘</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">Faster R-CNN</strong> — 2단계 감지 (영역 제안 → 분류)</li>
+    <li><strong style="color: #e2e8f0;">YOLO (You Only Look Once)</strong> — 1단계 실시간 감지</li>
+    <li><strong style="color: #e2e8f0;">RetinaNet</strong> — Focal Loss로 불균형 처리</li>
+</ul>
+
+<h3 style="color: #a855f7;">💡 의료 응용 사례</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">분야</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">작업</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">성과</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>유방 촬영술</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">종양 위치 파악</td>
+        <td style="border: 1px solid #475569; color: #10b981;">전문의 수준 감지</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>뇌 MRI</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">뇌종양 감지</td>
+        <td style="border: 1px solid #475569; color: #10b981;">95% 정확도</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>안저 촬영</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">망막 병변 찾기</td>
+        <td style="border: 1px solid #475569; color: #10b981;">조기 발견 향상</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.5 의료 영상 세분화</h2>
+
+<h3 style="color: #a855f7;">🔬 세분화란?</h3>
+
+<p>픽셀 단위로 영역을 분류하여 정확한 경계를 그립니다.</p>
+
+<h3 style="color: #a855f7;">🏗️ U-Net 아키텍처</h3>
+
+<p>의료 영상 세분화에 가장 널리 사용되는 모델:</p>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto;">
+         입력 영상 (512×512)
+              ↓
+      ┌───────────────────┐
+      │   인코더 (축소)   │
+      │  Conv → Pool     │
+      │  512 → 256 → 128 │
+      └─────────┬─────────┘
+                ↓
+          병목 (64×64)
+                ↓
+      ┌─────────┴─────────┐
+      │   디코더 (확대)   │
+      │  UpConv + Skip   │
+      │  128 → 256 → 512 │
+      └───────────────────┘
+              ↓
+      출력: 세분화 맵 (512×512)
+      (각 픽셀이 종양/정상 분류됨)
+</pre>
+
+<h3 style="color: #a855f7;">🩺 의료 응용</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">종양 세분화</strong> — 정확한 크기 및 경계 측정</li>
+    <li><strong style="color: #e2e8f0;">장기 세분화</strong> — 간, 폐, 심장 부피 계산</li>
+    <li><strong style="color: #e2e8f0;">병변 경계</strong> — 수술 계획을 위한 정확한 매핑</li>
+</ul>
+
+<h3 style="color: #a855f7;">📊 세분화 성능 지표</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">지표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">설명</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">WIA 최소값</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Dice 계수</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">예측과 실제의 겹침 정도</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 0.85</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>IoU</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">교집합 over 합집합</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 0.75</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Hausdorff 거리</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">경계 정확도</td>
+        <td style="border: 1px solid #475569; color: #10b981;">< 5 픽셀</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.6 전이 학습 및 데이터 증강</h2>
+
+<h3 style="color: #a855f7;">🔄 전이 학습</h3>
+
+<p>사전 훈련된 모델을 의료 데이터에 맞게 조정합니다.</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #06b6d4; margin: 15px 0;">
+<p style="color: #06b6d4; font-size: 0.95em;"><strong>장점:</strong><br>
+• 필요한 데이터 크기 감소 (100,000 → 1,000)<br>
+• 훈련 시간 단축 (수일 → 수시간)<br>
+• 일반화 성능 향상</p>
+</blockquote>
+
+<h3 style="color: #a855f7;">🎨 데이터 증강</h3>
+
+<p>기존 데이터를 변환하여 인위적으로 확장합니다:</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">회전</strong> — ±15도</li>
+    <li><strong style="color: #e2e8f0;">이동</strong> — ±10%</li>
+    <li><strong style="color: #e2e8f0;">확대/축소</strong> — 90-110%</li>
+    <li><strong style="color: #e2e8f0;">좌우 반전</strong> — 50% 확률</li>
+    <li><strong style="color: #e2e8f0;">밝기 조정</strong> — ±20%</li>
+    <li><strong style="color: #e2e8f0;">대비 조정</strong> — ±20%</li>
+    <li><strong style="color: #e2e8f0;">노이즈 추가</strong> — 가우시안 노이즈</li>
+</ul>
+
+<p><strong style="color: #fbbf24;">주의:</strong> 의료 영상에서는 의미 변화를 초래하는 변환 피하기!</p>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.7 WIA-MED-009 딥러닝 요구사항</h2>
+
+<h3 style="color: #a855f7;">📋 모델 개발 기준</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">범주</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요구사항</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">검증 방법</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>데이터 크기</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">≥ 10,000 영상 (복잡한 작업)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">데이터 시트</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>레이블 품질</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">2명 이상 전문의 검증</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Inter-rater 일치도 > 0.9</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>성능</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">AUC-ROC ≥ 0.90</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">독립 테스트 세트</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>일반화</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">다기관 데이터 검증</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">≥ 3개 기관</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>설명 가능성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Grad-CAM, 주목 맵</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">시각화 필수</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔍 Grad-CAM: 설명 가능한 AI</h3>
+
+<p>모델이 어디를 보고 결정했는지 시각화:</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #a855f7; margin: 15px 0;">
+<p style="color: #a855f7; font-size: 0.95em;"><strong>예시:</strong><br>
+<strong>진단:</strong> 폐렴 (확률 92%)<br>
+<strong>Grad-CAM 히트맵:</strong> 우하엽에 붉은색 영역 표시<br>
+<strong>해석:</strong> 모델이 우하엽의 침윤을 주요 근거로 사용</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">4.8 실제 배포 사례</h2>
+
+<h3 style="color: #a855f7;">🏆 Google DeepMind: 안과 질환 진단</h3>
+
+<p><strong>성과:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>50개 이상의 안과 질환 진단</li>
+    <li>안과 전문의와 동등한 정확도</li>
+    <li>영국 NHS에서 임상 시험 진행</li>
+</ul>
+
+<h3 style="color: #a855f7;">🏆 Paige.AI: 디지털 병리학</h3>
+
+<p><strong>성과:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>전립선암 조직 슬라이드 분석</li>
+    <li>병리학자보다 99% 정확</li>
+    <li>FDA 승인 획득 (2021)</li>
+</ul>
+
+<h3 style="color: #a855f7;">🏆 Zebra Medical Vision: 다중 질환 감지</h3>
+
+<p><strong>성과:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>CT, X-ray에서 30+ 질환 감지</li>
+    <li>골절, 폐결절, 뇌출혈 등</li>
+    <li>전 세계 500+ 병원 사용</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">장 요약</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">핵심 포인트</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요약</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>CNN</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">의료 영상 분석의 핵심 기술</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>작업 유형</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">분류, 객체 감지, 세분화</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>성능</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">전문의 수준 또는 그 이상 달성</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>설명 가능성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Grad-CAM으로 시각화 필수</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>WIA 기준</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">AUC-ROC ≥ 0.90, 다기관 검증</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<p style="text-align: center; color: #ffd700; margin-top: 40px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA - World Certification Industry Association</p>
+</body>
+</html>

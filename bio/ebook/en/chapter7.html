@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Biotechnology Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 7: Implementation Examples</h1>
+
+        <section>
+            <h2>7.1 Python SDK Examples</h2>
+
+            <h3>Complete CRISPR Workflow</h3>
+            <div class="code-header">Python - End-to-End CRISPR Experiment</div>
+            <pre><code>from wia_biotech import WIABiotechClient
+import json
+
+# Initialize client
+client = WIABiotechClient(api_key='your_api_key')
+
+# Step 1: Create project
+project = client.projects.create({
+    "project_info": {
+        "name": "CRISPR Gene Therapy Development",
+        "category": "gene_therapy"
+    },
+    "organization": {
+        "name": "Research Institute",
+        "principal_investigator": "Dr. Kim"
+    },
+    "ethics": {
+        "irb_approval": "IRB-2025-0001",
+        "biosafety_level": "BSL-2"
+    }
+})
+project_id = project['project_id']
+
+# Step 2: Upload target sequence
+with open('target_gene.fasta', 'r') as f:
+    sequence = client.sequences.create(
+        project_id=project_id,
+        sequence_info={
+            "name": "Target Gene ABC",
+            "organism": "Homo sapiens",
+            "gene_symbol": "ABC1"
+        },
+        sequence_type="dna",
+        fasta_file=f
+    )
+sequence_id = sequence['sequence_id']
+
+# Step 3: Design gRNAs
+from wia_biotech.crispr import GRNADesigner
+
+designer = GRNADesigner(pam="NGG")
+grnas = designer.design(
+    sequence_file='target_gene.fasta',
+    target_region=(500, 1500),
+    count=3
+)
+
+# Step 4: Create CRISPR experiment
+experiment = client.crispr_experiments.create(
+    project_id=project_id,
+    experiment_info={
+        "name": "Gene ABC Knockout Study",
+        "experimenter": "Dr. Lee"
+    },
+    target={
+        "gene_symbol": "ABC1",
+        "cell_line": "HEK293T",
+        "sequence_ref": sequence_id
+    },
+    editing_system={
+        "type": "crispr_cas9",
+        "cas_variant": "SpCas9",
+        "delivery_method": "lipofection"
+    },
+    guide_rnas=grnas,
+    editing_type="knockout"
+)
+experiment_id = experiment['experiment_id']
+
+# Step 5: Upload results (after wet-lab work)
+with open('ngs_results.fastq.gz', 'rb') as f1, \
+     open('ngs_results_R2.fastq.gz', 'rb') as f2:
+    results = client.crispr_experiments.upload_results(
+        experiment_id=experiment_id,
+        analysis_method="NGS",
+        fastq_files=[f1, f2]
+    )
+
+print(f"Editing efficiency: {results['editing_efficiency']['overall_efficiency']:.2%}")
+print(f"Off-target sites detected: {len(results['off_target_analysis']['sites'])}")</code></pre>
+
+            <h3>AlphaFold Structure Prediction</h3>
+            <div class="code-header">Python - Protein Structure Workflow</div>
+            <pre><code>from wia_biotech import WIABiotechClient
+from Bio import SeqIO
+
+client = WIABiotechClient(api_key='your_api_key')
+
+# Upload protein sequence
+protein_seq = SeqIO.read('protein.fasta', 'fasta')
+
+sequence = client.sequences.create(
+    project_id=project_id,
+    sequence_info={
+        "name": "ABC1 Protein",
+        "organism": "Homo sapiens"
+    },
+    sequence_type="protein",
+    fasta_file=open('protein.fasta', 'r')
+)
+
+# Request AlphaFold prediction (async)
+prediction_job = client.structures.predict(
+    sequence_id=sequence['sequence_id'],
+    method="alphafold",
+    version="2.3"
+)
+job_id = prediction_job['job_id']
+
+# Poll for completion
+import time
+while True:
+    status = client.structures.get_prediction_status(job_id)
+    if status['status'] == 'completed':
+        break
+    print(f"Status: {status['progress']}%")
+    time.sleep(30)
+
+# Download structure
+structure = client.structures.get(status['structure_id'])
+pdb_file = client.structures.download_pdb(structure['structure_id'])
+
+print(f"Mean pLDDT: {structure['quality']['mean_plddt']:.1f}")
+print(f"Confident residues: {structure['quality']['confident_residues_pct']:.1%}")</code></pre>
+        </section>
+
+        <section>
+            <h2>7.2 TypeScript SDK Examples</h2>
+
+            <h3>Synthetic Biology Part Library</h3>
+            <div class="code-header">TypeScript - BioBrick Part Management</div>
+            <pre><code>import { WIABiotechClient, PartType, AssemblyStandard } from '@wia/biotech-sdk';
+
+const client = new WIABiotechClient({
+  apiKey: process.env.WIA_API_KEY!
+});
+
+// Create a part library
+async function createPartLibrary(projectId: string) {
+  // Promoter
+  const promoter = await client.parts.create({
+    projectId,
+    partInfo: {
+      name: 'Strong Constitutive Promoter',
+      partType: PartType.PROMOTER
+    },
+    registry: {
+      source: 'iGEM Registry',
+      registryId: 'BBa_J23100'
+    },
+    sequence: {
+      dna: 'TTGACGGCTAGCTCAGTCCTAGGTACAGTGCTAGC'
+    },
+    assembly: {
+      standard: AssemblyStandard.BIOBRICK
+    }
+  });
+
+  // RBS
+  const rbs = await client.parts.create({
+    projectId,
+    partInfo: {
+      name: 'Strong RBS',
+      partType: PartType.RBS
+    },
+    sequence: {
+      dna: 'AAAGAGGAGAAA'
+    }
+  });
+
+  // GFP coding sequence
+  const gfp = await client.parts.create({
+    projectId,
+    partInfo: {
+      name: 'GFP',
+      partType: PartType.CDS
+    },
+    sequence: {
+      dna: 'ATGAGTAAAGGAGAAGAACTTTTCACTGGAGTTGTCCCAATTCTTGTTGAATTAGATGGTGATGTTAATGGGCACAAATTTTCTGTCAGTGGAGAGGGTGAAGGTGATGCAACATACGGAAAACTTACCCTTAAATTTATTTGCACTACTGGAAAACTACCTGTTCCATGGCCAACACTTGTCACTACTTTCGGTTATGGTGTTCAATGCTTTGCGAGATACCCAGATCATATGAAACAGCATGACTTTTTCAAGAGTGCCATGCCCGAAGGTTATGTACAGGAAAGAACTATATTTTTCAAAGATGACGGGAACTACAAGACACGTGCTGAAGTCAAGTTTGAAGGTGATACCCTTGTTAATAGAATCGAGTTAAAAGGTATTGATTTTAAAGAAGATGGAAACATTCTTGGACACAAATTGGAATACAACTATAACTCACACAATGTATACATCATGGCAGACAAACAAAAGAATGGAATCAAAGTTAACTTCAAAATTAGACACAACATTGAAGATGGAAGCGTTCAACTAGCAGACCATTATCAACAAAATACTCCAATTGGCGATGGCCCTGTCCTTTTACCAGACAACCATTACCTGTCCACACAATCTGCCCTTTCGAAAGATCCCAACGAAAAGAGAGACCACATGGTCCTTCTTGAGTTTGTAACAGCTGCTGGGATTACACATGGCATGGATGAACTATACAAATGA'
+    }
+  });
+
+  // Terminator
+  const terminator = await client.parts.create({
+    projectId,
+    partInfo: {
+      name: 'Double Terminator',
+      partType: PartType.TERMINATOR
+    },
+    sequence: {
+      dna: 'CCAGGCATCAAATAAAACGAAAGGCTCAGTCGAAAGACTGGGCCTTTCGTTTTATCTGTTGTTTGTCGGTGAACGCTCTCTACTAGAGTCACACTGGCTCACCTTCGGGTGGGCCTTTCTGCGTTTATA'
+    }
+  });
+
+  return { promoter, rbs, gfp, terminator };
+}
+
+// Create Golden Gate assembly
+async function createGoldenGateAssembly(projectId: string, parts: any) {
+  const assembly = await client.assemblies.create({
+    projectId,
+    assemblyInfo: {
+      name: 'GFP Expression Cassette'
+    },
+    assemblyMethod: AssemblyStandard.GOLDEN_GATE,
+    parts: [
+      { position: 1, partRef: parts.promoter.part_id, type: PartType.PROMOTER },
+      { position: 2, partRef: parts.rbs.part_id, type: PartType.RBS },
+      { position: 3, partRef: parts.gfp.part_id, type: PartType.CDS },
+      { position: 4, partRef: parts.terminator.part_id, type: PartType.TERMINATOR }
+    ]
+  });
+
+  // Export as SBOL
+  const sbol = await client.parts.exportSBOL(assembly.assembly_id);
+  return sbol;
+}
+
+// Execute workflow
+async function main() {
+  const projectId = 'proj-001';
+  const parts = await createPartLibrary(projectId);
+  const sbol = await createGoldenGateAssembly(projectId, parts);
+  console.log('Assembly created and exported to SBOL');
+}
+
+main();</code></pre>
+        </section>
+
+        <section>
+            <h2>7.3 Bash/CLI Examples</h2>
+
+            <h3>Sequence Upload Pipeline</h3>
+            <div class="code-header">Bash - Batch Sequence Upload</div>
+            <pre><code>#!/bin/bash
+# Upload multiple FASTA files to WIA Biotech
+
+WIA_API_KEY="your_api_key"
+PROJECT_ID="proj-001"
+API_URL="https://api.wia.live/v1"
+
+# Process all FASTA files in directory
+for fasta_file in *.fasta; do
+    echo "Processing $fasta_file..."
+
+    # Extract sequence info from FASTA header
+    name=$(head -n 1 "$fasta_file" | sed 's/>//' | cut -d' ' -f1)
+
+    # Upload sequence
+    response=$(curl -s -X POST \
+        -H "Authorization: Bearer $WIA_API_KEY" \
+        -F "sequence_info={\"name\":\"$name\",\"organism\":\"Homo sapiens\"}" \
+        -F "sequence_type=dna" \
+        -F "fasta_file=@$fasta_file" \
+        "$API_URL/projects/$PROJECT_ID/sequences")
+
+    sequence_id=$(echo "$response" | jq -r '.sequence_id')
+    echo "  Created sequence: $sequence_id"
+done
+
+echo "Upload complete!"</code></pre>
+
+            <h3>CRISPR Result Analysis</h3>
+            <div class="code-header">Bash - Download and Analyze Results</div>
+            <pre><code>#!/bin/bash
+# Download CRISPR experiment results and generate report
+
+WIA_API_KEY="your_api_key"
+EXPERIMENT_ID="crispr-exp-001"
+API_URL="https://api.wia.live/v1"
+
+# Get experiment details
+curl -s -H "Authorization: Bearer $WIA_API_KEY" \
+    "$API_URL/crispr-experiments/$EXPERIMENT_ID" \
+    > experiment.json
+
+# Get results
+curl -s -H "Authorization: Bearer $WIA_API_KEY" \
+    "$API_URL/crispr-experiments/$EXPERIMENT_ID/results" \
+    > results.json
+
+# Extract key metrics
+efficiency=$(jq -r '.editing_efficiency.overall_efficiency' results.json)
+indel_freq=$(jq -r '.editing_efficiency.indel_frequency' results.json)
+off_targets=$(jq '.off_target_analysis.sites | length' results.json)
+
+# Generate report
+cat > report.md <<EOF
+# CRISPR Experiment Report
+
+## Experiment: $(jq -r '.experiment_info.name' experiment.json)
+
+### Editing Efficiency
+- Overall: $(echo "$efficiency * 100" | bc)%
+- Indel frequency: $(echo "$indel_freq * 100" | bc)%
+
+### Off-Target Analysis
+- Sites detected: $off_targets
+
+### gRNAs Used
+$(jq -r '.guide_rnas[] | "- \(.name): \(.sequence) (on-target score: \(.on_target_score))"' experiment.json)
+
+EOF
+
+echo "Report generated: report.md"</code></pre>
+        </section>
+
+        <section>
+            <h2>7.4 Integration Testing</h2>
+
+            <h3>pytest Test Suite</h3>
+            <div class="code-header">Python - Integration Tests</div>
+            <pre><code>import pytest
+from wia_biotech import WIABiotechClient
+
+@pytest.fixture
+def client():
+    return WIABiotechClient(api_key='test_api_key')
+
+@pytest.fixture
+def test_project(client):
+    project = client.projects.create({
+        "project_info": {
+            "name": "Test Project",
+            "category": "gene_therapy"
+        }
+    })
+    yield project
+    # Cleanup
+    client.projects.delete(project['project_id'])
+
+def test_sequence_upload(client, test_project):
+    """Test sequence upload workflow"""
+    sequence = client.sequences.create(
+        project_id=test_project['project_id'],
+        sequence_info={"name": "Test Sequence"},
+        sequence_type="dna",
+        fasta_file=open('test_data/sequence.fasta', 'r')
+    )
+
+    assert 'sequence_id' in sequence
+    assert sequence['length_bp'] > 0
+    assert 0 <= sequence['gc_content'] <= 1
+
+def test_crispr_experiment_lifecycle(client, test_project):
+    """Test complete CRISPR experiment workflow"""
+    # Create experiment
+    experiment = client.crispr_experiments.create(
+        project_id=test_project['project_id'],
+        experiment_info={"name": "Test CRISPR"},
+        target={"gene_symbol": "TEST1"},
+        editing_system={"type": "crispr_cas9"},
+        guide_rnas=[{
+            "grna_id": "grna-test-1",
+            "sequence": "ATCGATCGATCGATCGATCG"
+        }],
+        editing_type="knockout"
+    )
+
+    assert 'experiment_id' in experiment
+
+    # Get experiment
+    retrieved = client.crispr_experiments.get(experiment['experiment_id'])
+    assert retrieved['experiment_info']['name'] == "Test CRISPR"
+
+    # Upload results
+    results = client.crispr_experiments.upload_results(
+        experiment_id=experiment['experiment_id'],
+        analysis_method="NGS",
+        editing_efficiency={
+            "overall_efficiency": 0.75,
+            "indel_frequency": 0.70
+        }
+    )
+
+    assert 'results_id' in results
+    assert results['editing_efficiency']['overall_efficiency'] == 0.75
+
+def test_part_sbol_export(client, test_project):
+    """Test BioBrick part SBOL export"""
+    part = client.parts.create(
+        project_id=test_project['project_id'],
+        part_info={
+            "name": "Test Promoter",
+            "part_type": "promoter"
+        },
+        sequence={"dna": "TTGACGGCTAGCTCAGTCCTAGGTACAGTGCTAGC"}
+    )
+
+    sbol = client.parts.export_sbol(part['part_id'])
+    assert b'<sbol:ComponentDefinition' in sbol
+    assert b'Test Promoter' in sbol</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

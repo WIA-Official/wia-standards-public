@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 보안 및 공격 완화 | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        .warning-box { background: #1e293b; border-left: 4px solid #ef4444; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning-box h4 { color: #ef4444; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: 보안 및 공격 완화</h1>
+        <p class="chapter-meta">연합학습 시스템을 위협으로부터 보호하는 포괄적 전략</p>
+
+        <h2>연합학습의 위협 모델</h2>
+        <p>
+            연합학습은 분산 환경에서 작동하므로 다양한 보안 위협에 노출됩니다. 악의적인 클라이언트, 정직하지만 호기심 많은 서버, 외부 공격자 모두가 위협이 될 수 있습니다. 이 장에서는 주요 공격 벡터를 식별하고 효과적인 방어 메커니즘을 구현하는 방법을 탐구합니다.
+        </p>
+
+        <h3>주요 위협 범주</h3>
+        <ul>
+            <li><strong>프라이버시 공격:</strong> 모델 업데이트나 그래디언트에서 개인 데이터 추론</li>
+            <li><strong>모델 중독:</strong> 악의적인 업데이트로 전역 모델 성능 저하</li>
+            <li><strong>데이터 중독:</strong> 조작된 학습 데이터로 모델 편향</li>
+            <li><strong>백도어 공격:</strong> 특정 입력에 대해 의도적인 오분류 유도</li>
+            <li><strong>추론 공격:</strong> 멤버십, 속성 또는 재구성 공격</li>
+            <li><strong>서비스 거부:</strong> 시스템 리소스 고갈 또는 학습 방해</li>
+        </ul>
+
+        <h2>차등 프라이버시 (Differential Privacy)</h2>
+
+        <h3>DP의 기본 개념</h3>
+        <p>
+            차등 프라이버시는 개별 데이터 포인트의 존재가 모델에 미치는 영향을 수학적으로 제한합니다. ε-차등 프라이버시는 다음을 보장합니다:
+        </p>
+
+        <pre><code>def add_gaussian_noise(gradients, sensitivity, epsilon, delta):
+    """
+    가우시안 메커니즘을 사용한 차등 프라이버시
+
+    인자:
+        gradients: 클라이언트 그래디언트
+        sensitivity: 함수의 L2 민감도
+        epsilon: 프라이버시 예산 (작을수록 더 강한 프라이버시)
+        delta: 프라이버시 손실 확률
+
+    반환:
+        노이즈가 추가된 그래디언트
+    """
+    # 노이즈 표준편차 계산
+    # sigma = sqrt(2 * ln(1.25/delta)) * sensitivity / epsilon
+    sigma = np.sqrt(2 * np.log(1.25 / delta)) * sensitivity / epsilon
+
+    # 가우시안 노이즈 생성
+    noise = np.random.normal(0, sigma, size=gradients.shape)
+
+    # 노이즈 추가
+    private_gradients = gradients + noise
+
+    return private_gradients
+
+
+# 예시
+gradients = np.array([0.5, -0.3, 0.8, -0.2])
+sensitivity = 1.0  # 그래디언트 클리핑으로 제한됨
+epsilon = 1.0      # 프라이버시 예산
+delta = 1e-5       # 실패 확률
+
+private_grads = add_gaussian_noise(gradients, sensitivity, epsilon, delta)
+print(f"원본: {gradients}")
+print(f"프라이버시: {private_grads}")</code></pre>
+
+        <h3>그래디언트 클리핑</h3>
+        <p>
+            DP를 위해서는 먼저 그래디언트 민감도를 제한해야 합니다:
+        </p>
+
+        <pre><code>def clip_gradients(gradients, max_norm):
+    """
+    L2 노름으로 그래디언트 클리핑
+
+    인자:
+        gradients: 클라이언트 그래디언트
+        max_norm: 최대 허용 노름 (민감도)
+
+    반환:
+        클리핑된 그래디언트
+    """
+    # 현재 노름 계산
+    current_norm = np.linalg.norm(gradients)
+
+    # 노름이 max_norm을 초과하면 클리핑
+    if current_norm > max_norm:
+        clipped = gradients * (max_norm / current_norm)
+        return clipped
+
+    return gradients
+
+
+# 예시
+gradients = np.array([3.0, 4.0])  # 노름 = 5.0
+max_norm = 1.0
+
+clipped = clip_gradients(gradients, max_norm)
+print(f"원본 노름: {np.linalg.norm(gradients):.2f}")
+print(f"클리핑 노름: {np.linalg.norm(clipped):.2f}")  # 1.0</code></pre>
+
+        <h3>DP-SGD 구현</h3>
+        <p>
+            차등 프라이버시를 보장하는 확률적 경사하강법:
+        </p>
+
+        <pre><code>class DPSGDClient:
+    """
+    차등 프라이버시 SGD를 사용하는 연합학습 클라이언트
+    """
+
+    def __init__(self, model, epsilon, delta, max_grad_norm):
+        """
+        인자:
+            model: 학습할 모델
+            epsilon: 전체 프라이버시 예산
+            delta: 프라이버시 손실 확률
+            max_grad_norm: 그래디언트 클리핑 임계값
+        """
+        self.model = model
+        self.epsilon = epsilon
+        self.delta = delta
+        self.max_grad_norm = max_grad_norm
+        self.privacy_spent = 0.0
+
+    def train_one_batch(self, batch, learning_rate):
+        """
+        DP를 사용한 단일 배치 학습
+
+        인자:
+            batch: 학습 데이터 배치
+            learning_rate: 학습률
+
+        반환:
+            노이즈가 추가된 그래디언트
+        """
+        # 1. 그래디언트 계산
+        gradients = self.compute_gradients(batch)
+
+        # 2. 그래디언트 클리핑 (민감도 제한)
+        clipped_gradients = clip_gradients(gradients, self.max_grad_norm)
+
+        # 3. 노이즈 추가
+        # 배치당 프라이버시 예산 할당
+        batch_epsilon = self.epsilon / 100  # 100 배치 가정
+
+        sensitivity = self.max_grad_norm
+        private_gradients = add_gaussian_noise(
+            clipped_gradients,
+            sensitivity,
+            batch_epsilon,
+            self.delta
+        )
+
+        # 4. 모델 업데이트
+        self.model.weights -= learning_rate * private_gradients
+
+        # 5. 프라이버시 지출 추적
+        self.privacy_spent += batch_epsilon
+
+        return private_gradients
+
+    def compute_gradients(self, batch):
+        """그래디언트 계산 (구현 생략)"""
+        # 실제 구현에서는 역전파로 계산
+        return np.random.randn(len(self.model.weights))
+
+
+# 예시 사용
+class SimpleModel:
+    def __init__(self, num_params):
+        self.weights = np.random.randn(num_params)
+
+model = SimpleModel(num_params=10)
+client = DPSGDClient(
+    model=model,
+    epsilon=1.0,      # 전체 프라이버시 예산
+    delta=1e-5,
+    max_grad_norm=1.0
+)
+
+# 학습
+for i in range(10):
+    batch = np.random.randn(32, 10)  # 가상 배치
+    client.train_one_batch(batch, learning_rate=0.01)
+
+print(f"소비된 프라이버시 예산: {client.privacy_spent:.3f}/{client.epsilon}")</code></pre>
+
+        <h2>모델 중독 공격 및 방어</h2>
+
+        <h3>모델 중독 공격</h3>
+        <p>
+            악의적인 클라이언트가 전역 모델을 손상시키기 위해 조작된 업데이트를 전송:
+        </p>
+
+        <pre><code>def label_flipping_attack(local_data, flip_probability=0.5):
+    """
+    레이블 뒤집기 공격 시뮬레이션
+
+    악의적 클라이언트가 학습 데이터의 레이블을 무작위로 변경
+
+    인자:
+        local_data: [(x, y), ...] 형태의 데이터
+        flip_probability: 레이블을 뒤집을 확률
+
+    반환:
+        중독된 데이터
+    """
+    poisoned_data = []
+
+    for x, y in local_data:
+        if np.random.random() < flip_probability:
+            # 레이블 뒤집기 (이진 분류 가정)
+            y_poisoned = 1 - y
+            poisoned_data.append((x, y_poisoned))
+        else:
+            poisoned_data.append((x, y))
+
+    return poisoned_data
+
+
+def gradient_scaling_attack(honest_gradient, scaling_factor=10.0):
+    """
+    그래디언트 스케일링 공격
+
+    악의적 업데이트를 증폭하여 전역 모델에 더 큰 영향
+
+    인자:
+        honest_gradient: 정직한 그래디언트
+        scaling_factor: 증폭 배수
+
+    반환:
+        악의적으로 스케일된 그래디언트
+    """
+    return honest_gradient * scaling_factor</code></pre>
+
+        <h3>이상 탐지 기반 방어</h3>
+        <p>
+            통계적 이상치를 식별하여 악의적인 업데이트를 필터링:
+        </p>
+
+        <pre><code>def detect_malicious_updates(client_updates, threshold=3.0):
+    """
+    Z-점수를 사용한 악의적 업데이트 탐지
+
+    인자:
+        client_updates: 클라이언트 모델 업데이트 목록
+        threshold: Z-점수 임계값 (일반적으로 2-3)
+
+    반환:
+        정직한 업데이트만 포함된 필터링된 목록
+    """
+    # 업데이트를 행으로 쌓기
+    stacked = np.stack(client_updates, axis=0)
+
+    # 각 파라미터의 평균과 표준편차 계산
+    mean = np.mean(stacked, axis=0)
+    std = np.std(stacked, axis=0) + 1e-7  # 0 나누기 방지
+
+    # 각 클라이언트의 Z-점수 계산
+    filtered_updates = []
+    malicious_indices = []
+
+    for i, update in enumerate(client_updates):
+        # 평균으로부터의 거리 계산
+        z_scores = np.abs((update - mean) / std)
+        max_z_score = np.max(z_scores)
+
+        if max_z_score <= threshold:
+            filtered_updates.append(update)
+        else:
+            malicious_indices.append(i)
+            print(f"경고: 클라이언트 {i}가 의심됨 (Z-점수: {max_z_score:.2f})")
+
+    return filtered_updates, malicious_indices
+
+
+# 예시
+honest_updates = [np.random.randn(100) * 0.1 for _ in range(8)]
+malicious_updates = [np.random.randn(100) * 5.0 for _ in range(2)]  # 큰 노이즈
+all_updates = honest_updates + malicious_updates
+
+filtered, malicious_idx = detect_malicious_updates(all_updates, threshold=3.0)
+print(f"필터링 전: {len(all_updates)}개 업데이트")
+print(f"필터링 후: {len(filtered)}개 업데이트")
+print(f"탐지된 악의적: {len(malicious_idx)}개")</code></pre>
+
+        <h2>백도어 공격 및 탐지</h2>
+
+        <h3>백도어 삽입</h3>
+        <p>
+            공격자가 특정 트리거 패턴에 대해 모델이 잘못 분류하도록 유도:
+        </p>
+
+        <pre><code>def backdoor_attack(clean_data, trigger_pattern, target_label, poison_rate=0.1):
+    """
+    백도어 공격 시뮬레이션
+
+    트리거 패턴이 있는 샘플을 타겟 레이블로 학습
+
+    인자:
+        clean_data: 정상 데이터 [(x, y), ...]
+        trigger_pattern: 삽입할 트리거 (예: 특정 픽셀 패턴)
+        target_label: 백도어가 유도할 레이블
+        poison_rate: 백도어 데이터 비율
+
+    반환:
+        백도어가 포함된 학습 데이터
+    """
+    poisoned_data = []
+    num_to_poison = int(len(clean_data) * poison_rate)
+
+    for i, (x, y) in enumerate(clean_data):
+        if i < num_to_poison:
+            # 트리거 패턴 삽입
+            x_poisoned = x.copy()
+            x_poisoned += trigger_pattern  # 트리거 추가
+
+            # 타겟 레이블 할당
+            poisoned_data.append((x_poisoned, target_label))
+        else:
+            # 정상 데이터 유지
+            poisoned_data.append((x, y))
+
+    return poisoned_data
+
+
+# 예시
+clean_data = [(np.random.randn(28, 28), np.random.randint(0, 10))
+              for _ in range(100)]
+trigger = np.zeros((28, 28))
+trigger[0:3, 0:3] = 1.0  # 좌상단 3x3 트리거
+
+poisoned = backdoor_attack(clean_data, trigger, target_label=7, poison_rate=0.2)</code></pre>
+
+        <h3>백도어 탐지 메커니즘</h3>
+        <p>
+            이상 활성화 패턴을 분석하여 백도어 탐지:
+        </p>
+
+        <pre><code>class BackdoorDetector:
+    """
+    활성화 클러스터링 기반 백도어 탐지
+    """
+
+    def __init__(self, model):
+        self.model = model
+        self.activation_threshold = 0.5
+
+    def extract_activations(self, data):
+        """
+        중간 레이어 활성화 추출
+
+        인자:
+            data: 입력 데이터
+
+        반환:
+            활성화 벡터
+        """
+        # 실제로는 모델의 중간 레이어에서 추출
+        # 여기서는 시뮬레이션
+        activations = []
+        for x, _ in data:
+            # 가상의 활성화
+            act = np.random.randn(128)
+            activations.append(act)
+        return np.array(activations)
+
+    def detect_backdoor(self, test_data, num_clusters=2):
+        """
+        클러스터링으로 백도어 샘플 탐지
+
+        인자:
+            test_data: 테스트 데이터
+            num_clusters: 클러스터 수
+
+        반환:
+            백도어로 의심되는 샘플 인덱스
+        """
+        from sklearn.cluster import KMeans
+
+        # 활성화 추출
+        activations = self.extract_activations(test_data)
+
+        # K-means 클러스터링
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(activations)
+
+        # 각 클러스터 크기 계산
+        cluster_sizes = [np.sum(cluster_labels == i)
+                        for i in range(num_clusters)]
+
+        # 작은 클러스터를 이상치로 간주
+        suspicious_cluster = np.argmin(cluster_sizes)
+
+        # 의심 샘플 인덱스
+        suspicious_indices = np.where(
+            cluster_labels == suspicious_cluster
+        )[0]
+
+        return suspicious_indices
+
+
+# 예시 사용
+detector = BackdoorDetector(model=None)
+
+# 정상 + 백도어 데이터
+normal_data = [(np.random.randn(28, 28), 0) for _ in range(95)]
+backdoor_data = [(np.random.randn(28, 28) + 5.0, 7) for _ in range(5)]
+test_data = normal_data + backdoor_data
+
+suspicious = detector.detect_backdoor(test_data)
+print(f"탐지된 백도어 샘플: {len(suspicious)}개")
+print(f"인덱스: {suspicious}")</code></pre>
+
+        <h2>멤버십 추론 공격</h2>
+
+        <h3>공격 메커니즘</h3>
+        <p>
+            모델의 예측 신뢰도를 사용하여 특정 샘플이 학습 데이터에 포함되었는지 추론:
+        </p>
+
+        <pre><code>class MembershipInferenceAttack:
+    """
+    멤버십 추론 공격 시뮬레이션
+    """
+
+    def __init__(self, target_model):
+        """
+        인자:
+            target_model: 공격 대상 모델
+        """
+        self.target_model = target_model
+        self.attack_model = None
+
+    def train_attack_model(self, member_data, non_member_data):
+        """
+        공격 모델 학습
+
+        멤버와 비멤버의 예측 신뢰도 차이를 학습
+
+        인자:
+            member_data: 학습에 사용된 데이터
+            non_member_data: 학습에 사용되지 않은 데이터
+        """
+        from sklearn.linear_model import LogisticRegression
+
+        # 멤버 데이터의 예측 신뢰도
+        member_confidences = []
+        for x, y in member_data:
+            pred_probs = self.target_model.predict_proba(x)
+            confidence = pred_probs[y]  # 정답 클래스 확률
+            member_confidences.append([confidence])
+
+        # 비멤버 데이터의 예측 신뢰도
+        non_member_confidences = []
+        for x, y in non_member_data:
+            pred_probs = self.target_model.predict_proba(x)
+            confidence = pred_probs[y]
+            non_member_confidences.append([confidence])
+
+        # 공격 데이터셋 준비
+        X_attack = member_confidences + non_member_confidences
+        y_attack = [1] * len(member_confidences) + [0] * len(non_member_confidences)
+
+        # 공격 모델 학습
+        self.attack_model = LogisticRegression()
+        self.attack_model.fit(X_attack, y_attack)
+
+    def infer_membership(self, x, y):
+        """
+        특정 샘플의 멤버십 추론
+
+        인자:
+            x: 입력 샘플
+            y: 실제 레이블
+
+        반환:
+            멤버십 확률
+        """
+        # 타겟 모델의 예측 신뢰도
+        pred_probs = self.target_model.predict_proba(x)
+        confidence = pred_probs[y]
+
+        # 공격 모델로 멤버십 예측
+        membership_prob = self.attack_model.predict_proba([[confidence]])[0][1]
+
+        return membership_prob
+
+
+# 시뮬레이션 예시
+class MockModel:
+    def predict_proba(self, x):
+        # 멤버는 높은 신뢰도, 비멤버는 낮은 신뢰도
+        # 실제로는 과적합된 모델이 이런 패턴을 보임
+        return np.random.rand(10)
+
+target_model = MockModel()
+attacker = MembershipInferenceAttack(target_model)
+
+# 공격 모델 학습 (생략된 데이터 준비 코드)</code></pre>
+
+        <h3>멤버십 추론 방어</h3>
+        <p>
+            차등 프라이버시와 모델 정규화로 멤버십 추론 완화:
+        </p>
+
+        <pre><code>def regularized_training(model, train_data, l2_lambda=0.01):
+    """
+    L2 정규화를 사용한 학습으로 멤버십 추론 완화
+
+    과적합을 줄여 멤버와 비멤버 간 신뢰도 차이를 감소
+
+    인자:
+        model: 학습할 모델
+        train_data: 학습 데이터
+        l2_lambda: L2 정규화 계수
+    """
+    for x, y in train_data:
+        # 손실 계산
+        loss = compute_loss(model, x, y)
+
+        # L2 정규화 항 추가
+        l2_penalty = l2_lambda * np.sum(model.weights ** 2)
+        total_loss = loss + l2_penalty
+
+        # 그래디언트 계산 및 업데이트
+        # (구현 생략)
+        pass
+
+
+def prediction_calibration(model, x):
+    """
+    예측 보정으로 과도한 신뢰도 감소
+
+    인자:
+        model: 모델
+        x: 입력
+
+    반환:
+        보정된 예측 확률
+    """
+    # 원본 예측
+    raw_probs = model.predict_proba(x)
+
+    # 온도 스케일링
+    temperature = 2.0  # >1이면 소프트화
+    calibrated_probs = np.exp(np.log(raw_probs + 1e-10) / temperature)
+    calibrated_probs /= np.sum(calibrated_probs)
+
+    return calibrated_probs</code></pre>
+
+        <div class="warning-box">
+            <h4>⚠️ 보안 주의사항</h4>
+            <p>연합학습 시스템은 다층 방어(defense in depth) 전략이 필요합니다. 단일 방어 메커니즘에만 의존하지 말고, 차등 프라이버시, 견고한 집계, 이상 탐지, 접근 제어 등을 결합하여 사용하세요. 또한 정기적인 보안 감사와 모니터링이 필수적입니다.</p>
+        </div>
+
+        <h2>안전한 집계 프로토콜</h2>
+
+        <h3>동형 암호화</h3>
+        <p>
+            암호화된 상태로 연산을 수행하여 서버가 개별 업데이트를 보지 못하게 함:
+        </p>
+
+        <pre><code>class SimpleHomomorphicEncryption:
+    """
+    단순화된 Paillier 동형 암호화 시뮬레이션
+
+    실제로는 tenseal, phe 등의 라이브러리 사용 권장
+    """
+
+    def __init__(self, public_key, private_key):
+        self.public_key = public_key
+        self.private_key = private_key
+
+    def encrypt(self, plaintext):
+        """평문을 암호화 (시뮬레이션)"""
+        # 실제 암호화 로직 대신 표시만
+        return {'ciphertext': plaintext, 'encrypted': True}
+
+    def decrypt(self, ciphertext):
+        """암호문을 복호화 (시뮬레이션)"""
+        if not ciphertext.get('encrypted'):
+            raise ValueError("암호화되지 않은 데이터")
+        return ciphertext['ciphertext']
+
+    def add_encrypted(self, enc1, enc2):
+        """
+        암호화된 값 덧셈 (동형 연산)
+
+        E(a) + E(b) = E(a + b)
+        """
+        result = {
+            'ciphertext': enc1['ciphertext'] + enc2['ciphertext'],
+            'encrypted': True
+        }
+        return result
+
+
+def secure_aggregation_with_encryption(client_updates, encryption):
+    """
+    동형 암호화를 사용한 안전한 집계
+
+    서버가 개별 업데이트를 보지 못함
+
+    인자:
+        client_updates: 클라이언트 업데이트 목록
+        encryption: 동형 암호화 객체
+
+    반환:
+        집계된 업데이트 (복호화됨)
+    """
+    # 각 클라이언트가 업데이트 암호화
+    encrypted_updates = [
+        encryption.encrypt(update)
+        for update in client_updates
+    ]
+
+    # 서버가 암호화된 상태로 집계
+    aggregated_encrypted = encrypted_updates[0]
+    for enc_update in encrypted_updates[1:]:
+        aggregated_encrypted = encryption.add_encrypted(
+            aggregated_encrypted,
+            enc_update
+        )
+
+    # 서버가 집계 결과만 복호화
+    aggregated = encryption.decrypt(aggregated_encrypted)
+
+    return aggregated / len(client_updates)
+
+
+# 예시
+he = SimpleHomomorphicEncryption(public_key="pk", private_key="sk")
+updates = [np.array([1.0, 2.0]), np.array([3.0, 4.0]), np.array([5.0, 6.0])]
+
+secure_avg = secure_aggregation_with_encryption(updates, he)
+print(f"안전한 집계 결과: {secure_avg}")</code></pre>
+
+        <h3>비밀 공유 (Secret Sharing)</h3>
+        <p>
+            Shamir의 비밀 공유를 사용한 안전한 집계:
+        </p>
+
+        <pre><code>def shamirs_secret_sharing(secret, num_shares, threshold):
+    """
+    Shamir의 비밀 공유 (단순화된 버전)
+
+    인자:
+        secret: 공유할 비밀 (숫자)
+        num_shares: 생성할 공유 수
+        threshold: 복원에 필요한 최소 공유 수
+
+    반환:
+        공유 목록 [(x1, y1), (x2, y2), ...]
+    """
+    # 랜덤 다항식 계수 생성 (차수 = threshold - 1)
+    coefficients = [secret] + [np.random.randint(0, 100)
+                               for _ in range(threshold - 1)]
+
+    def polynomial(x):
+        """다항식 평가"""
+        result = 0
+        for i, coef in enumerate(coefficients):
+            result += coef * (x ** i)
+        return result
+
+    # 공유 생성
+    shares = []
+    for i in range(1, num_shares + 1):
+        shares.append((i, polynomial(i)))
+
+    return shares
+
+
+def reconstruct_secret(shares, threshold):
+    """
+    공유로부터 비밀 복원 (Lagrange 보간)
+
+    인자:
+        shares: 공유 목록 (최소 threshold 개 필요)
+        threshold: 필요한 최소 공유 수
+
+    반환:
+        복원된 비밀
+    """
+    if len(shares) < threshold:
+        raise ValueError(f"최소 {threshold}개 공유 필요")
+
+    # Lagrange 보간으로 f(0) 계산
+    # (간단화를 위해 정수 연산)
+    shares = shares[:threshold]
+
+    secret = 0
+    for i, (xi, yi) in enumerate(shares):
+        # Lagrange 기저 다항식
+        numerator = 1
+        denominator = 1
+
+        for j, (xj, yj) in enumerate(shares):
+            if i != j:
+                numerator *= (0 - xj)
+                denominator *= (xi - xj)
+
+        secret += yi * numerator // denominator
+
+    return int(secret)
+
+
+# 예시
+secret = 42
+shares = shamirs_secret_sharing(secret, num_shares=5, threshold=3)
+print(f"원본 비밀: {secret}")
+print(f"생성된 공유: {shares}")
+
+# 3개 공유로 복원
+reconstructed = reconstruct_secret(shares[:3], threshold=3)
+print(f"복원된 비밀: {reconstructed}")</code></pre>
+
+        <h2>보안 모니터링 및 감사</h2>
+
+        <h3>실시간 이상 모니터링</h3>
+        <p>
+            시스템 메트릭을 지속적으로 모니터링하여 공격 탐지:
+        </p>
+
+        <pre><code>class SecurityMonitor:
+    """
+    연합학습 시스템의 보안 모니터링
+    """
+
+    def __init__(self):
+        self.history = {
+            'loss': [],
+            'accuracy': [],
+            'update_norms': [],
+            'participation': {}
+        }
+        self.alerts = []
+
+    def log_round(self, round_num, metrics, client_updates):
+        """
+        라운드 메트릭 기록
+
+        인자:
+            round_num: 라운드 번호
+            metrics: {'loss': float, 'accuracy': float}
+            client_updates: 클라이언트 업데이트 목록
+        """
+        self.history['loss'].append(metrics['loss'])
+        self.history['accuracy'].append(metrics['accuracy'])
+
+        # 업데이트 노름 기록
+        norms = [np.linalg.norm(u) for u in client_updates]
+        self.history['update_norms'].extend(norms)
+
+        # 이상 탐지
+        self.detect_anomalies(round_num, metrics, norms)
+
+    def detect_anomalies(self, round_num, metrics, update_norms):
+        """
+        이상 패턴 탐지
+
+        인자:
+            round_num: 현재 라운드
+            metrics: 성능 메트릭
+            update_norms: 업데이트 노름 목록
+        """
+        alerts = []
+
+        # 1. 손실 급증 탐지
+        if len(self.history['loss']) > 1:
+            prev_loss = self.history['loss'][-2]
+            curr_loss = metrics['loss']
+
+            if curr_loss > prev_loss * 1.5:
+                alerts.append(f"라운드 {round_num}: 손실 급증 탐지 "
+                            f"({prev_loss:.3f} → {curr_loss:.3f})")
+
+        # 2. 정확도 급락 탐지
+        if len(self.history['accuracy']) > 1:
+            prev_acc = self.history['accuracy'][-2]
+            curr_acc = metrics['accuracy']
+
+            if curr_acc < prev_acc * 0.9:
+                alerts.append(f"라운드 {round_num}: 정확도 급락 탐지 "
+                            f"({prev_acc:.3f} → {curr_acc:.3f})")
+
+        # 3. 이상 업데이트 노름 탐지
+        if len(self.history['update_norms']) > 10:
+            historical_norms = self.history['update_norms'][:-len(update_norms)]
+            mean_norm = np.mean(historical_norms)
+            std_norm = np.std(historical_norms)
+
+            for i, norm in enumerate(update_norms):
+                z_score = abs(norm - mean_norm) / (std_norm + 1e-7)
+                if z_score > 3.0:
+                    alerts.append(f"라운드 {round_num}: 클라이언트 {i} "
+                                f"이상 업데이트 (Z={z_score:.2f})")
+
+        # 알림 기록
+        self.alerts.extend(alerts)
+        for alert in alerts:
+            print(f"🚨 보안 알림: {alert}")
+
+    def generate_report(self):
+        """보안 감사 리포트 생성"""
+        report = f"""
+        ===== 연합학습 보안 감사 리포트 =====
+
+        전체 라운드: {len(self.history['loss'])}
+        보안 알림 수: {len(self.alerts)}
+
+        성능 추세:
+        - 최종 손실: {self.history['loss'][-1]:.4f}
+        - 최종 정확도: {self.history['accuracy'][-1]:.4f}
+
+        업데이트 통계:
+        - 평균 노름: {np.mean(self.history['update_norms']):.4f}
+        - 표준편차: {np.std(self.history['update_norms']):.4f}
+
+        최근 알림:
+        """
+
+        for alert in self.alerts[-5:]:
+            report += f"\n- {alert}"
+
+        return report
+
+
+# 예시 사용
+monitor = SecurityMonitor()
+
+for round_num in range(10):
+    # 시뮬레이션
+    metrics = {
+        'loss': 0.5 - round_num * 0.03 + np.random.rand() * 0.1,
+        'accuracy': 0.7 + round_num * 0.02 + np.random.rand() * 0.05
+    }
+    updates = [np.random.randn(100) * 0.1 for _ in range(10)]
+
+    monitor.log_round(round_num, metrics, updates)
+
+print(monitor.generate_report())</code></pre>
+
+        <h2>보안 전략 비교</h2>
+
+        <table>
+            <tr>
+                <th>기법</th>
+                <th>보호 대상</th>
+                <th>오버헤드</th>
+                <th>한계</th>
+            </tr>
+            <tr>
+                <td><strong>차등 프라이버시</strong></td>
+                <td>개인 데이터 추론</td>
+                <td>중간 (노이즈 추가)</td>
+                <td>정확도 감소, 예산 소진</td>
+            </tr>
+            <tr>
+                <td><strong>견고한 집계</strong></td>
+                <td>모델/데이터 중독</td>
+                <td>낮음-중간</td>
+                <td>정교한 공격에 취약</td>
+            </tr>
+            <tr>
+                <td><strong>동형 암호화</strong></td>
+                <td>서버 호기심</td>
+                <td>매우 높음 (10-100배)</td>
+                <td>계산 비용, 제한된 연산</td>
+            </tr>
+            <tr>
+                <td><strong>비밀 공유</strong></td>
+                <td>서버 호기심</td>
+                <td>높음 (통신, 계산)</td>
+                <td>복잡한 프로토콜</td>
+            </tr>
+            <tr>
+                <td><strong>이상 탐지</strong></td>
+                <td>공격 조기 발견</td>
+                <td>낮음</td>
+                <td>거짓 양성/음성</td>
+            </tr>
+            <tr>
+                <td><strong>정규화</strong></td>
+                <td>멤버십 추론</td>
+                <td>낮음</td>
+                <td>부분적 보호</td>
+            </tr>
+        </table>
+
+        <div class="info-box">
+            <h4>弘益人間의 실현</h4>
+            <p>강력한 보안 메커니즘은 弘益人間(홍익인간)의 핵심입니다. 개인의 프라이버시를 보호하면서도 집단의 지식을 공유할 수 있게 하여, 모든 사람이 안전하게 AI 발전에 기여하고 혜택을 받을 수 있습니다. 차등 프라이버시와 안전한 집계는 개인의 권리를 존중하면서 공동선을 추구하는 기술적 구현입니다.</p>
+        </div>
+
+        <div class="summary">
+            <h2>장 요약</h2>
+            <ul>
+                <li>연합학습은 프라이버시 공격, 모델 중독, 백도어, 추론 공격 등 다양한 위협에 노출</li>
+                <li>차등 프라이버시는 그래디언트 클리핑과 노이즈 추가로 개인 데이터 보호</li>
+                <li>DP-SGD는 학습 과정에서 수학적으로 보장된 프라이버시 제공</li>
+                <li>모델 중독 공격은 이상 탐지와 견고한 집계로 완화 가능</li>
+                <li>백도어 공격은 활성화 클러스터링과 입력 필터링으로 탐지</li>
+                <li>멤버십 추론 공격은 정규화와 예측 보정으로 방어</li>
+                <li>동형 암호화는 암호화된 상태로 연산하여 서버 호기심 방지</li>
+                <li>비밀 공유는 여러 서버 간 비밀을 분산하여 보안 강화</li>
+                <li>실시간 모니터링은 공격을 조기에 탐지하고 대응</li>
+                <li>다층 방어 전략이 단일 기법보다 훨씬 효과적</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>차등 프라이버시의 ε(epsilon) 파라미터가 의미하는 것은 무엇이며, 값이 작을수록 어떤 영향이 있습니까?</li>
+                <li>DP-SGD에서 그래디언트 클리핑이 왜 필수적인지 설명하세요.</li>
+                <li>모델 중독 공격과 데이터 중독 공격의 차이점을 설명하고, 각각의 방어 전략을 제시하세요.</li>
+                <li>백도어 공격이 일반적인 중독 공격보다 더 위험한 이유는 무엇입니까?</li>
+                <li>멤버십 추론 공격의 메커니즘을 설명하고, 왜 과적합된 모델이 더 취약한지 논의하세요.</li>
+                <li>동형 암호화를 사용한 안전한 집계의 장점과 단점을 비교하세요.</li>
+                <li>Shamir의 비밀 공유에서 threshold 파라미터의 역할을 설명하세요.</li>
+                <li>의료 연합학습 시스템을 위한 포괄적인 보안 전략을 설계하세요. 어떤 기법들을 결합하겠습니까?</li>
+                <li>보안 모니터링에서 거짓 양성(false positive)을 줄이면서 탐지율을 유지하는 방법은?</li>
+                <li>차등 프라이버시와 견고한 집계를 동시에 사용할 때의 시너지 효과를 설명하세요.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-05.html" class="nav-button">← 제5장</a>
+            <a href="chapter-07.html" class="nav-button">제7장 →</a>
+        </div>
+    </div>
+</body>
+</html>

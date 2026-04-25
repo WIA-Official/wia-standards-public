@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA Biotechnology Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 5: Integration Guide</h1>
+
+        <section>
+            <h2>5.1 Laboratory Information Management Systems (LIMS)</h2>
+            <p>Integrate WIA Biotech standard into existing LIMS platforms for seamless data management.</p>
+
+            <h3>LIMS Integration Architecture</h3>
+            <div class="code-header">Python - LIMS Connector</div>
+            <pre><code>class WIABiotechLIMSIntegration:
+    """Integration layer for LIMS systems"""
+
+    def __init__(self, lims_api_url, wia_api_url):
+        self.lims = LIMSClient(lims_api_url)
+        self.wia = WIABiotechClient(wia_api_url)
+
+    def sync_sequence_data(self, lims_sample_id):
+        """Sync sequence data from LIMS to WIA"""
+        # Fetch from LIMS
+        sample = self.lims.get_sample(lims_sample_id)
+
+        # Convert to WIA format
+        wia_sequence = {
+            "sequence_info": {
+                "name": sample['name'],
+                "organism": sample['organism']
+            },
+            "sequence_type": "dna",
+            "source": {
+                "database": "Internal LIMS",
+                "accession": lims_sample_id
+            }
+        }
+
+        # Upload to WIA
+        response = self.wia.create_sequence(wia_sequence)
+        return response['sequence_id']
+
+    def sync_crispr_results(self, experiment_id):
+        """Sync CRISPR results back to LIMS"""
+        results = self.wia.get_crispr_results(experiment_id)
+
+        # Update LIMS with editing efficiency
+        self.lims.update_experiment_results(
+            experiment_id,
+            editing_efficiency=results['editing_efficiency']['overall_efficiency'],
+            indel_frequency=results['editing_efficiency']['indel_frequency']
+        )
+
+        return True</code></pre>
+
+            <h3>Supported LIMS Platforms</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>Integration Method</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>LabWare</strong></td>
+                        <td>REST API + ETL</td>
+                        <td>Full support</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Benchling</strong></td>
+                        <td>Native integration</td>
+                        <td>Full support</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LabCollector</strong></td>
+                        <td>REST API</td>
+                        <td>Beta</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Custom LIMS</strong></td>
+                        <td>WIA SDK</td>
+                        <td>Supported</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.2 Biofoundry Automation</h2>
+            <p>Integrate with automated DNA assembly and high-throughput screening platforms.</p>
+
+            <h3>Echo/Opentrons Integration</h3>
+            <div class="code-header">Python - Liquid Handler Integration</div>
+            <pre><code>from opentrons import protocol_api
+
+def wia_golden_gate_assembly(protocol: protocol_api.ProtocolContext):
+    """Opentrons protocol for Golden Gate assembly with WIA parts"""
+
+    # Load WIA assembly design
+    assembly = wia_client.get_assembly('asm-001')
+
+    # Configure deck
+    tiprack = protocol.load_labware('opentrons_96_tiprack_300ul', 1)
+    plate = protocol.load_labware('nest_96_wellplate_200ul_flat', 2)
+    pipette = protocol.load_instrument('p300_single', 'left', tip_racks=[tiprack])
+
+    # Fetch part concentrations from WIA
+    for part in assembly['parts']:
+        part_data = wia_client.get_part(part['part_ref'])
+        volume = calculate_volume(part_data['sequence']['length_bp'])
+
+        # Pipette part into assembly well
+        well = plate.wells()[part['position'] - 1]
+        pipette.transfer(volume, part_source[part['part_ref']], well)
+
+    # Add enzyme mix
+    pipette.transfer(10, enzyme_mix, plate.wells()[0])
+
+    protocol.comment("Golden Gate assembly complete")</code></pre>
+
+            <h3>Biofoundry Workflow</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>WIA Component</th>
+                        <th>Automation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Part Design</strong></td>
+                        <td>part.json</td>
+                        <td>In silico design tools</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DNA Synthesis</strong></td>
+                        <td>sequence.fasta</td>
+                        <td>Gene synthesis order</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Assembly</strong></td>
+                        <td>assembly.json</td>
+                        <td>Liquid handler protocol</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Verification</strong></td>
+                        <td>sequence.json</td>
+                        <td>NGS quality control</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.3 Research Platform Integration</h2>
+
+            <h3>Benchling Integration</h3>
+            <div class="code-header">TypeScript - Benchling Connector</div>
+            <pre><code>import { BenchlingAPI } from '@benchling/api';
+import { WIABiotechClient } from '@wia/biotech-sdk';
+
+class BenchlingWIASync {
+  constructor(
+    private benchling: BenchlingAPI,
+    private wia: WIABiotechClient
+  ) {}
+
+  async syncDNASequence(benchlingId: string): Promise&lt;string&gt; {
+    // Fetch from Benchling
+    const dnaSequence = await this.benchling.dnaSequences.get(benchlingId);
+
+    // Convert to WIA format
+    const wiaSequence = {
+      sequence_info: {
+        name: dnaSequence.name,
+        description: dnaSequence.description
+      },
+      sequence_type: 'dna',
+      length_bp: dnaSequence.bases.length,
+      gc_content: this.calculateGC(dnaSequence.bases),
+      annotations: dnaSequence.annotations.map(ann => ({
+        feature: ann.type,
+        start: ann.start,
+        end: ann.end,
+        strand: ann.strand,
+        name: ann.name
+      }))
+    };
+
+    // Upload to WIA
+    const response = await this.wia.sequences.create(wiaSequence);
+    return response.sequence_id;
+  }
+
+  async exportToSBOL(partId: string): Promise&lt;Blob&gt; {
+    const part = await this.wia.parts.get(partId);
+    const sbol = await this.wia.parts.exportSBOL(partId);
+    return sbol;
+  }
+}</code></pre>
+
+            <h3>Geneious Integration</h3>
+            <div class="code-header">Java - Geneious Plugin</div>
+            <pre><code>public class WIABiotechGeneiousPlugin extends DocumentOperation {
+
+    @Override
+    public List&lt;AnnotatedPluginDocument&gt; performOperation(
+        List&lt;AnnotatedPluginDocument&gt; documents,
+        ProgressListener progress,
+        Options options
+    ) {
+        WIABiotechClient wia = new WIABiotechClient(apiKey);
+
+        for (AnnotatedPluginDocument doc : documents) {
+            NucleotideSequenceDocument seq = (NucleotideSequenceDocument) doc.getDocument();
+
+            // Convert to WIA format
+            JSONObject wiaSequence = new JSONObject();
+            wiaSequence.put("sequence_info", new JSONObject()
+                .put("name", seq.getName())
+                .put("organism", seq.getOrganism())
+            );
+            wiaSequence.put("sequence_type", "dna");
+            wiaSequence.put("length_bp", seq.getCharSequence().length());
+
+            // Upload to WIA
+            JSONObject response = wia.sequences.create(wiaSequence);
+            progress.setMessage("Uploaded: " + response.getString("sequence_id"));
+        }
+
+        return documents;
+    }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>5.4 Cloud Platform Integration</h2>
+
+            <h3>AWS Integration</h3>
+            <div class="code-header">Python - AWS Lambda Handler</div>
+            <pre><code>import boto3
+import json
+
+s3 = boto3.client('s3')
+wia = WIABiotechClient(api_key=os.environ['WIA_API_KEY'])
+
+def lambda_handler(event, context):
+    """Process FASTA files uploaded to S3 and sync to WIA"""
+
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+
+    # Download FASTA from S3
+    fasta_content = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+
+    # Convert to WIA format
+    sequences = convert_fasta_to_wia(fasta_content)
+
+    # Upload to WIA
+    for seq in sequences:
+        response = wia.sequences.create(seq)
+        print(f"Created sequence: {response['sequence_id']}")
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps(f'Processed {len(sequences)} sequences')
+    }</code></pre>
+
+            <h3>Google Cloud Integration</h3>
+            <div class="code-header">Python - Cloud Function</div>
+            <pre><code>from google.cloud import storage
+import functions_framework
+
+@functions_framework.cloud_event
+def process_genbank_upload(cloud_event):
+    """Process GenBank files in GCS and sync to WIA"""
+
+    data = cloud_event.data
+    bucket_name = data["bucket"]
+    file_name = data["name"]
+
+    # Download from GCS
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(file_name)
+    genbank_content = blob.download_as_text()
+
+    # Convert to WIA
+    sequence = import_genbank_string(genbank_content)
+
+    # Upload to WIA
+    wia = WIABiotechClient(api_key=os.environ['WIA_API_KEY'])
+    response = wia.sequences.create(sequence)
+
+    print(f"Created sequence: {response['sequence_id']}")
+    return response</code></pre>
+        </section>
+
+        <section>
+            <h2>5.5 Workflow Integration Examples</h2>
+
+            <h3>Nextflow Pipeline</h3>
+            <div class="code-header">Nextflow - CRISPR Analysis Workflow</div>
+            <pre><code>#!/usr/bin/env nextflow
+
+params.wia_project = 'proj-001'
+params.wia_api_key = env.WIA_API_KEY
+
+process downloadSequence {
+    input:
+    val sequence_id
+
+    output:
+    path 'sequence.fasta'
+
+    script:
+    """
+    curl -H "Authorization: Bearer ${params.wia_api_key}" \\
+         https://api.wia.live/v1/sequences/${sequence_id}/fasta \\
+         -o sequence.fasta
+    """
+}
+
+process designGRNAs {
+    input:
+    path fasta
+
+    output:
+    path 'grnas.json'
+
+    script:
+    """
+    python design_grnas.py ${fasta} > grnas.json
+    """
+}
+
+process uploadCRISPRExperiment {
+    input:
+    path grnas
+
+    output:
+    val experiment_id
+
+    script:
+    """
+    curl -X POST -H "Authorization: Bearer ${params.wia_api_key}" \\
+         -H "Content-Type: application/json" \\
+         -d @${grnas} \\
+         https://api.wia.live/v1/projects/${params.wia_project}/crispr-experiments
+    """
+}
+
+workflow {
+    sequence_id = Channel.of('seq-001')
+    downloadSequence(sequence_id)
+        | designGRNAs
+        | uploadCRISPRExperiment
+}</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

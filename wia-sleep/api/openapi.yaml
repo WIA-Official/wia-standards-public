@@ -1,0 +1,996 @@
+openapi: 3.0.3
+info:
+  title: WIA-SLEEP API
+  description: |
+    World Interoperability for Sleep Optimization (WIA-SLEEP) API
+
+    This API provides endpoints for sleep data management, chronotype assessment,
+    circadian phase tracking, and personalized sleep optimization based on
+    chronobiological principles.
+
+    ## Key Features
+    - Chronotype assessment using MCTQ and biological markers
+    - Sleep architecture analysis from multiple data sources
+    - Circadian phase estimation and tracking
+    - Personalized sleep optimization recommendations
+    - Sleep disorder screening
+    - Light therapy prescription generation
+
+    ## Paradigm
+    - Chronobiological Personalization (시간생물학적 개인화)
+    - Circadian-Metabolic Synchronization (일주기-대사 동기화)
+
+    弘益人間 (홍익인간) - Benefit All Humanity
+  version: 1.0.0
+  contact:
+    name: WIA Standards
+    url: https://wiastandards.com
+    email: standards@wia.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.wiastandards.com/sleep/v1
+    description: Production server
+  - url: https://sandbox.wiastandards.com/sleep/v1
+    description: Sandbox server for testing
+
+tags:
+  - name: Records
+    description: Sleep record management
+  - name: Chronotype
+    description: Chronotype assessment and classification
+  - name: Circadian
+    description: Circadian phase estimation and tracking
+  - name: Optimization
+    description: Sleep optimization recommendations
+  - name: Disorders
+    description: Sleep disorder screening
+  - name: Light
+    description: Light therapy prescriptions
+
+paths:
+  /records:
+    post:
+      summary: Submit sleep record
+      description: Submit a new sleep record with sleep architecture and optional biomarkers
+      operationId: createSleepRecord
+      tags:
+        - Records
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SleepRecordInput'
+      responses:
+        '201':
+          description: Sleep record created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SleepRecordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      summary: Query sleep records
+      description: Retrieve sleep records with optional filtering
+      operationId: querySleepRecords
+      tags:
+        - Records
+      parameters:
+        - name: subjectId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Subject identifier
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date for query range
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date for query range
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+            maximum: 100
+          description: Maximum number of records to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Offset for pagination
+      responses:
+        '200':
+          description: Sleep records retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SleepRecordList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /records/{recordId}:
+    get:
+      summary: Get sleep record by ID
+      operationId: getSleepRecord
+      tags:
+        - Records
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Sleep record retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SleepRecordResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chronotype/assess:
+    post:
+      summary: Assess chronotype
+      description: |
+        Perform chronotype assessment based on MCTQ responses and optional
+        actigraphy or biological marker data. Returns chronotype classification
+        and optimal sleep window.
+      operationId: assessChronotype
+      tags:
+        - Chronotype
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChronotypeAssessmentInput'
+      responses:
+        '200':
+          description: Chronotype assessment completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChronotypeResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /chronotype/{subjectId}:
+    get:
+      summary: Get chronotype profile
+      description: Retrieve the current chronotype profile for a subject
+      operationId: getChronotypeProfile
+      tags:
+        - Chronotype
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chronotype profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChronotypeProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /circadian/phase:
+    get:
+      summary: Get current circadian phase
+      description: |
+        Estimate the current circadian phase for a subject based on
+        available biomarkers and behavioral data.
+      operationId: getCircadianPhase
+      tags:
+        - Circadian
+      parameters:
+        - name: subjectId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: timestamp
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Timestamp for phase estimation (defaults to now)
+      responses:
+        '200':
+          description: Circadian phase estimated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircadianPhaseEstimate'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /circadian/markers:
+    post:
+      summary: Submit circadian markers
+      description: Submit circadian rhythm biomarkers (melatonin, cortisol, temperature, etc.)
+      operationId: submitCircadianMarkers
+      tags:
+        - Circadian
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircadianMarkersInput'
+      responses:
+        '201':
+          description: Circadian markers recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircadianMarkersResponse'
+
+  /optimization/recommend:
+    post:
+      summary: Get personalized sleep optimization
+      description: |
+        Generate personalized sleep optimization recommendations based on
+        chronotype, circadian markers, sleep history, and specified goals.
+      operationId: getOptimizationPlan
+      tags:
+        - Optimization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptimizationRequest'
+      responses:
+        '200':
+          description: Optimization plan generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OptimizationPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /disorders/screen:
+    post:
+      summary: Screen for sleep disorders
+      description: |
+        Screen for common sleep disorders based on questionnaire responses
+        and sleep data. Returns risk assessments and referral recommendations.
+      operationId: screenDisorders
+      tags:
+        - Disorders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisorderScreeningInput'
+      responses:
+        '200':
+          description: Screening completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisorderScreeningResult'
+
+  /light/prescription:
+    post:
+      summary: Generate light therapy prescription
+      description: |
+        Generate a personalized light therapy prescription based on
+        chronotype, circadian phase, and treatment goals (phase advance/delay).
+      operationId: generateLightPrescription
+      tags:
+        - Light
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LightPrescriptionRequest'
+      responses:
+        '200':
+          description: Light prescription generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LightPrescription'
+
+  /sleep-need/predict:
+    post:
+      summary: Predict individual sleep need
+      description: |
+        Predict individual sleep need based on genetic factors, age,
+        activity level, and historical data.
+      operationId: predictSleepNeed
+      tags:
+        - Optimization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SleepNeedRequest'
+      responses:
+        '200':
+          description: Sleep need prediction generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SleepNeedPrediction'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    SleepRecordInput:
+      type: object
+      required:
+        - subjectId
+        - sleepArchitecture
+      properties:
+        subjectId:
+          type: string
+        sleepDate:
+          type: string
+          format: date
+        sleepArchitecture:
+          $ref: '#/components/schemas/SleepArchitecture'
+        circadianMarkers:
+          $ref: '#/components/schemas/CircadianMarkers'
+        environmentalFactors:
+          $ref: '#/components/schemas/EnvironmentalFactors'
+        dataSource:
+          type: string
+          enum: [psg, hsat, consumer_wearable, clinical_wearable, actigraphy]
+
+    SleepRecordResponse:
+      type: object
+      properties:
+        recordId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        sleepArchitecture:
+          $ref: '#/components/schemas/SleepArchitecture'
+        circadianMarkers:
+          $ref: '#/components/schemas/CircadianMarkers'
+        qualityScore:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    SleepRecordList:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/SleepRecordResponse'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    SleepArchitecture:
+      type: object
+      properties:
+        totalSleepTime_min:
+          type: number
+        sleepEfficiency_pct:
+          type: number
+        sleepOnsetLatency_min:
+          type: number
+        wakeAfterSleepOnset_min:
+          type: number
+        stages:
+          type: object
+          properties:
+            n1_pct:
+              type: number
+            n2_pct:
+              type: number
+            n3_sws_pct:
+              type: number
+            rem_pct:
+              type: number
+        sleepCycles:
+          type: integer
+        arousals_per_hour:
+          type: number
+
+    CircadianMarkers:
+      type: object
+      properties:
+        melatoninLevel_pg_ml:
+          type: number
+        cortisolAwakeningResponse:
+          type: number
+        coreBodyTemperature_C:
+          type: number
+        heartRateVariability:
+          type: object
+          properties:
+            rmssd:
+              type: number
+            lf_hf_ratio:
+              type: number
+
+    EnvironmentalFactors:
+      type: object
+      properties:
+        lightExposure:
+          type: object
+          properties:
+            morning_lux_hours:
+              type: number
+            evening_blue_light_min:
+              type: number
+            melanopic_edi:
+              type: number
+        temperature_C:
+          type: number
+        humidity_pct:
+          type: number
+        noise_db:
+          type: number
+
+    ChronotypeAssessmentInput:
+      type: object
+      required:
+        - subjectId
+        - mctqResponses
+      properties:
+        subjectId:
+          type: string
+        mctqResponses:
+          type: object
+          properties:
+            workdays:
+              $ref: '#/components/schemas/SleepSchedule'
+            freeDays:
+              $ref: '#/components/schemas/SleepSchedule'
+            workDaysPerWeek:
+              type: integer
+            alarmUsage:
+              type: boolean
+        actimetryData:
+          type: array
+          items:
+            type: object
+        biologicalMarkers:
+          type: object
+          properties:
+            dlmo:
+              type: string
+              format: time
+            cbtNadir:
+              type: string
+              format: time
+
+    SleepSchedule:
+      type: object
+      properties:
+        bedtime:
+          type: string
+          format: time
+        sleepLatency_min:
+          type: number
+        wakeTime:
+          type: string
+          format: time
+        sleepDuration_hours:
+          type: number
+
+    ChronotypeResult:
+      type: object
+      properties:
+        msfsc:
+          type: number
+          description: Corrected mid-sleep on free days
+        chronotype:
+          type: string
+          enum: [extreme_early, moderate_early, intermediate, moderate_late, extreme_late]
+        socialJetlag_hours:
+          type: number
+        optimalSleepWindow:
+          type: object
+          properties:
+            bedtime:
+              type: string
+              format: time
+            wakeTime:
+              type: string
+              format: time
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    ChronotypeProfile:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        mctqScore:
+          type: number
+        classification:
+          type: string
+          enum: [extreme_early, moderate_early, intermediate, moderate_late, extreme_late]
+        dlmo:
+          type: string
+          format: time
+        cbtNadir:
+          type: string
+          format: time
+        optimalSleepWindow:
+          type: object
+          properties:
+            bedtime:
+              type: string
+              format: time
+            wakeTime:
+              type: string
+              format: time
+        optimalWakeTime:
+          type: string
+          format: time
+        socialJetlag:
+          type: number
+        lastUpdated:
+          type: string
+          format: date-time
+
+    CircadianPhaseEstimate:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        currentPhase:
+          type: number
+          minimum: 0
+          maximum: 24
+          description: Current circadian phase in hours (0-24)
+        phaseAngle:
+          type: number
+          description: Phase angle relative to local time
+        entrainmentStatus:
+          type: string
+          enum: [entrained, free_running, delayed, advanced]
+        recommendedShift:
+          type: number
+          description: Recommended phase shift in hours
+        optimalAlertness:
+          type: array
+          items:
+            type: object
+            properties:
+              startTime:
+                type: string
+                format: time
+              endTime:
+                type: string
+                format: time
+              level:
+                type: string
+                enum: [peak, good, moderate, low]
+
+    CircadianMarkersInput:
+      type: object
+      required:
+        - subjectId
+      properties:
+        subjectId:
+          type: string
+        measurementTimestamp:
+          type: string
+          format: date-time
+        melatonin:
+          type: object
+          properties:
+            level_pg_ml:
+              type: number
+            sampleType:
+              type: string
+              enum: [saliva, plasma]
+        cortisol:
+          type: object
+          properties:
+            level_nmol_L:
+              type: number
+            minutesAfterWaking:
+              type: integer
+        coreBodyTemp_C:
+          type: number
+        hrv:
+          type: object
+          properties:
+            rmssd:
+              type: number
+            lf_hf_ratio:
+              type: number
+
+    CircadianMarkersResponse:
+      type: object
+      properties:
+        recordId:
+          type: string
+          format: uuid
+        subjectId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        estimatedDLMO:
+          type: string
+          format: time
+        phaseUpdate:
+          type: boolean
+
+    OptimizationRequest:
+      type: object
+      required:
+        - subjectId
+        - goals
+      properties:
+        subjectId:
+          type: string
+        goals:
+          type: array
+          items:
+            type: string
+            enum:
+              - reduce_latency
+              - increase_efficiency
+              - phase_advance
+              - phase_delay
+              - improve_sws
+              - improve_rem
+              - reduce_wakeups
+              - reduce_social_jetlag
+        constraints:
+          type: object
+          properties:
+            workSchedule:
+              type: object
+              properties:
+                wakeTimeRequired:
+                  type: string
+                  format: time
+                flexibility:
+                  type: string
+                  enum: [fixed, flexible, highly_flexible]
+            preferredBedtime:
+              type: string
+              format: time
+
+    OptimizationPlan:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        targetBedtime:
+          type: string
+          format: time
+        targetWakeTime:
+          type: string
+          format: time
+        lightTherapy:
+          $ref: '#/components/schemas/LightPrescription'
+        melatoninTiming:
+          type: string
+          format: time
+        temperatureSchedule:
+          type: object
+          properties:
+            eveningCooldown:
+              type: string
+              format: time
+            targetTemp_C:
+              type: number
+        mealTiming:
+          type: object
+          properties:
+            lastMealDeadline:
+              type: string
+              format: time
+            caffeineDeadline:
+              type: string
+              format: time
+        exerciseTiming:
+          type: object
+          properties:
+            optimalWindow:
+              type: object
+              properties:
+                start:
+                  type: string
+                  format: time
+                end:
+                  type: string
+                  format: time
+            avoidAfter:
+              type: string
+              format: time
+        expectedOutcomes:
+          type: object
+          properties:
+            sleepEfficiencyImprovement_pct:
+              type: number
+            latencyReduction_min:
+              type: number
+            phaseShift_hours:
+              type: number
+            timeToEffect_days:
+              type: integer
+
+    DisorderScreeningInput:
+      type: object
+      required:
+        - subjectId
+      properties:
+        subjectId:
+          type: string
+        questionnaires:
+          type: object
+          properties:
+            isi:
+              type: array
+              description: Insomnia Severity Index responses (7 items)
+              items:
+                type: integer
+            ess:
+              type: array
+              description: Epworth Sleepiness Scale responses (8 items)
+              items:
+                type: integer
+            stopBang:
+              type: object
+              description: STOP-BANG questionnaire for OSA screening
+        sleepData:
+          type: object
+          properties:
+            averageAHI:
+              type: number
+            averageSpO2:
+              type: number
+            plmIndex:
+              type: number
+
+    DisorderScreeningResult:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        screeningDate:
+          type: string
+          format: date-time
+        riskAssessments:
+          type: array
+          items:
+            type: object
+            properties:
+              disorder:
+                type: string
+                enum:
+                  - obstructive_sleep_apnea
+                  - insomnia
+                  - delayed_sleep_phase
+                  - advanced_sleep_phase
+                  - restless_legs
+                  - narcolepsy
+                  - hypersomnia
+              riskLevel:
+                type: string
+                enum: [low, moderate, high]
+              score:
+                type: number
+              interpretation:
+                type: string
+        referralRecommended:
+          type: boolean
+        referralType:
+          type: string
+          enum: [sleep_specialist, psg_study, hsat, none]
+
+    LightPrescriptionRequest:
+      type: object
+      required:
+        - subjectId
+        - goal
+      properties:
+        subjectId:
+          type: string
+        goal:
+          type: string
+          enum: [phase_advance, phase_delay, amplitude_increase, maintain]
+        targetShift_hours:
+          type: number
+        constraints:
+          type: object
+          properties:
+            earliestExposure:
+              type: string
+              format: time
+            latestExposure:
+              type: string
+              format: time
+            maxDuration_min:
+              type: integer
+
+    LightPrescription:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        prescriptionId:
+          type: string
+          format: uuid
+        sessions:
+          type: array
+          items:
+            type: object
+            properties:
+              timing:
+                type: string
+                format: time
+              duration_min:
+                type: integer
+              intensity_lux:
+                type: integer
+              melanopicEDI:
+                type: number
+              colorTemp_K:
+                type: integer
+              relativeToEvent:
+                type: string
+                enum: [wake, dlmo, cbt_nadir]
+              offsetMinutes:
+                type: integer
+        avoidanceWindow:
+          type: object
+          description: Time window to avoid bright light
+          properties:
+            start:
+              type: string
+              format: time
+            end:
+              type: string
+              format: time
+        expectedPhaseShift_hours:
+          type: number
+        durationOfTreatment_days:
+          type: integer
+
+    SleepNeedRequest:
+      type: object
+      required:
+        - subjectId
+      properties:
+        subjectId:
+          type: string
+        age:
+          type: integer
+        geneticFactors:
+          type: object
+          properties:
+            per3Vntr:
+              type: string
+              enum: ['4/4', '4/5', '5/5']
+            adenosineSensitivity:
+              type: string
+              enum: [high, medium, low]
+        activityLevel:
+          type: string
+          enum: [sedentary, light, moderate, high, athlete]
+        cognitiveLoad:
+          type: string
+          enum: [low, moderate, high]
+
+    SleepNeedPrediction:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        predictedNeed_hours:
+          type: number
+        range:
+          type: object
+          properties:
+            minimum_hours:
+              type: number
+            maximum_hours:
+              type: number
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        factors:
+          type: array
+          items:
+            type: object
+            properties:
+              factor:
+                type: string
+              impact:
+                type: string
+                enum: [increases, decreases, neutral]
+              magnitude:
+                type: string
+                enum: [small, moderate, large]
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+security:
+  - bearerAuth: []
+  - apiKey: []

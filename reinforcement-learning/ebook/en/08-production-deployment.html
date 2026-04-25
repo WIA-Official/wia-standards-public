@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Production Deployment | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box, .warning-box, .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; }
+        .info-box { border-left: 4px solid #3b82f6; }
+        .warning-box { border-left: 4px solid #f59e0b; }
+        .success-box { border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 8: Production Deployment</h1>
+            <div class="chapter-meta">WIA-AI-025 | From Research to Real World 🚀</div>
+        </header>
+
+        <main>
+            <h2>8.1 From Lab to Production</h2>
+
+            <p>Deploying RL systems in production requires careful consideration of performance, safety, monitoring, and maintenance. This chapter covers the engineering practices needed to successfully deploy RL agents in real-world systems.</p>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">Reality Check:</strong>
+                <p>Production RL is very different from research RL. Real systems need to handle edge cases, maintain safety guarantees, scale efficiently, and adapt to changing environments—all while operating 24/7.</p>
+            </div>
+
+            <h3>Production Requirements</h3>
+
+            <ul>
+                <li><strong>Latency:</strong> Real-time inference (milliseconds to seconds)</li>
+                <li><strong>Reliability:</strong> High availability and fault tolerance</li>
+                <li><strong>Safety:</strong> Bounded behavior, fail-safes</li>
+                <li><strong>Monitoring:</strong> Track performance and detect drift</li>
+                <li><strong>Scalability:</strong> Handle production-scale load</li>
+                <li><strong>Explainability:</strong> Understand agent decisions</li>
+            </ul>
+
+            <h2>8.2 Model Serving Architecture</h2>
+
+            <h3>Inference Server</h3>
+
+            <pre><code>from fastapi import FastAPI
+import torch
+import uvicorn
+
+app = FastAPI()
+
+class RLModelServer:
+    def __init__(self, model_path):
+        // Load trained model
+        self.model = torch.load(model_path)
+        self.model.eval()
+
+        // Move to GPU if available
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+
+    def preprocess(self, observation):
+        """Normalize and convert to tensor."""
+        obs = torch.FloatTensor(observation).unsqueeze(0)
+        return obs.to(self.device)
+
+    def postprocess(self, action_tensor):
+        """Convert tensor to action."""
+        return action_tensor.cpu().numpy()[0]
+
+    @torch.no_grad()
+    def predict(self, observation):
+        """Run inference."""
+        obs_tensor = self.preprocess(observation)
+        action_tensor = self.model(obs_tensor)
+        action = self.postprocess(action_tensor)
+        return action
+
+// Global model server instance
+model_server = RLModelServer(model_path='models/agent.pt')
+
+@app.post("/predict")
+async def predict(observation: list):
+    """
+    Inference endpoint.
+
+    Request: {"observation": [0.1, 0.2, 0.3, ...]}
+    Response: {"action": [1.5, -0.3, ...], "latency_ms": 12.5}
+    """
+    import time
+    start = time.time()
+
+    action = model_server.predict(observation)
+
+    latency = (time.time() - start) * 1000
+
+    return {
+        "action": action.tolist(),
+        "latency_ms": latency
+    }
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)</code></pre>
+
+            <h3>TensorFlow Serving</h3>
+
+            <pre><code>// Export model for TF Serving
+import tensorflow as tf
+
+// Save model in SavedModel format
+tf.saved_model.save(model, 'serving_model/1')
+
+// Serve using TensorFlow Serving (Docker)
+docker run -p 8501:8501 \
+  --mount type=bind,source=$(pwd)/serving_model,target=/models/rl_agent \
+  -e MODEL_NAME=rl_agent \
+  -t tensorflow/serving
+
+// Client code
+import requests
+import json
+
+def predict(observation):
+    url = 'http://localhost:8501/v1/models/rl_agent:predict'
+
+    data = json.dumps({
+        "signature_name": "serving_default",
+        "instances": [observation.tolist()]
+    })
+
+    response = requests.post(url, data=data, headers={"content-type": "application/json"})
+    prediction = response.json()['predictions'][0]
+
+    return prediction</code></pre>
+
+            <h2>8.3 Distributed Training</h2>
+
+            <h3>Data Parallel Training</h3>
+
+            <pre><code>import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+def cleanup():
+    dist.destroy_process_group()
+
+def train_worker(rank, world_size):
+    setup(rank, world_size)
+
+    // Create model and move to GPU
+    model = PolicyNetwork().to(rank)
+    ddp_model = DDP(model, device_ids=[rank])
+
+    // Create environment
+    env = gym.make('Humanoid-v2')
+
+    // Training loop
+    for episode in range(num_episodes):
+        state = env.reset()
+        done = False
+
+        while not done:
+            action = ddp_model(torch.FloatTensor(state).to(rank))
+            next_state, reward, done, _ = env.step(action.cpu().numpy())
+
+            // Compute loss
+            loss = compute_loss(...)
+
+            // Backward pass (gradients averaged across GPUs)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            state = next_state
+
+    cleanup()
+
+def main():
+    world_size = torch.cuda.device_count()
+    mp.spawn(train_worker, args=(world_size,), nprocs=world_size, join=True)
+
+if __name__ == "__main__":
+    main()</code></pre>
+
+            <h3>Ray for Distributed RL</h3>
+
+            <pre><code>import ray
+from ray.rllib.agents.ppo import PPOTrainer
+
+ray.init()
+
+// Configuration
+config = {
+    "env": "CartPole-v1",
+    "num_workers": 16,           // Parallel environment workers
+    "num_gpus": 4,               // GPUs for training
+    "train_batch_size": 4000,
+    "sgd_minibatch_size": 128,
+    "num_sgd_iter": 10,
+    "lr": 3e-4,
+    "framework": "torch"
+}
+
+// Create trainer
+trainer = PPOTrainer(config=config)
+
+// Training
+for iteration in range(1000):
+    result = trainer.train()
+
+    print(f"Iteration {iteration}")
+    print(f"  Reward: {result['episode_reward_mean']:.2f}")
+    print(f"  Length: {result['episode_len_mean']:.2f}")
+
+    // Save checkpoint
+    if iteration % 100 == 0:
+        checkpoint = trainer.save()
+        print(f"  Checkpoint saved: {checkpoint}")
+
+// Export for deployment
+trainer.export_policy_model("./exported_models")</code></pre>
+
+            <h2>8.4 Safety and Constraints</h2>
+
+            <h3>Safe Exploration</h3>
+
+            <pre><code>class SafetyLayer:
+    """
+    Safety wrapper that prevents unsafe actions.
+    """
+    def __init__(self, env, safety_constraints):
+        self.env = env
+        self.constraints = safety_constraints
+
+    def is_safe(self, state, action):
+        """Check if action satisfies all safety constraints."""
+        for constraint in self.constraints:
+            if not constraint.check(state, action):
+                return False
+        return True
+
+    def get_safe_action(self, state, proposed_action):
+        """
+        Project unsafe action to nearest safe action.
+        """
+        if self.is_safe(state, proposed_action):
+            return proposed_action
+
+        // Find nearest safe action (optimization problem)
+        safe_action = self.project_to_safe_set(state, proposed_action)
+        return safe_action
+
+// Usage
+safe_env = SafetyLayer(env, safety_constraints=[
+    MaxVelocityConstraint(max_speed=5.0),
+    WorkspaceConstraint(bounds=workspace_bounds),
+    CollisionConstraint(obstacles=obstacles)
+])
+
+action = policy(state)
+safe_action = safe_env.get_safe_action(state, action)
+next_state, reward, done = env.step(safe_action)</code></pre>
+
+            <h3>Constrained RL</h3>
+
+            <pre><code>class CPO:  // Constrained Policy Optimization
+    """
+    Optimize policy while satisfying safety constraints:
+
+    maximize E[reward]
+    subject to E[cost] ≤ threshold
+    """
+    def __init__(self, cost_limit=25):
+        self.policy = PolicyNetwork()
+        self.value = ValueNetwork()
+        self.cost_value = ValueNetwork()  // Estimate cost
+        self.cost_limit = cost_limit
+
+    def update(self, trajectories):
+        // Compute advantage and cost advantage
+        advantages = self.compute_advantages(trajectories)
+        cost_advantages = self.compute_cost_advantages(trajectories)
+
+        // Current policy performance
+        current_reward = self.evaluate_reward()
+        current_cost = self.evaluate_cost()
+
+        // Constrained optimization
+        // Use Lagrangian: L = reward - λ * (cost - limit)
+        policy_loss = -(advantages - λ * cost_advantages).mean()
+
+        // Update policy
+        optimizer.zero_grad()
+        policy_loss.backward()
+
+        // Project gradient to satisfy constraints
+        self.project_gradients(current_cost, self.cost_limit)
+
+        optimizer.step()
+
+        // Update λ (Lagrange multiplier)
+        if current_cost > self.cost_limit:
+            λ *= 1.05  // Increase penalty
+        else:
+            λ *= 0.95  // Decrease penalty</code></pre>
+
+            <h2>8.5 Monitoring and Observability</h2>
+
+            <h3>Metrics Collection</h3>
+
+            <pre><code>from prometheus_client import Counter, Histogram, Gauge
+import time
+
+// Define metrics
+inference_counter = Counter('rl_inference_total', 'Total inference requests')
+inference_latency = Histogram('rl_inference_latency_seconds', 'Inference latency')
+action_distribution = Histogram('rl_action_values', 'Distribution of action values')
+reward_gauge = Gauge('rl_episode_reward', 'Episode reward')
+
+class MonitoredAgent:
+    def __init__(self, policy):
+        self.policy = policy
+
+    @inference_latency.time()
+    def predict(self, observation):
+        inference_counter.inc()
+
+        action = self.policy(observation)
+
+        // Track action distribution
+        action_distribution.observe(action.mean())
+
+        return action
+
+    def on_episode_end(self, total_reward):
+        reward_gauge.set(total_reward)
+
+// Logging
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class LoggingAgent:
+    def predict(self, observation):
+        logger.info(f"Observation: {observation}")
+
+        action = self.policy(observation)
+
+        logger.info(f"Action: {action}")
+
+        return action</code></pre>
+
+            <h3>Anomaly Detection</h3>
+
+            <pre><code>class AnomalyDetector:
+    """
+    Detect distribution shift and anomalous behavior.
+    """
+    def __init__(self):
+        self.observation_stats = {
+            'mean': None,
+            'std': None,
+            'min': None,
+            'max': None
+        }
+
+    def fit(self, observations):
+        """Learn normal observation distribution."""
+        import numpy as np
+
+        self.observation_stats['mean'] = np.mean(observations, axis=0)
+        self.observation_stats['std'] = np.std(observations, axis=0)
+        self.observation_stats['min'] = np.min(observations, axis=0)
+        self.observation_stats['max'] = np.max(observations, axis=0)
+
+    def detect_anomaly(self, observation):
+        """Check if observation is anomalous."""
+        import numpy as np
+
+        // Z-score based detection
+        z_score = np.abs(
+            (observation - self.observation_stats['mean']) /
+            (self.observation_stats['std'] + 1e-8)
+        )
+
+        is_anomaly = np.any(z_score > 3.0)  // 3-sigma rule
+
+        if is_anomaly:
+            logger.warning(f"Anomalous observation detected: {observation}")
+            // Trigger alert, use fallback policy, etc.
+
+        return is_anomaly</code></pre>
+
+            <h2>8.6 Online Learning and Adaptation</h2>
+
+            <h3>Continual Learning</h3>
+
+            <pre><code>class ContinualLearner:
+    """
+    Continue learning from production data.
+    """
+    def __init__(self, policy, update_frequency=1000):
+        self.policy = policy
+        self.buffer = ReplayBuffer(capacity=100000)
+        self.update_frequency = update_frequency
+        self.step_count = 0
+
+    def act(self, observation):
+        action = self.policy(observation)
+        return action
+
+    def observe(self, observation, action, reward, next_observation):
+        // Store experience
+        self.buffer.add(observation, action, reward, next_observation)
+
+        self.step_count += 1
+
+        // Periodic updates
+        if self.step_count % self.update_frequency == 0:
+            self.update_policy()
+
+    def update_policy(self):
+        """Update policy from recent experience."""
+        if len(self.buffer) < batch_size:
+            return
+
+        batch = self.buffer.sample(batch_size)
+
+        // Compute loss
+        loss = compute_td_loss(self.policy, batch)
+
+        // Update with small learning rate (stability)
+        optimizer = torch.optim.Adam(self.policy.parameters(), lr=1e-5)
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
+        optimizer.step()
+
+        logger.info(f"Policy updated. Loss: {loss.item():.4f}")</code></pre>
+
+            <h3>A/B Testing</h3>
+
+            <pre><code>class ABTestingFramework:
+    """
+    Compare multiple policy versions in production.
+    """
+    def __init__(self, policies, traffic_split=None):
+        self.policies = policies  // {'baseline': policy_A, 'treatment': policy_B}
+
+        if traffic_split is None:
+            traffic_split = {k: 1.0/len(policies) for k in policies}
+
+        self.traffic_split = traffic_split
+        self.metrics = {k: [] for k in policies}
+
+    def select_policy(self, user_id):
+        """Route traffic to policy variants."""
+        import random
+
+        // Deterministic routing based on user_id
+        hash_val = hash(user_id) % 100
+
+        cumulative = 0
+        for policy_name, percentage in self.traffic_split.items():
+            cumulative += percentage * 100
+            if hash_val < cumulative:
+                return policy_name, self.policies[policy_name]
+
+        return list(self.policies.items())[0]
+
+    def record_metric(self, policy_name, reward):
+        self.metrics[policy_name].append(reward)
+
+    def analyze_results(self):
+        """Statistical analysis of A/B test."""
+        import numpy as np
+        from scipy import stats
+
+        baseline_rewards = self.metrics['baseline']
+        treatment_rewards = self.metrics['treatment']
+
+        // T-test
+        t_stat, p_value = stats.ttest_ind(treatment_rewards, baseline_rewards)
+
+        print(f"Baseline mean reward: {np.mean(baseline_rewards):.2f}")
+        print(f"Treatment mean reward: {np.mean(treatment_rewards):.2f}")
+        print(f"P-value: {p_value:.4f}")
+
+        if p_value < 0.05:
+            if np.mean(treatment_rewards) > np.mean(baseline_rewards):
+                print("Treatment is significantly better!")
+            else:
+                print("Baseline is significantly better!")
+        else:
+            print("No significant difference")</code></pre>
+
+            <h2>8.7 Model Compression and Optimization</h2>
+
+            <h3>Quantization</h3>
+
+            <pre><code>import torch
+
+// Post-training quantization
+model = torch.load('policy.pt')
+model.eval()
+
+// Dynamic quantization (weights + activations)
+quantized_model = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+
+// Save quantized model
+torch.save(quantized_model, 'policy_quantized.pt')
+
+// Model size comparison
+import os
+original_size = os.path.getsize('policy.pt') / 1024  // KB
+quantized_size = os.path.getsize('policy_quantized.pt') / 1024
+
+print(f"Original: {original_size:.2f} KB")
+print(f"Quantized: {quantized_size:.2f} KB")
+print(f"Compression: {original_size/quantized_size:.2f}x")</code></pre>
+
+            <h3>Knowledge Distillation</h3>
+
+            <pre><code>class PolicyDistillation:
+    """
+    Train smaller student policy to mimic large teacher.
+    """
+    def __init__(self, teacher_policy, student_policy):
+        self.teacher = teacher_policy
+        self.student = student_policy
+
+        self.teacher.eval()  // Freeze teacher
+
+    def distill(self, states, temperature=2.0):
+        """
+        Train student to match teacher's action distribution.
+        """
+        with torch.no_grad():
+            // Soft teacher predictions
+            teacher_logits = self.teacher(states) / temperature
+            teacher_probs = F.softmax(teacher_logits, dim=-1)
+
+        // Student predictions
+        student_logits = self.student(states) / temperature
+        student_log_probs = F.log_softmax(student_logits, dim=-1)
+
+        // KL divergence loss
+        loss = F.kl_div(student_log_probs, teacher_probs, reduction='batchmean')
+
+        return loss
+
+// Training loop
+teacher = LargePolicy()  // 10M parameters
+student = SmallPolicy()  // 1M parameters
+
+optimizer = torch.optim.Adam(student.parameters(), lr=1e-3)
+
+for epoch in range(100):
+    states = sample_states()
+
+    loss = distillation.distill(states)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+print(f"Student trained! Parameters: {count_parameters(student)}")</code></pre>
+
+            <h2>8.8 Deployment Checklist</h2>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Pre-Deployment Checklist:</strong>
+                <ol>
+                    <li>✓ Comprehensive testing in simulation</li>
+                    <li>✓ Safety constraints implemented and verified</li>
+                    <li>✓ Fallback policy for anomalies</li>
+                    <li>✓ Monitoring and alerting configured</li>
+                    <li>✓ Latency requirements met</li>
+                    <li>✓ A/B testing framework ready</li>
+                    <li>✓ Rollback plan prepared</li>
+                    <li>✓ Documentation complete</li>
+                    <li>✓ Team trained on operations</li>
+                    <li>✓ Gradual rollout plan (canary deployment)</li>
+                </ol>
+            </div>
+
+            <h3>Deployment Stages</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Traffic %</th>
+                        <th>Duration</th>
+                        <th>Criteria</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Canary</td>
+                        <td>1%</td>
+                        <td>24 hours</td>
+                        <td>No critical errors</td>
+                    </tr>
+                    <tr>
+                        <td>Limited</td>
+                        <td>10%</td>
+                        <td>3 days</td>
+                        <td>Performance ≥ baseline</td>
+                    </tr>
+                    <tr>
+                        <td>Extended</td>
+                        <td>50%</td>
+                        <td>1 week</td>
+                        <td>Statistically significant improvement</td>
+                    </tr>
+                    <tr>
+                        <td>Full</td>
+                        <td>100%</td>
+                        <td>Ongoing</td>
+                        <td>Continued monitoring</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8.9 Case Studies</h2>
+
+            <h3>Google Data Center Cooling</h3>
+
+            <p>DeepMind's RL system reduced cooling energy by 40%:</p>
+
+            <ul>
+                <li><strong>Environment:</strong> Data center with hundreds of sensors and actuators</li>
+                <li><strong>State:</strong> Temperature, pressure, power consumption (time-series)</li>
+                <li><strong>Actions:</strong> Adjust cooling system settings</li>
+                <li><strong>Reward:</strong> -energy_consumption (minimize)</li>
+                <li><strong>Safety:</strong> Hard constraints on temperature ranges</li>
+                <li><strong>Deployment:</strong> Gradual rollout with human oversight</li>
+            </ul>
+
+            <h3>Recommendation Systems</h3>
+
+            <pre><code>class RecommenderRL:
+    """
+    RL for personalized recommendations.
+    """
+    def __init__(self):
+        self.policy = SlateGenerationPolicy()
+
+    def recommend(self, user_id, context):
+        """
+        Generate slate of recommendations.
+
+        State: user history, context, time
+        Action: slate of items to show
+        Reward: clicks, watch time, satisfaction
+        """
+        state = self.get_state(user_id, context)
+
+        // Generate candidate items
+        candidates = self.candidate_generation(user_id)
+
+        // Rank and select top-k
+        slate = self.policy(state, candidates)
+
+        return slate
+
+    def update(self, user_id, slate, feedback):
+        """Learn from user feedback."""
+        reward = self.compute_reward(feedback)
+
+        self.buffer.add(state, slate, reward)
+
+        if len(self.buffer) > batch_size:
+            self.train_step()</code></pre>
+
+            <h2>8.10 Future Directions</h2>
+
+            <h3>Emerging Trends</h3>
+
+            <ul>
+                <li><strong>Offline RL:</strong> Learn from logged data without environment interaction</li>
+                <li><strong>Meta-RL:</strong> Learn to learn, adapt quickly to new tasks</li>
+                <li><strong>Sim-to-Real:</strong> Better transfer from simulation to real world</li>
+                <li><strong>Explainable RL:</strong> Interpret agent decisions</li>
+                <li><strong>Foundation Models:</strong> Pre-trained RL models for transfer</li>
+            </ul>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">The Future is Bright:</strong>
+                <p>RL is moving from research labs to production systems at an accelerating pace. With better tools, frameworks, and best practices, deploying RL in real-world applications is becoming increasingly accessible.</p>
+            </div>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Production RL requires careful consideration of safety, latency, and reliability</li>
+                    <li>Model serving frameworks enable scalable inference</li>
+                    <li>Distributed training accelerates learning on large-scale problems</li>
+                    <li>Safety layers and constrained RL ensure bounded behavior</li>
+                    <li>Monitoring and observability are critical for detecting issues</li>
+                    <li>Online learning enables adaptation to changing environments</li>
+                    <li>A/B testing validates improvements in production</li>
+                    <li>Model compression reduces deployment costs</li>
+                    <li>Gradual rollout minimizes risks</li>
+                    <li>Real-world case studies demonstrate RL's practical impact</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>Review Questions</h3>
+                <div class="quiz-question">
+                    <strong>1. Why is safety particularly important in production RL systems?</strong>
+                    <p style="color: #94a3b8;">Answer: RL agents can take unexpected actions during exploration or in novel situations. Without safety constraints, this could cause damage, injuries, or system failures in real-world deployments.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. What is the purpose of A/B testing in RL deployment?</strong>
+                    <p style="color: #94a3b8;">Answer: To compare a new policy against the baseline policy in production with real users, providing statistical evidence of improvement before full rollout.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. How does knowledge distillation help with deployment?</strong>
+                    <p style="color: #94a3b8;">Answer: It trains a smaller student model to mimic a large teacher model, reducing computational requirements and latency while maintaining performance.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>4. What is the benefit of continual learning in production?</strong>
+                    <p style="color: #94a3b8;">Answer: Allows the agent to adapt to changing environments and improve from real production data, maintaining performance as conditions evolve.</p>
+                </div>
+            </div>
+
+            <div style="background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; border: 2px solid #10B981; text-align: center;">
+                <h2 style="color: #10B981; margin-bottom: 1rem;">🎉 Congratulations!</h2>
+                <p style="font-size: 1.2rem;">You've completed the WIA-AI-025 Reinforcement Learning course!</p>
+                <p style="margin-top: 1rem;">You now have the knowledge to:</p>
+                <ul style="text-align: left; display: inline-block; margin-top: 1rem;">
+                    <li>Understand RL fundamentals and MDPs</li>
+                    <li>Implement value-based and policy gradient methods</li>
+                    <li>Apply actor-critic algorithms</li>
+                    <li>Use model-based RL for planning</li>
+                    <li>Coordinate multi-agent systems</li>
+                    <li>Deploy RL systems in production</li>
+                </ul>
+                <p style="margin-top: 2rem; font-size: 1.1rem;">
+                    <a href="../../simulator/index.html" style="color: #10B981;">🎮 Continue practicing in the simulator</a>
+                </p>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

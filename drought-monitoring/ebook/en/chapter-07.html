@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Phase 4 - Integration - WIA Drought Monitoring</title>
+    <style>
+        :root{--bg:#0f172a;--bg-secondary:#1e293b;--bg-tertiary:#334155;--text:#f1f5f9;--text-secondary:#cbd5e1;--primary: #8B5CF6;--primary: #8B5CF6}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.8}.container{max-width:900px;margin:0 auto;padding:3rem 2rem}h1{font-size:2.5rem;color:var(--primary);margin-bottom:.5rem}h2{font-size:1.8rem;color:var(--primary);margin-top:3rem;margin-bottom:1rem}h3{font-size:1.3rem;color:var(--accent);margin-top:2rem;margin-bottom:1rem}.chapter-number{color:var(--text-secondary);font-size:1.2rem;margin-bottom:2rem}p{margin-bottom:1.5rem;color:var(--text-secondary)}table{width:100%;border-collapse:collapse;margin:2rem 0;background:var(--bg-secondary);border-radius:8px;overflow:hidden}th,td{padding:1rem;text-align:left;border-bottom:1px solid var(--bg-tertiary)}th{background:var(--bg-tertiary);color:var(--primary);font-weight:600}.summary-box,.key-takeaways,.review-questions{background:var(--bg-secondary);padding:2rem;border-radius:8px;margin:2rem 0}.summary-box{border-left:4px solid var(--primary)}ul,ol{margin:1rem 0 1rem 2rem}li{margin:.5rem 0;color:var(--text-secondary)}.callout{background:var(--bg-tertiary);border-left:4px solid var(--accent);padding:1.5rem;margin:1.5rem 0;border-radius:4px}.nav-links{display:flex;justify-content:space-between;margin-top:3rem;padding-top:2rem;border-top:2px solid var(--bg-tertiary)}.nav-links a{color:var(--primary);text-decoration:none;padding:.75rem 1.5rem;background:var(--bg-secondary);border-radius:8px;transition:all .3s}.nav-links a:hover{background:var(--primary);color:var(--bg)}pre{background:var(--bg);border:1px solid var(--bg-tertiary);border-radius:8px;padding:1.5rem;overflow-x:auto;margin:1rem 0}code{color:var(--accent);font-family:'Courier New',monospace;font-size:.9em}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-number">Chapter 7</div>
+        <h1>Phase 4 - System Integration</h1>
+
+        <h2>Connecting Drought Data to Action</h2>
+
+        <p>The ultimate value of drought monitoring comes not from collecting data, but from using that data to make better decisions. Phase 4 of the WIA standard defines how drought information integrates with the systems that actually manage water resources, agricultural operations, and emergency response. This chapter explores integration patterns for farm management platforms, irrigation controllers, early warning systems, and climate adaptation tools.</p>
+
+        <p>Effective integration transforms drought monitoring from passive observation to active management, enabling automated responses, proactive planning, and optimized resource allocation.</p>
+
+        <h2>Farm Management System Integration</h2>
+
+        <p>Modern farms increasingly rely on digital management platforms that track everything from field operations to financial records. Integrating drought data into these systems enables farmers to make data-driven decisions about irrigation, crop selection, and risk management.</p>
+
+        <h3>Integration Architecture</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Function</th>
+                    <th>Data Flow</th>
+                    <th>Update Frequency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Field Registry</td>
+                    <td>Geographic field boundaries and crop data</td>
+                    <td>Farm system → WIA service</td>
+                    <td>Seasonal</td>
+                </tr>
+                <tr>
+                    <td>Drought Monitor</td>
+                    <td>Current drought indices for each field</td>
+                    <td>WIA service → Farm system</td>
+                    <td>Daily/Weekly</td>
+                </tr>
+                <tr>
+                    <td>Alert Engine</td>
+                    <td>Threshold-based notifications</td>
+                    <td>WIA service → Farm system</td>
+                    <td>Real-time</td>
+                </tr>
+                <tr>
+                    <td>Decision Support</td>
+                    <td>Crop-specific recommendations</td>
+                    <td>Bidirectional</td>
+                    <td>On-demand</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Implementation Example</h3>
+
+        <pre><code>// Farm Management System Integration
+
+class FarmDroughtIntegration {
+  constructor(wiaClient, farmFields) {
+    this.wia = wiaClient;
+    this.fields = farmFields;
+  }
+
+  async updateFieldStatus() {
+    for (const field of this.fields) {
+      // Get drought data for field location
+      const drought = await this.wia.getCurrentStatus({
+        lat: field.centroid.lat,
+        lon: field.centroid.lon,
+        indices: ['pdsi', 'spi', 'soil_moisture', 'ndvi']
+      });
+
+      // Calculate crop-specific water stress
+      const stress = this.calculateCropStress(drought, field.crop);
+
+      // Update field status
+      field.droughtStatus = {
+        pdsi: drought.pdsi.value,
+        classification: drought.pdsi.classification,
+        soilMoisture: drought.soil_moisture.layers[0].moisture_percent,
+        ndviAnomaly: drought.ndvi.anomaly,
+        waterStress: stress.level,
+        lastUpdated: new Date()
+      };
+
+      // Generate recommendations
+      if (stress.level >= 'moderate') {
+        field.recommendations.push({
+          type: 'irrigation',
+          priority: 'high',
+          action: `Irrigate ${this.calculateIrrigationAmount(drought, field)} mm`,
+          reason: `Soil moisture at ${drought.soil_moisture.layers[0].moisture_percent}%,
+                   below ${field.crop.optimalMoisture}% optimal for ${field.crop.name}`
+        });
+      }
+
+      // Log to field history
+      await this.logDroughtEvent(field, drought, stress);
+    }
+  }
+
+  calculateCropStress(drought, crop) {
+    const soilDeficit = crop.optimalMoisture - drought.soil_moisture.layers[0].moisture_percent;
+    const ndviStress = Math.abs(drought.ndvi.anomaly);
+
+    let stressScore = 0;
+    if (soilDeficit > 10) stressScore += 40;
+    else if (soilDeficit > 5) stressScore += 20;
+
+    if (ndviStress > 0.15) stressScore += 40;
+    else if (ndviStress > 0.10) stressScore += 20;
+
+    if (drought.pdsi.value < -3) stressScore += 20;
+
+    return {
+      score: stressScore,
+      level: stressScore > 60 ? 'severe' :
+             stressScore > 40 ? 'moderate' :
+             stressScore > 20 ? 'mild' : 'none',
+      soilDeficit: soilDeficit,
+      vegetationStress: ndviStress
+    };
+  }
+
+  calculateIrrigationAmount(drought, field) {
+    const targetMoisture = field.crop.optimalMoisture;
+    const currentMoisture = drought.soil_moisture.layers[0].moisture_percent;
+    const deficit = (targetMoisture - currentMoisture) / 100;
+
+    // Convert to mm of water needed
+    const rootDepth = field.crop.rootDepth_cm;
+    const waterMM = deficit * rootDepth * 10;
+
+    // Add 20% for application efficiency
+    return Math.ceil(waterMM * 1.2);
+  }
+}
+
+// Usage
+const farmSystem = new FarmDroughtIntegration(
+  new WIADroughtClient({ apiKey: 'farm-api-key' }),
+  await loadFarmFields()
+);
+
+// Update daily
+setInterval(() => farmSystem.updateFieldStatus(), 24 * 60 * 60 * 1000);</code></pre>
+
+        <h2>Irrigation System Integration</h2>
+
+        <p>Smart irrigation systems can automatically adjust watering schedules based on real-time drought conditions, optimizing water use while maintaining crop health.</p>
+
+        <h3>Irrigation Controller Protocol</h3>
+
+        <pre><code>// Automatic Irrigation Controller
+
+class SmartIrrigationController {
+  constructor(wiaClient, irrigationZones, weatherForecast) {
+    this.wia = wiaClient;
+    this.zones = irrigationZones;
+    this.weather = weatherForecast;
+  }
+
+  async optimizeSchedule() {
+    for (const zone of this.zones) {
+      // Get current drought conditions
+      const drought = await this.wia.getCurrentStatus({
+        lat: zone.location.lat,
+        lon: zone.location.lon,
+        indices: ['soil_moisture', 'evapotranspiration', 'pdsi']
+      });
+
+      // Get forecast
+      const forecast = await this.weather.get7DayForecast(zone.location);
+
+      // Calculate irrigation need
+      const schedule = this.calculateOptimalSchedule({
+        currentMoisture: drought.soil_moisture,
+        evapotranspiration: drought.evapotranspiration.etc_mm_day,
+        forecast: forecast,
+        crop: zone.crop,
+        pdsi: drought.pdsi.value
+      });
+
+      // Apply schedule
+      await this.applySchedule(zone, schedule);
+
+      // Log decision
+      this.logIrrigationDecision(zone, drought, schedule);
+    }
+  }
+
+  calculateOptimalSchedule(params) {
+    const {currentMoisture, evapotranspiration, forecast, crop, pdsi} = params;
+
+    // Current deficit
+    const currentDeficit = crop.optimalMoisture -
+                          currentMoisture.layers[0].moisture_percent;
+
+    // Forecasted ET over next 7 days
+    const futureET = evapotranspiration * 7;
+
+    // Forecasted precipitation
+    const futureRain = forecast.precipitation_mm.reduce((a,b) => a+b, 0);
+
+    // Net deficit
+    let netDeficit = currentDeficit + futureET - futureRain;
+
+    // Adjust for drought severity (more conservative during drought)
+    if (pdsi < -2) {
+      netDeficit *= 1.2;  // Irrigate more during drought
+    }
+
+    // Convert to irrigation amount
+    const irrigationAmount = Math.max(0, netDeficit * crop.rootDepth_cm / 10);
+
+    // Determine timing
+    if (irrigationAmount > 40) {
+      // Split into multiple applications
+      return {
+        sessions: [
+          {day: 0, amount: 20, duration: 120},
+          {day: 2, amount: 20, duration: 120},
+          {day: 4, amount: irrigationAmount - 40, duration: (irrigationAmount - 40) * 6}
+        ],
+        totalAmount: irrigationAmount,
+        reason: 'high_deficit_split_application'
+      };
+    } else if (irrigationAmount > 10) {
+      return {
+        sessions: [{day: 0, amount: irrigationAmount, duration: irrigationAmount * 6}],
+        totalAmount: irrigationAmount,
+        reason: 'moderate_deficit_single_application'
+      };
+    } else {
+      return {
+        sessions: [],
+        totalAmount: 0,
+        reason: 'sufficient_moisture'
+      };
+    }
+  }
+
+  async applySchedule(zone, schedule) {
+    for (const session of schedule.sessions) {
+      // Schedule irrigation event
+      const scheduledTime = new Date();
+      scheduledTime.setDate(scheduledTime.getDate() + session.day);
+      scheduledTime.setHours(5, 0, 0);  // Early morning
+
+      await zone.controller.schedule({
+        time: scheduledTime,
+        duration_minutes: session.duration,
+        zone: zone.id,
+        priority: 'drought_optimization'
+      });
+
+      console.log(`Scheduled ${session.amount}mm irrigation for ${zone.name} ` +
+                  `on ${scheduledTime.toLocaleDateString()}`);
+    }
+  }
+}</code></pre>
+
+        <h3>Water Budget Optimization</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Drought Level</th>
+                    <th>Irrigation Strategy</th>
+                    <th>Water Savings</th>
+                    <th>Crop Impact</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Normal (PDSI > -1)</td>
+                    <td>Full crop requirements</td>
+                    <td>0%</td>
+                    <td>None</td>
+                </tr>
+                <tr>
+                    <td>Mild Drought (-1 to -2)</td>
+                    <td>Precision timing, reduced waste</td>
+                    <td>10-15%</td>
+                    <td>Minimal</td>
+                </tr>
+                <tr>
+                    <td>Moderate (-2 to -3)</td>
+                    <td>Deficit irrigation on tolerant crops</td>
+                    <td>20-30%</td>
+                    <td>5-10% yield</td>
+                </tr>
+                <tr>
+                    <td>Severe (-3 to -4)</td>
+                    <td>Critical stages only</td>
+                    <td>40-50%</td>
+                    <td>15-25% yield</td>
+                </tr>
+                <tr>
+                    <td>Extreme (< -4)</td>
+                    <td>Survival irrigation, crop triage</td>
+                    <td>60-70%</td>
+                    <td>30-50% yield</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Early Warning System Integration</h2>
+
+        <p>Government agencies and humanitarian organizations need drought early warning systems that trigger predefined response actions when conditions deteriorate.</p>
+
+        <h3>Multi-Tier Alert System</h3>
+
+        <pre><code>// Early Warning System
+
+class DroughtEarlyWarningSystem {
+  constructor(wiaClient, regions, responseTeams) {
+    this.wia = wiaClient;
+    this.regions = regions;
+    this.teams = responseTeams;
+    this.alertHistory = new Map();
+  }
+
+  async monitorRegions() {
+    for (const region of this.regions) {
+      // Get comprehensive drought assessment
+      const assessment = await this.wia.getRegionalStatus({
+        region_id: region.id,
+        indices: ['pdsi', 'spi', 'soil_moisture', 'ndvi'],
+        aggregation: 'weighted_mean'
+      });
+
+      // Determine alert level
+      const alertLevel = this.determineAlertLevel(assessment, region);
+
+      // Check if escalation needed
+      const previousLevel = this.alertHistory.get(region.id);
+      if (alertLevel > previousLevel) {
+        await this.escalateAlert(region, alertLevel, assessment);
+      } else if (alertLevel < previousLevel) {
+        await this.deescalateAlert(region, alertLevel, assessment);
+      }
+
+      this.alertHistory.set(region.id, alertLevel);
+    }
+  }
+
+  determineAlertLevel(assessment, region) {
+    let score = 0;
+
+    // PDSI contribution
+    if (assessment.pdsi.mean < -4) score += 40;
+    else if (assessment.pdsi.mean < -3) score += 30;
+    else if (assessment.pdsi.mean < -2) score += 20;
+
+    // SPI contribution (12-month)
+    if (assessment.spi.spi_12_month < -2) score += 30;
+    else if (assessment.spi.spi_12_month < -1.5) score += 20;
+
+    // Affected area
+    const droughtArea = assessment.summary.drought_area_percent;
+    if (droughtArea > 75) score += 20;
+    else if (droughtArea > 50) score += 15;
+    else if (droughtArea > 25) score += 10;
+
+    // NDVI anomaly
+    if (assessment.ndvi.mean_anomaly < -0.2) score += 10;
+
+    // Duration consideration
+    const duration = this.calculateDroughtDuration(region.id);
+    if (duration > 12) score += 10;  // Over 1 year
+    else if (duration > 6) score += 5;
+
+    // Convert score to alert level
+    if (score >= 80) return 4;  // Emergency
+    if (score >= 60) return 3;  // Alert
+    if (score >= 40) return 2;  // Warning
+    if (score >= 20) return 1;  // Watch
+    return 0;  // Normal
+  }
+
+  async escalateAlert(region, level, assessment) {
+    const alertTypes = ['normal', 'watch', 'warning', 'alert', 'emergency'];
+    const levelName = alertTypes[level];
+
+    console.log(`ESCALATING ${region.name} to ${levelName.toUpperCase()}`);
+
+    // Notify appropriate response teams
+    const teams = this.getResponseTeams(level);
+    for (const team of teams) {
+      await team.notify({
+        region: region,
+        level: levelName,
+        assessment: assessment,
+        actions: this.getRequiredActions(level),
+        timestamp: new Date()
+      });
+    }
+
+    // Activate predefined response plans
+    await this.activateResponsePlan(region, level);
+
+    // Public notification
+    await this.issuePublicAlert(region, level, assessment);
+
+    // International coordination for emergencies
+    if (level === 4) {
+      await this.notifyInternationalAgencies(region, assessment);
+    }
+  }
+
+  getRequiredActions(alertLevel) {
+    const actions = {
+      1: [  // Watch
+        'Increase monitoring frequency to daily',
+        'Prepare emergency water supplies',
+        'Notify agricultural extension services',
+        'Review drought contingency plans'
+      ],
+      2: [  // Warning
+        'Implement voluntary water conservation',
+        'Activate agricultural support programs',
+        'Deploy soil moisture monitoring equipment',
+        'Begin public awareness campaigns'
+      ],
+      3: [  // Alert
+        'Mandatory water use restrictions',
+        'Emergency livestock feeding programs',
+        'Deploy water distribution systems',
+        'Activate crop insurance mechanisms'
+      ],
+      4: [  // Emergency
+        'Emergency water rationing',
+        'Food aid distribution',
+        'Mass livestock evacuation/sales',
+        'Request international assistance',
+        'Implement emergency employment programs'
+      ]
+    };
+    return actions[alertLevel] || [];
+  }
+}</code></pre>
+
+        <h2>Climate Adaptation Planning Integration</h2>
+
+        <p>Long-term drought trends inform climate adaptation strategies for water resource planning, land use decisions, and infrastructure investments.</p>
+
+        <h3>Trend Analysis and Projection</h3>
+
+        <pre><code>// Climate Adaptation Planning
+
+class ClimateAdaptationPlanner {
+  constructor(wiaClient, region, planningHorizon) {
+    this.wia = wiaClient;
+    this.region = region;
+    this.horizon = planningHorizon;  // years
+  }
+
+  async generateAdaptationPlan() {
+    // Historical drought analysis
+    const historical = await this.wia.getHistoricalData({
+      region_id: this.region.id,
+      start_date: this.getStartDate(30),  // 30 years
+      end_date: new Date().toISOString(),
+      indices: ['pdsi', 'spi'],
+      interval: 'monthly'
+    });
+
+    // Analyze trends
+    const trends = this.analyzeTrends(historical);
+
+    // Get climate projections
+    const projections = await this.getClimateProjections(
+      this.region,
+      this.horizon
+    );
+
+    // Calculate adaptation needs
+    const needs = this.calculateAdaptationNeeds(trends, projections);
+
+    // Generate recommendations
+    return {
+      currentState: this.summarizeCurrentConditions(historical),
+      historicalTrends: trends,
+      futureProjections: projections,
+      adaptationNeeds: needs,
+      recommendations: this.generateRecommendations(needs),
+      estimatedCosts: this.estimateCosts(needs),
+      timeline: this.createImplementationTimeline(needs)
+    };
+  }
+
+  analyzeTrends(historical) {
+    const droughtFrequency = this.calculateDroughtFrequency(historical);
+    const severityTrend = this.calculateSeverityTrend(historical);
+    const durationTrend = this.calculateDurationTrend(historical);
+
+    return {
+      frequency: {
+        decades: {
+          '1995-2004': droughtFrequency.slice(0, 10).length,
+          '2005-2014': droughtFrequency.slice(10, 20).length,
+          '2015-2024': droughtFrequency.slice(20).length
+        },
+        trend: this.linearRegression(droughtFrequency).slope
+      },
+      severity: {
+        mean: severityTrend.mean,
+        trend: this.linearRegression(severityTrend.values).slope,
+        extremeEvents: severityTrend.values.filter(v => v < -4).length
+      },
+      duration: {
+        mean: durationTrend.mean,
+        longest: Math.max(...durationTrend.events.map(e => e.duration)),
+        trend: this.linearRegression(durationTrend.events.map(e => e.duration)).slope
+      }
+    };
+  }
+
+  calculateAdaptationNeeds(trends, projections) {
+    const waterDeficit = this.projectWaterDeficit(trends, projections);
+    const cropVulnerability = this.assessCropVulnerability(projections);
+
+    return {
+      waterStorage: {
+        additionalCapacity_ML: waterDeficit.storage_needed,
+        priority: waterDeficit.severity
+      },
+      irrigation: {
+        efficiency_improvement_percent: 30,
+        expansion_hectares: cropVulnerability.irrigationNeed
+      },
+      cropDiversification: {
+        droughtTolerantPercent: 40,
+        suggestedCrops: this.identifyDroughtTolerantCrops()
+      },
+      waterConservation: {
+        urban_reduction_percent: 20,
+        agricultural_efficiency_percent: 25
+      }
+    };
+  }
+
+  generateRecommendations(needs) {
+    return [
+      {
+        category: 'Infrastructure',
+        priority: 'High',
+        actions: [
+          `Increase water storage capacity by ${needs.waterStorage.additionalCapacity_ML} ML`,
+          'Modernize irrigation systems to achieve 90% efficiency',
+          'Develop groundwater recharge facilities'
+        ],
+        timeline: '5-10 years',
+        cost: '$' + (needs.waterStorage.additionalCapacity_ML * 1.2).toFixed(0) + 'M'
+      },
+      {
+        category: 'Agricultural',
+        priority: 'High',
+        actions: [
+          'Transition 40% of cropland to drought-tolerant varieties',
+          'Implement precision agriculture technologies',
+          'Establish crop insurance programs'
+        ],
+        timeline: '3-7 years',
+        cost: '$' + (this.region.farmland_hectares * 500).toFixed(0)
+      },
+      {
+        category: 'Policy',
+        priority: 'Medium',
+        actions: [
+          'Implement tiered water pricing',
+          'Establish water trading markets',
+          'Update building codes for water efficiency'
+        ],
+        timeline: '2-4 years',
+        cost: '$5M'
+      }
+    ];
+  }
+}</code></pre>
+
+        <h2>Mobile Application Integration</h2>
+
+        <p>Farmers and water managers need drought information accessible anywhere, anytime. Mobile apps provide field-level access to WIA drought data.</p>
+
+        <h3>Mobile SDK Implementation</h3>
+
+        <pre><code>// Mobile Application Integration (React Native example)
+
+import WIADrought from '@wia/drought-monitoring';
+
+class FarmerDroughtApp {
+  constructor() {
+    this.wia = new WIADrought({
+      apiKey: process.env.WIA_API_KEY,
+      cacheEnabled: true,
+      offlineMode: true
+    });
+  }
+
+  async getFieldConditions(field) {
+    try {
+      // Try online first
+      const drought = await this.wia.getCurrentStatus({
+        lat: field.latitude,
+        lon: field.longitude,
+        indices: ['pdsi', 'spi', 'soil_moisture', 'ndvi']
+      });
+
+      // Cache for offline use
+      await this.cacheFieldData(field.id, drought);
+
+      return this.formatForDisplay(drought);
+    } catch (error) {
+      // Fallback to cached data if offline
+      if (!this.isOnline()) {
+        return await this.getCachedFieldData(field.id);
+      }
+      throw error;
+    }
+  }
+
+  formatForDisplay(drought) {
+    return {
+      status: {
+        condition: this.getConditionLabel(drought.pdsi.classification),
+        color: this.getConditionColor(drought.pdsi.value),
+        icon: this.getConditionIcon(drought.pdsi.value)
+      },
+      indices: {
+        pdsi: {
+          value: drought.pdsi.value.toFixed(1),
+          label: 'Palmer Index',
+          trend: this.calculateTrend(drought.pdsi)
+        },
+        soilMoisture: {
+          value: drought.soil_moisture.layers[0].moisture_percent.toFixed(0) + '%',
+          label: 'Soil Moisture',
+          status: drought.soil_moisture.layers[0].stress_level
+        },
+        vegetation: {
+          value: drought.ndvi.value.toFixed(2),
+          label: 'Vegetation Health',
+          anomaly: drought.ndvi.anomaly.toFixed(2)
+        }
+      },
+      recommendations: this.generateRecommendations(drought),
+      lastUpdated: new Date(drought.timestamp)
+    };
+  }
+
+  async enablePushNotifications(fields, thresholds) {
+    // Subscribe to alerts for user's fields
+    const subscription = await this.wia.subscribeAlerts({
+      locations: fields.map(f => ({
+        lat: f.latitude,
+        lon: f.longitude,
+        name: f.name
+      })),
+      thresholds: thresholds,
+      notification_methods: [{
+        type: 'push',
+        device_token: await this.getDeviceToken()
+      }]
+    });
+
+    return subscription.id;
+  }
+}</code></pre>
+
+        <div class="summary-box">
+            <h3>Chapter Summary</h3>
+            <p>This chapter explored Phase 4 of the WIA standard: System Integration. We examined how drought monitoring connects with farm management systems for data-driven decision making, smart irrigation controllers for automated water optimization, early warning systems with multi-tier alert protocols, climate adaptation planning for long-term resilience, and mobile applications for field-level access. These integrations transform drought data from passive information into active management tools that optimize water use, protect crops, and support proactive planning.</p>
+        </div>
+
+        <div class="key-takeaways">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Farm Management Integration:</strong> Real-time drought data combined with crop-specific knowledge enables automatic field monitoring, irrigation recommendations, and water stress alerts tailored to each field's conditions.</li>
+                <li><strong>Smart Irrigation Optimization:</strong> Automated controllers using drought indices, weather forecasts, and crop water requirements can reduce water use by 10-70% depending on drought severity while minimizing yield impacts.</li>
+                <li><strong>Multi-Tier Early Warning:</strong> Alert systems with defined escalation levels (Watch, Warning, Alert, Emergency) and corresponding actions enable coordinated responses from local to international scales.</li>
+                <li><strong>Climate Adaptation Planning:</strong> Historical trend analysis combined with climate projections identifies specific adaptation needs for water storage, irrigation efficiency, and drought-tolerant crop adoption.</li>
+                <li><strong>Mobile Accessibility:</strong> Offline-capable mobile apps with push notifications ensure farmers and managers access critical drought information anywhere, even in areas with limited connectivity.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Describe how the farm management system integration calculates crop-specific water stress. Why is it important to consider both soil moisture deficits and NDVI anomalies rather than relying on a single indicator?</li>
+                <li>Analyze the smart irrigation controller's schedule optimization algorithm. How does it balance current deficits, forecasted ET, expected precipitation, and drought severity to determine irrigation timing and amounts?</li>
+                <li>Explain the early warning system's alert level determination process. What are the advantages of using a composite score from multiple drought indices rather than a single threshold?</li>
+                <li>Compare the required actions for Watch vs. Emergency alert levels. How do the responses differ in scope, urgency, and resource requirements?</li>
+                <li>Evaluate the climate adaptation planning approach. How does analyzing historical trends alongside future projections improve adaptation strategy development compared to using current conditions alone?</li>
+                <li>Discuss the mobile application's offline capability. Why is this particularly important for agricultural drought monitoring, and what technical challenges does it present for maintaining data currency?</li>
+            </ol>
+        </div>
+
+        <div class="summary-box">
+            <h3>Looking Ahead</h3>
+            <p>With all four phases of the WIA standard explored, Chapter 8 provides comprehensive guidance on implementation and certification. We'll cover step-by-step deployment procedures, testing and validation requirements, certification levels from Bronze through Platinum, best practices for data quality, and case studies of successful WIA implementations across different scales and contexts.</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-06.html">← Chapter 6</a>
+            <a href="chapter-08.html">Chapter 8: Implementation →</a>
+        </div>
+    </div>
+</body>
+</html>

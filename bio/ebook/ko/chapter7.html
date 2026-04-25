@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 구현 예제 - WIA 생명공학 데이터</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>7장: 구현 예제</h1>
+
+        <section>
+            <h2>7.1 Python SDK 예제</h2>
+
+            <h3>완전한 CRISPR 워크플로우</h3>
+            <div class="code-header">Python - 엔드투엔드 CRISPR 실험</div>
+            <pre><code>from wia_biotech import WIABiotechClient
+
+# 클라이언트 초기화
+client = WIABiotechClient(api_key='your_api_key')
+
+# 1단계: 프로젝트 생성
+project = client.projects.create({
+    "project_info": {
+        "name": "CRISPR 유전자 치료 개발",
+        "category": "gene_therapy"
+    },
+    "organization": {
+        "name": "연구소",
+        "principal_investigator": "김 박사"
+    },
+    "ethics": {
+        "irb_approval": "IRB-2025-0001",
+        "biosafety_level": "BSL-2"
+    }
+})
+project_id = project['project_id']
+
+# 2단계: 대상 서열 업로드
+with open('target_gene.fasta', 'r') as f:
+    sequence = client.sequences.create(
+        project_id=project_id,
+        sequence_info={
+            "name": "대상 유전자 ABC",
+            "organism": "Homo sapiens",
+            "gene_symbol": "ABC1"
+        },
+        sequence_type="dna",
+        fasta_file=f
+    )
+sequence_id = sequence['sequence_id']
+
+# 3단계: gRNA 설계
+from wia_biotech.crispr import GRNADesigner
+
+designer = GRNADesigner(pam="NGG")
+grnas = designer.design(
+    sequence_file='target_gene.fasta',
+    target_region=(500, 1500),
+    count=3
+)
+
+# 4단계: CRISPR 실험 생성
+experiment = client.crispr_experiments.create(
+    project_id=project_id,
+    experiment_info={
+        "name": "유전자 ABC 녹아웃 연구",
+        "experimenter": "이 박사"
+    },
+    target={
+        "gene_symbol": "ABC1",
+        "cell_line": "HEK293T",
+        "sequence_ref": sequence_id
+    },
+    editing_system={
+        "type": "crispr_cas9",
+        "cas_variant": "SpCas9",
+        "delivery_method": "lipofection"
+    },
+    guide_rnas=grnas,
+    editing_type="knockout"
+)
+
+print(f"실험 생성됨: {experiment['experiment_id']}")</code></pre>
+
+            <h3>AlphaFold 구조 예측</h3>
+            <div class="code-header">Python - 단백질 구조 워크플로우</div>
+            <pre><code>from wia_biotech import WIABiotechClient
+
+client = WIABiotechClient(api_key='your_api_key')
+
+# 단백질 서열 업로드
+sequence = client.sequences.create(
+    project_id=project_id,
+    sequence_info={
+        "name": "ABC1 단백질",
+        "organism": "Homo sapiens"
+    },
+    sequence_type="protein",
+    fasta_file=open('protein.fasta', 'r')
+)
+
+# AlphaFold 예측 요청 (비동기)
+prediction_job = client.structures.predict(
+    sequence_id=sequence['sequence_id'],
+    method="alphafold",
+    version="2.3"
+)
+
+# 완료 대기
+import time
+while True:
+    status = client.structures.get_prediction_status(job_id)
+    if status['status'] == 'completed':
+        break
+    print(f"상태: {status['progress']}%")
+    time.sleep(30)
+
+# 구조 다운로드
+structure = client.structures.get(status['structure_id'])
+print(f"평균 pLDDT: {structure['quality']['mean_plddt']:.1f}")</code></pre>
+        </section>
+
+        <section>
+            <h2>7.2 TypeScript SDK 예제</h2>
+
+            <h3>합성생물학 부품 라이브러리</h3>
+            <div class="code-header">TypeScript - BioBrick 부품 관리</div>
+            <pre><code>import { WIABiotechClient, PartType } from '@wia/biotech-sdk';
+
+const client = new WIABiotechClient({
+  apiKey: process.env.WIA_API_KEY!
+});
+
+// 부품 라이브러리 생성
+async function createPartLibrary(projectId: string) {
+  // 프로모터
+  const promoter = await client.parts.create({
+    projectId,
+    partInfo: {
+      name: '강력한 구성적 프로모터',
+      partType: PartType.PROMOTER
+    },
+    sequence: {
+      dna: 'TTGACGGCTAGCTCAGTCCTAGGTACAGTGCTAGC'
+    }
+  });
+
+  // GFP 코딩 서열
+  const gfp = await client.parts.create({
+    projectId,
+    partInfo: {
+      name: 'GFP',
+      partType: PartType.CDS
+    },
+    sequence: { dna: 'ATG...' }
+  });
+
+  return { promoter, gfp };
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>7.3 Bash/CLI 예제</h2>
+
+            <h3>서열 업로드 파이프라인</h3>
+            <div class="code-header">Bash - 배치 서열 업로드</div>
+            <pre><code>#!/bin/bash
+# WIA Biotech에 여러 FASTA 파일 업로드
+
+WIA_API_KEY="your_api_key"
+PROJECT_ID="proj-001"
+API_URL="https://api.wia.live/v1"
+
+# 디렉토리의 모든 FASTA 파일 처리
+for fasta_file in *.fasta; do
+    echo "$fasta_file 처리 중..."
+
+    # FASTA 헤더에서 서열 정보 추출
+    name=$(head -n 1 "$fasta_file" | sed 's/>//' | cut -d' ' -f1)
+
+    # 서열 업로드
+    response=$(curl -s -X POST \
+        -H "Authorization: Bearer $WIA_API_KEY" \
+        -F "sequence_info={\"name\":\"$name\"}" \
+        -F "sequence_type=dna" \
+        -F "fasta_file=@$fasta_file" \
+        "$API_URL/projects/$PROJECT_ID/sequences")
+
+    sequence_id=$(echo "$response" | jq -r '.sequence_id')
+    echo "  생성된 서열: $sequence_id"
+done
+
+echo "업로드 완료!"</code></pre>
+        </section>
+
+        <section>
+            <h2>7.4 통합 테스트</h2>
+
+            <h3>pytest 테스트 스위트</h3>
+            <div class="code-header">Python - 통합 테스트</div>
+            <pre><code>import pytest
+from wia_biotech import WIABiotechClient
+
+@pytest.fixture
+def client():
+    return WIABiotechClient(api_key='test_api_key')
+
+def test_sequence_upload(client, test_project):
+    """서열 업로드 워크플로우 테스트"""
+    sequence = client.sequences.create(
+        project_id=test_project['project_id'],
+        sequence_info={"name": "테스트 서열"},
+        sequence_type="dna",
+        fasta_file=open('test_data/sequence.fasta', 'r')
+    )
+
+    assert 'sequence_id' in sequence
+    assert sequence['length_bp'] > 0
+    assert 0 <= sequence['gc_content'] <= 1
+
+def test_crispr_experiment_lifecycle(client, test_project):
+    """완전한 CRISPR 실험 워크플로우 테스트"""
+    experiment = client.crispr_experiments.create(
+        project_id=test_project['project_id'],
+        experiment_info={"name": "테스트 CRISPR"},
+        target={"gene_symbol": "TEST1"},
+        editing_system={"type": "crispr_cas9"},
+        guide_rnas=[{
+            "grna_id": "grna-test-1",
+            "sequence": "ATCGATCGATCGATCGATCG"
+        }],
+        editing_type="knockout"
+    )
+
+    assert 'experiment_id' in experiment</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

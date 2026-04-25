@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 가치 기반 방법 | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; font-size: 1rem; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; transition: all 0.3s ease; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        .warning-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b; }
+        .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제3장: 가치 기반 방법</h1>
+            <div class="chapter-meta">WIA-AI-025 | Q-러닝, DQN, 그리고 그 이상 🎯</div>
+        </header>
+
+        <main>
+            <h2>3.1 가치 기반 방법 소개</h2>
+
+            <p>가치 기반 방법은 각 상태에 있는 것의 가치(또는 각 상태에서 각 행동을 취하는 것의 가치)를 학습하고 이러한 가치로부터 정책을 도출합니다. 핵심 아이디어는: Q*(s,a)를 알면 단순히 argmax_a Q*(s,a)를 선택하여 최적으로 행동할 수 있다는 것입니다.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">주요 장점:</strong>
+                <p>가치 기반 방법은 환경 역학의 모델을 필요로 하지 않습니다. 시행착오를 통해 경험에서 직접 학습합니다.</p>
+            </div>
+
+            <h2>3.2 몬테카를로 방법</h2>
+
+            <p>몬테카를로(MC) 방법은 완전한 에피소드의 경험으로부터 학습합니다. 샘플 수익을 평균하여 가치 함수를 추정합니다.</p>
+
+            <h3>첫 방문 MC 예측</h3>
+
+            <pre><code>def first_visit_mc_prediction(policy, env, episodes=1000, gamma=0.99):
+    """
+    첫 방문 몬테카를로를 사용하여 V^π를 추정합니다.
+    """
+    V = defaultdict(float)
+    returns = defaultdict(list)
+
+    for episode in range(episodes):
+        # 정책을 따라 에피소드 생성
+        states, actions, rewards = generate_episode(policy, env)
+
+        G = 0
+        visited = set()
+
+        # 에피소드를 역방향으로 처리
+        for t in reversed(range(len(states))):
+            s = states[t]
+            r = rewards[t]
+
+            G = gamma * G + r
+
+            # 첫 방문 확인
+            if s not in visited:
+                visited.add(s)
+                returns[s].append(G)
+                V[s] = np.mean(returns[s])
+
+    return V</code></pre>
+
+            <h3>엡실론-탐욕을 사용한 MC 제어</h3>
+
+            <pre><code>def mc_control_epsilon_greedy(env, episodes=10000, gamma=0.99, epsilon=0.1):
+    """
+    몬테카를로 제어를 사용하여 최적 정책을 찾습니다.
+    """
+    Q = defaultdict(lambda: defaultdict(float))
+    returns = defaultdict(lambda: defaultdict(list))
+
+    for episode in range(episodes):
+        # 엡실론-탐욕 정책으로 에피소드 생성
+        states, actions, rewards = [], [], []
+        state = env.reset()
+
+        while True:
+            # 엡실론-탐욕 행동 선택
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                action = max(Q[state], key=Q[state].get)
+
+            next_state, reward, done, _ = env.step(action)
+
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+
+            if done:
+                break
+
+            state = next_state
+
+        # Q-값 업데이트
+        G = 0
+        visited = set()
+
+        for t in reversed(range(len(states))):
+            s, a, r = states[t], actions[t], rewards[t]
+            G = gamma * G + r
+
+            if (s, a) not in visited:
+                visited.add((s, a))
+                returns[s][a].append(G)
+                Q[s][a] = np.mean(returns[s][a])
+
+    return Q</code></pre>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">제한사항:</strong>
+                <p>몬테카를로 방법은 가치를 업데이트하기 위해 에피소드가 끝날 때까지 기다려야 합니다. 이것은 긴 에피소드에서 느릴 수 있고 연속 작업에는 작동하지 않습니다.</p>
+            </div>
+
+            <h2>3.3 시간차 학습</h2>
+
+            <p>시간차(TD) 학습은 몬테카를로와 동적 프로그래밍의 아이디어를 결합합니다. TD 방법은 부트스트래핑을 통해 불완전한 에피소드에서 학습할 수 있습니다.</p>
+
+            <h3>TD(0) 예측</h3>
+
+            <pre><code>V(sₜ) ← V(sₜ) + α[rₜ₊₁ + γV(sₜ₊₁) - V(sₜ)]
+              ↑           ↑      ↑              ↑
+           기존 값    학습률   TD 목표      기존 값
+
+TD 목표 = rₜ₊₁ + γV(sₜ₊₁)
+TD 오차 = rₜ₊₁ + γV(sₜ₊₁) - V(sₜ)</code></pre>
+
+            <h3>TD vs MC</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>측면</th>
+                        <th>몬테카를로</th>
+                        <th>시간차</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>업데이트 타이밍</td>
+                        <td>에피소드 끝</td>
+                        <td>매 시간 단계</td>
+                    </tr>
+                    <tr>
+                        <td>목표</td>
+                        <td>실제 수익 Gₜ</td>
+                        <td>추정 rₜ₊₁ + γV(sₜ₊₁)</td>
+                    </tr>
+                    <tr>
+                        <td>분산</td>
+                        <td>높음</td>
+                        <td>낮음</td>
+                    </tr>
+                    <tr>
+                        <td>편향</td>
+                        <td>없음 (편향 없음)</td>
+                        <td>존재 (편향 있음)</td>
+                    </tr>
+                    <tr>
+                        <td>연속 작업</td>
+                        <td>적용 불가</td>
+                        <td>잘 작동</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3.4 Q-러닝</h2>
+
+            <p>Q-러닝은 가장 중요한 TD 제어 알고리즘입니다. 오프-정책입니다: 탐색적 정책을 따르면서 최적 정책에 대해 학습합니다.</p>
+
+            <h3>Q-러닝 알고리즘</h3>
+
+            <pre><code>Q(sₜ,aₜ) ← Q(sₜ,aₜ) + α[rₜ₊₁ + γ max_a Q(sₜ₊₁,a) - Q(sₜ,aₜ)]
+
+핵심 포인트:
+1. 오프-정책: 행동 정책과 관계없이 Q* 학습
+2. 부트스트래핑: 추정값 Q(s',a')를 사용하여 Q(s,a) 업데이트
+3. 특정 조건 하에서 최적 Q*로 수렴</code></pre>
+
+            <h3>완전한 Q-러닝 구현</h3>
+
+            <pre><code>import numpy as np
+import gym
+
+def q_learning(env, episodes=5000, alpha=0.1, gamma=0.99, epsilon=0.1):
+    """
+    이산 상태/행동 공간을 위한 Q-러닝 알고리즘.
+
+    Args:
+        env: OpenAI Gym 환경
+        episodes: 학습 에피소드 수
+        alpha: 학습률
+        gamma: 할인 계수
+        epsilon: 탐색 비율
+    """
+    # Q-테이블 초기화
+    Q = np.zeros([env.observation_space.n, env.action_space.n])
+
+    # 학습 통계
+    episode_rewards = []
+
+    for episode in range(episodes):
+        state = env.reset()
+        total_reward = 0
+        done = False
+
+        while not done:
+            # 엡실론-탐욕 행동 선택
+            if np.random.random() < epsilon:
+                action = env.action_space.sample()  # 탐색
+            else:
+                action = np.argmax(Q[state])        # 활용
+
+            # 행동 수행
+            next_state, reward, done, _ = env.step(action)
+            total_reward += reward
+
+            # Q-러닝 업데이트
+            best_next_action = np.argmax(Q[next_state])
+            td_target = reward + gamma * Q[next_state, best_next_action]
+            td_error = td_target - Q[state, action]
+            Q[state, action] += alpha * td_error
+
+            state = next_state
+
+        episode_rewards.append(total_reward)
+
+        # 엡실론 감소
+        epsilon = max(0.01, epsilon * 0.995)
+
+        if (episode + 1) % 500 == 0:
+            avg_reward = np.mean(episode_rewards[-100:])
+            print(f"에피소드 {episode+1}, 평균 보상: {avg_reward:.2f}")
+
+    return Q, episode_rewards</code></pre>
+
+            <h3>수렴 조건</h3>
+
+            <p>Q-러닝은 다음의 경우 Q*로 수렴합니다:</p>
+            <ul>
+                <li>모든 상태-행동 쌍이 무한히 자주 방문됨</li>
+                <li>학습률 α가 적절히 감소: Σα = ∞, Σα² < ∞</li>
+                <li>환경이 유한 MDP임</li>
+            </ul>
+
+            <h2>3.5 SARSA (온-정책 TD 제어)</h2>
+
+            <p>SARSA는 Q-러닝의 온-정책 버전입니다. 탐색을 포함하여 따르고 있는 정책의 가치를 학습합니다.</p>
+
+            <pre><code>Q(sₜ,aₜ) ← Q(sₜ,aₜ) + α[rₜ₊₁ + γQ(sₜ₊₁,aₜ₊₁) - Q(sₜ,aₜ)]
+
+SARSA라는 이름은 튜플 (sₜ, aₜ, rₜ₊₁, sₜ₊₁, aₜ₊₁)에서 유래</code></pre>
+
+            <h3>SARSA 구현</h3>
+
+            <pre><code>def sarsa(env, episodes=5000, alpha=0.1, gamma=0.99, epsilon=0.1):
+    """
+    SARSA 알고리즘 (온-정책 TD 제어).
+    """
+    Q = np.zeros([env.observation_space.n, env.action_space.n])
+
+    for episode in range(episodes):
+        state = env.reset()
+
+        # 엡실론-탐욕을 사용하여 초기 행동 선택
+        if np.random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
+            action = np.argmax(Q[state])
+
+        done = False
+
+        while not done:
+            # 행동 수행
+            next_state, reward, done, _ = env.step(action)
+
+            # 엡실론-탐욕을 사용하여 다음 행동 선택
+            if np.random.random() < epsilon:
+                next_action = env.action_space.sample()
+            else:
+                next_action = np.argmax(Q[next_state])
+
+            # SARSA 업데이트: 실제 다음 행동 사용
+            td_target = reward + gamma * Q[next_state, next_action]
+            td_error = td_target - Q[state, action]
+            Q[state, action] += alpha * td_error
+
+            state = next_state
+            action = next_action
+
+    return Q</code></pre>
+
+            <h3>Q-러닝 vs SARSA</h3>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">절벽 걷기 예제:</strong>
+                <p><strong>Q-러닝:</strong> 절벽에 가까운 최적 경로 학습 (학습 중 위험)<br>
+                <strong>SARSA:</strong> 절벽에서 떨어진 안전한 경로 학습 (탐색 고려)</p>
+            </div>
+
+            <h2>3.6 심층 Q-네트워크 (DQN)</h2>
+
+            <p>DQN은 심층 신경망을 함수 근사기로 사용하여 Q-러닝을 고차원 상태 공간으로 확장합니다.</p>
+
+            <h3>주요 혁신</h3>
+
+            <ol>
+                <li><strong>경험 재생:</strong> 전이를 버퍼에 저장하고 미니배치를 무작위로 샘플링</li>
+                <li><strong>타겟 네트워크:</strong> TD 타겟을 위한 별도 네트워크, 주기적으로 업데이트</li>
+                <li><strong>신경망:</strong> 테이블 저장 대신 Q(s,a) 근사</li>
+            </ol>
+
+            <h3>DQN 아키텍처</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+import torch.optim as optim
+from collections import deque
+import random
+
+class DQN(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(DQN, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim)
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+class ReplayBuffer:
+    def __init__(self, capacity=10000):
+        self.buffer = deque(maxlen=capacity)
+
+    def push(self, state, action, reward, next_state, done):
+        self.buffer.append((state, action, reward, next_state, done))
+
+    def sample(self, batch_size):
+        return random.sample(self.buffer, batch_size)
+
+    def __len__(self):
+        return len(self.buffer)</code></pre>
+
+            <h3>DQN 학습 루프</h3>
+
+            <pre><code>def train_dqn(env, episodes=1000, batch_size=64, gamma=0.99):
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    # 네트워크 초기화
+    policy_net = DQN(state_dim, action_dim)
+    target_net = DQN(state_dim, action_dim)
+    target_net.load_state_dict(policy_net.state_dict())
+
+    optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+    replay_buffer = ReplayBuffer(capacity=10000)
+
+    epsilon = 1.0
+    epsilon_decay = 0.995
+    epsilon_min = 0.01
+
+    for episode in range(episodes):
+        state = env.reset()
+        total_reward = 0
+
+        while True:
+            # 엡실론-탐욕 행동 선택
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                with torch.no_grad():
+                    state_tensor = torch.FloatTensor(state).unsqueeze(0)
+                    q_values = policy_net(state_tensor)
+                    action = q_values.argmax().item()
+
+            next_state, reward, done, _ = env.step(action)
+            total_reward += reward
+
+            # 전이 저장
+            replay_buffer.push(state, action, reward, next_state, done)
+
+            # 학습 단계
+            if len(replay_buffer) > batch_size:
+                # 미니배치 샘플링
+                batch = replay_buffer.sample(batch_size)
+                states, actions, rewards, next_states, dones = zip(*batch)
+
+                states = torch.FloatTensor(states)
+                actions = torch.LongTensor(actions)
+                rewards = torch.FloatTensor(rewards)
+                next_states = torch.FloatTensor(next_states)
+                dones = torch.FloatTensor(dones)
+
+                # Q(s,a) 계산
+                q_values = policy_net(states).gather(1, actions.unsqueeze(1))
+
+                # 타겟 계산: r + γ max Q(s',a')
+                with torch.no_grad():
+                    next_q_values = target_net(next_states).max(1)[0]
+                    targets = rewards + gamma * next_q_values * (1 - dones)
+
+                # 손실 계산 및 업데이트
+                loss = nn.MSELoss()(q_values.squeeze(), targets)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            if done:
+                break
+
+            state = next_state
+
+        # 타겟 네트워크 업데이트
+        if episode % 10 == 0:
+            target_net.load_state_dict(policy_net.state_dict())
+
+        # 엡실론 감소
+        epsilon = max(epsilon_min, epsilon * epsilon_decay)
+
+        print(f"에피소드 {episode}, 보상: {total_reward}, 엡실론: {epsilon:.3f}")
+
+    return policy_net</code></pre>
+
+            <h2>3.7 DQN 개선</h2>
+
+            <h3>더블 DQN</h3>
+
+            <p>행동 선택과 평가를 분리하여 Q-러닝의 과대평가 편향 문제를 해결합니다:</p>
+
+            <pre><code># 표준 DQN
+target = r + γ max_a Q_target(s', a)
+
+# 더블 DQN
+a* = argmax_a Q_policy(s', a)        # 정책 네트워크로 선택
+target = r + γ Q_target(s', a*)       # 타겟 네트워크로 평가</code></pre>
+
+            <h3>듀얼링 DQN</h3>
+
+            <p>가치와 어드밴티지 스트림을 분리합니다:</p>
+
+            <pre><code>class DuelingDQN(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(DuelingDQN, self).__init__()
+
+        self.feature = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        # 가치 스트림
+        self.value_stream = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+        # 어드밴티지 스트림
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim)
+        )
+
+    def forward(self, state):
+        features = self.feature(state)
+        value = self.value_stream(features)
+        advantages = self.advantage_stream(features)
+
+        # Q(s,a) = V(s) + A(s,a) - mean(A(s,·))
+        q_values = value + (advantages - advantages.mean(dim=1, keepdim=True))
+        return q_values</code></pre>
+
+            <h3>우선순위 경험 재생</h3>
+
+            <p>중요한 전이를 더 자주 샘플링합니다:</p>
+
+            <pre><code>class PrioritizedReplayBuffer:
+    def __init__(self, capacity, alpha=0.6):
+        self.capacity = capacity
+        self.alpha = alpha  # 우선순위 지수
+        self.buffer = []
+        self.priorities = []
+        self.position = 0
+
+    def push(self, transition):
+        max_priority = max(self.priorities) if self.priorities else 1.0
+
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(transition)
+            self.priorities.append(max_priority)
+        else:
+            self.buffer[self.position] = transition
+            self.priorities[self.position] = max_priority
+
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size, beta=0.4):
+        # 샘플링 확률 계산
+        priorities = np.array(self.priorities)
+        probabilities = priorities ** self.alpha
+        probabilities /= probabilities.sum()
+
+        # 인덱스 샘플링
+        indices = np.random.choice(len(self.buffer), batch_size, p=probabilities)
+
+        # 중요도 샘플링 가중치 계산
+        weights = (len(self.buffer) * probabilities[indices]) ** (-beta)
+        weights /= weights.max()
+
+        samples = [self.buffer[idx] for idx in indices]
+        return samples, indices, weights
+
+    def update_priorities(self, indices, td_errors):
+        for idx, error in zip(indices, td_errors):
+            self.priorities[idx] = abs(error) + 1e-6</code></pre>
+
+            <h2>3.8 레인보우 DQN</h2>
+
+            <p>레인보우는 여러 DQN 개선 사항을 결합합니다:</p>
+
+            <ul>
+                <li>더블 Q-러닝</li>
+                <li>듀얼링 네트워크</li>
+                <li>우선순위 경험 재생</li>
+                <li>다단계 학습 (n-step 수익)</li>
+                <li>분포적 RL (C51)</li>
+                <li>노이지 네트워크 (탐색용)</li>
+            </ul>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">성능:</strong>
+                <p>레인보우는 Atari 벤치마크에서 최첨단 성능을 달성하여 바닐라 DQN과 개별 개선 사항을 크게 능가했습니다.</p>
+            </div>
+
+            <h2>3.9 실전 팁</h2>
+
+            <h3>하이퍼파라미터 튜닝</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>파라미터</th>
+                        <th>일반적 범위</th>
+                        <th>효과</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>학습률 (α)</td>
+                        <td>1e-4 ~ 1e-2</td>
+                        <td>학습 속도</td>
+                    </tr>
+                    <tr>
+                        <td>할인 (γ)</td>
+                        <td>0.95 ~ 0.99</td>
+                        <td>계획 수평선</td>
+                    </tr>
+                    <tr>
+                        <td>배치 크기</td>
+                        <td>32 ~ 256</td>
+                        <td>업데이트 안정성</td>
+                    </tr>
+                    <tr>
+                        <td>버퍼 크기</td>
+                        <td>10k ~ 1M</td>
+                        <td>경험 다양성</td>
+                    </tr>
+                    <tr>
+                        <td>타겟 업데이트</td>
+                        <td>1k~10k 단계마다</td>
+                        <td>타겟 안정성</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>일반적인 함정</h3>
+
+            <ul>
+                <li><strong>과대평가:</strong> 더블 DQN 사용</li>
+                <li><strong>불안정성:</strong> 학습률 조정, 그래디언트 클리핑 사용</li>
+                <li><strong>탐색 부족:</strong> 엡실론 감소 조정, 노이지 네트워크 시도</li>
+                <li><strong>상관관계:</strong> 더 큰 재생 버퍼 사용</li>
+                <li><strong>파국적 망각:</strong> 버퍼 크기 증가, 경험 재생 사용</li>
+            </ul>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>가치 기반 방법은 Q(s,a) 또는 V(s)를 학습하고 가치로부터 정책을 도출합니다</li>
+                    <li>몬테카를로 방법은 완전한 에피소드에서 학습합니다</li>
+                    <li>시간차 학습은 부트스트래핑하고 온라인으로 업데이트합니다</li>
+                    <li>Q-러닝은 오프-정책이며 최적 Q*를 직접 학습합니다</li>
+                    <li>SARSA는 온-정책이며 행동 정책의 가치를 학습합니다</li>
+                    <li>DQN은 신경망으로 Q-러닝을 고차원 공간으로 확장합니다</li>
+                    <li>경험 재생은 상관관계를 깨고 샘플 효율성을 개선합니다</li>
+                    <li>타겟 네트워크는 고정된 타겟을 제공하여 학습을 안정화합니다</li>
+                    <li>더블 DQN, 듀얼링 DQN, PER은 DQN을 더욱 개선합니다</li>
+                    <li>레인보우는 최첨단 성능을 위해 여러 개선 사항을 결합합니다</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>복습 문제</h3>
+                <div class="quiz-question">
+                    <strong>1. Q-러닝과 SARSA의 주요 차이점은 무엇인가요?</strong>
+                    <p style="color: #94a3b8;">답변: Q-러닝은 오프-정책이며 업데이트에 max Q(s',a')를 사용합니다(최적 정책 학습). SARSA는 온-정책이며 실제로 취한 행동에 대해 Q(s',a')를 사용합니다(행동 정책의 가치 학습).</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. DQN은 왜 경험 재생을 사용하나요?</strong>
+                    <p style="color: #94a3b8;">답변: 순차 데이터의 시간적 상관관계를 깨고 경험을 여러 번 재사용하여 샘플 효율성을 개선하기 위해서입니다.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. 더블 DQN은 어떤 문제를 해결하나요?</strong>
+                    <p style="color: #94a3b8;">답변: 두 네트워크를 사용하여 행동 선택과 평가를 분리함으로써 Q-러닝의 과대평가 편향 문제를 해결합니다.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

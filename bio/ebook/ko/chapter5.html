@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 통합 가이드 - WIA 생명공학 데이터</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>5장: 통합 가이드</h1>
+
+        <section>
+            <h2>5.1 실험실 정보 관리 시스템 (LIMS)</h2>
+            <p>원활한 데이터 관리를 위해 WIA Biotech 표준을 기존 LIMS 플랫폼에 통합합니다.</p>
+
+            <h3>지원되는 LIMS 플랫폼</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>플랫폼</th>
+                        <th>통합 방법</th>
+                        <th>상태</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>LabWare</strong></td><td>REST API + ETL</td><td>완전 지원</td></tr>
+                    <tr><td><strong>Benchling</strong></td><td>네이티브 통합</td><td>완전 지원</td></tr>
+                    <tr><td><strong>LabCollector</strong></td><td>REST API</td><td>베타</td></tr>
+                    <tr><td><strong>맞춤형 LIMS</strong></td><td>WIA SDK</td><td>지원됨</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.2 바이오파운드리 자동화</h2>
+            <p>자동화된 DNA 조립 및 고처리량 스크리닝 플랫폼과 통합합니다.</p>
+
+            <h3>바이오파운드리 워크플로우</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>단계</th>
+                        <th>WIA 구성요소</th>
+                        <th>자동화</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>부품 설계</strong></td><td>part.json</td><td>실리코 설계 도구</td></tr>
+                    <tr><td><strong>DNA 합성</strong></td><td>sequence.fasta</td><td>유전자 합성 주문</td></tr>
+                    <tr><td><strong>조립</strong></td><td>assembly.json</td><td>액체 핸들러 프로토콜</td></tr>
+                    <tr><td><strong>검증</strong></td><td>sequence.json</td><td>NGS 품질 관리</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5.3 연구 플랫폼 통합</h2>
+            <p>Benchling, Geneious 및 기타 연구 플랫폼과의 통합입니다.</p>
+
+            <div class="code-header">TypeScript - Benchling 커넥터</div>
+            <pre><code>import { WIABiotechClient } from '@wia/biotech-sdk';
+
+class BenchlingWIASync {
+  async syncDNASequence(benchlingId: string) {
+    const dnaSequence = await this.benchling.dnaSequences.get(benchlingId);
+
+    const wiaSequence = {
+      sequence_info: {
+        name: dnaSequence.name,
+        description: dnaSequence.description
+      },
+      sequence_type: 'dna',
+      length_bp: dnaSequence.bases.length
+    };
+
+    const response = await this.wia.sequences.create(wiaSequence);
+    return response.sequence_id;
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>5.4 클라우드 플랫폼 통합</h2>
+
+            <h3>AWS 통합</h3>
+            <div class="code-header">Python - AWS Lambda 핸들러</div>
+            <pre><code>import boto3
+import json
+
+s3 = boto3.client('s3')
+wia = WIABiotechClient(api_key=os.environ['WIA_API_KEY'])
+
+def lambda_handler(event, context):
+    """S3에 업로드된 FASTA 파일 처리 및 WIA 동기화"""
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+
+    fasta_content = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+    sequences = convert_fasta_to_wia(fasta_content)
+
+    for seq in sequences:
+        response = wia.sequences.create(seq)
+        print(f"생성된 서열: {response['sequence_id']}")
+
+    return {'statusCode': 200}</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

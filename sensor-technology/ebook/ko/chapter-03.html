@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 이미지 센서 기술 | WIA-SENSOR-001</title>
+    <meta name="description" content="Sony IMX, Samsung ISOCELL, ToF, LiDAR 등 이미지 센서 기술의 원리와 응용에 대한 종합 가이드">
+    <meta name="keywords" content="이미지 센서, CMOS, CCD, Sony IMX, Samsung ISOCELL, ToF, LiDAR, WIA 표준">
+    <meta name="author" content="World Industry Association">
+    <style>
+        :root {
+            --bg-primary: #0a0b0d;
+            --bg-secondary: #12141a;
+            --bg-tertiary: #1a1d25;
+            --bg-card: #1e2128;
+            --text-primary: #f0f2f5;
+            --text-secondary: #a8b0bc;
+            --text-muted: #6b7280;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #00b894;
+            --accent-tertiary: #0984e3;
+            --accent-sensor: #e17055;
+            --accent-gradient: linear-gradient(135deg, #00d4aa 0%, #00b894 50%, #0984e3 100%);
+            --border-color: #2d3139;
+            --shadow-color: rgba(0, 212, 170, 0.1);
+            --code-bg: #0d0e10;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans KR', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .sensor-wave {
+            position: absolute;
+            border-radius: 50%;
+            animation: sensorPulse 4s ease-in-out infinite;
+            border: 1px solid rgba(0, 212, 170, 0.1);
+        }
+
+        .sensor-wave:nth-child(1) { width: 300px; height: 300px; top: 10%; left: 5%; animation-delay: 0s; }
+        .sensor-wave:nth-child(2) { width: 400px; height: 400px; top: 60%; right: 10%; animation-delay: 1s; }
+        .sensor-wave:nth-child(3) { width: 250px; height: 250px; bottom: 20%; left: 20%; animation-delay: 2s; }
+
+        @keyframes sensorPulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.3); opacity: 0.1; }
+        }
+
+        header {
+            position: relative;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            z-index: 10;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 50px; height: 50px;
+            background: var(--accent-gradient);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .logo-text h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-text span { font-size: 0.8rem; color: var(--text-secondary); }
+
+        nav { display: flex; gap: 1rem; align-items: center; }
+
+        nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        nav a:hover {
+            color: var(--accent-primary);
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .chapter-hero {
+            position: relative;
+            padding: 4rem 2rem;
+            background: radial-gradient(ellipse at center, var(--bg-secondary) 0%, var(--bg-primary) 70%);
+            text-align: center;
+            z-index: 5;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chapter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(0, 212, 170, 0.15);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .chapter-hero h2 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .chapter-hero h2 span {
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .chapter-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 1.5rem;
+        }
+
+        main {
+            position: relative;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            z-index: 5;
+        }
+
+        .content-section { margin-bottom: 4rem; }
+
+        .content-section h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .content-section h4 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem;
+            color: var(--text-primary);
+        }
+
+        .content-section p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-size: 1.05rem;
+        }
+
+        .content-section ul, .content-section ol {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            padding-left: 2rem;
+        }
+
+        .content-section li { margin-bottom: 0.75rem; }
+
+        .info-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .info-box.highlight { border-left: 4px solid var(--accent-primary); }
+        .info-box.warning { border-left: 4px solid var(--accent-sensor); }
+
+        .info-box h5 {
+            color: var(--accent-primary);
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-box p { color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem; }
+
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            color: var(--text-primary);
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .code-block .comment { color: #6b7280; }
+        .code-block .keyword { color: #c792ea; }
+        .code-block .string { color: #c3e88d; }
+        .code-block .number { color: #f78c6c; }
+        .code-block .function { color: #82aaff; }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table th, .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: var(--bg-tertiary);
+            color: var(--accent-primary);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .data-table td { color: var(--text-secondary); font-size: 0.95rem; }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover td { background: rgba(0, 212, 170, 0.05); }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-3px);
+        }
+
+        .feature-card .icon { font-size: 2rem; margin-bottom: 1rem; }
+        .feature-card h5 { color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .feature-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; }
+
+        .sensor-spec-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .sensor-spec-card h4 {
+            color: var(--accent-primary);
+            margin-bottom: 1rem;
+        }
+
+        .spec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .spec-item {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .spec-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+        }
+
+        .spec-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .chapter-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            margin-top: 4rem;
+        }
+
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--accent-primary);
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .nav-btn .direction { font-size: 0.8rem; color: var(--text-muted); }
+        .nav-btn .title { font-weight: 600; }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        footer p { color: var(--text-muted); font-size: 0.85rem; }
+        .philosophy { color: var(--accent-primary); font-style: italic; margin-top: 0.5rem; }
+
+        @media (max-width: 768px) {
+            .chapter-hero h2 { font-size: 2rem; }
+            .chapter-meta { flex-direction: column; gap: 0.5rem; }
+            .header-content { flex-direction: column; gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="sensor-wave"></div>
+        <div class="sensor-wave"></div>
+        <div class="sensor-wave"></div>
+    </div>
+
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">📷</div>
+                <div class="logo-text">
+                    <h1>WIA-SENSOR-001</h1>
+                    <span>센서 기술 표준</span>
+                </div>
+            </a>
+            </div>
+    </header>
+
+    <section class="chapter-hero">
+        <div class="chapter-badge">
+            <span>📖</span>
+            <span>제3장 / 전체 8장</span>
+        </div>
+        <h2><span>이미지 센서</span> 기술</h2>
+        <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto;">Sony IMX, Samsung ISOCELL부터 ToF, LiDAR까지 현대 이미지 센서 기술의 원리와 응용을 탐구합니다.</p>
+        <div class="chapter-meta">
+            <span>⏱️ 읽기 시간 40분</span>
+            <span>📊 중급 수준</span>
+            <span>📅 2025년 1월 업데이트</span>
+        </div>
+    </section>
+
+    <main>
+        <section class="content-section">
+            <h3>📷 이미지 센서의 기초</h3>
+            <p>이미지 센서는 빛을 전기 신호로 변환하여 디지털 이미지를 생성하는 반도체 장치입니다. 스마트폰 카메라, DSLR, 의료 영상, 자율주행차, 보안 시스템 등 현대 사회의 거의 모든 영역에서 이미지 센서가 사용됩니다.</p>
+
+            <p>이미지 센서 시장은 스마트폰과 자동차 산업의 성장에 힘입어 지속적으로 확대되고 있습니다. 특히 고해상도, 저조도 성능, 3D 깊이 인식에 대한 수요가 증가하면서 기술 혁신이 가속화되고 있습니다.</p>
+
+            <div class="info-box highlight">
+                <h5>💡 시장 현황</h5>
+                <p>글로벌 이미지 센서 시장은 2025년까지 약 350억 달러 규모로 성장할 것으로 예상됩니다. Sony와 Samsung이 시장을 주도하며, 자동차용 센서와 산업용 비전 시스템이 새로운 성장 동력으로 부상하고 있습니다.</p>
+            </div>
+
+            <h4>CCD vs CMOS</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>특성</th>
+                        <th>CCD</th>
+                        <th>CMOS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>전하 전송</strong></td>
+                        <td>순차적 전하 이동</td>
+                        <td>픽셀별 직접 읽기</td>
+                    </tr>
+                    <tr>
+                        <td><strong>전력 소비</strong></td>
+                        <td>높음 (수 와트)</td>
+                        <td>낮음 (밀리와트)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>노이즈</strong></td>
+                        <td>낮음</td>
+                        <td>과거에는 높았으나 현재 개선됨</td>
+                    </tr>
+                    <tr>
+                        <td><strong>속도</strong></td>
+                        <td>상대적으로 느림</td>
+                        <td>고속 읽기 가능</td>
+                    </tr>
+                    <tr>
+                        <td><strong>통합성</strong></td>
+                        <td>별도 회로 필요</td>
+                        <td>온칩 ADC, ISP 통합</td>
+                    </tr>
+                    <tr>
+                        <td><strong>비용</strong></td>
+                        <td>높음</td>
+                        <td>대량 생산으로 저렴</td>
+                    </tr>
+                    <tr>
+                        <td><strong>현재 주용도</strong></td>
+                        <td>과학/의료 이미징</td>
+                        <td>스마트폰, 자동차, IoT</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h3>🔴 Sony IMX 시리즈</h3>
+            <p>Sony는 세계 최대의 이미지 센서 제조업체로, IMX 시리즈는 스마트폰, 카메라, 자동차, 보안 시스템 등 다양한 분야에서 사용됩니다. Exmor, Exmor RS, Exmor RS 스택드 등 독자적인 기술을 통해 업계를 선도하고 있습니다.</p>
+
+            <h4>주요 기술</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h5>Stacked CMOS</h5>
+                    <p>픽셀 어레이와 로직 회로를 수직으로 적층하여 고속 읽기와 고기능성 실현</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🌙</div>
+                    <h5>Dual Gain</h5>
+                    <p>동시에 두 가지 게인으로 읽어 HDR 이미지 생성, 넓은 다이나믹 레인지</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⚡</div>
+                    <h5>DRAM 적층</h5>
+                    <p>센서에 DRAM 레이어 추가로 초고속 연사 및 슬로모션 촬영 지원</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🎯</div>
+                    <h5>Dual Pixel AF</h5>
+                    <p>모든 픽셀이 위상차 AF 가능, 빠르고 정확한 오토포커스</p>
+                </div>
+            </div>
+
+            <h4>대표 제품</h4>
+            <div class="sensor-spec-card">
+                <h4>Sony IMX989 (1인치 플래그십)</h4>
+                <div class="spec-grid">
+                    <div class="spec-item">
+                        <div class="spec-value">50.3MP</div>
+                        <div class="spec-label">해상도</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1인치</div>
+                        <div class="spec-label">센서 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1.6μm</div>
+                        <div class="spec-label">픽셀 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">Quad Bayer</div>
+                        <div class="spec-label">필터 배열</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">8K</div>
+                        <div class="spec-label">비디오</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">Stacked</div>
+                        <div class="spec-label">구조</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sensor-spec-card">
+                <h4>Sony IMX766 (미드레인지 인기)</h4>
+                <div class="spec-grid">
+                    <div class="spec-item">
+                        <div class="spec-value">50MP</div>
+                        <div class="spec-label">해상도</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1/1.56"</div>
+                        <div class="spec-label">센서 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1.0μm</div>
+                        <div class="spec-label">픽셀 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">OIS</div>
+                        <div class="spec-label">손떨림 보정</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>🔵 Samsung ISOCELL</h3>
+            <p>Samsung ISOCELL은 삼성의 이미지 센서 브랜드로, 혁신적인 픽셀 기술을 통해 고해상도와 우수한 저조도 성능을 제공합니다. 특히 200MP 이상의 초고해상도 센서와 Tetra²pixel 기술이 특징입니다.</p>
+
+            <h4>핵심 기술</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">🛡️</div>
+                    <h5>ISOCELL 기술</h5>
+                    <p>픽셀 간 물리적 장벽으로 색상 간섭 최소화, 색 재현성 향상</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">4️⃣</div>
+                    <h5>Tetra²pixel</h5>
+                    <p>16개 픽셀을 하나로 결합하여 저조도에서 2.0μm급 성능 제공</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔍</div>
+                    <h5>Super QPD</h5>
+                    <p>전 영역 위상차 AF, 모든 픽셀에서 오토포커스 가능</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📹</div>
+                    <h5>Smart-ISO Pro</h5>
+                    <p>동시 다중 ISO 읽기로 단일 프레임 HDR 구현</p>
+                </div>
+            </div>
+
+            <h4>대표 제품</h4>
+            <div class="sensor-spec-card">
+                <h4>Samsung ISOCELL HP3 (200MP)</h4>
+                <div class="spec-grid">
+                    <div class="spec-item">
+                        <div class="spec-value">200MP</div>
+                        <div class="spec-label">해상도</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1/1.4"</div>
+                        <div class="spec-label">센서 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">0.56μm</div>
+                        <div class="spec-label">픽셀 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">8K@30</div>
+                        <div class="spec-label">비디오</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">12.5MP</div>
+                        <div class="spec-label">비닝 후</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">2.24μm</div>
+                        <div class="spec-label">비닝 픽셀</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sensor-spec-card">
+                <h4>Samsung ISOCELL GN5 (인기 모델)</h4>
+                <div class="spec-grid">
+                    <div class="spec-item">
+                        <div class="spec-value">50MP</div>
+                        <div class="spec-label">해상도</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1/1.57"</div>
+                        <div class="spec-label">센서 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">1.0μm</div>
+                        <div class="spec-label">픽셀 크기</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-value">Dual PD</div>
+                        <div class="spec-label">AF 타입</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>🔦 ToF (Time-of-Flight) 센서</h3>
+            <p>ToF 센서는 빛이 대상까지 이동하고 돌아오는 시간을 측정하여 깊이 정보를 획득합니다. 얼굴 인식, 증강 현실(AR), 제스처 인식, 로봇 비전 등에 사용됩니다.</p>
+
+            <h4>작동 원리</h4>
+            <p>ToF 센서는 적외선(IR) LED 또는 레이저를 사용하여 광 펄스를 방출합니다. 이 빛이 대상에서 반사되어 돌아오는 시간을 측정하여 거리를 계산합니다. 빛의 속도(약 3×10⁸ m/s)를 알고 있으므로, 왕복 시간의 절반에 광속을 곱하면 거리를 얻습니다.</p>
+
+            <div class="info-box highlight">
+                <h5>📐 거리 계산 공식</h5>
+                <p><strong>d = (c × t) / 2</strong></p>
+                <p>d: 거리, c: 광속 (3×10⁸ m/s), t: 왕복 시간</p>
+            </div>
+
+            <h4>ToF 센서 유형</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>유형</th>
+                        <th>방식</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Direct ToF (dToF)</strong></td>
+                        <td>펄스 왕복 시간 직접 측정</td>
+                        <td>장거리, 높은 정확도</td>
+                        <td>높은 전력 소비, 비용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Indirect ToF (iToF)</strong></td>
+                        <td>변조광의 위상 차이 측정</td>
+                        <td>저전력, 저비용</td>
+                        <td>다중 경로 간섭, 거리 제한</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>주요 응용 분야</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">👤</div>
+                    <h5>얼굴 인식</h5>
+                    <p>3D 깊이 맵으로 안전한 생체 인증. Apple Face ID, 삼성 3D 깊이 센서</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🎮</div>
+                    <h5>AR/VR</h5>
+                    <p>실시간 공간 매핑, 객체 인식, 손 추적</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📱</div>
+                    <h5>카메라 AF</h5>
+                    <p>빠르고 정확한 레이저 오토포커스</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🤖</div>
+                    <h5>로봇 비전</h5>
+                    <p>장애물 감지, 내비게이션, 피킹</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>🔴 LiDAR 시스템</h3>
+            <p>LiDAR(Light Detection and Ranging)는 레이저 펄스를 사용하여 주변 환경의 3D 점군(Point Cloud) 데이터를 생성하는 센서입니다. 자율주행차, 드론, 지도 제작, 고고학 탐사 등에서 핵심적인 역할을 합니다.</p>
+
+            <h4>LiDAR vs ToF vs 스테레오 카메라</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>특성</th>
+                        <th>LiDAR</th>
+                        <th>ToF</th>
+                        <th>스테레오 카메라</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>측정 범위</strong></td>
+                        <td>200m+</td>
+                        <td>5-10m</td>
+                        <td>가변적</td>
+                    </tr>
+                    <tr>
+                        <td><strong>정확도</strong></td>
+                        <td>cm급</td>
+                        <td>cm급</td>
+                        <td>픽셀/거리 의존</td>
+                    </tr>
+                    <tr>
+                        <td><strong>조명 의존성</strong></td>
+                        <td>낮음</td>
+                        <td>낮음</td>
+                        <td>높음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>비용</strong></td>
+                        <td>높음</td>
+                        <td>중간</td>
+                        <td>낮음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>데이터 밀도</strong></td>
+                        <td>매우 높음</td>
+                        <td>중간</td>
+                        <td>높음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>주요 용도</strong></td>
+                        <td>자율주행, 매핑</td>
+                        <td>모바일, 실내</td>
+                        <td>범용 깊이</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>LiDAR 유형</h4>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">🔄</div>
+                    <h5>기계식 스캐닝</h5>
+                    <p>회전 미러로 360° 스캔. Velodyne, Ouster. 자율주행차 루프탑.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h5>MEMS 미러</h5>
+                    <p>소형 MEMS 미러로 빔 조향. 소형, 저비용. Innoviz, Luminar.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⚡</div>
+                    <h5>솔리드 스테이트</h5>
+                    <p>움직이는 부품 없음. 광학 위상 배열 또는 플래시. 고신뢰성.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">💡</div>
+                    <h5>플래시 LiDAR</h5>
+                    <p>전체 씬을 단일 펄스로 조명. 고속, 짧은 거리.</p>
+                </div>
+            </div>
+
+            <h4>주요 LiDAR 제조사</h4>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>제조사</th>
+                        <th>기술</th>
+                        <th>범위</th>
+                        <th>주요 고객</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Velodyne</strong></td>
+                        <td>기계식/솔리드스테이트</td>
+                        <td>300m</td>
+                        <td>Waymo, Baidu</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Luminar</strong></td>
+                        <td>MEMS, 1550nm</td>
+                        <td>500m</td>
+                        <td>Volvo, Mercedes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Innoviz</strong></td>
+                        <td>MEMS</td>
+                        <td>250m</td>
+                        <td>BMW</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hesai</strong></td>
+                        <td>기계식/반고체</td>
+                        <td>200m</td>
+                        <td>중국 자율주행</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-block">
+                <pre><span class="comment">// LiDAR 점군 데이터 처리 예시</span>
+<span class="keyword">interface</span> LiDARPoint {
+    x: <span class="keyword">number</span>;      <span class="comment">// X 좌표 (m)</span>
+    y: <span class="keyword">number</span>;      <span class="comment">// Y 좌표 (m)</span>
+    z: <span class="keyword">number</span>;      <span class="comment">// Z 좌표 (m)</span>
+    intensity: <span class="keyword">number</span>;   <span class="comment">// 반사 강도</span>
+    ring: <span class="keyword">number</span>;    <span class="comment">// 스캔 라인 번호</span>
+    timestamp: <span class="keyword">number</span>; <span class="comment">// 시간 스탬프 (ns)</span>
+}
+
+<span class="keyword">function</span> <span class="function">processPointCloud</span>(points: LiDARPoint[]): <span class="keyword">void</span> {
+    <span class="comment">// 지면 제거</span>
+    <span class="keyword">const</span> nonGroundPoints = points.filter(p => p.z > <span class="number">0.2</span>);
+    
+    <span class="comment">// 거리 기반 필터링</span>
+    <span class="keyword">const</span> validPoints = nonGroundPoints.filter(p => {
+        <span class="keyword">const</span> distance = Math.sqrt(p.x**<span class="number">2</span> + p.y**<span class="number">2</span> + p.z**<span class="number">2</span>);
+        <span class="keyword">return</span> distance > <span class="number">0.5</span> && distance < <span class="number">100</span>;
+    });
+    
+    <span class="comment">// 클러스터링 및 객체 감지</span>
+    <span class="keyword">const</span> clusters = euclideanClustering(validPoints, <span class="number">0.5</span>);
+    console.log(<span class="string">`감지된 객체 수: ${clusters.length}`</span>);
+}</pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h3>📚 장 요약</h3>
+            <p>이 장에서는 이미지 센서 기술의 다양한 측면을 다루었습니다:</p>
+            
+            <ul>
+                <li><strong>이미지 센서 기초:</strong> CCD vs CMOS, 광전 변환 원리</li>
+                <li><strong>Sony IMX:</strong> Stacked CMOS, Dual Gain, DRAM 적층 기술</li>
+                <li><strong>Samsung ISOCELL:</strong> ISOCELL 격벽, Tetra²pixel, Super QPD</li>
+                <li><strong>ToF 센서:</strong> Direct/Indirect ToF, 깊이 측정 원리</li>
+                <li><strong>LiDAR:</strong> 기계식, MEMS, 솔리드 스테이트 방식, 자율주행 응용</li>
+            </ul>
+
+            <p>다음 장에서는 환경 센서(가스, 온도, 습도) 기술에 대해 자세히 알아봅니다.</p>
+        </section>
+
+        <div class="title">MEMS 센서 기술</div>
+                </div>
+            </a>
+            <a href="chapter-04.html" class="nav-btn">
+                <div>
+                    <div class="direction">다음 장</div>
+                    <div class="title">환경 센서</div>
+                </div>
+                <span>→</span>
+            </a>
+        </div>
+    </main>
+</body>
+</html>

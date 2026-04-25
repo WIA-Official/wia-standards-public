@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Model-Based Reinforcement Learning | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box, .warning-box, .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; }
+        .info-box { border-left: 4px solid #3b82f6; }
+        .warning-box { border-left: 4px solid #f59e0b; }
+        .success-box { border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 6: Model-Based Reinforcement Learning</h1>
+            <div class="chapter-meta">WIA-AI-025 | Planning with Learned Models 🧠</div>
+        </header>
+
+        <main>
+            <h2>6.1 Introduction to Model-Based RL</h2>
+
+            <p>Model-based RL learns a model of the environment's dynamics and uses it for planning. This contrasts with model-free methods that learn values or policies directly from experience without an explicit model.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Definition:</strong>
+                <p>A <strong>model</strong> predicts what the environment will do next given the current state and action:</p>
+                <ul>
+                    <li><strong>Transition Model:</strong> P(s'|s,a) - predicts next state</li>
+                    <li><strong>Reward Model:</strong> R(s,a) - predicts reward</li>
+                </ul>
+            </div>
+
+            <h3>Why Use Models?</h3>
+
+            <ul>
+                <li><strong>Sample Efficiency:</strong> Learn from simulated experience (no real environment interaction needed)</li>
+                <li><strong>Planning:</strong> Can reason about future consequences without trial and error</li>
+                <li><strong>Transfer:</strong> Models can generalize to new tasks</li>
+                <li><strong>Safety:</strong> Test policies in simulation before deployment</li>
+                <li><strong>Data Generation:</strong> Generate synthetic training data</li>
+            </ul>
+
+            <h2>6.2 Dyna Architecture</h2>
+
+            <p>Dyna combines model-free and model-based learning by integrating planning, acting, and model-learning:</p>
+
+            <pre><code>Algorithm: Dyna-Q
+
+Initialize Q(s,a) and Model(s,a)
+
+Loop:
+    // (a) Acting: interact with environment
+    s = current state
+    a = ε-greedy(Q, s)
+    Execute a, observe r, s'
+
+    // (b) Model-free learning: direct RL
+    Q(s,a) ← Q(s,a) + α[r + γ max Q(s',a') - Q(s,a)]
+
+    // (c) Model learning: update transition/reward model
+    Model(s,a) ← (s', r)
+
+    // (d) Planning: learn from simulated experience
+    Repeat n times:
+        s_sim = random previously observed state
+        a_sim = random previously taken action
+        s'_sim, r_sim = Model(s_sim, a_sim)
+        Q(s_sim, a_sim) ← Q(s_sim, a_sim) + α[r_sim + γ max Q(s'_sim, a') - Q(s_sim, a_sim)]</code></pre>
+
+            <h3>Dyna-Q Implementation</h3>
+
+            <pre><code>import numpy as np
+from collections import defaultdict
+
+class DynaQ:
+    def __init__(self, n_states, n_actions, planning_steps=50, alpha=0.1, gamma=0.95, epsilon=0.1):
+        self.Q = np.zeros((n_states, n_actions))
+        self.model = {}  // Model(s,a) -> (s', r)
+        self.planning_steps = planning_steps
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+
+    def select_action(self, state):
+        if np.random.random() < self.epsilon:
+            return np.random.randint(self.Q.shape[1])
+        return np.argmax(self.Q[state])
+
+    def update(self, state, action, reward, next_state):
+        // Direct RL (model-free)
+        td_target = reward + self.gamma * np.max(self.Q[next_state])
+        td_error = td_target - self.Q[state, action]
+        self.Q[state, action] += self.alpha * td_error
+
+        // Model learning
+        self.model[(state, action)] = (next_state, reward)
+
+        // Planning (model-based)
+        for _ in range(self.planning_steps):
+            // Sample random previously experienced (s,a)
+            (s, a), (s_next, r) = random.choice(list(self.model.items()))
+
+            // Simulate Q-learning update
+            td_target = r + self.gamma * np.max(self.Q[s_next])
+            td_error = td_target - self.Q[s, a]
+            self.Q[s, a] += self.alpha * td_error
+
+# Usage
+env = gym.make('FrozenLake-v1')
+agent = DynaQ(n_states=env.observation_space.n,
+              n_actions=env.action_space.n,
+              planning_steps=50)
+
+state = env.reset()
+for step in range(1000):
+    action = agent.select_action(state)
+    next_state, reward, done, _ = env.step(action)
+    agent.update(state, action, reward, next_state)
+    state = next_state if not done else env.reset()</code></pre>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">Key Insight:</strong>
+                <p>Dyna learns much faster than pure model-free Q-learning because it updates Q-values not just from real experience but also from many simulated experiences using the model.</p>
+            </div>
+
+            <h2>6.3 Learning Dynamics Models</h2>
+
+            <p>Modern model-based RL uses neural networks to learn complex dynamics:</p>
+
+            <h3>Deterministic Dynamics Model</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+
+class DynamicsModel(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        super(DynamicsModel, self).__init__()
+
+        self.network = nn.Sequential(
+            nn.Linear(state_dim + action_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, state_dim + 1)  // Predict Δs and reward
+        )
+
+    def forward(self, state, action):
+        """
+        Predict next state and reward.
+
+        Args:
+            state: current state
+            action: action taken
+
+        Returns:
+            next_state: predicted next state
+            reward: predicted reward
+        """
+        x = torch.cat([state, action], dim=-1)
+        output = self.network(x)
+
+        delta_state = output[:, :-1]  // State change
+        reward = output[:, -1:]       // Reward
+
+        next_state = state + delta_state  // Residual prediction
+        return next_state, reward
+
+# Training the model
+def train_dynamics_model(model, replay_buffer, batch_size=256, epochs=10):
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    for epoch in range(epochs):
+        states, actions, rewards, next_states, _ = replay_buffer.sample(batch_size)
+
+        // Predict
+        pred_next_states, pred_rewards = model(states, actions)
+
+        // Loss
+        state_loss = nn.MSELoss()(pred_next_states, next_states)
+        reward_loss = nn.MSELoss()(pred_rewards, rewards)
+        loss = state_loss + reward_loss
+
+        // Update
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if (epoch + 1) % 10 == 0:
+            print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")</code></pre>
+
+            <h3>Probabilistic Dynamics Model</h3>
+
+            <p>For stochastic environments, predict distributions:</p>
+
+            <pre><code>class ProbabilisticDynamicsModel(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        super(ProbabilisticDynamicsModel, self).__init__()
+
+        self.shared = nn.Sequential(
+            nn.Linear(state_dim + action_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        // Mean and log variance of next state
+        self.mean_head = nn.Linear(hidden_dim, state_dim)
+        self.logvar_head = nn.Linear(hidden_dim, state_dim)
+
+        // Reward prediction
+        self.reward_head = nn.Linear(hidden_dim, 1)
+
+    def forward(self, state, action):
+        features = self.shared(torch.cat([state, action], dim=-1))
+
+        mean = self.mean_head(features) + state  // Residual
+        logvar = self.logvar_head(features)
+        reward = self.reward_head(features)
+
+        return mean, logvar, reward
+
+    def sample(self, state, action):
+        """Sample next state from learned distribution."""
+        mean, logvar, reward = self.forward(state, action)
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        next_state = mean + eps * std
+        return next_state, reward</code></pre>
+
+            <h2>6.4 Model Predictive Control (MPC)</h2>
+
+            <p>MPC uses the model to plan actions by optimizing over action sequences:</p>
+
+            <pre><code>def mpc_planning(model, state, horizon=10, num_candidates=1000):
+    """
+    Model Predictive Control: plan best action sequence.
+
+    Args:
+        model: learned dynamics model
+        state: current state
+        horizon: planning horizon
+        num_candidates: number of random action sequences to try
+
+    Returns:
+        best_action: first action of best sequence
+    """
+    best_return = -float('inf')
+    best_action = None
+
+    for _ in range(num_candidates):
+        // Sample random action sequence
+        action_sequence = [sample_random_action() for _ in range(horizon)]
+
+        // Simulate trajectory
+        total_return = 0
+        sim_state = state.clone()
+
+        for t, action in enumerate(action_sequence):
+            // Predict next state and reward using model
+            sim_state, reward = model(sim_state, action)
+            total_return += (gamma ** t) * reward
+
+        // Keep best sequence
+        if total_return > best_return:
+            best_return = total_return
+            best_action = action_sequence[0]
+
+    return best_action
+
+// Usage
+state = torch.FloatTensor(env.reset())
+action = mpc_planning(dynamics_model, state, horizon=10)
+next_state, reward, done, _ = env.step(action.numpy())</code></pre>
+
+            <h3>Cross-Entropy Method (CEM) for MPC</h3>
+
+            <pre><code>def cem_planning(model, state, horizon=10, population=500, elite_frac=0.1, iterations=5):
+    """
+    Cross-Entropy Method for action sequence optimization.
+    """
+    action_dim = model.action_dim
+
+    // Initialize: mean=0, std=1 for each action in sequence
+    mean = torch.zeros(horizon, action_dim)
+    std = torch.ones(horizon, action_dim)
+
+    for iteration in range(iterations):
+        // Sample action sequences from current distribution
+        action_sequences = []
+        for _ in range(population):
+            actions = torch.normal(mean, std)
+            action_sequences.append(actions)
+
+        // Evaluate each sequence
+        returns = []
+        for actions in action_sequences:
+            total_return = simulate_trajectory(model, state, actions)
+            returns.append(total_return)
+
+        // Select elite sequences
+        elite_count = int(population * elite_frac)
+        elite_indices = torch.topk(torch.tensor(returns), elite_count).indices
+        elite_sequences = [action_sequences[i] for i in elite_indices]
+
+        // Update distribution
+        elite_sequences = torch.stack(elite_sequences)
+        mean = elite_sequences.mean(dim=0)
+        std = elite_sequences.std(dim=0)
+
+    // Return first action of best sequence
+    return mean[0]</code></pre>
+
+            <h2>6.5 Monte Carlo Tree Search (MCTS)</h2>
+
+            <p>MCTS builds a search tree by repeatedly simulating and expanding promising paths:</p>
+
+            <pre><code>class MCTSNode:
+    def __init__(self, state, parent=None):
+        self.state = state
+        self.parent = parent
+        self.children = {}
+        self.visits = 0
+        self.value = 0
+
+    def is_fully_expanded(self, action_space):
+        return len(self.children) == len(action_space)
+
+    def best_child(self, c=1.41):
+        """UCB1 formula for child selection."""
+        choices = []
+        for action, child in self.children.items():
+            if child.visits == 0:
+                ucb = float('inf')
+            else:
+                exploit = child.value / child.visits
+                explore = c * np.sqrt(np.log(self.visits) / child.visits)
+                ucb = exploit + explore
+            choices.append((ucb, action, child))
+
+        return max(choices, key=lambda x: x[0])[2]
+
+def mcts(root_state, model, simulations=1000):
+    """
+    Monte Carlo Tree Search using learned model.
+
+    Steps:
+    1. Selection: traverse tree using UCB
+    2. Expansion: add new node
+    3. Simulation: rollout using model
+    4. Backpropagation: update values
+    """
+    root = MCTSNode(root_state)
+
+    for _ in range(simulations):
+        node = root
+        state = root_state.clone()
+
+        // 1. Selection
+        while node.is_fully_expanded(action_space) and node.children:
+            node = node.best_child()
+            state, _ = model(state, node.action)
+
+        // 2. Expansion
+        if not node.is_fully_expanded(action_space):
+            action = random.choice([a for a in action_space if a not in node.children])
+            next_state, reward = model(state, action)
+            child = MCTSNode(next_state, parent=node)
+            child.action = action
+            node.children[action] = child
+            node = child
+            state = next_state
+
+        // 3. Simulation (rollout)
+        total_reward = 0
+        depth = 0
+        while depth < max_depth:
+            action = random.choice(action_space)
+            state, reward = model(state, action)
+            total_reward += (gamma ** depth) * reward
+            depth += 1
+
+        // 4. Backpropagation
+        while node is not None:
+            node.visits += 1
+            node.value += total_reward
+            node = node.parent
+
+    // Return best action
+    return max(root.children.items(), key=lambda x: x[1].visits)[0]</code></pre>
+
+            <h2>6.6 World Models</h2>
+
+            <p>World Models learn compact latent representations of environments:</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">World Models Architecture (Ha & Schmidhuber, 2018):</strong>
+                <ol>
+                    <li><strong>VAE (V):</strong> Compresses observations to latent codes</li>
+                    <li><strong>MDN-RNN (M):</strong> Predicts future latent states</li>
+                    <li><strong>Controller (C):</strong> Maps latent states to actions</li>
+                </ol>
+            </div>
+
+            <pre><code>class WorldModel:
+    def __init__(self, obs_dim, action_dim, latent_dim=32):
+        // Vision model: encode observations
+        self.vae = VAE(obs_dim, latent_dim)
+
+        // Memory model: predict next latent state
+        self.rnn = MDN_RNN(latent_dim, action_dim, hidden_dim=256)
+
+        // Controller: simple linear policy
+        self.controller = Controller(latent_dim + hidden_dim, action_dim)
+
+    def encode(self, observation):
+        """Compress observation to latent code."""
+        return self.vae.encode(observation)
+
+    def predict_next(self, latent_state, action, hidden):
+        """Predict next latent state given current state and action."""
+        return self.rnn(latent_state, action, hidden)
+
+    def act(self, latent_state, hidden):
+        """Select action based on latent state."""
+        return self.controller(torch.cat([latent_state, hidden]))
+
+    def dream(self, initial_latent, steps=100):
+        """
+        Simulate future trajectory in latent space.
+        Train controller entirely in imagination!
+        """
+        latent = initial_latent
+        hidden = self.rnn.init_hidden()
+        trajectory = []
+
+        for _ in range(steps):
+            action = self.act(latent, hidden)
+            next_latent, reward, hidden = self.predict_next(latent, action, hidden)
+
+            trajectory.append((latent, action, reward, next_latent))
+            latent = next_latent
+
+        return trajectory</code></pre>
+
+            <h2>6.7 Model-Based vs Model-Free</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Model-Based</th>
+                        <th>Model-Free</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Sample Efficiency</td>
+                        <td>High (learns from simulation)</td>
+                        <td>Low (needs real experience)</td>
+                    </tr>
+                    <tr>
+                        <td>Asymptotic Performance</td>
+                        <td>Limited by model error</td>
+                        <td>Can reach optimal</td>
+                    </tr>
+                    <tr>
+                        <td>Computational Cost</td>
+                        <td>High (planning)</td>
+                        <td>Low (forward pass)</td>
+                    </tr>
+                    <tr>
+                        <td>Complexity</td>
+                        <td>High (model + planner)</td>
+                        <td>Low (policy/value only)</td>
+                    </tr>
+                    <tr>
+                        <td>Generalization</td>
+                        <td>Good (model transfers)</td>
+                        <td>Task-specific</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6.8 Hybrid Approaches</h2>
+
+            <h3>Model-Based Value Expansion (MVE)</h3>
+
+            <p>Use model to improve value estimates in model-free algorithms:</p>
+
+            <pre><code>// Standard TD target
+V_target = r + γ V(s')
+
+// MVE: use model to expand k-step into future
+V_target = r + γ r' + γ² r'' + ... + γᵏ V(s_k)
+
+where s', r' = Model(s, a)
+      s'', r'' = Model(s', a')
+      ...</code></pre>
+
+            <h3>AlphaZero Architecture</h3>
+
+            <pre><code>class AlphaZero:
+    """
+    Combines deep learning, MCTS, and self-play.
+    """
+    def __init__(self):
+        // Single neural network outputs (policy, value)
+        self.network = ResidualNetwork()
+
+    def search(self, state):
+        """MCTS with network for policy and value."""
+        root = MCTSNode(state)
+
+        for _ in range(num_simulations):
+            node = root
+
+            // Selection
+            while node.is_expanded():
+                node = node.select_child()
+
+            // Expansion and evaluation
+            policy, value = self.network(node.state)
+            node.expand(policy)
+
+            // Backpropagation
+            node.backup(value)
+
+        // Return improved policy
+        return root.get_action_probs()
+
+    def self_play(self):
+        """Generate training data through self-play."""
+        game = Game()
+        trajectory = []
+
+        while not game.done():
+            state = game.state()
+            policy = self.search(state)
+            action = sample(policy)
+
+            game.step(action)
+            trajectory.append((state, policy))
+
+        // Game result as value target
+        result = game.result()
+
+        return [(s, p, result) for s, p in trajectory]</code></pre>
+
+            <h2>6.9 Practical Considerations</h2>
+
+            <h3>When to Use Model-Based RL?</h3>
+
+            <ul>
+                <li><strong>Limited Data:</strong> When real interactions are expensive</li>
+                <li><strong>Sim-to-Real:</strong> When good simulators exist</li>
+                <li><strong>Safety Critical:</strong> Test in simulation first</li>
+                <li><strong>Interpretability:</strong> Model provides understanding</li>
+                <li><strong>Transfer Learning:</strong> Reuse models across tasks</li>
+            </ul>
+
+            <h3>Challenges</h3>
+
+            <ul>
+                <li><strong>Model Error:</strong> Inaccurate models hurt performance</li>
+                <li><strong>Compounding Errors:</strong> Errors accumulate over long horizons</li>
+                <li><strong>Complexity:</strong> Harder to implement than model-free</li>
+                <li><strong>Computational Cost:</strong> Planning is expensive</li>
+            </ul>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">Model Bias:</strong>
+                <p>Policies optimized for a learned model may exploit model errors. Solutions: uncertainty estimation, ensemble models, short planning horizons.</p>
+            </div>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Model-based RL learns environment dynamics for planning</li>
+                    <li>Dyna integrates planning, acting, and model-learning</li>
+                    <li>Neural networks can learn complex dynamics models</li>
+                    <li>MPC optimizes action sequences using models</li>
+                    <li>MCTS builds search trees for discrete planning</li>
+                    <li>World Models learn in latent space for efficiency</li>
+                    <li>Model-based methods are sample efficient but limited by model accuracy</li>
+                    <li>Hybrid approaches combine model-based and model-free strengths</li>
+                    <li>AlphaZero shows the power of combining MCTS with deep learning</li>
+                    <li>Choice depends on sample budget, computational resources, and environment complexity</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>Review Questions</h3>
+                <div class="quiz-question">
+                    <strong>1. What are the main advantages of model-based RL?</strong>
+                    <p style="color: #94a3b8;">Answer: Sample efficiency (learn from simulated experience), planning ability, transfer learning, safety (test in simulation), and interpretability.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. How does Dyna combine model-free and model-based learning?</strong>
+                    <p style="color: #94a3b8;">Answer: Dyna learns from both real experience (model-free updates) and simulated experience generated by the learned model (model-based planning).</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. What is the main challenge with model-based RL?</strong>
+                    <p style="color: #94a3b8;">Answer: Model error - inaccurate models hurt performance, and errors compound over long planning horizons.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

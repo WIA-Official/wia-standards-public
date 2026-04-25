@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 클라이언트 선택 전략 | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제5장: 클라이언트 선택 전략</h1>
+        <p class="chapter-meta">효율적인 학습을 위한 최적의 클라이언트 부분집합 선택 마스터하기</p>
+
+        <h2>클라이언트 선택의 중요성</h2>
+        <p>
+            실제 연합학습 시스템에서는 매 라운드마다 모든 클라이언트를 참여시키는 것이 불가능하거나 비효율적입니다. 수백만 개의 모바일 장치가 있을 수 있고, 많은 장치가 오프라인 상태이거나 리소스 제약이 있거나 네트워크 연결이 불안정할 수 있습니다. 클라이언트 선택 전략은 각 학습 라운드에 참여할 클라이언트 부분집합을 결정하여 수렴 속도, 모델 품질, 공정성 및 시스템 효율성에 영향을 미칩니다.
+        </p>
+
+        <h2>무작위 선택: 기준선 접근법</h2>
+
+        <h3>균일 무작위 샘플링</h3>
+        <p>
+            가장 간단한 전략은 사용 가능한 클라이언트 풀에서 무작위로 선택하는 것입니다:
+        </p>
+
+        <pre><code>import random
+import numpy as np
+
+def random_client_selection(available_clients, num_to_select):
+    """
+    균일 무작위 클라이언트 선택
+
+    인자:
+        available_clients: 사용 가능한 클라이언트 ID 목록
+        num_to_select: 이번 라운드에 선택할 클라이언트 수
+
+    반환:
+        선택된 클라이언트 ID 목록
+    """
+    if num_to_select > len(available_clients):
+        # 요청보다 클라이언트가 적으면 모두 선택
+        return available_clients.copy()
+
+    # 무작위 샘플링 (교체 없이)
+    selected = random.sample(available_clients, num_to_select)
+
+    return selected
+
+
+# 예시 사용
+available = list(range(1000))  # 1000개 클라이언트 사용 가능
+selected = random_client_selection(available, num_to_select=100)
+print(f"라운드에 선택된 클라이언트: {len(selected)}개")</code></pre>
+
+        <h3>무작위 선택의 장단점</h3>
+        <ul>
+            <li><strong>장점:</strong> 간단, 편향 없음, 공정함, 구현 용이</li>
+            <li><strong>단점:</strong> 데이터 품질 무시, 클라이언트 능력 무시, 통계적으로 최적이 아님</li>
+            <li><strong>사용처:</strong> 동질적인 클라이언트, 프로토타이핑, 기준선</li>
+        </ul>
+
+        <h2>리소스 인식 선택</h2>
+
+        <h3>계층화 샘플링</h3>
+        <p>
+            클라이언트를 리소스 능력에 따라 계층으로 분류하고 각 계층에서 샘플링:
+        </p>
+
+        <pre><code>class StratifiedClientSelector:
+    """
+    리소스 계층 기반 클라이언트 선택
+    """
+
+    def __init__(self, clients_by_tier):
+        """
+        인자:
+            clients_by_tier: 계층별 클라이언트 딕셔너리
+                {'high': [client_ids], 'medium': [client_ids], 'low': [client_ids]}
+        """
+        self.clients_by_tier = clients_by_tier
+
+    def select(self, num_to_select, tier_weights=None):
+        """
+        계층별 가중치를 사용한 계층화 샘플링
+
+        인자:
+            num_to_select: 선택할 총 클라이언트 수
+            tier_weights: 각 계층의 가중치 {'high': 0.5, 'medium': 0.3, 'low': 0.2}
+
+        반환:
+            선택된 클라이언트 ID 목록
+        """
+        if tier_weights is None:
+            # 기본: 균등 분배
+            tier_weights = {tier: 1.0 / len(self.clients_by_tier)
+                          for tier in self.clients_by_tier}
+
+        selected = []
+
+        for tier, weight in tier_weights.items():
+            # 이 계층에서 선택할 클라이언트 수 계산
+            num_from_tier = int(num_to_select * weight)
+
+            available = self.clients_by_tier.get(tier, [])
+
+            if len(available) == 0:
+                continue
+
+            # 이 계층에서 샘플링
+            num_from_tier = min(num_from_tier, len(available))
+            tier_selected = random.sample(available, num_from_tier)
+
+            selected.extend(tier_selected)
+
+        return selected
+
+
+# 예시 사용
+clients_by_tier = {
+    'high': list(range(100)),      # 100개 고성능 클라이언트
+    'medium': list(range(100, 500)), # 400개 중간 클라이언트
+    'low': list(range(500, 1000))    # 500개 저성능 클라이언트
+}
+
+selector = StratifiedClientSelector(clients_by_tier)
+
+# 고성능 클라이언트에 더 많은 가중치
+selected = selector.select(
+    num_to_select=100,
+    tier_weights={'high': 0.5, 'medium': 0.3, 'low': 0.2}
+)</code></pre>
+
+        <h3>배터리 및 네트워크 제약</h3>
+        <p>
+            모바일 장치의 경우 배터리 수준과 네트워크 조건을 고려:
+        </p>
+
+        <pre><code>def battery_network_aware_selection(clients, num_to_select):
+    """
+    배터리와 네트워크 상태를 고려한 선택
+
+    인자:
+        clients: 클라이언트 정보 목록
+            [{'id': 1, 'battery': 0.8, 'network': 'wifi', 'available': True}, ...]
+        num_to_select: 선택할 클라이언트 수
+
+    반환:
+        선택된 클라이언트 ID 목록
+    """
+    # 사용 가능한 클라이언트 필터링
+    available = [c for c in clients if c['available']]
+
+    # 각 클라이언트에 점수 할당
+    scored_clients = []
+
+    for client in available:
+        score = 0.0
+
+        # 배터리 점수 (0-1)
+        battery_score = client['battery']
+
+        # 네트워크 점수
+        network_score = {
+            'wifi': 1.0,
+            '4g': 0.7,
+            '3g': 0.4,
+            '2g': 0.1
+        }.get(client['network'], 0.1)
+
+        # 결합 점수 (배터리 60%, 네트워크 40%)
+        score = 0.6 * battery_score + 0.4 * network_score
+
+        scored_clients.append({
+            'id': client['id'],
+            'score': score
+        })
+
+    # 점수별 정렬 (높은 것이 우선)
+    scored_clients.sort(key=lambda x: x['score'], reverse=True)
+
+    # 상위 클라이언트 선택
+    selected_ids = [c['id'] for c in scored_clients[:num_to_select]]
+
+    return selected_ids
+
+
+# 예시
+clients = [
+    {'id': 1, 'battery': 0.9, 'network': 'wifi', 'available': True},
+    {'id': 2, 'battery': 0.2, 'network': 'wifi', 'available': True},
+    {'id': 3, 'battery': 0.8, 'network': '3g', 'available': True},
+    {'id': 4, 'battery': 0.5, 'network': '4g', 'available': True},
+]
+
+selected = battery_network_aware_selection(clients, num_to_select=2)
+# 결과: [1, 4] (높은 배터리 + wifi, 중간 배터리 + 4g)</code></pre>
+
+        <h2>데이터 인식 선택</h2>
+
+        <h3>데이터 다양성 기반 선택</h3>
+        <p>
+            데이터 분포의 다양성을 최대화하는 클라이언트 선택:
+        </p>
+
+        <pre><code>def diversity_based_selection(clients, num_to_select):
+    """
+    데이터 다양성을 최대화하는 클라이언트 선택
+
+    인자:
+        clients: 클라이언트 정보 목록
+            [{'id': 1, 'data_distribution': [0.1, 0.2, 0.7], ...}, ...]
+        num_to_select: 선택할 클라이언트 수
+
+    반환:
+        다양한 데이터를 가진 선택된 클라이언트 ID
+    """
+    if len(clients) <= num_to_select:
+        return [c['id'] for c in clients]
+
+    selected = []
+    remaining = clients.copy()
+
+    # 첫 번째 클라이언트는 무작위 선택
+    first = random.choice(remaining)
+    selected.append(first)
+    remaining.remove(first)
+
+    # 그리디하게 가장 다른 클라이언트 선택
+    while len(selected) < num_to_select and remaining:
+        max_diversity = -1
+        best_client = None
+
+        for candidate in remaining:
+            # 선택된 클라이언트와의 평균 거리 계산
+            diversity = 0.0
+
+            for selected_client in selected:
+                # 분포 간 KL 발산 또는 유클리드 거리
+                dist = np.linalg.norm(
+                    np.array(candidate['data_distribution']) -
+                    np.array(selected_client['data_distribution'])
+                )
+                diversity += dist
+
+            avg_diversity = diversity / len(selected)
+
+            if avg_diversity > max_diversity:
+                max_diversity = avg_diversity
+                best_client = candidate
+
+        if best_client:
+            selected.append(best_client)
+            remaining.remove(best_client)
+
+    return [c['id'] for c in selected]
+
+
+# 예시: 10개 클래스에 대한 데이터 분포
+clients = [
+    {'id': 1, 'data_distribution': [0.9, 0.05, 0.05] + [0]*7},  # 주로 클래스 0
+    {'id': 2, 'data_distribution': [0.05, 0.9, 0.05] + [0]*7},  # 주로 클래스 1
+    {'id': 3, 'data_distribution': [0.1, 0.1, 0.8] + [0]*7},    # 주로 클래스 2
+    {'id': 4, 'data_distribution': [0.3, 0.3, 0.4] + [0]*7},    # 균형잡힌
+]
+
+selected = diversity_based_selection(clients, num_to_select=3)
+# 다양한 데이터 분포를 가진 클라이언트 선택</code></pre>
+
+        <h3>데이터 양 기반 가중치</h3>
+        <p>
+            더 많은 데이터를 가진 클라이언트에 더 높은 선택 확률 부여:
+        </p>
+
+        <pre><code>def weighted_by_data_size(clients, num_to_select):
+    """
+    데이터 크기에 비례하는 확률로 클라이언트 선택
+
+    인자:
+        clients: [{'id': 1, 'data_size': 1000}, ...]
+        num_to_select: 선택할 클라이언트 수
+
+    반환:
+        선택된 클라이언트 ID
+    """
+    # 총 데이터 크기 계산
+    total_data = sum(c['data_size'] for c in clients)
+
+    # 각 클라이언트의 선택 확률 계산
+    probabilities = [c['data_size'] / total_data for c in clients]
+
+    # 가중치가 있는 샘플링 (교체 없이)
+    selected_indices = np.random.choice(
+        len(clients),
+        size=min(num_to_select, len(clients)),
+        replace=False,
+        p=probabilities
+    )
+
+    selected_ids = [clients[i]['id'] for i in selected_indices]
+
+    return selected_ids</code></pre>
+
+        <h2>기여도 기반 선택</h2>
+
+        <h3>과거 기여도 추적</h3>
+        <p>
+            클라이언트의 과거 업데이트 품질을 기반으로 선택:
+        </p>
+
+        <pre><code>class ContributionBasedSelector:
+    """
+    과거 기여도를 추적하고 보상하는 선택기
+    """
+
+    def __init__(self, num_clients):
+        """
+        인자:
+            num_clients: 총 클라이언트 수
+        """
+        # 각 클라이언트의 기여도 점수 추적
+        self.contribution_scores = {i: 1.0 for i in range(num_clients)}
+        self.participation_count = {i: 0 for i in range(num_clients)}
+
+    def update_contribution(self, client_id, improvement):
+        """
+        클라이언트의 기여도 점수 업데이트
+
+        인자:
+            client_id: 클라이언트 식별자
+            improvement: 이 클라이언트로 인한 모델 개선도 (음수 가능)
+        """
+        # 지수 이동 평균으로 점수 업데이트
+        alpha = 0.3  # 학습률
+        old_score = self.contribution_scores[client_id]
+        new_score = alpha * improvement + (1 - alpha) * old_score
+
+        self.contribution_scores[client_id] = max(0.1, new_score)  # 최소값 유지
+        self.participation_count[client_id] += 1
+
+    def select(self, available_clients, num_to_select, exploration_rate=0.1):
+        """
+        기여도 점수 기반 선택 (exploration 포함)
+
+        인자:
+            available_clients: 사용 가능한 클라이언트 ID 목록
+            num_to_select: 선택할 수
+            exploration_rate: 무작위 탐색 비율
+
+        반환:
+            선택된 클라이언트 ID
+        """
+        # Exploration: 일부는 무작위 선택
+        num_explore = int(num_to_select * exploration_rate)
+        num_exploit = num_to_select - num_explore
+
+        selected = []
+
+        # Exploitation: 높은 기여도 선택
+        if num_exploit > 0:
+            # 사용 가능한 클라이언트의 점수 가져오기
+            scores = [(cid, self.contribution_scores[cid])
+                     for cid in available_clients]
+
+            # 점수별 정렬
+            scores.sort(key=lambda x: x[1], reverse=True)
+
+            # 상위 선택
+            selected.extend([cid for cid, _ in scores[:num_exploit]])
+
+        # Exploration: 무작위 선택
+        if num_explore > 0:
+            remaining = [c for c in available_clients if c not in selected]
+            if remaining:
+                explore_selected = random.sample(
+                    remaining,
+                    min(num_explore, len(remaining))
+                )
+                selected.extend(explore_selected)
+
+        return selected
+
+
+# 예시 사용
+selector = ContributionBasedSelector(num_clients=100)
+
+for round_num in range(10):
+    available = list(range(100))
+    selected = selector.select(available, num_to_select=10)
+
+    # 시뮬레이션: 각 클라이언트의 기여도 업데이트
+    for client_id in selected:
+        # 무작위 개선도 (실제로는 검증 손실 개선 등)
+        improvement = np.random.randn() * 0.5 + 1.0
+        selector.update_contribution(client_id, improvement)</code></pre>
+
+        <h2>공정성 인식 선택</h2>
+
+        <h3>공평한 참여 보장</h3>
+        <p>
+            모든 클라이언트가 시간이 지남에 따라 공평하게 참여하도록 보장:
+        </p>
+
+        <pre><code>def fairness_aware_selection(clients, num_to_select, participation_history):
+    """
+    공정성을 고려한 클라이언트 선택
+
+    덜 자주 선택된 클라이언트에 우선순위 부여
+
+    인자:
+        clients: 사용 가능한 클라이언트 ID 목록
+        num_to_select: 선택할 클라이언트 수
+        participation_history: {client_id: 참여 횟수} 딕셔너리
+
+    반환:
+        선택된 클라이언트 ID
+    """
+    # 각 클라이언트의 참여 횟수 가져오기
+    participation_counts = {
+        cid: participation_history.get(cid, 0)
+        for cid in clients
+    }
+
+    # 역가중치 계산 (적게 참여한 클라이언트가 높은 확률)
+    max_participation = max(participation_counts.values()) if participation_counts else 1
+
+    # 확률 계산: 적게 참여할수록 높은 확률
+    weights = []
+    for cid in clients:
+        count = participation_counts[cid]
+        # 역 가중치 (최소 0.1 보장)
+        weight = max(0.1, (max_participation + 1) - count)
+        weights.append(weight)
+
+    # 정규화
+    total_weight = sum(weights)
+    probabilities = [w / total_weight for w in weights]
+
+    # 가중 샘플링
+    selected_indices = np.random.choice(
+        len(clients),
+        size=min(num_to_select, len(clients)),
+        replace=False,
+        p=probabilities
+    )
+
+    selected = [clients[i] for i in selected_indices]
+
+    return selected
+
+
+# 예시
+clients = list(range(20))
+participation_history = {
+    0: 5, 1: 2, 2: 8, 3: 1, 4: 3,  # 일부는 많이, 일부는 적게 참여
+    # 나머지는 0 (처음 참여)
+}
+
+selected = fairness_aware_selection(clients, 5, participation_history)
+# 덜 참여한 클라이언트가 선택될 가능성 높음</code></pre>
+
+        <h2>적응형 선택 전략</h2>
+
+        <h3>Multi-Armed Bandit 접근법</h3>
+        <p>
+            클라이언트 선택을 Multi-Armed Bandit 문제로 모델링:
+        </p>
+
+        <pre><code>class UCBClientSelector:
+    """
+    Upper Confidence Bound (UCB) 기반 클라이언트 선택
+
+    탐색-활용 균형을 자동으로 조정
+    """
+
+    def __init__(self, num_clients, c=1.0):
+        """
+        인자:
+            num_clients: 총 클라이언트 수
+            c: 탐색 상수 (높을수록 더 많은 탐색)
+        """
+        self.num_clients = num_clients
+        self.c = c
+
+        # 각 클라이언트의 평균 보상 추적
+        self.mean_rewards = np.zeros(num_clients)
+        self.selection_counts = np.zeros(num_clients)
+        self.total_rounds = 0
+
+    def select(self, available_clients, num_to_select):
+        """
+        UCB 알고리즘으로 클라이언트 선택
+
+        UCB(i) = mean_reward(i) + c * sqrt(ln(t) / n(i))
+
+        인자:
+            available_clients: 사용 가능한 클라이언트 ID
+            num_to_select: 선택할 클라이언트 수
+
+        반환:
+            선택된 클라이언트 ID
+        """
+        self.total_rounds += 1
+
+        ucb_scores = {}
+
+        for client_id in available_clients:
+            if self.selection_counts[client_id] == 0:
+                # 한 번도 선택 안 된 클라이언트는 무한대 점수
+                ucb_scores[client_id] = float('inf')
+            else:
+                # UCB 점수 계산
+                mean_reward = self.mean_rewards[client_id]
+                exploration_bonus = self.c * np.sqrt(
+                    np.log(self.total_rounds) / self.selection_counts[client_id]
+                )
+                ucb_scores[client_id] = mean_reward + exploration_bonus
+
+        # UCB 점수별 정렬
+        sorted_clients = sorted(
+            available_clients,
+            key=lambda x: ucb_scores[x],
+            reverse=True
+        )
+
+        # 상위 클라이언트 선택
+        selected = sorted_clients[:num_to_select]
+
+        # 선택 횟수 업데이트
+        for client_id in selected:
+            self.selection_counts[client_id] += 1
+
+        return selected
+
+    def update_rewards(self, client_rewards):
+        """
+        클라이언트 보상 업데이트
+
+        인자:
+            client_rewards: {client_id: reward} 딕셔너리
+        """
+        for client_id, reward in client_rewards.items():
+            # 이동 평균 업데이트
+            count = self.selection_counts[client_id]
+            if count > 0:
+                old_mean = self.mean_rewards[client_id]
+                self.mean_rewards[client_id] = (
+                    (old_mean * (count - 1) + reward) / count
+                )
+
+
+# 예시 사용
+selector = UCBClientSelector(num_clients=100, c=1.5)
+
+for round_num in range(50):
+    available = list(range(100))
+    selected = selector.select(available, num_to_select=10)
+
+    # 시뮬레이션: 보상 계산 (예: 검증 정확도 개선)
+    rewards = {}
+    for client_id in selected:
+        # 클라이언트마다 다른 보상 (일부는 좋은 데이터 보유)
+        base_reward = 0.5 if client_id < 20 else 0.3
+        reward = base_reward + np.random.randn() * 0.1
+        rewards[client_id] = reward
+
+    selector.update_rewards(rewards)</code></pre>
+
+        <h2>하이브리드 선택 전략</h2>
+
+        <h3>다중 기준 결합</h3>
+        <p>
+            여러 선택 기준을 결합하는 통합 프레임워크:
+        </p>
+
+        <pre><code>class HybridClientSelector:
+    """
+    여러 선택 기준을 결합하는 하이브리드 선택기
+    """
+
+    def __init__(self, criteria_weights=None):
+        """
+        인자:
+            criteria_weights: 각 기준의 가중치
+                {'data_size': 0.3, 'battery': 0.2, 'contribution': 0.5}
+        """
+        if criteria_weights is None:
+            criteria_weights = {
+                'data_size': 0.33,
+                'battery': 0.33,
+                'contribution': 0.34
+            }
+
+        self.criteria_weights = criteria_weights
+        self.contribution_tracker = {}
+
+    def compute_composite_score(self, client):
+        """
+        여러 기준을 결합한 복합 점수 계산
+
+        인자:
+            client: 클라이언트 정보 딕셔너리
+
+        반환:
+            0-1 범위의 복합 점수
+        """
+        score = 0.0
+
+        # 데이터 크기 점수 (정규화)
+        data_score = min(client.get('data_size', 0) / 10000, 1.0)
+        score += self.criteria_weights['data_size'] * data_score
+
+        # 배터리 점수
+        battery_score = client.get('battery', 0.5)
+        score += self.criteria_weights['battery'] * battery_score
+
+        # 기여도 점수
+        contribution_score = self.contribution_tracker.get(
+            client['id'], 0.5
+        )
+        score += self.criteria_weights['contribution'] * contribution_score
+
+        return score
+
+    def select(self, available_clients, num_to_select):
+        """
+        복합 점수 기반 선택
+
+        인자:
+            available_clients: 클라이언트 정보 목록
+            num_to_select: 선택할 수
+
+        반환:
+            선택된 클라이언트 ID
+        """
+        # 각 클라이언트의 점수 계산
+        scored = []
+        for client in available_clients:
+            score = self.compute_composite_score(client)
+            scored.append((client['id'], score))
+
+        # 점수별 정렬
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        # 상위 80%는 점수 기반, 20%는 무작위 (탐색)
+        num_exploit = int(num_to_select * 0.8)
+        num_explore = num_to_select - num_exploit
+
+        selected = []
+
+        # Exploitation
+        selected.extend([cid for cid, _ in scored[:num_exploit]])
+
+        # Exploration
+        remaining = [cid for cid, _ in scored[num_exploit:]]
+        if remaining and num_explore > 0:
+            explore = random.sample(
+                remaining,
+                min(num_explore, len(remaining))
+            )
+            selected.extend(explore)
+
+        return selected</code></pre>
+
+        <h2>시스템 제약 고려</h2>
+
+        <h3>대역폭 제약</h3>
+        <p>
+            네트워크 대역폭 제약 하에서 클라이언트 선택:
+        </p>
+
+        <pre><code>def bandwidth_constrained_selection(clients, max_total_bandwidth):
+    """
+    대역폭 제약 하에서 최대 가치 클라이언트 선택
+
+    이것은 Knapsack 문제와 유사
+
+    인자:
+        clients: [{'id': 1, 'data_size': 1000, 'bandwidth_required': 50}, ...]
+        max_total_bandwidth: 사용 가능한 총 대역폭
+
+    반환:
+        선택된 클라이언트 ID
+    """
+    # 각 클라이언트의 가치/비용 비율 계산
+    value_per_bandwidth = []
+
+    for client in clients:
+        value = client['data_size']  # 또는 다른 가치 메트릭
+        cost = client['bandwidth_required']
+        ratio = value / cost if cost > 0 else 0
+
+        value_per_bandwidth.append({
+            'id': client['id'],
+            'ratio': ratio,
+            'bandwidth': cost
+        })
+
+    # 비율별 정렬 (그리디 접근법)
+    value_per_bandwidth.sort(key=lambda x: x['ratio'], reverse=True)
+
+    # 그리디하게 선택
+    selected = []
+    total_bandwidth_used = 0
+
+    for client in value_per_bandwidth:
+        if total_bandwidth_used + client['bandwidth'] <= max_total_bandwidth:
+            selected.append(client['id'])
+            total_bandwidth_used += client['bandwidth']
+
+    return selected</code></pre>
+
+        <h2>선택 전략 비교</h2>
+
+        <table>
+            <tr>
+                <th>전략</th>
+                <th>복잡도</th>
+                <th>장점</th>
+                <th>단점</th>
+                <th>최적 사용처</th>
+            </tr>
+            <tr>
+                <td><strong>무작위</strong></td>
+                <td>O(n)</td>
+                <td>간단, 공정, 편향 없음</td>
+                <td>비효율적, 리소스 무시</td>
+                <td>프로토타이핑, 기준선</td>
+            </tr>
+            <tr>
+                <td><strong>계층화</strong></td>
+                <td>O(n)</td>
+                <td>리소스 균형, 예측 가능</td>
+                <td>정적 계층 필요</td>
+                <td>이질적 디바이스</td>
+            </tr>
+            <tr>
+                <td><strong>데이터 다양성</strong></td>
+                <td>O(n²)</td>
+                <td>더 나은 수렴, 편향 감소</td>
+                <td>느림, 데이터 분포 필요</td>
+                <td>비IID 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>기여도 기반</strong></td>
+                <td>O(n log n)</td>
+                <td>품질 보상, 적응형</td>
+                <td>편향 가능, 추적 필요</td>
+                <td>장기 배포</td>
+            </tr>
+            <tr>
+                <td><strong>공정성 인식</strong></td>
+                <td>O(n)</td>
+                <td>공평한 참여, 포용적</td>
+                <td>최적 아닐 수 있음</td>
+                <td>규제 준수</td>
+            </tr>
+            <tr>
+                <td><strong>UCB/Bandit</strong></td>
+                <td>O(n)</td>
+                <td>자동 균형, 적응형</td>
+                <td>워밍업 필요, 복잡</td>
+                <td>동적 환경</td>
+            </tr>
+            <tr>
+                <td><strong>하이브리드</strong></td>
+                <td>O(n log n)</td>
+                <td>유연, 포괄적</td>
+                <td>조정 필요</td>
+                <td>프로덕션 시스템</td>
+            </tr>
+        </table>
+
+        <div class="info-box">
+            <h4>弘益人間의 실현</h4>
+            <p>공정한 클라이언트 선택 전략은 弘益人間(홍익인간)의 정신을 구현합니다. 모든 참여자에게 기여할 기회를 공평하게 제공하고, 리소스가 제한된 장치도 배제하지 않으며, 다양한 데이터 분포를 존중함으로써 진정으로 포용적인 AI를 만들 수 있습니다. 기여도를 보상하면서도 공정성을 유지하는 것은 모두에게 이로운 기술을 만드는 핵심입니다.</p>
+        </div>
+
+        <div class="summary">
+            <h2>장 요약</h2>
+            <ul>
+                <li>클라이언트 선택은 수렴 속도, 효율성 및 공정성에 중대한 영향</li>
+                <li>무작위 선택은 간단하지만 리소스와 데이터 품질 무시</li>
+                <li>계층화 샘플링은 클라이언트 능력 차이를 고려</li>
+                <li>배터리 및 네트워크 인식 선택은 모바일 FL에 중요</li>
+                <li>데이터 다양성 기반 선택은 비IID 문제 완화</li>
+                <li>기여도 추적은 고품질 업데이트를 제공하는 클라이언트 보상</li>
+                <li>공정성 인식 전략은 모든 클라이언트에게 참여 기회 보장</li>
+                <li>UCB/Bandit 접근법은 탐색-활용 자동 균형</li>
+                <li>하이브리드 전략은 여러 기준을 결합하여 최적화</li>
+                <li>프로덕션 시스템은 대역폭, 지연시간 등 시스템 제약 고려 필요</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>무작위 클라이언트 선택의 주요 장단점은 무엇이며, 어떤 시나리오에 적합합니까?</li>
+                <li>계층화 샘플링이 이질적인 클라이언트 환경에서 왜 유용한지 설명하세요.</li>
+                <li>배터리 및 네트워크 인식 선택이 모바일 연합학습에서 왜 중요합니까?</li>
+                <li>데이터 다양성 기반 선택이 비IID 문제를 어떻게 완화하는지 설명하세요.</li>
+                <li>기여도 기반 선택에서 exploration과 exploitation의 균형이 왜 중요합니까?</li>
+                <li>공정성 인식 선택 전략을 설계하고 그 이점을 설명하세요.</li>
+                <li>UCB 알고리즘이 클라이언트 선택에 어떻게 적용되는지 설명하세요.</li>
+                <li>하이브리드 선택 전략에서 여러 기준의 가중치를 어떻게 결정하겠습니까?</li>
+                <li>대역폭 제약 하에서 클라이언트 선택 문제를 공식화하고 해결하세요.</li>
+                <li>100만 개의 모바일 장치를 위한 클라이언트 선택 전략을 설계하세요. 어떤 요소들을 고려하겠습니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-04.html" class="nav-button">← 제4장</a>
+            <a href="chapter-06.html" class="nav-button">제6장 →</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WHOOP to WIA-SLEEP Mapping",
+  "version": "1.0.0",
+  "deviceInfo": {
+    "manufacturer": "WHOOP Inc.",
+    "device": "WHOOP Band",
+    "generations": ["WHOOP 3.0", "WHOOP 4.0"],
+    "apiVersion": "v1",
+    "documentation": "https://developer.whoop.com/api"
+  },
+  "dataSource": "consumer_wearable",
+  "sleepArchitecture": {
+    "mappings": {
+      "totalSleepTime_min": {
+        "whoopField": "sleep.total_in_bed_time_milli",
+        "unit": "milliseconds",
+        "transform": "value / 60000",
+        "notes": "Total time in bed; for TST use sleep periods minus wake"
+      },
+      "sleepEfficiency_pct": {
+        "whoopField": "sleep.sleep_efficiency_percentage",
+        "unit": "percent",
+        "transform": "value",
+        "notes": "Directly provided by WHOOP API"
+      },
+      "sleepOnsetLatency_min": {
+        "whoopField": "sleep.latency_milli",
+        "unit": "milliseconds",
+        "transform": "value / 60000"
+      },
+      "wakeAfterSleepOnset_min": {
+        "whoopField": "sleep.disturbances_milli",
+        "unit": "milliseconds",
+        "transform": "value / 60000",
+        "notes": "Time spent awake after falling asleep"
+      },
+      "stages.n1_pct": {
+        "whoopField": "sleep.light_sleep_duration_milli",
+        "notes": "WHOOP combines N1+N2 as 'light sleep'"
+      },
+      "stages.n2_pct": {
+        "whoopField": "sleep.light_sleep_duration_milli",
+        "derivation": "(value / totalSleepTime) * 100",
+        "notes": "Combined N1+N2; labeled as light sleep"
+      },
+      "stages.n3_sws_pct": {
+        "whoopField": "sleep.slow_wave_sleep_duration_milli",
+        "derivation": "(value / totalSleepTime) * 100"
+      },
+      "stages.rem_pct": {
+        "whoopField": "sleep.rem_sleep_duration_milli",
+        "derivation": "(value / totalSleepTime) * 100"
+      },
+      "sleepCycles": {
+        "whoopField": "sleep.sleep_cycle_count",
+        "transform": "value",
+        "notes": "Number of complete sleep cycles detected"
+      },
+      "arousals_per_hour": {
+        "whoopField": "sleep.disturbance_count",
+        "transform": "value / (totalSleepTime_min / 60)",
+        "notes": "Calculate from disturbance count"
+      }
+    }
+  },
+  "circadianMarkers": {
+    "mappings": {
+      "heartRateVariability.rmssd": {
+        "whoopField": "recovery.hrv_rmssd_milli",
+        "unit": "milliseconds",
+        "transform": "value",
+        "notes": "WHOOP provides RMSSD directly"
+      },
+      "restingHeartRate": {
+        "whoopField": "recovery.resting_heart_rate",
+        "unit": "bpm"
+      }
+    }
+  },
+  "sleepQuality": {
+    "mappings": {
+      "overallScore": {
+        "whoopField": "sleep.score.sleep_performance_percentage",
+        "notes": "WHOOP sleep performance score"
+      },
+      "sleepNeed": {
+        "whoopField": "sleep.score.sleep_need_milli",
+        "transform": "value / 3600000",
+        "unit": "hours",
+        "notes": "WHOOP's personalized sleep need estimate"
+      },
+      "sleepDebt": {
+        "whoopField": "sleep.score.sleep_debt_milli",
+        "transform": "value / 3600000",
+        "unit": "hours"
+      }
+    }
+  },
+  "recoveryMetrics": {
+    "description": "WHOOP recovery metrics relate to sleep quality and readiness",
+    "mappings": {
+      "recoveryScore": {
+        "whoopField": "recovery.score",
+        "unit": "0-100",
+        "notes": "Overall recovery score based on HRV, RHR, sleep"
+      },
+      "hrvStatus": {
+        "whoopField": "recovery.state",
+        "values": ["green", "yellow", "red"],
+        "notes": "Recovery state indicator"
+      }
+    }
+  },
+  "apiEndpoints": {
+    "sleep": {
+      "endpoint": "/v1/activity/sleep",
+      "method": "GET",
+      "parameters": {
+        "start": "ISO8601 datetime",
+        "end": "ISO8601 datetime",
+        "limit": "integer",
+        "nextToken": "pagination token"
+      }
+    },
+    "recovery": {
+      "endpoint": "/v1/recovery",
+      "method": "GET"
+    },
+    "cycle": {
+      "endpoint": "/v1/cycle",
+      "method": "GET",
+      "notes": "WHOOP cycle contains aggregated data"
+    }
+  },
+  "authentication": {
+    "type": "OAuth 2.0",
+    "tokenEndpoint": "https://api.prod.whoop.com/oauth/oauth2/token",
+    "scopes": ["read:sleep", "read:recovery", "read:cycles"]
+  },
+  "dataQuality": {
+    "sleepStaging": {
+      "accuracy": "moderate-good",
+      "validation": "Proprietary algorithms validated against PSG",
+      "limitations": [
+        "N1/N2 combined as light sleep",
+        "Requires consistent wear for accurate baseline"
+      ]
+    },
+    "hrv": {
+      "accuracy": "good",
+      "method": "PPG-based RMSSD during sleep",
+      "notes": "Measured during deep sleep for consistency"
+    },
+    "sleepNeed": {
+      "accuracy": "personalized",
+      "notes": "Adapts to individual based on historical data"
+    }
+  },
+  "uniqueFeatures": {
+    "strainTracking": {
+      "description": "WHOOP tracks daily strain which influences sleep need",
+      "field": "cycle.score.strain",
+      "notes": "Higher strain increases calculated sleep need"
+    },
+    "sleepCoach": {
+      "description": "Provides recommended bedtime and wake time",
+      "fields": ["sleep_coach.recommended_bedtime", "sleep_coach.recommended_wake_time"]
+    }
+  },
+  "transformationFunctions": {
+    "convertToWIASleep": {
+      "description": "Transform WHOOP API response to WIA-SLEEP format",
+      "pseudocode": "function convertWhoopToWIASleep(whoopSleep, whoopRecovery) {\n  const totalSleepMs = whoopSleep.slow_wave_sleep_duration_milli + \n                       whoopSleep.light_sleep_duration_milli + \n                       whoopSleep.rem_sleep_duration_milli;\n  \n  return {\n    recordId: generateUUID(),\n    subjectId: whoopSleep.user_id,\n    timestamp: whoopSleep.end,\n    dataSource: 'consumer_wearable',\n    sleepArchitecture: {\n      summary: {\n        totalSleepTime_min: totalSleepMs / 60000,\n        sleepEfficiency_pct: whoopSleep.sleep_efficiency_percentage,\n        sleepOnsetLatency_min: whoopSleep.latency_milli / 60000,\n        wakeAfterSleepOnset_min: whoopSleep.disturbances_milli / 60000\n      },\n      stagePercentages: {\n        n1_pct: 0,\n        n2_pct: (whoopSleep.light_sleep_duration_milli / totalSleepMs) * 100,\n        n3_sws_pct: (whoopSleep.slow_wave_sleep_duration_milli / totalSleepMs) * 100,\n        rem_pct: (whoopSleep.rem_sleep_duration_milli / totalSleepMs) * 100\n      },\n      cycleCount: whoopSleep.sleep_cycle_count\n    },\n    circadianMarkers: {\n      heartRateVariability: {\n        rmssd: whoopRecovery?.hrv_rmssd_milli\n      }\n    }\n  };\n}"
+    }
+  }
+}

@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Policy Gradient Methods | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box, .warning-box, .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; }
+        .info-box { border-left: 4px solid #3b82f6; }
+        .warning-box { border-left: 4px solid #f59e0b; }
+        .success-box { border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 4: Policy Gradient Methods</h1>
+            <div class="chapter-meta">WIA-AI-025 | Direct Policy Optimization 🎲</div>
+        </header>
+
+        <main>
+            <h2>4.1 Introduction to Policy Gradient</h2>
+
+            <p>Unlike value-based methods that learn Q(s,a) and derive a policy, policy gradient methods directly parameterize and optimize the policy π_θ(a|s). This approach is particularly powerful for continuous action spaces and stochastic policies.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Key Idea:</strong>
+                <p>Parameterize the policy π_θ(a|s) with parameters θ (e.g., neural network weights) and optimize θ to maximize expected return J(θ) using gradient ascent.</p>
+            </div>
+
+            <h3>Why Policy Gradient?</h3>
+
+            <ul>
+                <li><strong>Continuous Actions:</strong> Natural for continuous action spaces</li>
+                <li><strong>Stochastic Policies:</strong> Can learn probabilistic strategies</li>
+                <li><strong>Theoretical Guarantees:</strong> Converges to local optima</li>
+                <li><strong>Better Convergence:</strong> Small changes in θ → small changes in policy</li>
+                <li><strong>Works with Function Approximation:</strong> Compatible with deep learning</li>
+            </ul>
+
+            <h2>4.2 Policy Gradient Theorem</h2>
+
+            <p>The policy gradient theorem provides the foundation for all policy gradient algorithms:</p>
+
+            <pre><code>∇_θ J(θ) = E_π[∇_θ log π_θ(a|s) Q^π(s,a)]
+
+In words: The gradient of the objective equals the expected gradient of log probability weighted by Q-value.
+
+Intuition: Increase probability of good actions (high Q), decrease probability of bad actions (low Q)</code></pre>
+
+            <h3>Derivation Intuition</h3>
+
+            <pre><code>J(θ) = E_π[R]  // Expected return
+
+∇_θ J(θ) = ∇_θ E[Σ r_t]
+         = E[Σ ∇_θ log π_θ(a_t|s_t) Σ_{t'≥t} r_t']
+         = E[Σ ∇_θ log π_θ(a_t|s_t) Q^π(s_t,a_t)]
+
+This is the REINFORCE gradient estimator.</code></pre>
+
+            <h2>4.3 REINFORCE Algorithm</h2>
+
+            <p>REINFORCE is the simplest policy gradient algorithm, using Monte Carlo returns to estimate Q^π(s,a):</p>
+
+            <pre><code>Algorithm: REINFORCE (Monte Carlo Policy Gradient)
+
+Initialize policy parameters θ randomly
+
+For each episode:
+    Generate episode following π_θ: s_0, a_0, r_1, s_1, a_1, ..., s_T
+
+    For t = 0 to T-1:
+        G_t = Σ_{k=0}^{T-t-1} γ^k r_{t+k+1}  // Return from time t
+
+        θ ← θ + α γ^t G_t ∇_θ log π_θ(a_t|s_t)  // Gradient ascent</code></pre>
+
+            <h3>REINFORCE Implementation</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+
+class PolicyNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(PolicyNetwork, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim),
+            nn.Softmax(dim=-1)  # Output probabilities
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+def reinforce(env, episodes=1000, gamma=0.99, lr=1e-3):
+    """
+    REINFORCE algorithm for episodic tasks.
+    """
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    policy = PolicyNetwork(state_dim, action_dim)
+    optimizer = optim.Adam(policy.parameters(), lr=lr)
+
+    for episode in range(episodes):
+        # Generate episode
+        states, actions, rewards = [], [], []
+        state = env.reset()
+        done = False
+
+        while not done:
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+
+            # Sample action from policy
+            with torch.no_grad():
+                action_probs = policy(state_tensor)
+                action_dist = torch.distributions.Categorical(action_probs)
+                action = action_dist.sample()
+
+            next_state, reward, done, _ = env.step(action.item())
+
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+
+            state = next_state
+
+        # Compute returns
+        returns = []
+        G = 0
+        for r in reversed(rewards):
+            G = r + gamma * G
+            returns.insert(0, G)
+
+        returns = torch.FloatTensor(returns)
+
+        # Normalize returns (reduces variance)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+
+        # Compute policy gradient
+        loss = 0
+        for state, action, G in zip(states, actions, returns):
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            action_probs = policy(state_tensor)
+            action_dist = torch.distributions.Categorical(action_probs)
+
+            # -log π(a|s) * G  (negative because we minimize)
+            loss += -action_dist.log_prob(action) * G
+
+        # Update policy
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if (episode + 1) % 100 == 0:
+            print(f"Episode {episode+1}, Total Reward: {sum(rewards)}")
+
+    return policy</code></pre>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">High Variance:</strong>
+                <p>REINFORCE suffers from high variance because it uses Monte Carlo returns. This can slow convergence. Solutions: baselines, actor-critic methods.</p>
+            </div>
+
+            <h2>4.4 Baseline Functions</h2>
+
+            <p>Adding a baseline b(s) reduces variance without introducing bias:</p>
+
+            <pre><code>∇_θ J(θ) = E[∇_θ log π_θ(a|s) (Q^π(s,a) - b(s))]
+
+Common baselines:
+1. b(s) = V^π(s)  // State value function
+2. b(s) = average return
+3. b(s) = moving average of returns</code></pre>
+
+            <h3>REINFORCE with Baseline</h3>
+
+            <pre><code>def reinforce_with_baseline(env, episodes=1000, gamma=0.99, lr=1e-3):
+    """
+    REINFORCE with learned value function baseline.
+    """
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    policy = PolicyNetwork(state_dim, action_dim)
+    value_net = ValueNetwork(state_dim)  # Baseline
+
+    policy_optimizer = optim.Adam(policy.parameters(), lr=lr)
+    value_optimizer = optim.Adam(value_net.parameters(), lr=lr)
+
+    for episode in range(episodes):
+        states, actions, rewards = generate_episode(env, policy)
+
+        returns = compute_returns(rewards, gamma)
+        returns = torch.FloatTensor(returns)
+
+        # Update value network (baseline)
+        states_tensor = torch.FloatTensor(states)
+        values = value_net(states_tensor).squeeze()
+        value_loss = nn.MSELoss()(values, returns)
+
+        value_optimizer.zero_grad()
+        value_loss.backward()
+        value_optimizer.step()
+
+        # Update policy with baseline
+        advantages = returns - values.detach()  # A(s,a) = G - V(s)
+
+        policy_loss = 0
+        for state, action, advantage in zip(states, actions, advantages):
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            action_probs = policy(state_tensor)
+            action_dist = torch.distributions.Categorical(action_probs)
+            policy_loss += -action_dist.log_prob(action) * advantage
+
+        policy_optimizer.zero_grad()
+        policy_loss.backward()
+        policy_optimizer.step()
+
+    return policy</code></pre>
+
+            <h2>4.5 Trust Region Policy Optimization (TRPO)</h2>
+
+            <p>TRPO ensures stable learning by constraining policy updates to a "trust region":</p>
+
+            <pre><code>maximize E[π_θ_new / π_θ_old * A(s,a)]
+subject to E[KL(π_θ_old || π_θ_new)] ≤ δ
+
+where:
+- KL divergence constrains how much the policy can change
+- δ is the trust region size
+- This prevents catastrophic policy updates</code></pre>
+
+            <h3>Natural Policy Gradient</h3>
+
+            <p>TRPO uses the natural gradient, which accounts for the geometry of the policy space:</p>
+
+            <pre><code>Natural gradient: ∇̃_θ J = F^{-1} ∇_θ J
+
+where F is the Fisher Information Matrix:
+F = E[∇_θ log π(a|s) ∇_θ log π(a|s)^T]
+
+The natural gradient points in the direction of steepest ascent in probability space, not parameter space.</code></pre>
+
+            <h2>4.6 Proximal Policy Optimization (PPO)</h2>
+
+            <p>PPO simplifies TRPO while maintaining its benefits through a clipped objective:</p>
+
+            <pre><code>L^CLIP(θ) = E[min(r_t(θ) Â_t, clip(r_t(θ), 1-ε, 1+ε) Â_t)]
+
+where:
+r_t(θ) = π_θ(a_t|s_t) / π_θ_old(a_t|s_t)  // Probability ratio
+Â_t = estimated advantage
+ε = clipping parameter (typically 0.1 or 0.2)</code></pre>
+
+            <h3>PPO Algorithm</h3>
+
+            <pre><code>class PPO:
+    def __init__(self, state_dim, action_dim, lr=3e-4, gamma=0.99,
+                 epsilon=0.2, epochs=10, batch_size=64):
+        self.policy = PolicyNetwork(state_dim, action_dim)
+        self.old_policy = PolicyNetwork(state_dim, action_dim)
+        self.old_policy.load_state_dict(self.policy.state_dict())
+
+        self.value_net = ValueNetwork(state_dim)
+
+        self.optimizer = optim.Adam([
+            {'params': self.policy.parameters()},
+            {'params': self.value_net.parameters()}
+        ], lr=lr)
+
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epochs = epochs
+        self.batch_size = batch_size
+
+    def select_action(self, state):
+        state = torch.FloatTensor(state).unsqueeze(0)
+        with torch.no_grad():
+            action_probs = self.policy(state)
+            dist = torch.distributions.Categorical(action_probs)
+            action = dist.sample()
+        return action.item()
+
+    def update(self, states, actions, rewards, next_states, dones):
+        """
+        Update policy using PPO.
+        """
+        states = torch.FloatTensor(states)
+        actions = torch.LongTensor(actions)
+        rewards = torch.FloatTensor(rewards)
+        next_states = torch.FloatTensor(next_states)
+        dones = torch.FloatTensor(dones)
+
+        # Compute returns and advantages
+        with torch.no_grad():
+            values = self.value_net(states).squeeze()
+            next_values = self.value_net(next_states).squeeze()
+
+            # GAE (Generalized Advantage Estimation)
+            advantages = rewards + self.gamma * next_values * (1 - dones) - values
+            returns = advantages + values
+
+        # Normalize advantages
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        # Get old action probabilities
+        with torch.no_grad():
+            old_probs = self.old_policy(states)
+            old_dist = torch.distributions.Categorical(old_probs)
+            old_log_probs = old_dist.log_prob(actions)
+
+        # PPO update for multiple epochs
+        for _ in range(self.epochs):
+            # Current policy probabilities
+            new_probs = self.policy(states)
+            new_dist = torch.distributions.Categorical(new_probs)
+            new_log_probs = new_dist.log_prob(actions)
+
+            # Ratio of new and old probabilities
+            ratio = torch.exp(new_log_probs - old_log_probs)
+
+            # Clipped surrogate objective
+            surr1 = ratio * advantages
+            surr2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * advantages
+            policy_loss = -torch.min(surr1, surr2).mean()
+
+            # Value loss
+            new_values = self.value_net(states).squeeze()
+            value_loss = nn.MSELoss()(new_values, returns)
+
+            # Entropy bonus (encourages exploration)
+            entropy = new_dist.entropy().mean()
+
+            # Total loss
+            loss = policy_loss + 0.5 * value_loss - 0.01 * entropy
+
+            # Update networks
+            self.optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
+            self.optimizer.step()
+
+        # Update old policy
+        self.old_policy.load_state_dict(self.policy.state_dict())</code></pre>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">Why PPO is Popular:</strong>
+                <ul>
+                    <li>Simple to implement (compared to TRPO)</li>
+                    <li>Good sample efficiency</li>
+                    <li>Stable training</li>
+                    <li>Works well across many tasks</li>
+                    <li>Used in ChatGPT's RLHF training</li>
+                </ul>
+            </div>
+
+            <h2>4.7 Continuous Action Spaces</h2>
+
+            <p>Policy gradient methods excel in continuous control. We parameterize the policy as a Gaussian:</p>
+
+            <pre><code>π_θ(a|s) = N(μ_θ(s), σ_θ(s))
+
+where:
+- μ_θ(s): mean action (neural network output)
+- σ_θ(s): standard deviation (can be learned or fixed)</code></pre>
+
+            <h3>Continuous Action Policy Network</h3>
+
+            <pre><code>class ContinuousPolicyNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
+        super(ContinuousPolicyNetwork, self).__init__()
+
+        self.shared = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        # Mean of action distribution
+        self.mean = nn.Linear(hidden_dim, action_dim)
+
+        # Log std of action distribution
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
+
+    def forward(self, state):
+        features = self.shared(state)
+        mean = self.mean(features)
+        std = torch.exp(self.log_std)
+        return mean, std
+
+    def sample_action(self, state):
+        mean, std = self.forward(state)
+        dist = torch.distributions.Normal(mean, std)
+        action = dist.sample()
+        log_prob = dist.log_prob(action).sum(dim=-1)
+        return action, log_prob
+
+# Usage for continuous control (e.g., MuJoCo)
+policy = ContinuousPolicyNetwork(state_dim=17, action_dim=6)
+state = torch.FloatTensor(state)
+action, log_prob = policy.sample_action(state)</code></pre>
+
+            <h2>4.8 Generalized Advantage Estimation (GAE)</h2>
+
+            <p>GAE balances bias and variance in advantage estimation:</p>
+
+            <pre><code>A^GAE(λ)_t = Σ_{l=0}^∞ (γλ)^l δ_{t+l}
+
+where:
+δ_t = r_t + γV(s_{t+1}) - V(s_t)  // TD error
+
+λ ∈ [0, 1] controls the bias-variance tradeoff:
+- λ = 0: A = δ_t (high bias, low variance, like TD)
+- λ = 1: A = Σ r_t - V(s_t) (low bias, high variance, like MC)</code></pre>
+
+            <h3>GAE Implementation</h3>
+
+            <pre><code>def compute_gae(rewards, values, next_values, dones, gamma=0.99, lambda_=0.95):
+    """
+    Compute Generalized Advantage Estimation.
+
+    Args:
+        rewards: list of rewards
+        values: list of value estimates V(s_t)
+        next_values: list of value estimates V(s_{t+1})
+        dones: list of done flags
+        gamma: discount factor
+        lambda_: GAE parameter
+    """
+    advantages = []
+    gae = 0
+
+    for t in reversed(range(len(rewards))):
+        # TD error
+        delta = rewards[t] + gamma * next_values[t] * (1 - dones[t]) - values[t]
+
+        # GAE
+        gae = delta + gamma * lambda_ * (1 - dones[t]) * gae
+        advantages.insert(0, gae)
+
+    return advantages</code></pre>
+
+            <h2>4.9 Practical Considerations</h2>
+
+            <h3>Hyperparameters</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Typical Value</th>
+                        <th>Effect</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Learning Rate</td>
+                        <td>3e-4</td>
+                        <td>Step size for updates</td>
+                    </tr>
+                    <tr>
+                        <td>PPO Clip ε</td>
+                        <td>0.1 - 0.2</td>
+                        <td>Trust region size</td>
+                    </tr>
+                    <tr>
+                        <td>GAE λ</td>
+                        <td>0.95 - 0.99</td>
+                        <td>Bias-variance tradeoff</td>
+                    </tr>
+                    <tr>
+                        <td>Entropy Coefficient</td>
+                        <td>0.01</td>
+                        <td>Exploration bonus</td>
+                    </tr>
+                    <tr>
+                        <td>Value Loss Coefficient</td>
+                        <td>0.5</td>
+                        <td>Value function importance</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Tips for Success</h3>
+
+            <ul>
+                <li><strong>Normalize observations:</strong> Use running mean/std</li>
+                <li><strong>Normalize returns:</strong> Reduces variance</li>
+                <li><strong>Clip gradients:</strong> Prevents explosion</li>
+                <li><strong>Use orthogonal initialization:</strong> Better for deep networks</li>
+                <li><strong>Tune entropy bonus:</strong> Balances exploration</li>
+                <li><strong>Monitor KL divergence:</strong> Detect unstable updates</li>
+            </ul>
+
+            <h2>4.10 Comparison: Policy Gradient vs Value-Based</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Policy Gradient</th>
+                        <th>Value-Based (DQN)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Action Spaces</td>
+                        <td>Continuous + Discrete</td>
+                        <td>Discrete only</td>
+                    </tr>
+                    <tr>
+                        <td>Policy Type</td>
+                        <td>Stochastic natural</td>
+                        <td>Deterministic (ε-greedy)</td>
+                    </tr>
+                    <tr>
+                        <td>Convergence</td>
+                        <td>Local optimum guaranteed</td>
+                        <td>May oscillate/diverge</td>
+                    </tr>
+                    <tr>
+                        <td>Sample Efficiency</td>
+                        <td>Lower (on-policy)</td>
+                        <td>Higher (off-policy + replay)</td>
+                    </tr>
+                    <tr>
+                        <td>Stability</td>
+                        <td>Generally more stable</td>
+                        <td>Can be unstable</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Policy gradient methods directly optimize policy parameters θ</li>
+                    <li>The policy gradient theorem enables gradient-based optimization</li>
+                    <li>REINFORCE uses Monte Carlo returns but suffers high variance</li>
+                    <li>Baselines reduce variance without introducing bias</li>
+                    <li>TRPO constrains policy updates using KL divergence</li>
+                    <li>PPO simplifies TRPO with clipped surrogate objective</li>
+                    <li>Policy gradients excel at continuous action spaces</li>
+                    <li>GAE balances bias and variance in advantage estimation</li>
+                    <li>PPO is widely used in practice (RLHF, robotics, games)</li>
+                    <li>Key tradeoff: stability vs sample efficiency</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>Review Questions</h3>
+                <div class="quiz-question">
+                    <strong>1. What are the main advantages of policy gradient over value-based methods?</strong>
+                    <p style="color: #94a3b8;">Answer: Policy gradient methods can handle continuous action spaces, naturally learn stochastic policies, have guaranteed convergence to local optima, and are more stable with function approximation.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. Why does REINFORCE have high variance?</strong>
+                    <p style="color: #94a3b8;">Answer: Because it uses full Monte Carlo returns, which depend on many random actions and transitions throughout an episode.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. How does PPO differ from TRPO?</strong>
+                    <p style="color: #94a3b8;">Answer: PPO uses a clipped objective instead of a hard KL constraint, making it simpler to implement while maintaining similar benefits.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>4. What is the purpose of GAE's λ parameter?</strong>
+                    <p style="color: #94a3b8;">Answer: λ controls the bias-variance tradeoff in advantage estimation. λ=0 is high-bias/low-variance (TD), λ=1 is low-bias/high-variance (MC).</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

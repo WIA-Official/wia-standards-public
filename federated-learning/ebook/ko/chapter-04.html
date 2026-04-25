@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 집계 알고리즘 | WIA-AI-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; margin-bottom: 2rem; padding: 0.5rem 1rem; background: #1e293b; color: #10B981; text-decoration: none; border-radius: 4px; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #64748b; margin-bottom: 2rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 3px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        .info-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .info-box h4 { color: #10B981; margin-bottom: 0.5rem; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 2px solid #10B981; }
+        .summary h2 { border-bottom: none; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제4장: 집계 알고리즘</h1>
+        <p class="chapter-meta">분산 모델 업데이트를 전역 모델로 결합하는 기술 마스터하기</p>
+
+        <h2>연합학습에서 집계의 역할</h2>
+        <p>
+            집계는 연합학습의 핵심으로, 여러 클라이언트의 모델 업데이트를 개선된 전역 모델로 결합하는 프로세스입니다. 집계 알고리즘의 선택은 수렴 속도, 적대적 클라이언트에 대한 견고성, 비IID 데이터 처리 및 전반적인 모델 품질에 상당한 영향을 미칩니다. 이 장에서는 단순 평균에서 정교한 비잔틴 견고 방법까지 집계 전략을 탐구합니다.
+        </p>
+
+        <h2>연합 평균화 (FedAvg)</h2>
+
+        <h3>표준 알고리즘</h3>
+        <p>
+            McMahan 등이 2017년에 제안한 연합 평균화는 가장 널리 사용되는 집계 방법으로 남아 있습니다. 클라이언트 모델 업데이트의 가중 평균을 계산합니다:
+        </p>
+
+        <pre><code>def federated_averaging(client_models, client_data_sizes):
+    """
+    표준 FedAvg 집계
+
+    인자:
+        client_models: 각 클라이언트의 모델 가중치 목록
+        client_data_sizes: 클라이언트당 학습 샘플 수
+
+    반환:
+        집계된 전역 모델
+    """
+    total_samples = sum(client_data_sizes)
+
+    # 데이터셋 크기별 가중 평균
+    global_model = np.zeros_like(client_models[0])
+
+    for i, (model, num_samples) in enumerate(zip(client_models, client_data_sizes)):
+        weight = num_samples / total_samples
+        global_model += weight * model
+
+    return global_model
+
+
+# 예시
+client_models = [
+    np.array([1.0, 2.0, 3.0]),  # 클라이언트 1: 100 샘플
+    np.array([1.5, 1.8, 2.9]),  # 클라이언트 2: 200 샘플
+    np.array([0.9, 2.1, 3.2])   # 클라이언트 3: 150 샘플
+]
+client_data_sizes = [100, 200, 150]
+
+global_model = federated_averaging(client_models, client_data_sizes)
+# 결과: 클라이언트 2에 더 많은 영향력을 주는 가중 평균</code></pre>
+
+        <h3>데이터 크기별 가중치를 사용하는 이유?</h3>
+        <p>
+            데이터셋 크기별 가중치는 더 나은 그래디언트 추정을 제공합니다. 1000개 샘플이 있는 클라이언트는 10개 샘플이 있는 클라이언트보다 더 신뢰할 수 있는 그래디언트를 제공합니다. 이 가중치 방식은 집계 그래디언트 추정량의 분산을 최소화합니다.
+        </p>
+
+        <h3>모멘텀 기반 FedAvg</h3>
+        <p>
+            서버 측 모멘텀 추가로 수렴 개선:
+        </p>
+
+        <pre><code>class MomentumFedAvg:
+    def __init__(self, beta=0.9):
+        self.beta = beta  # 모멘텀 계수
+        self.velocity = None
+
+    def aggregate(self, client_models, client_data_sizes):
+        """서버 측 모멘텀이 있는 FedAvg"""
+
+        # 표준 가중 평균
+        global_update = federated_averaging(client_models, client_data_sizes)
+
+        # 첫 번째 라운드에서 속도 초기화
+        if self.velocity is None:
+            self.velocity = np.zeros_like(global_update)
+
+        # 모멘텀으로 속도 업데이트
+        self.velocity = self.beta * self.velocity + (1 - self.beta) * global_update
+
+        return self.velocity</code></pre>
+
+        <h2>비IID 데이터 처리</h2>
+
+        <h3>비IID 도전과제</h3>
+        <p>
+            실제 연합학습에서 클라이언트 데이터는 종종 비IID(독립 동일 분포가 아님)입니다. 이로 인해:
+        </p>
+
+        <ul>
+            <li><strong>가중치 발산:</strong> 로컬 모델이 분리됨</li>
+            <li><strong>느린 수렴:</strong> 목표 정확도에 도달하기 위해 더 많은 라운드 필요</li>
+            <li><strong>최종 정확도 감소:</strong> 전역 모델이 더 나쁜 성능</li>
+            <li><strong>불안정한 학습:</strong> 손실/정확도의 진동</li>
+        </ul>
+
+        <h3>FedProx: 근접 항 정규화</h3>
+        <p>
+            FedProx는 로컬 모델을 전역 모델에 가깝게 유지하기 위해 근접 항을 추가합니다:
+        </p>
+
+        <pre><code>def fedprox_local_training(local_data, global_model, mu=0.01, epochs=5):
+    """
+    근접 항이 있는 FedProx 로컬 학습
+
+    손실 = 원본_손실 + (mu/2) * ||w - w_global||^2
+
+    인자:
+        local_data: 클라이언트의 학습 데이터
+        global_model: 현재 전역 모델 가중치
+        mu: 근접 항 계수 (높을수록 더 강한 정규화)
+        epochs: 로컬 학습 에포크 수
+
+    반환:
+        업데이트된 로컬 모델
+    """
+    local_model = global_model.copy()
+
+    for epoch in range(epochs):
+        for batch in local_data:
+            # 원본 손실의 그래디언트 계산
+            grad_loss = compute_gradient(local_model, batch)
+
+            # 근접 항 그래디언트 추가
+            grad_proximal = mu * (local_model - global_model)
+
+            # 결합된 그래디언트
+            total_grad = grad_loss + grad_proximal
+
+            # 업데이트 단계
+            learning_rate = 0.01
+            local_model = local_model - learning_rate * total_grad
+
+    return local_model</code></pre>
+
+        <h3>SCAFFOLD: 분산 감소</h3>
+        <p>
+            SCAFFOLD는 클라이언트 드리프트를 수정하기 위해 제어 변수를 사용합니다:
+        </p>
+
+        <pre><code>class SCAFFOLD:
+    """
+    연합학습을 위한 확률적 제어 평균화
+
+    클라이언트 드리프트를 수정하기 위한 제어 변수 유지
+    """
+
+    def __init__(self):
+        self.server_control = None  # 서버 제어 변수
+        self.client_controls = {}   # 클라이언트 제어 변수
+
+    def client_update(self, client_id, local_data, global_model, steps=100):
+        """제어 변수를 사용한 클라이언트 학습"""
+
+        # 필요한 경우 제어 변수 초기화
+        if self.server_control is None:
+            self.server_control = np.zeros_like(global_model)
+
+        if client_id not in self.client_controls:
+            self.client_controls[client_id] = np.zeros_like(global_model)
+
+        local_model = global_model.copy()
+        c_server = self.server_control
+        c_client = self.client_controls[client_id]
+
+        # 제어 변수 업데이트를 위한 클라이언트 그래디언트 추적
+        gradient_sum = np.zeros_like(global_model)
+
+        for step in range(steps):
+            # 배치 샘플링
+            batch = sample_batch(local_data)
+
+            # 그래디언트 계산
+            grad = compute_gradient(local_model, batch)
+            gradient_sum += grad
+
+            # 제어 변수 보정 적용
+            corrected_grad = grad - c_client + c_server
+
+            # 로컬 모델 업데이트
+            local_model = local_model - 0.01 * corrected_grad
+
+        # 클라이언트 제어 변수 업데이트
+        delta_model = local_model - global_model
+        c_client_new = c_client - c_server + delta_model / (steps * 0.01)
+
+        self.client_controls[client_id] = c_client_new
+
+        return local_model, c_client_new
+
+    def server_aggregate(self, client_models, client_controls, num_clients):
+        """제어 변수 업데이트를 사용한 서버 집계"""
+
+        # 클라이언트 모델 평균화
+        global_model = np.mean(client_models, axis=0)
+
+        # 클라이언트 제어 변수 평균화
+        avg_client_control = np.mean(client_controls, axis=0)
+
+        # 서버 제어 변수 업데이트
+        self.server_control = avg_client_control
+
+        return global_model</code></pre>
+
+        <h2>비잔틴 견고 집계</h2>
+
+        <h3>비잔틴 위협</h3>
+        <p>
+            악의적인 클라이언트는 전역 모델을 방해하기 위해 임의의 업데이트를 보낼 수 있습니다. 비잔틴 견고 집계는 이러한 악의적인 기여를 필터링하거나 하향 가중합니다.
+        </p>
+
+        <h3>좌표별 중앙값</h3>
+        <p>
+            각 모델 파라미터에 대해 평균을 중앙값으로 대체:
+        </p>
+
+        <pre><code>def coordinate_wise_median(client_models):
+    """
+    좌표별 중앙값을 사용한 견고한 집계
+
+    최대 50%의 비잔틴 클라이언트 허용 (특정 가정 하에)
+
+    인자:
+        client_models: 클라이언트 모델 업데이트 목록
+
+    반환:
+        중앙값을 사용한 집계 모델
+    """
+    # 모델을 행으로 쌓기
+    stacked = np.stack(client_models, axis=0)
+
+    # 클라이언트 축을 따라 중앙값 계산 (axis=0)
+    global_model = np.median(stacked, axis=0)
+
+    return global_model
+
+
+# 비잔틴 공격이 있는 예시
+client_models = [
+    np.array([1.0, 2.0, 3.0]),    # 정직함
+    np.array([1.1, 1.9, 3.1]),    # 정직함
+    np.array([0.9, 2.1, 2.9]),    # 정직함
+    np.array([100.0, -100.0, 50.0])  # 비잔틴!
+]
+
+# 평균은 크게 영향받음: [25.75, -23.5, 14.75]
+avg = np.mean(client_models, axis=0)
+
+# 중앙값은 견고함: [1.0, 2.0, 3.0]
+robust = coordinate_wise_median(client_models)</code></pre>
+
+        <h3>트리밍된 평균</h3>
+        <p>
+            평균 전에 이상값 제거:
+        </p>
+
+        <pre><code>def trimmed_mean(client_models, trim_ratio=0.1):
+    """
+    트리밍된 평균을 사용한 집계
+
+    평균 전에 각 좌표에 대해 상위 및 하위 trim_ratio 비율의 값 제거
+
+    인자:
+        client_models: 클라이언트 업데이트 목록
+        trim_ratio: 각 끝에서 트리밍할 비율 (예: 0.1 = 10%)
+
+    반환:
+        견고한 집계 모델
+    """
+    stacked = np.stack(client_models, axis=0)
+    num_clients = len(client_models)
+
+    # 각 끝에서 트리밍할 클라이언트 수
+    num_trim = int(num_clients * trim_ratio)
+
+    # 클라이언트 축을 따라 정렬
+    sorted_models = np.sort(stacked, axis=0)
+
+    # 상위 및 하위 제거
+    if num_trim > 0:
+        trimmed = sorted_models[num_trim:-num_trim, :]
+    else:
+        trimmed = sorted_models
+
+    # 나머지 평균화
+    global_model = np.mean(trimmed, axis=0)
+
+    return global_model</code></pre>
+
+        <h3>Krum 알고리즘</h3>
+        <p>
+            다른 것들과 가장 가까운 클라이언트 모델 선택 (가장 "전형적"):
+        </p>
+
+        <pre><code>def krum(client_models, num_byzantines):
+    """
+    Krum: 비잔틴 견고 집계
+
+    가장 가까운 이웃까지의 거리 합이 가장 작은 모델 선택
+    (의심되는 비잔틴 제외)
+
+    인자:
+        client_models: 클라이언트 모델 업데이트 목록
+        num_byzantines: 최대 비잔틴 클라이언트 수
+
+    반환:
+        선택된 견고한 모델
+    """
+    num_clients = len(client_models)
+    num_to_consider = num_clients - num_byzantines - 2
+
+    # 쌍별 거리 계산
+    distances = np.zeros((num_clients, num_clients))
+    for i in range(num_clients):
+        for j in range(i + 1, num_clients):
+            dist = np.linalg.norm(client_models[i] - client_models[j])
+            distances[i, j] = dist
+            distances[j, i] = dist
+
+    # 각 클라이언트에 대해 점수 계산 (가장 가까운 이웃까지의 거리 합)
+    scores = []
+    for i in range(num_clients):
+        # 다른 모든 클라이언트까지의 거리 가져오기
+        dists_to_others = distances[i, :]
+
+        # 정렬하고 가장 가까운 num_to_consider 취하기
+        closest_dists = np.sort(dists_to_others)[1:num_to_consider+1]  # 자신 제외
+
+        score = np.sum(closest_dists)
+        scores.append(score)
+
+    # 최소 점수를 가진 클라이언트 선택
+    selected_idx = np.argmin(scores)
+
+    return client_models[selected_idx]
+
+
+# 예시
+honest_models = [np.random.randn(100) for _ in range(7)]
+byzantine_models = [np.random.randn(100) * 10 for _ in range(3)]  # 큰 노이즈
+all_models = honest_models + byzantine_models
+
+# Krum은 정직한 모델 중 하나를 선택
+robust_model = krum(all_models, num_byzantines=3)</code></pre>
+
+        <h2>개인화된 연합학습</h2>
+
+        <h3>개인화 동기</h3>
+        <p>
+            단일 전역 모델은 데이터 이질성으로 인해 모든 클라이언트에 잘 맞지 않을 수 있습니다. 개인화는 전역 지식을 활용하면서 클라이언트별 모델을 생성합니다.
+        </p>
+
+        <h3>파인튜닝 접근법</h3>
+        <p>
+            전역 모델로 시작하고 로컬 데이터에서 파인튜닝:
+        </p>
+
+        <pre><code>def personalized_finetuning(global_model, local_data, finetune_epochs=3):
+    """
+    파인튜닝을 통한 간단한 개인화
+
+    인자:
+        global_model: 서버의 전역 모델
+        local_data: 클라이언트의 로컬 데이터셋
+        finetune_epochs: 로컬 파인튜닝 에포크 수
+
+    반환:
+        이 클라이언트를 위한 개인화된 모델
+    """
+    personalized_model = global_model.copy()
+
+    # 로컬 데이터에만 파인튜닝
+    for epoch in range(finetune_epochs):
+        for batch in local_data:
+            grad = compute_gradient(personalized_model, batch)
+            personalized_model = personalized_model - 0.01 * grad
+
+    return personalized_model</code></pre>
+
+        <h2>집계 방법 비교</h2>
+
+        <table>
+            <tr>
+                <th>방법</th>
+                <th>장점</th>
+                <th>단점</th>
+                <th>최적 사용처</th>
+            </tr>
+            <tr>
+                <td><strong>FedAvg</strong></td>
+                <td>간단, 효율적, 잘 연구됨</td>
+                <td>공격에 취약, 비IID에 어려움</td>
+                <td>양성, 상대적으로 IID 설정</td>
+            </tr>
+            <tr>
+                <td><strong>FedProx</strong></td>
+                <td>더 나은 비IID 처리</td>
+                <td>하이퍼파라미터 조정 (mu)</td>
+                <td>이질적인 데이터 분포</td>
+            </tr>
+            <tr>
+                <td><strong>SCAFFOLD</strong></td>
+                <td>분산 감소, 빠른 수렴</td>
+                <td>더 높은 메모리 (제어 변수)</td>
+                <td>좋은 리소스를 가진 비IID</td>
+            </tr>
+            <tr>
+                <td><strong>중앙값</strong></td>
+                <td>간단, 이상값에 견고</td>
+                <td>유용한 정보 무시</td>
+                <td>소수의 비잔틴</td>
+            </tr>
+            <tr>
+                <td><strong>트리밍된 평균</strong></td>
+                <td>견고성과 유용성 균형</td>
+                <td>비잔틴 비율 알아야 함</td>
+                <td>알려진 공격 비율</td>
+            </tr>
+            <tr>
+                <td><strong>Krum</strong></td>
+                <td>강력한 비잔틴 견고성</td>
+                <td>O(n²) 복잡도, 데이터 낭비</td>
+                <td>중요한 애플리케이션, 작은 n</td>
+            </tr>
+            <tr>
+                <td><strong>개인화</strong></td>
+                <td>더 나은 개별 성능</td>
+                <td>더 복잡, 로컬 데이터 필요</td>
+                <td>매우 이질적인 클라이언트</td>
+            </tr>
+        </table>
+
+        <div class="info-box">
+            <h4>弘益人間의 실현</h4>
+            <p>견고한 집계 알고리즘은 악의적인 행위자로부터 협력 학습을 보호하여 모든 정직한 참여자가 弘益人間(홍익인간)의 정신에 따라 혜택을 받을 수 있도록 합니다. 비IID 데이터를 처리하고 개인화를 가능하게 함으로써 이러한 알고리즘은 다양한 배경과 요구를 가진 사람들이 공정하게 AI 발전에 기여하고 혜택을 받을 수 있도록 보장합니다.</p>
+        </div>
+
+        <div class="summary">
+            <h2>장 요약</h2>
+            <ul>
+                <li>집계는 분산 클라이언트 업데이트를 전역 모델로 결합</li>
+                <li>FedAvg는 데이터셋 크기별 가중 평균 사용 - 간단하고 효과적인 기준선</li>
+                <li>FedProx는 비IID 데이터 분포를 처리하기 위해 근접 항 추가</li>
+                <li>SCAFFOLD는 분산 감소 및 빠른 수렴을 위해 제어 변수 사용</li>
+                <li>비잔틴 견고 방법(중앙값, 트리밍된 평균, Krum)은 악의적인 클라이언트에 대해 방어</li>
+                <li>개인화된 FL은 전역 지식을 활용하면서 클라이언트별 모델 생성</li>
+                <li>주의 기반 집계는 최적의 클라이언트 가중치를 적응적으로 학습</li>
+                <li>집계 선택은 데이터 분포, 위협 모델 및 리소스에 따라 다름</li>
+                <li>견고한 방법은 보안을 위해 일부 정확도를 교환</li>
+                <li>현대 시스템은 종종 여러 기술을 결합 (예: FedProx + 트리밍된 평균)</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 질문</h2>
+            <ol>
+                <li>연합 평균화를 설명하세요. 균일 평균이 아닌 데이터셋 크기별 가중치를 사용하는 이유는 무엇입니까?</li>
+                <li>FedProx가 비IID 데이터의 도전과제를 어떻게 해결합니까? 근접 항은 무엇을 합니까?</li>
+                <li>SCAFFOLD의 제어 변수 메커니즘을 설명하세요. 클라이언트 드리프트를 어떻게 줄입니까?</li>
+                <li>좌표별 중앙값과 트리밍된 평균을 비교하세요. 비잔틴 공격에 어느 것이 더 견고합니까?</li>
+                <li>Krum 알고리즘이 가장 신뢰할 수 있는 클라이언트 모델을 어떻게 선택합니까?</li>
+                <li>개인화된 연합학습이란 무엇입니까? 언제 유익합니까?</li>
+                <li>50개 병원과 잠재적 적대자가 있는 의료 FL 시스템을 위한 집계 전략을 설계하세요.</li>
+                <li>프로덕션에서 비잔틴 공격이 발생하고 있는지 어떻게 감지하겠습니까?</li>
+                <li>비잔틴 견고 집계에서 견고성과 유용성 간의 트레이드오프를 설명하세요.</li>
+                <li>주의 기반 집계가 단순 평균보다 왜 성능이 우수할 수 있습니까?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← 제3장</a>
+            <a href="chapter-05.html" class="nav-button">제5장 →</a>
+        </div>
+    </div>
+</body>
+</html>

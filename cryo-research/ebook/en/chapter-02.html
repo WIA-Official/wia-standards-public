@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 2: Experiment Tracking and Metadata</title>
+</head>
+<body>
+<pre>
+================================================================================
+CHAPTER 2: EXPERIMENT TRACKING AND METADATA
+================================================================================
+
+<a href="index.html">[BACK TO TABLE OF CONTENTS]</a>
+
+--------------------------------------------------------------------------------
+2.1 EXPERIMENT LIFECYCLE MANAGEMENT
+--------------------------------------------------------------------------------
+
+Every cryopreservation research experiment progresses through defined stages,
+each requiring specific documentation. WIA-CRYO-010 provides lifecycle tracking
+that ensures no critical information is lost.
+
+[CRYO] EXPERIMENT LIFECYCLE STAGES:
+
+    +------------------------------------------------------------------+
+    | Stage          | Status      | Required Documentation           |
+    +------------------------------------------------------------------+
+    | 1. Planning    | PROPOSED    | Hypothesis, protocol design      |
+    +------------------------------------------------------------------+
+    | 2. Ethics      | APPROVED    | IRB approval, consent forms      |
+    +------------------------------------------------------------------+
+    | 3. Setup       | PREPARING   | Materials, equipment calibration |
+    +------------------------------------------------------------------+
+    | 4. Execution   | IN_PROGRESS | Real-time data collection        |
+    +------------------------------------------------------------------+
+    | 5. Analysis    | ANALYZING   | Statistical results              |
+    +------------------------------------------------------------------+
+    | 6. Publication | COMPLETED   | Manuscript, data deposition      |
+    +------------------------------------------------------------------+
+    | 7. Archival    | ARCHIVED    | Long-term storage metadata       |
+    +------------------------------------------------------------------+
+
+[i] LIFECYCLE WORKFLOW:
+
+    PROPOSED → APPROVED → PREPARING → IN_PROGRESS → ANALYZING → COMPLETED
+                    │            │            │
+                    ▼            ▼            ▼
+                REJECTED    SUSPENDED    FAILED
+                    │            │            │
+                    └────────────┴────────────┘
+                             ARCHIVED
+
+[!] CRITICAL TRANSITIONS:
+
+    PROPOSED → APPROVED: Requires ethics documentation
+    PREPARING → IN_PROGRESS: Requires equipment validation
+    IN_PROGRESS → ANALYZING: Requires complete data collection
+    ANALYZING → COMPLETED: Requires statistical verification
+    COMPLETED → ARCHIVED: Requires publication or formal closure
+
+
+--------------------------------------------------------------------------------
+2.2 METADATA SCHEMA DESIGN
+--------------------------------------------------------------------------------
+
+Comprehensive metadata ensures experiments are findable, understandable, and
+reproducible decades after completion.
+
+[CRYO] CORE METADATA FIELDS:
+
+    ADMINISTRATIVE METADATA
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ Field                  | Type      | Required | Example           │
+    ├────────────────────────┼───────────┼──────────┼──────────────────┤
+    │ experimentId           | UUID      | Yes      | exp-2025-a3f7... │
+    │ title                  | String    | Yes      | "DMSO Optimization│
+    │ principalInvestigator  | Person    | Yes      | Dr. Jane Smith   │
+    │ institution            | Org       | Yes      | WIA Research Ctr │
+    │ fundingSource          | String    | No       | NIH-R01-123456   │
+    │ irbApproval            | String    | Cond.    | IRB-2025-001     │
+    │ startDate              | ISO-8601  | Yes      | 2025-01-15       │
+    │ completionDate         | ISO-8601  | No       | 2025-06-30       │
+    └──────────────────────────────────────────────────────────────────┘
+
+    SCIENTIFIC METADATA
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ Field                  | Type      | Required | Example           │
+    ├────────────────────────┼───────────┼──────────┼──────────────────┤
+    │ researchType           | Enum      | Yes      | CPA_OPTIMIZATION │
+    │ hypothesis             | String    | Yes      | "15% DMSO improves│
+    │ subjectType            | Enum      | Yes      | CELL_CULTURE     │
+    │ species                | String    | Yes      | Homo sapiens     │
+    │ sampleSize             | Integer   | Yes      | 150              │
+    │ replicates             | Integer   | Yes      | 6                │
+    │ controlGroups          | Integer   | Yes      | 3                │
+    └──────────────────────────────────────────────────────────────────┘
+
+    TECHNICAL METADATA
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ Field                  | Type      | Required | Example           │
+    ├────────────────────────┼───────────┼──────────┼──────────────────┤
+    │ cpaFormulation         | Object    | Yes      | {DMSO: 15%, ...} │
+    │ coolingProtocol        | Object    | Yes      | {rate: -1°C/min} │
+    │ storageDuration        | Duration  | Yes      | P6M (6 months)   │
+    │ warmingProtocol        | Object    | Yes      | {rate: 10°C/min} │
+    │ assessmentMethods      | Array     | Yes      | [Trypan, MTT]    │
+    │ equipment              | Array     | Yes      | [CRF-2000, ...]  │
+    └──────────────────────────────────────────────────────────────────┘
+
+[i] JSON-LD EXAMPLE:
+
+{
+  "@context": "https://wia.org/standards/cryo-research/v1",
+  "@type": "CryoResearchExperiment",
+  "experimentId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+  "title": "DMSO Concentration Optimization for Hepatocyte Preservation",
+  "principalInvestigator": {
+    "@type": "Person",
+    "name": "Dr. Jane Smith",
+    "orcid": "0000-0002-1234-5678",
+    "affiliation": "WIA Research Center"
+  },
+  "institution": {
+    "@type": "Organization",
+    "name": "WIA Research Center",
+    "ror": "https://ror.org/abc123"
+  },
+  "lifecycle": {
+    "status": "IN_PROGRESS",
+    "startDate": "2025-01-15T09:00:00Z",
+    "expectedCompletion": "2025-06-30T17:00:00Z"
+  },
+  "scientific": {
+    "researchType": "CPA_OPTIMIZATION",
+    "hypothesis": "Increasing DMSO from 10% to 15% will improve hepatocyte
+                   viability post-thaw from 75% to 85% without increasing
+                   toxicity.",
+    "subjectType": "CELL_CULTURE",
+    "species": "Homo sapiens",
+    "tissueType": "Hepatocytes",
+    "sampleSize": 150,
+    "replicates": 6,
+    "controlGroups": 3
+  },
+  "technical": {
+    "cpaFormulations": [
+      {
+        "id": "CONTROL",
+        "dmso": {"concentration": 10, "unit": "%"},
+        "trehalose": {"concentration": 200, "unit": "mM"}
+      },
+      {
+        "id": "TEST",
+        "dmso": {"concentration": 15, "unit": "%"},
+        "trehalose": {"concentration": 200, "unit": "mM"}
+      }
+    ],
+    "coolingProtocol": {
+      "method": "CONTROLLED_RATE",
+      "rate": -1,
+      "unit": "°C/min",
+      "equipment": "CryoMed CRF-2000"
+    }
+  }
+}
+
+
+--------------------------------------------------------------------------------
+2.3 SUBJECT CLASSIFICATION SYSTEMS
+--------------------------------------------------------------------------------
+
+Consistent subject classification enables cross-study comparisons and
+meta-analysis.
+
+[CRYO] SUBJECT TYPE TAXONOMY:
+
+    BIOLOGICAL MATERIALS
+    │
+    ├── CELLS
+    │   ├── Primary Cells
+    │   │   ├── Hepatocytes
+    │   │   ├── Cardiomyocytes
+    │   │   ├── Neurons
+    │   │   └── Stem Cells
+    │   │       ├── Embryonic (ESC)
+    │   │       ├── Induced Pluripotent (iPSC)
+    │   │       └── Adult/Somatic
+    │   └── Cell Lines
+    │       ├── Immortalized
+    │       └── Transformed
+    │
+    ├── TISSUES
+    │   ├── Epithelial
+    │   ├── Connective
+    │   ├── Muscle
+    │   └── Nervous
+    │
+    ├── ORGANS
+    │   ├── Heart
+    │   ├── Liver
+    │   ├── Kidney
+    │   ├── Lung
+    │   └── Pancreas
+    │
+    ├── ORGANISMS
+    │   ├── Invertebrates
+    │   │   └── C. elegans
+    │   └── Vertebrates
+    │       ├── Fish (Zebrafish)
+    │       ├── Amphibians
+    │       └── Mammals
+    │
+    └── REPRODUCTIVE
+        ├── Gametes
+        │   ├── Oocytes
+        │   └── Sperm
+        └── Embryos
+
+[i] CLASSIFICATION CODES:
+
+    +------------------------------------------------------------------+
+    | Code           | Description              | Example             |
+    +------------------------------------------------------------------+
+    | CEL-PRI-HEP    | Primary Hepatocytes      | Human liver cells   |
+    +------------------------------------------------------------------+
+    | CEL-STC-iPSC   | Induced Pluripotent SC   | Reprogrammed cells  |
+    +------------------------------------------------------------------+
+    | TIS-MUS-CAR    | Cardiac Muscle Tissue    | Heart muscle        |
+    +------------------------------------------------------------------+
+    | ORG-HRT-WHO    | Whole Heart Organ        | Complete heart      |
+    +------------------------------------------------------------------+
+    | ORG-VRT-ZBF    | Zebrafish Organism       | Whole animal        |
+    +------------------------------------------------------------------+
+    | REP-GAM-OOC    | Oocyte Gamete            | Egg cell            |
+    +------------------------------------------------------------------+
+
+
+--------------------------------------------------------------------------------
+2.4 PROTOCOL DOCUMENTATION
+--------------------------------------------------------------------------------
+
+Detailed protocol documentation is essential for reproducibility. WIA-CRYO-010
+defines structured formats for every protocol component.
+
+[!] PROTOCOL COMPONENTS:
+
+    1. PREPARATION PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Subject procurement and handling                               │
+    │ - CPA preparation and quality verification                       │
+    │ - Equipment calibration and validation                           │
+    │ - Temperature probe placement                                    │
+    │ - Control group setup                                            │
+    └──────────────────────────────────────────────────────────────────┘
+
+    2. CPA LOADING PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Initial concentration                                          │
+    │ - Addition method (stepwise vs. continuous)                      │
+    │ - Equilibration time at each step                                │
+    │ - Temperature during loading                                     │
+    │ - Agitation/perfusion parameters                                 │
+    └──────────────────────────────────────────────────────────────────┘
+
+    3. COOLING PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Starting temperature                                           │
+    │ - Target temperature                                             │
+    │ - Cooling rate(s) - may be multi-stage                          │
+    │ - Container type and volume                                      │
+    │ - Ice nucleation temperature (if seeding)                        │
+    └──────────────────────────────────────────────────────────────────┘
+
+    4. STORAGE PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Storage temperature                                            │
+    │ - Storage duration                                               │
+    │ - Container type                                                 │
+    │ - Storage location/facility                                      │
+    │ - Monitoring frequency                                           │
+    └──────────────────────────────────────────────────────────────────┘
+
+    5. WARMING PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Warming method                                                 │
+    │ - Warming rate                                                   │
+    │ - Target temperature                                             │
+    │ - Bath medium composition                                        │
+    │ - Agitation parameters                                           │
+    └──────────────────────────────────────────────────────────────────┘
+
+    6. CPA REMOVAL PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Removal method (dilution vs. washing)                          │
+    │ - Number of steps                                                │
+    │ - Duration of each step                                          │
+    │ - Final CPA concentration                                        │
+    │ - Media composition                                              │
+    └──────────────────────────────────────────────────────────────────┘
+
+    7. ASSESSMENT PHASE
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Assessment timing (immediate, 24h, etc.)                       │
+    │ - Viability assays                                               │
+    │ - Functional tests                                               │
+    │ - Morphological examination                                      │
+    │ - Statistical analysis plan                                      │
+    └──────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+2.5 HYPOTHESIS REGISTRATION
+--------------------------------------------------------------------------------
+
+Pre-registration of hypotheses prevents publication bias and p-hacking.
+WIA-CRYO-010 supports formal hypothesis documentation.
+
+[CRYO] HYPOTHESIS STRUCTURE:
+
+    +------------------------------------------------------------------+
+    | Component          | Description              | Example          |
+    +------------------------------------------------------------------+
+    | Independent        | Variable being           | DMSO             |
+    | Variable           | manipulated              | concentration    |
+    +------------------------------------------------------------------+
+    | Dependent          | Outcome being measured   | Cell viability   |
+    | Variable           |                          |                  |
+    +------------------------------------------------------------------+
+    | Predicted          | Expected relationship    | Positive linear  |
+    | Relationship       |                          |                  |
+    +------------------------------------------------------------------+
+    | Effect Size        | Magnitude of expected    | 10% improvement  |
+    |                    | change                   |                  |
+    +------------------------------------------------------------------+
+    | Null Hypothesis    | No-effect statement      | DMSO has no      |
+    |                    |                          | effect           |
+    +------------------------------------------------------------------+
+    | Alternative        | Effect statement         | DMSO improves    |
+    | Hypothesis         |                          | viability        |
+    +------------------------------------------------------------------+
+
+[i] HYPOTHESIS REGISTRATION EXAMPLE:
+
+{
+  "@type": "ResearchHypothesis",
+  "registrationDate": "2025-01-15T09:00:00Z",
+  "preregistrationId": "osf.io/abc123",
+  "hypothesis": {
+    "null": "DMSO concentration has no effect on hepatocyte viability
+             post-thaw in the range 10-15%.",
+    "alternative": "Increasing DMSO concentration from 10% to 15% will
+                    improve hepatocyte viability post-thaw.",
+    "predicted": {
+      "direction": "POSITIVE",
+      "magnitude": "10% absolute increase",
+      "mechanism": "Reduced ice crystal formation due to increased
+                    colligative protection"
+    }
+  },
+  "variables": {
+    "independent": [
+      {
+        "name": "DMSO Concentration",
+        "type": "CONTINUOUS",
+        "levels": [10, 12.5, 15],
+        "unit": "%"
+      }
+    ],
+    "dependent": [
+      {
+        "name": "Cell Viability",
+        "type": "CONTINUOUS",
+        "measurement": "Trypan Blue Exclusion",
+        "unit": "%",
+        "expectedRange": [70, 90]
+      }
+    ],
+    "controlled": [
+      "Cooling rate", "Storage duration", "Warming rate",
+      "Cell density", "Culture conditions"
+    ]
+  },
+  "statisticalPlan": {
+    "design": "RANDOMIZED_CONTROLLED",
+    "sampleSize": 150,
+    "powerAnalysis": {
+      "targetPower": 0.80,
+      "alphaLevel": 0.05,
+      "expectedEffect": 0.5
+    },
+    "primaryAnalysis": "One-way ANOVA",
+    "postHoc": "Tukey HSD"
+  }
+}
+
+
+--------------------------------------------------------------------------------
+2.6 DATA COLLECTION STANDARDS
+--------------------------------------------------------------------------------
+
+Consistent data collection ensures quality and comparability across experiments.
+
+[!] DATA COLLECTION BEST PRACTICES:
+
+    TEMPORAL RESOLUTION
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ Measurement Type        | Frequency           | Precision        │
+    ├─────────────────────────┼─────────────────────┼─────────────────┤
+    │ Temperature (cooling)   | 1 Hz (1/sec)        | ±0.1°C          │
+    │ Temperature (storage)   | 1/hour              | ±1.0°C          │
+    │ CPA concentration       | Each step           | ±0.1%           │
+    │ Viability assessment    | Protocol-defined    | ±2%             │
+    │ Morphological imaging   | Per sample          | 10x minimum     │
+    └──────────────────────────────────────────────────────────────────┘
+
+    MEASUREMENT ACCURACY
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ Parameter              | Required Accuracy   | Calibration      │
+    ├────────────────────────┼─────────────────────┼─────────────────┤
+    │ Temperature            | ±0.5°C              | NIST traceable   │
+    │ Volume                 | ±1%                 | Gravimetric      │
+    │ Concentration          | ±2%                 | Spectrophotometry│
+    │ Cell count             | ±5%                 | Hemocytometer    │
+    │ Time                   | ±1 second           | NTP synchronized │
+    └──────────────────────────────────────────────────────────────────┘
+
+[CRYO] RAW DATA FORMATS:
+
+    TIME-SERIES DATA (Temperature, etc.)
+    CSV Format:
+    timestamp,probe_id,temperature_celsius,location
+    2025-01-15T10:00:00Z,T001,-1.2,core
+    2025-01-15T10:00:01Z,T001,-1.3,core
+    2025-01-15T10:00:02Z,T001,-1.4,core
+
+    VIABILITY MEASUREMENTS
+    JSON Format:
+    {
+      "sampleId": "S001",
+      "assay": "TRYPAN_BLUE",
+      "totalCells": 1000,
+      "viableCells": 873,
+      "viabilityPercent": 87.3,
+      "timestamp": "2025-01-15T14:30:00Z",
+      "operator": "Dr. Smith",
+      "equipment": "Hemocytometer-HC100"
+    }
+
+    IMAGING DATA
+    TIFF + Metadata:
+    Filename: S001_10x_brightfield_001.tif
+    Metadata (JSON sidecar):
+    {
+      "sampleId": "S001",
+      "magnification": "10x",
+      "modality": "BRIGHTFIELD",
+      "exposure": "100ms",
+      "timestamp": "2025-01-15T14:35:00Z"
+    }
+
+
+--------------------------------------------------------------------------------
+2.7 QUALITY CONTROL MEASURES
+--------------------------------------------------------------------------------
+
+Quality control ensures data integrity and identifies errors early.
+
+[OK] QC CHECKPOINTS:
+
+    1. PRE-EXPERIMENT QC
+       ✓ Equipment calibration verification
+       ✓ Reagent quality testing (osmolality, pH)
+       ✓ Control sample preparation
+       ✓ Data collection system testing
+       ✓ Protocol review and sign-off
+
+    2. DURING-EXPERIMENT QC
+       ✓ Real-time temperature monitoring
+       ✓ Automated range checks (alerts for out-of-spec values)
+       ✓ Intermediate viability checks
+       ✓ Control group tracking
+       ✓ Data backup verification
+
+    3. POST-EXPERIMENT QC
+       ✓ Data completeness check
+       ✓ Statistical outlier detection
+       ✓ Control group validation
+       ✓ Measurement consistency review
+       ✓ Metadata completeness verification
+
+[!] AUTOMATED QC RULES:
+
+    RANGE CHECKS
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ IF temperature > -195°C AND < -197°C THEN storage_ok = TRUE     │
+    │ IF viability > 100% THEN flag_error = TRUE                      │
+    │ IF cooling_rate > 0 THEN flag_warming_detected = TRUE           │
+    │ IF missing_data > 5% THEN flag_incomplete = TRUE                │
+    └──────────────────────────────────────────────────────────────────┘
+
+    CONSISTENCY CHECKS
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ IF sample_count != expected_count THEN investigate              │
+    │ IF control_viability < 80% THEN flag_assay_issue = TRUE         │
+    │ IF replicate_variance > 15% THEN flag_high_variance = TRUE      │
+    └──────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+2.8 AUDIT TRAIL REQUIREMENTS
+--------------------------------------------------------------------------------
+
+Complete audit trails enable verification and troubleshooting.
+
+[CRYO] AUDIT TRAIL COMPONENTS:
+
+    WHO: User identification
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Username or ORCID                                              │
+    │ - Full name                                                      │
+    │ - Role (PI, technician, analyst)                                 │
+    │ - Digital signature (cryptographic)                              │
+    └──────────────────────────────────────────────────────────────────┘
+
+    WHAT: Action description
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - Action type (CREATE, UPDATE, DELETE, EXECUTE)                 │
+    │ - Object affected (experiment, protocol, data)                   │
+    │ - Changes made (before/after values)                             │
+    │ - Reason for change (if applicable)                              │
+    └──────────────────────────────────────────────────────────────────┘
+
+    WHEN: Timestamp
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - ISO-8601 format with timezone                                  │
+    │ - NTP-synchronized                                               │
+    │ - Immutable (cannot be edited)                                   │
+    └──────────────────────────────────────────────────────────────────┘
+
+    WHERE: Location
+    ┌──────────────────────────────────────────────────────────────────┐
+    │ - IP address or workstation ID                                   │
+    │ - Physical location (if relevant)                                │
+    │ - System/software version                                        │
+    └──────────────────────────────────────────────────────────────────┘
+
+[i] AUDIT LOG EXAMPLE:
+
+{
+  "@type": "AuditEvent",
+  "eventId": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "timestamp": "2025-01-15T10:15:23.456Z",
+  "actor": {
+    "orcid": "0000-0002-1234-5678",
+    "name": "Dr. Jane Smith",
+    "role": "PRINCIPAL_INVESTIGATOR"
+  },
+  "action": {
+    "type": "UPDATE",
+    "object": "CryoResearchExperiment",
+    "objectId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "field": "hypothesis",
+    "previousValue": "DMSO improves viability",
+    "newValue": "DMSO at 15% improves viability by 10% vs 10% DMSO",
+    "reason": "Clarification of hypothesis specificity"
+  },
+  "context": {
+    "ipAddress": "192.168.1.100",
+    "workstation": "LAB-WS-05",
+    "software": "WIA-CRYO-LIMS v2.1.0"
+  },
+  "signature": {
+    "algorithm": "RS256",
+    "value": "eyJhbGc...truncated..."
+  }
+}
+
+
+--------------------------------------------------------------------------------
+CHAPTER SUMMARY
+--------------------------------------------------------------------------------
+
+This chapter covered comprehensive experiment tracking and metadata management
+for cryopreservation research.
+
+Key Takeaways:
+
+  [OK] 1. LIFECYCLE MANAGEMENT
+       Experiments progress through defined stages (proposed, approved,
+       in-progress, analyzing, completed, archived) with specific
+       documentation requirements at each transition.
+
+  [OK] 2. METADATA SCHEMAS
+       Comprehensive metadata includes administrative (PI, institution),
+       scientific (hypothesis, sample size), and technical (protocols,
+       equipment) information in structured JSON-LD format.
+
+  [OK] 3. SUBJECT CLASSIFICATION
+       Hierarchical taxonomy enables consistent classification from cells
+       to organisms with standardized codes (e.g., CEL-PRI-HEP).
+
+  [OK] 4. PROTOCOL DOCUMENTATION
+       Detailed documentation of all seven phases: preparation, CPA loading,
+       cooling, storage, warming, CPA removal, and assessment.
+
+  [OK] 5. HYPOTHESIS REGISTRATION
+       Pre-registration prevents p-hacking by documenting null/alternative
+       hypotheses, variables, and statistical plans before data collection.
+
+  [OK] 6. QUALITY CONTROL
+       Three-tier QC (pre-, during-, and post-experiment) with automated
+       range and consistency checks ensures data integrity.
+
+  [OK] 7. AUDIT TRAILS
+       Complete who/what/when/where logging with cryptographic signatures
+       enables verification and regulatory compliance.
+
+Next Chapter: Cryoprotectant Formulation Databases - Learn how to document
+and manage CPA compositions and their performance characteristics.
+
+
+--------------------------------------------------------------------------------
+REVIEW QUESTIONS
+--------------------------------------------------------------------------------
+
+1. What are the seven stages in the cryopreservation research experiment
+   lifecycle?
+
+2. Describe the three categories of metadata in the WIA-CRYO-010 schema.
+
+3. What is the purpose of the subject classification code system? Give three
+   examples of classification codes.
+
+4. List the seven phases of protocol documentation and explain why each is
+   critical for reproducibility.
+
+5. How does hypothesis pre-registration prevent publication bias?
+
+6. What are the three QC checkpoints in an experiment, and what does each
+   verify?
+
+--------------------------------------------------------------------------------
+
+<a href="chapter-03.html">[NEXT: CHAPTER 3 - CPA FORMULATION DATABASES]</a>
+<a href="index.html">[TABLE OF CONTENTS]</a>
+
+================================================================================
+</pre>
+</body>
+</html>

@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 프로덕션 배포 | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.2rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        h2 { color: #10B981; font-size: 1.6rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        code { color: #10B981; font-family: 'Courier New', monospace; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        .warning-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b; }
+        .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .completion-box { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; border: 2px solid #10B981; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제8장: 프로덕션 배포</h1>
+            <div class="chapter-meta">WIA-AI-025 | 연구에서 실제 세계로</div>
+        </header>
+
+        <main>
+            <h2>8.1 연구실에서 프로덕션으로</h2>
+
+            <p>프로덕션에서 RL 시스템을 배포하려면 성능, 안전성, 모니터링 및 유지보수에 대한 신중한 고려가 필요합니다. 이 장에서는 RL 에이전트를 실제 시스템에 성공적으로 배포하는 데 필요한 엔지니어링 관행을 다룹니다.</p>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">현실 점검:</strong>
+                <p>프로덕션 RL은 연구 RL과 매우 다릅니다. 실제 시스템은 엣지 케이스를 처리하고, 안전 보장을 유지하며, 효율적으로 확장하고, 변화하는 환경에 적응해야 합니다—모두 24/7 운영하면서 말이죠.</p>
+            </div>
+
+            <h3>프로덕션 요구사항</h3>
+
+            <ul>
+                <li><strong>지연 시간:</strong> 실시간 추론 (밀리초~초)</li>
+                <li><strong>신뢰성:</strong> 고가용성 및 장애 허용</li>
+                <li><strong>안전성:</strong> 제한된 동작, 안전 장치</li>
+                <li><strong>모니터링:</strong> 성능 추적 및 드리프트 감지</li>
+                <li><strong>확장성:</strong> 프로덕션 규모 부하 처리</li>
+                <li><strong>설명 가능성:</strong> 에이전트 결정 이해</li>
+            </ul>
+
+            <h2>8.2 모델 서빙 아키텍처</h2>
+
+            <h3>추론 서버</h3>
+
+            <pre><code>from fastapi import FastAPI
+import torch
+import uvicorn
+
+app = FastAPI()
+
+class RLModelServer:
+    def __init__(self, model_path):
+        # 훈련된 모델 로드
+        self.model = torch.load(model_path)
+        self.model.eval()
+
+        # GPU 사용 가능시 GPU로 이동
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+
+    def preprocess(self, observation):
+        """정규화 및 텐서로 변환."""
+        obs = torch.FloatTensor(observation).unsqueeze(0)
+        return obs.to(self.device)
+
+    def postprocess(self, action_tensor):
+        """텐서를 행동으로 변환."""
+        return action_tensor.cpu().numpy()[0]
+
+    @torch.no_grad()
+    def predict(self, observation):
+        """추론 실행."""
+        obs_tensor = self.preprocess(observation)
+        action_tensor = self.model(obs_tensor)
+        action = self.postprocess(action_tensor)
+        return action
+
+# 전역 모델 서버 인스턴스
+model_server = RLModelServer(model_path='models/agent.pt')
+
+@app.post("/predict")
+async def predict(observation: list):
+    """
+    추론 엔드포인트.
+
+    요청: {"observation": [0.1, 0.2, 0.3, ...]}
+    응답: {"action": [1.5, -0.3, ...], "latency_ms": 12.5}
+    """
+    import time
+    start = time.time()
+
+    action = model_server.predict(observation)
+
+    latency = (time.time() - start) * 1000
+
+    return {
+        "action": action.tolist(),
+        "latency_ms": latency
+    }
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)</code></pre>
+
+            <h3>TensorFlow Serving</h3>
+
+            <pre><code># TF Serving용 모델 내보내기
+import tensorflow as tf
+
+# SavedModel 형식으로 모델 저장
+tf.saved_model.save(model, 'serving_model/1')
+
+# TensorFlow Serving 사용 (Docker)
+docker run -p 8501:8501 \
+  --mount type=bind,source=$(pwd)/serving_model,target=/models/rl_agent \
+  -e MODEL_NAME=rl_agent \
+  -t tensorflow/serving
+
+# 클라이언트 코드
+import requests
+import json
+
+def predict(observation):
+    url = 'http://localhost:8501/v1/models/rl_agent:predict'
+
+    data = json.dumps({
+        "signature_name": "serving_default",
+        "instances": [observation.tolist()]
+    })
+
+    response = requests.post(url, data=data, headers={"content-type": "application/json"})
+    prediction = response.json()['predictions'][0]
+
+    return prediction</code></pre>
+
+            <h2>8.3 분산 훈련</h2>
+
+            <h3>데이터 병렬 훈련</h3>
+
+            <pre><code>import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+def cleanup():
+    dist.destroy_process_group()
+
+def train_worker(rank, world_size):
+    setup(rank, world_size)
+
+    # 모델 생성 및 GPU로 이동
+    model = PolicyNetwork().to(rank)
+    ddp_model = DDP(model, device_ids=[rank])
+
+    # 환경 생성
+    env = gym.make('Humanoid-v2')
+
+    # 훈련 루프
+    for episode in range(num_episodes):
+        state = env.reset()
+        done = False
+
+        while not done:
+            action = ddp_model(torch.FloatTensor(state).to(rank))
+            next_state, reward, done, _ = env.step(action.cpu().numpy())
+
+            # 손실 계산
+            loss = compute_loss(...)
+
+            # 역전파 (그래디언트가 GPU간 평균화됨)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            state = next_state
+
+    cleanup()
+
+def main():
+    world_size = torch.cuda.device_count()
+    mp.spawn(train_worker, args=(world_size,), nprocs=world_size, join=True)
+
+if __name__ == "__main__":
+    main()</code></pre>
+
+            <h3>분산 RL을 위한 Ray</h3>
+
+            <pre><code>import ray
+from ray.rllib.agents.ppo import PPOTrainer
+
+ray.init()
+
+# 구성
+config = {
+    "env": "CartPole-v1",
+    "num_workers": 16,           # 병렬 환경 워커
+    "num_gpus": 4,               # 훈련용 GPU
+    "train_batch_size": 4000,
+    "sgd_minibatch_size": 128,
+    "num_sgd_iter": 10,
+    "lr": 3e-4,
+    "framework": "torch"
+}
+
+# 트레이너 생성
+trainer = PPOTrainer(config=config)
+
+# 훈련
+for iteration in range(1000):
+    result = trainer.train()
+
+    print(f"반복 {iteration}")
+    print(f"  보상: {result['episode_reward_mean']:.2f}")
+    print(f"  길이: {result['episode_len_mean']:.2f}")
+
+    # 체크포인트 저장
+    if iteration % 100 == 0:
+        checkpoint = trainer.save()
+        print(f"  체크포인트 저장됨: {checkpoint}")
+
+# 배포용 내보내기
+trainer.export_policy_model("./exported_models")</code></pre>
+
+            <h2>8.4 안전성 및 제약조건</h2>
+
+            <h3>안전한 탐색</h3>
+
+            <pre><code>class SafetyLayer:
+    """
+    안전하지 않은 행동을 방지하는 안전 래퍼.
+    """
+    def __init__(self, env, safety_constraints):
+        self.env = env
+        self.constraints = safety_constraints
+
+    def is_safe(self, state, action):
+        """행동이 모든 안전 제약을 만족하는지 확인."""
+        for constraint in self.constraints:
+            if not constraint.check(state, action):
+                return False
+        return True
+
+    def get_safe_action(self, state, proposed_action):
+        """
+        안전하지 않은 행동을 가장 가까운 안전한 행동으로 투영.
+        """
+        if self.is_safe(state, proposed_action):
+            return proposed_action
+
+        # 가장 가까운 안전한 행동 찾기 (최적화 문제)
+        safe_action = self.project_to_safe_set(state, proposed_action)
+        return safe_action
+
+# 사용
+safe_env = SafetyLayer(env, safety_constraints=[
+    MaxVelocityConstraint(max_speed=5.0),
+    WorkspaceConstraint(bounds=workspace_bounds),
+    CollisionConstraint(obstacles=obstacles)
+])
+
+action = policy(state)
+safe_action = safe_env.get_safe_action(state, action)
+next_state, reward, done = env.step(safe_action)</code></pre>
+
+            <h3>제약 RL</h3>
+
+            <pre><code>class CPO:  # Constrained Policy Optimization
+    """
+    안전 제약을 만족하면서 정책 최적화:
+
+    maximize E[보상]
+    subject to E[비용] ≤ 임계값
+    """
+    def __init__(self, cost_limit=25):
+        self.policy = PolicyNetwork()
+        self.value = ValueNetwork()
+        self.cost_value = ValueNetwork()  # 비용 추정
+        self.cost_limit = cost_limit
+
+    def update(self, trajectories):
+        # 어드밴티지 및 비용 어드밴티지 계산
+        advantages = self.compute_advantages(trajectories)
+        cost_advantages = self.compute_cost_advantages(trajectories)
+
+        # 현재 정책 성능
+        current_reward = self.evaluate_reward()
+        current_cost = self.evaluate_cost()
+
+        # 제약 최적화
+        # 라그랑지안 사용: L = 보상 - λ * (비용 - 한계)
+        policy_loss = -(advantages - λ * cost_advantages).mean()
+
+        # 정책 업데이트
+        optimizer.zero_grad()
+        policy_loss.backward()
+
+        # 제약 만족을 위한 그래디언트 투영
+        self.project_gradients(current_cost, self.cost_limit)
+
+        optimizer.step()
+
+        # λ (라그랑주 승수) 업데이트
+        if current_cost > self.cost_limit:
+            λ *= 1.05  # 페널티 증가
+        else:
+            λ *= 0.95  # 페널티 감소</code></pre>
+
+            <h2>8.5 모니터링 및 관측성</h2>
+
+            <h3>메트릭 수집</h3>
+
+            <pre><code>from prometheus_client import Counter, Histogram, Gauge
+import time
+
+# 메트릭 정의
+inference_counter = Counter('rl_inference_total', '총 추론 요청')
+inference_latency = Histogram('rl_inference_latency_seconds', '추론 지연 시간')
+action_distribution = Histogram('rl_action_values', '행동 값 분포')
+reward_gauge = Gauge('rl_episode_reward', '에피소드 보상')
+
+class MonitoredAgent:
+    def __init__(self, policy):
+        self.policy = policy
+
+    @inference_latency.time()
+    def predict(self, observation):
+        inference_counter.inc()
+
+        action = self.policy(observation)
+
+        # 행동 분포 추적
+        action_distribution.observe(action.mean())
+
+        return action
+
+    def on_episode_end(self, total_reward):
+        reward_gauge.set(total_reward)
+
+# 로깅
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class LoggingAgent:
+    def predict(self, observation):
+        logger.info(f"관측: {observation}")
+
+        action = self.policy(observation)
+
+        logger.info(f"행동: {action}")
+
+        return action</code></pre>
+
+            <h3>이상 탐지</h3>
+
+            <pre><code>class AnomalyDetector:
+    """
+    분포 이동 및 이상 행동 탐지.
+    """
+    def __init__(self):
+        self.observation_stats = {
+            'mean': None,
+            'std': None,
+            'min': None,
+            'max': None
+        }
+
+    def fit(self, observations):
+        """정상 관측 분포 학습."""
+        import numpy as np
+
+        self.observation_stats['mean'] = np.mean(observations, axis=0)
+        self.observation_stats['std'] = np.std(observations, axis=0)
+        self.observation_stats['min'] = np.min(observations, axis=0)
+        self.observation_stats['max'] = np.max(observations, axis=0)
+
+    def detect_anomaly(self, observation):
+        """관측이 이상한지 확인."""
+        import numpy as np
+
+        # Z-점수 기반 탐지
+        z_score = np.abs(
+            (observation - self.observation_stats['mean']) /
+            (self.observation_stats['std'] + 1e-8)
+        )
+
+        is_anomaly = np.any(z_score > 3.0)  # 3-시그마 규칙
+
+        if is_anomaly:
+            logger.warning(f"이상 관측 탐지됨: {observation}")
+            # 알림 트리거, 폴백 정책 사용 등
+
+        return is_anomaly</code></pre>
+
+            <h2>8.6 온라인 학습 및 적응</h2>
+
+            <h3>지속적 학습</h3>
+
+            <pre><code>class ContinualLearner:
+    """
+    프로덕션 데이터에서 지속적으로 학습.
+    """
+    def __init__(self, policy, update_frequency=1000):
+        self.policy = policy
+        self.buffer = ReplayBuffer(capacity=100000)
+        self.update_frequency = update_frequency
+        self.step_count = 0
+
+    def act(self, observation):
+        action = self.policy(observation)
+        return action
+
+    def observe(self, observation, action, reward, next_observation):
+        # 경험 저장
+        self.buffer.add(observation, action, reward, next_observation)
+
+        self.step_count += 1
+
+        # 주기적 업데이트
+        if self.step_count % self.update_frequency == 0:
+            self.update_policy()
+
+    def update_policy(self):
+        """최근 경험에서 정책 업데이트."""
+        if len(self.buffer) < batch_size:
+            return
+
+        batch = self.buffer.sample(batch_size)
+
+        # 손실 계산
+        loss = compute_td_loss(self.policy, batch)
+
+        # 작은 학습률로 업데이트 (안정성)
+        optimizer = torch.optim.Adam(self.policy.parameters(), lr=1e-5)
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
+        optimizer.step()
+
+        logger.info(f"정책 업데이트됨. 손실: {loss.item():.4f}")</code></pre>
+
+            <h3>A/B 테스트</h3>
+
+            <pre><code>class ABTestingFramework:
+    """
+    프로덕션에서 여러 정책 버전 비교.
+    """
+    def __init__(self, policies, traffic_split=None):
+        self.policies = policies  # {'baseline': policy_A, 'treatment': policy_B}
+
+        if traffic_split is None:
+            traffic_split = {k: 1.0/len(policies) for k in policies}
+
+        self.traffic_split = traffic_split
+        self.metrics = {k: [] for k in policies}
+
+    def select_policy(self, user_id):
+        """트래픽을 정책 변형으로 라우팅."""
+        import random
+
+        # user_id 기반 결정론적 라우팅
+        hash_val = hash(user_id) % 100
+
+        cumulative = 0
+        for policy_name, percentage in self.traffic_split.items():
+            cumulative += percentage * 100
+            if hash_val < cumulative:
+                return policy_name, self.policies[policy_name]
+
+        return list(self.policies.items())[0]
+
+    def record_metric(self, policy_name, reward):
+        self.metrics[policy_name].append(reward)
+
+    def analyze_results(self):
+        """A/B 테스트 통계 분석."""
+        import numpy as np
+        from scipy import stats
+
+        baseline_rewards = self.metrics['baseline']
+        treatment_rewards = self.metrics['treatment']
+
+        # T-검정
+        t_stat, p_value = stats.ttest_ind(treatment_rewards, baseline_rewards)
+
+        print(f"기준선 평균 보상: {np.mean(baseline_rewards):.2f}")
+        print(f"처리군 평균 보상: {np.mean(treatment_rewards):.2f}")
+        print(f"P-값: {p_value:.4f}")
+
+        if p_value < 0.05:
+            if np.mean(treatment_rewards) > np.mean(baseline_rewards):
+                print("처리군이 유의하게 더 좋습니다!")
+            else:
+                print("기준선이 유의하게 더 좋습니다!")
+        else:
+            print("유의한 차이 없음")</code></pre>
+
+            <h2>8.7 모델 압축 및 최적화</h2>
+
+            <h3>양자화</h3>
+
+            <pre><code>import torch
+
+# 훈련 후 양자화
+model = torch.load('policy.pt')
+model.eval()
+
+# 동적 양자화 (가중치 + 활성화)
+quantized_model = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+
+# 양자화된 모델 저장
+torch.save(quantized_model, 'policy_quantized.pt')
+
+# 모델 크기 비교
+import os
+original_size = os.path.getsize('policy.pt') / 1024  # KB
+quantized_size = os.path.getsize('policy_quantized.pt') / 1024
+
+print(f"원본: {original_size:.2f} KB")
+print(f"양자화: {quantized_size:.2f} KB")
+print(f"압축률: {original_size/quantized_size:.2f}x")</code></pre>
+
+            <h3>지식 증류</h3>
+
+            <pre><code>class PolicyDistillation:
+    """
+    큰 교사의 행동을 모방하도록 작은 학생 정책 훈련.
+    """
+    def __init__(self, teacher_policy, student_policy):
+        self.teacher = teacher_policy
+        self.student = student_policy
+
+        self.teacher.eval()  # 교사 고정
+
+    def distill(self, states, temperature=2.0):
+        """
+        학생이 교사의 행동 분포를 매칭하도록 훈련.
+        """
+        with torch.no_grad():
+            # 소프트 교사 예측
+            teacher_logits = self.teacher(states) / temperature
+            teacher_probs = F.softmax(teacher_logits, dim=-1)
+
+        # 학생 예측
+        student_logits = self.student(states) / temperature
+        student_log_probs = F.log_softmax(student_logits, dim=-1)
+
+        # KL 발산 손실
+        loss = F.kl_div(student_log_probs, teacher_probs, reduction='batchmean')
+
+        return loss
+
+# 훈련 루프
+teacher = LargePolicy()  # 1000만 파라미터
+student = SmallPolicy()  # 100만 파라미터
+
+optimizer = torch.optim.Adam(student.parameters(), lr=1e-3)
+
+for epoch in range(100):
+    states = sample_states()
+
+    loss = distillation.distill(states)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+print(f"학생 훈련 완료! 파라미터: {count_parameters(student)}")</code></pre>
+
+            <h2>8.8 배포 체크리스트</h2>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">배포 전 체크리스트:</strong>
+                <ol>
+                    <li>✓ 시뮬레이션에서 포괄적 테스트</li>
+                    <li>✓ 안전 제약 구현 및 검증</li>
+                    <li>✓ 이상 상황을 위한 폴백 정책</li>
+                    <li>✓ 모니터링 및 알림 구성</li>
+                    <li>✓ 지연 시간 요구사항 충족</li>
+                    <li>✓ A/B 테스트 프레임워크 준비</li>
+                    <li>✓ 롤백 계획 준비</li>
+                    <li>✓ 문서화 완료</li>
+                    <li>✓ 팀 운영 교육</li>
+                    <li>✓ 점진적 롤아웃 계획 (카나리 배포)</li>
+                </ol>
+            </div>
+
+            <h3>배포 단계</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>단계</th>
+                        <th>트래픽 %</th>
+                        <th>기간</th>
+                        <th>기준</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>카나리</td>
+                        <td>1%</td>
+                        <td>24시간</td>
+                        <td>치명적 오류 없음</td>
+                    </tr>
+                    <tr>
+                        <td>제한</td>
+                        <td>10%</td>
+                        <td>3일</td>
+                        <td>성능 ≥ 기준선</td>
+                    </tr>
+                    <tr>
+                        <td>확장</td>
+                        <td>50%</td>
+                        <td>1주</td>
+                        <td>통계적으로 유의한 개선</td>
+                    </tr>
+                    <tr>
+                        <td>전체</td>
+                        <td>100%</td>
+                        <td>지속</td>
+                        <td>지속적 모니터링</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>8.9 사례 연구</h2>
+
+            <h3>Google 데이터센터 냉각</h3>
+
+            <p>DeepMind의 RL 시스템이 냉각 에너지를 40% 절감:</p>
+
+            <ul>
+                <li><strong>환경:</strong> 수백 개의 센서와 액추에이터가 있는 데이터센터</li>
+                <li><strong>상태:</strong> 온도, 압력, 전력 소비 (시계열)</li>
+                <li><strong>행동:</strong> 냉각 시스템 설정 조정</li>
+                <li><strong>보상:</strong> -에너지_소비 (최소화)</li>
+                <li><strong>안전성:</strong> 온도 범위에 대한 하드 제약</li>
+                <li><strong>배포:</strong> 인간 감독 하에 점진적 롤아웃</li>
+            </ul>
+
+            <h3>추천 시스템</h3>
+
+            <pre><code>class RecommenderRL:
+    """
+    개인화된 추천을 위한 RL.
+    """
+    def __init__(self):
+        self.policy = SlateGenerationPolicy()
+
+    def recommend(self, user_id, context):
+        """
+        추천 슬레이트 생성.
+
+        상태: 사용자 이력, 컨텍스트, 시간
+        행동: 보여줄 아이템 슬레이트
+        보상: 클릭, 시청 시간, 만족도
+        """
+        state = self.get_state(user_id, context)
+
+        # 후보 아이템 생성
+        candidates = self.candidate_generation(user_id)
+
+        # 순위 매기고 top-k 선택
+        slate = self.policy(state, candidates)
+
+        return slate
+
+    def update(self, user_id, slate, feedback):
+        """사용자 피드백에서 학습."""
+        reward = self.compute_reward(feedback)
+
+        self.buffer.add(state, slate, reward)
+
+        if len(self.buffer) > batch_size:
+            self.train_step()</code></pre>
+
+            <h2>8.10 미래 방향</h2>
+
+            <h3>신흥 트렌드</h3>
+
+            <ul>
+                <li><strong>오프라인 RL:</strong> 환경 상호작용 없이 로그 데이터에서 학습</li>
+                <li><strong>메타 RL:</strong> 학습하는 법 학습, 새로운 태스크에 빠르게 적응</li>
+                <li><strong>심-투-리얼:</strong> 시뮬레이션에서 실제 세계로 더 나은 전이</li>
+                <li><strong>설명 가능한 RL:</strong> 에이전트 결정 해석</li>
+                <li><strong>파운데이션 모델:</strong> 전이를 위한 사전 훈련된 RL 모델</li>
+            </ul>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">밝은 미래:</strong>
+                <p>RL은 가속화하는 속도로 연구실에서 프로덕션 시스템으로 이동하고 있습니다. 더 나은 도구, 프레임워크 및 모범 사례로, 실제 응용 프로그램에 RL을 배포하는 것이 점점 더 접근 가능해지고 있습니다.</p>
+            </div>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>프로덕션 RL은 안전성, 지연 시간 및 신뢰성에 대한 신중한 고려 필요</li>
+                    <li>모델 서빙 프레임워크가 확장 가능한 추론 가능하게 함</li>
+                    <li>분산 훈련이 대규모 문제에서 학습 가속화</li>
+                    <li>안전 레이어와 제약 RL이 제한된 동작 보장</li>
+                    <li>모니터링과 관측성이 문제 감지에 중요</li>
+                    <li>온라인 학습이 변화하는 환경에 적응 가능하게 함</li>
+                    <li>A/B 테스트가 프로덕션에서 개선 검증</li>
+                    <li>모델 압축이 배포 비용 감소</li>
+                    <li>점진적 롤아웃이 위험 최소화</li>
+                    <li>실제 사례 연구가 RL의 실용적 영향 입증</li>
+                </ul>
+            </div>
+
+            <div class="completion-box">
+                <h2 style="color: #10B981; margin-bottom: 1rem;">축하합니다!</h2>
+                <p style="font-size: 1.2rem;">WIA-AI-025 강화학습 과정을 완료했습니다!</p>
+                <p style="margin-top: 1rem;">이제 다음을 할 수 있는 지식을 갖추었습니다:</p>
+                <ul style="text-align: left; display: inline-block; margin-top: 1rem;">
+                    <li>RL 기초와 MDP 이해</li>
+                    <li>가치 기반 및 정책 경사 방법 구현</li>
+                    <li>액터-크리틱 알고리즘 적용</li>
+                    <li>계획을 위한 모델 기반 RL 사용</li>
+                    <li>다중 에이전트 시스템 조정</li>
+                    <li>RL 시스템 프로덕션 배포</li>
+                </ul>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

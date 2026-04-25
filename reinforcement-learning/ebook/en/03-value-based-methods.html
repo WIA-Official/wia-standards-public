@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Value-Based Methods | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; font-size: 1rem; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; transition: all 0.3s ease; }
+        nav a:hover { background: #10B981; color: white; }
+        h2 { color: #10B981; font-size: 2rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        .warning-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b; }
+        .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        .quiz { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .quiz h3 { color: #10B981; margin-bottom: 1rem; }
+        .quiz-question { margin-bottom: 1.5rem; padding: 1rem; background: #0f172a; border-radius: 8px; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 3: Value-Based Methods</h1>
+            <div class="chapter-meta">WIA-AI-025 | Q-Learning, DQN, and Beyond 🎯</div>
+        </header>
+
+        <main>
+            <h2>3.1 Introduction to Value-Based Methods</h2>
+
+            <p>Value-based methods learn the value of being in each state (or taking each action in each state) and derive a policy from these values. The key idea is: if we know Q*(s,a), we can act optimally by simply choosing argmax_a Q*(s,a).</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Key Advantage:</strong>
+                <p>Value-based methods don't require a model of the environment's dynamics. They learn directly from experience through trial and error.</p>
+            </div>
+
+            <h2>3.2 Monte Carlo Methods</h2>
+
+            <p>Monte Carlo (MC) methods learn from complete episodes of experience. They estimate value functions by averaging sample returns.</p>
+
+            <h3>First-Visit MC Prediction</h3>
+
+            <pre><code>def first_visit_mc_prediction(policy, env, episodes=1000, gamma=0.99):
+    """
+    Estimate V^π using first-visit Monte Carlo.
+    """
+    V = defaultdict(float)
+    returns = defaultdict(list)
+
+    for episode in range(episodes):
+        # Generate episode following policy
+        states, actions, rewards = generate_episode(policy, env)
+
+        G = 0
+        visited = set()
+
+        # Process episode backwards
+        for t in reversed(range(len(states))):
+            s = states[t]
+            r = rewards[t]
+
+            G = gamma * G + r
+
+            # First-visit check
+            if s not in visited:
+                visited.add(s)
+                returns[s].append(G)
+                V[s] = np.mean(returns[s])
+
+    return V</code></pre>
+
+            <h3>MC Control with Epsilon-Greedy</h3>
+
+            <pre><code>def mc_control_epsilon_greedy(env, episodes=10000, gamma=0.99, epsilon=0.1):
+    """
+    Find optimal policy using Monte Carlo control.
+    """
+    Q = defaultdict(lambda: defaultdict(float))
+    returns = defaultdict(lambda: defaultdict(list))
+
+    for episode in range(episodes):
+        # Generate episode with epsilon-greedy policy
+        states, actions, rewards = [], [], []
+        state = env.reset()
+
+        while True:
+            # Epsilon-greedy action selection
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                action = max(Q[state], key=Q[state].get)
+
+            next_state, reward, done, _ = env.step(action)
+
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+
+            if done:
+                break
+
+            state = next_state
+
+        # Update Q-values
+        G = 0
+        visited = set()
+
+        for t in reversed(range(len(states))):
+            s, a, r = states[t], actions[t], rewards[t]
+            G = gamma * G + r
+
+            if (s, a) not in visited:
+                visited.add((s, a))
+                returns[s][a].append(G)
+                Q[s][a] = np.mean(returns[s][a])
+
+    return Q</code></pre>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">Limitation:</strong>
+                <p>Monte Carlo methods must wait until the end of an episode to update values. This can be slow for long episodes and doesn't work for continuing tasks.</p>
+            </div>
+
+            <h2>3.3 Temporal Difference Learning</h2>
+
+            <p>Temporal Difference (TD) learning combines ideas from Monte Carlo and dynamic programming. TD methods can learn from incomplete episodes by bootstrapping.</p>
+
+            <h3>TD(0) Prediction</h3>
+
+            <pre><code>V(sₜ) ← V(sₜ) + α[rₜ₊₁ + γV(sₜ₊₁) - V(sₜ)]
+              ↑           ↑      ↑              ↑
+           old value  learning  TD target    old value
+                        rate
+
+TD target = rₜ₊₁ + γV(sₜ₊₁)
+TD error  = rₜ₊₁ + γV(sₜ₊₁) - V(sₜ)</code></pre>
+
+            <h3>TD vs MC</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Monte Carlo</th>
+                        <th>Temporal Difference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Update Timing</td>
+                        <td>End of episode</td>
+                        <td>Every time step</td>
+                    </tr>
+                    <tr>
+                        <td>Target</td>
+                        <td>Actual return Gₜ</td>
+                        <td>Estimate rₜ₊₁ + γV(sₜ₊₁)</td>
+                    </tr>
+                    <tr>
+                        <td>Variance</td>
+                        <td>High</td>
+                        <td>Low</td>
+                    </tr>
+                    <tr>
+                        <td>Bias</td>
+                        <td>None (unbiased)</td>
+                        <td>Present (biased)</td>
+                    </tr>
+                    <tr>
+                        <td>Continuing Tasks</td>
+                        <td>Not applicable</td>
+                        <td>Works well</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3.4 Q-Learning</h2>
+
+            <p>Q-Learning is the most important TD control algorithm. It's off-policy: learns about the optimal policy while following an exploratory policy.</p>
+
+            <h3>Q-Learning Algorithm</h3>
+
+            <pre><code>Q(sₜ,aₜ) ← Q(sₜ,aₜ) + α[rₜ₊₁ + γ max_a Q(sₜ₊₁,a) - Q(sₜ,aₜ)]
+
+Key points:
+1. Off-policy: learns Q* regardless of behavior policy
+2. Bootstraps: uses estimate Q(s',a') to update Q(s,a)
+3. Converges to optimal Q* under certain conditions</code></pre>
+
+            <h3>Complete Q-Learning Implementation</h3>
+
+            <pre><code>import numpy as np
+import gym
+
+def q_learning(env, episodes=5000, alpha=0.1, gamma=0.99, epsilon=0.1):
+    """
+    Q-Learning algorithm for discrete state/action spaces.
+
+    Args:
+        env: OpenAI Gym environment
+        episodes: number of training episodes
+        alpha: learning rate
+        gamma: discount factor
+        epsilon: exploration rate
+    """
+    # Initialize Q-table
+    Q = np.zeros([env.observation_space.n, env.action_space.n])
+
+    # Training statistics
+    episode_rewards = []
+
+    for episode in range(episodes):
+        state = env.reset()
+        total_reward = 0
+        done = False
+
+        while not done:
+            # Epsilon-greedy action selection
+            if np.random.random() < epsilon:
+                action = env.action_space.sample()  # Explore
+            else:
+                action = np.argmax(Q[state])        # Exploit
+
+            # Take action
+            next_state, reward, done, _ = env.step(action)
+            total_reward += reward
+
+            # Q-Learning update
+            best_next_action = np.argmax(Q[next_state])
+            td_target = reward + gamma * Q[next_state, best_next_action]
+            td_error = td_target - Q[state, action]
+            Q[state, action] += alpha * td_error
+
+            state = next_state
+
+        episode_rewards.append(total_reward)
+
+        # Decay epsilon
+        epsilon = max(0.01, epsilon * 0.995)
+
+        if (episode + 1) % 500 == 0:
+            avg_reward = np.mean(episode_rewards[-100:])
+            print(f"Episode {episode+1}, Avg Reward: {avg_reward:.2f}")
+
+    return Q, episode_rewards</code></pre>
+
+            <h3>Convergence Conditions</h3>
+
+            <p>Q-Learning converges to Q* if:</p>
+            <ul>
+                <li>All state-action pairs are visited infinitely often</li>
+                <li>Learning rate α decays appropriately: Σα = ∞, Σα² < ∞</li>
+                <li>The environment is a finite MDP</li>
+            </ul>
+
+            <h2>3.5 SARSA (On-Policy TD Control)</h2>
+
+            <p>SARSA is the on-policy version of Q-Learning. It learns the value of the policy being followed, including exploration.</p>
+
+            <pre><code>Q(sₜ,aₜ) ← Q(sₜ,aₜ) + α[rₜ₊₁ + γQ(sₜ₊₁,aₜ₊₁) - Q(sₜ,aₜ)]
+
+The name SARSA comes from the tuple (sₜ, aₜ, rₜ₊₁, sₜ₊₁, aₜ₊₁)</code></pre>
+
+            <h3>SARSA Implementation</h3>
+
+            <pre><code>def sarsa(env, episodes=5000, alpha=0.1, gamma=0.99, epsilon=0.1):
+    """
+    SARSA algorithm (on-policy TD control).
+    """
+    Q = np.zeros([env.observation_space.n, env.action_space.n])
+
+    for episode in range(episodes):
+        state = env.reset()
+
+        # Choose initial action using epsilon-greedy
+        if np.random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
+            action = np.argmax(Q[state])
+
+        done = False
+
+        while not done:
+            # Take action
+            next_state, reward, done, _ = env.step(action)
+
+            # Choose next action using epsilon-greedy
+            if np.random.random() < epsilon:
+                next_action = env.action_space.sample()
+            else:
+                next_action = np.argmax(Q[next_state])
+
+            # SARSA update: uses actual next action
+            td_target = reward + gamma * Q[next_state, next_action]
+            td_error = td_target - Q[state, action]
+            Q[state, action] += alpha * td_error
+
+            state = next_state
+            action = next_action
+
+    return Q</code></pre>
+
+            <h3>Q-Learning vs SARSA</h3>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">Cliff Walking Example:</strong>
+                <p><strong>Q-Learning:</strong> Learns optimal path close to cliff (risky during training)<br>
+                <strong>SARSA:</strong> Learns safer path away from cliff (accounts for exploration)</p>
+            </div>
+
+            <h2>3.6 Deep Q-Networks (DQN)</h2>
+
+            <p>DQN extends Q-Learning to high-dimensional state spaces using deep neural networks as function approximators.</p>
+
+            <h3>Key Innovations</h3>
+
+            <ol>
+                <li><strong>Experience Replay:</strong> Store transitions in buffer, sample mini-batches randomly</li>
+                <li><strong>Target Network:</strong> Separate network for TD targets, updated periodically</li>
+                <li><strong>Neural Network:</strong> Approximate Q(s,a) instead of tabular storage</li>
+            </ol>
+
+            <h3>DQN Architecture</h3>
+
+            <pre><code>import torch
+import torch.nn as nn
+import torch.optim as optim
+from collections import deque
+import random
+
+class DQN(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(DQN, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim)
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+class ReplayBuffer:
+    def __init__(self, capacity=10000):
+        self.buffer = deque(maxlen=capacity)
+
+    def push(self, state, action, reward, next_state, done):
+        self.buffer.append((state, action, reward, next_state, done))
+
+    def sample(self, batch_size):
+        return random.sample(self.buffer, batch_size)
+
+    def __len__(self):
+        return len(self.buffer)</code></pre>
+
+            <h3>DQN Training Loop</h3>
+
+            <pre><code>def train_dqn(env, episodes=1000, batch_size=64, gamma=0.99):
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    # Initialize networks
+    policy_net = DQN(state_dim, action_dim)
+    target_net = DQN(state_dim, action_dim)
+    target_net.load_state_dict(policy_net.state_dict())
+
+    optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+    replay_buffer = ReplayBuffer(capacity=10000)
+
+    epsilon = 1.0
+    epsilon_decay = 0.995
+    epsilon_min = 0.01
+
+    for episode in range(episodes):
+        state = env.reset()
+        total_reward = 0
+
+        while True:
+            # Epsilon-greedy action selection
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                with torch.no_grad():
+                    state_tensor = torch.FloatTensor(state).unsqueeze(0)
+                    q_values = policy_net(state_tensor)
+                    action = q_values.argmax().item()
+
+            next_state, reward, done, _ = env.step(action)
+            total_reward += reward
+
+            # Store transition
+            replay_buffer.push(state, action, reward, next_state, done)
+
+            # Training step
+            if len(replay_buffer) > batch_size:
+                # Sample mini-batch
+                batch = replay_buffer.sample(batch_size)
+                states, actions, rewards, next_states, dones = zip(*batch)
+
+                states = torch.FloatTensor(states)
+                actions = torch.LongTensor(actions)
+                rewards = torch.FloatTensor(rewards)
+                next_states = torch.FloatTensor(next_states)
+                dones = torch.FloatTensor(dones)
+
+                # Compute Q(s,a)
+                q_values = policy_net(states).gather(1, actions.unsqueeze(1))
+
+                # Compute target: r + γ max Q(s',a')
+                with torch.no_grad():
+                    next_q_values = target_net(next_states).max(1)[0]
+                    targets = rewards + gamma * next_q_values * (1 - dones)
+
+                # Compute loss and update
+                loss = nn.MSELoss()(q_values.squeeze(), targets)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            if done:
+                break
+
+            state = next_state
+
+        # Update target network
+        if episode % 10 == 0:
+            target_net.load_state_dict(policy_net.state_dict())
+
+        # Decay epsilon
+        epsilon = max(epsilon_min, epsilon * epsilon_decay)
+
+        print(f"Episode {episode}, Reward: {total_reward}, Epsilon: {epsilon:.3f}")
+
+    return policy_net</code></pre>
+
+            <h2>3.7 DQN Improvements</h2>
+
+            <h3>Double DQN</h3>
+
+            <p>Addresses overestimation bias in Q-Learning by decoupling action selection and evaluation:</p>
+
+            <pre><code># Standard DQN
+target = r + γ max_a Q_target(s', a)
+
+# Double DQN
+a* = argmax_a Q_policy(s', a)        # Select using policy network
+target = r + γ Q_target(s', a*)       # Evaluate using target network</code></pre>
+
+            <h3>Dueling DQN</h3>
+
+            <p>Separates value and advantage streams:</p>
+
+            <pre><code>class DuelingDQN(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(DuelingDQN, self).__init__()
+
+        self.feature = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        # Value stream
+        self.value_stream = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+        # Advantage stream
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim)
+        )
+
+    def forward(self, state):
+        features = self.feature(state)
+        value = self.value_stream(features)
+        advantages = self.advantage_stream(features)
+
+        # Q(s,a) = V(s) + A(s,a) - mean(A(s,·))
+        q_values = value + (advantages - advantages.mean(dim=1, keepdim=True))
+        return q_values</code></pre>
+
+            <h3>Prioritized Experience Replay</h3>
+
+            <p>Sample important transitions more frequently:</p>
+
+            <pre><code>class PrioritizedReplayBuffer:
+    def __init__(self, capacity, alpha=0.6):
+        self.capacity = capacity
+        self.alpha = alpha  # Priority exponent
+        self.buffer = []
+        self.priorities = []
+        self.position = 0
+
+    def push(self, transition):
+        max_priority = max(self.priorities) if self.priorities else 1.0
+
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(transition)
+            self.priorities.append(max_priority)
+        else:
+            self.buffer[self.position] = transition
+            self.priorities[self.position] = max_priority
+
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size, beta=0.4):
+        # Compute sampling probabilities
+        priorities = np.array(self.priorities)
+        probabilities = priorities ** self.alpha
+        probabilities /= probabilities.sum()
+
+        # Sample indices
+        indices = np.random.choice(len(self.buffer), batch_size, p=probabilities)
+
+        # Compute importance sampling weights
+        weights = (len(self.buffer) * probabilities[indices]) ** (-beta)
+        weights /= weights.max()
+
+        samples = [self.buffer[idx] for idx in indices]
+        return samples, indices, weights
+
+    def update_priorities(self, indices, td_errors):
+        for idx, error in zip(indices, td_errors):
+            self.priorities[idx] = abs(error) + 1e-6</code></pre>
+
+            <h2>3.8 Rainbow DQN</h2>
+
+            <p>Rainbow combines multiple DQN improvements:</p>
+
+            <ul>
+                <li>Double Q-Learning</li>
+                <li>Dueling Networks</li>
+                <li>Prioritized Experience Replay</li>
+                <li>Multi-step Learning (n-step returns)</li>
+                <li>Distributional RL (C51)</li>
+                <li>Noisy Networks (for exploration)</li>
+            </ul>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">Performance:</strong>
+                <p>Rainbow achieved state-of-the-art performance on Atari benchmarks, significantly outperforming vanilla DQN and individual improvements.</p>
+            </div>
+
+            <h2>3.9 Practical Tips</h2>
+
+            <h3>Hyperparameter Tuning</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Typical Range</th>
+                        <th>Effect</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Learning Rate (α)</td>
+                        <td>1e-4 to 1e-2</td>
+                        <td>Speed of learning</td>
+                    </tr>
+                    <tr>
+                        <td>Discount (γ)</td>
+                        <td>0.95 to 0.99</td>
+                        <td>Horizon of planning</td>
+                    </tr>
+                    <tr>
+                        <td>Batch Size</td>
+                        <td>32 to 256</td>
+                        <td>Stability of updates</td>
+                    </tr>
+                    <tr>
+                        <td>Buffer Size</td>
+                        <td>10k to 1M</td>
+                        <td>Experience diversity</td>
+                    </tr>
+                    <tr>
+                        <td>Target Update</td>
+                        <td>Every 1k-10k steps</td>
+                        <td>Target stability</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Common Pitfalls</h3>
+
+            <ul>
+                <li><strong>Overestimation:</strong> Use Double DQN</li>
+                <li><strong>Instability:</strong> Tune learning rate, use gradient clipping</li>
+                <li><strong>Poor Exploration:</strong> Adjust epsilon decay, try noisy networks</li>
+                <li><strong>Correlation:</strong> Use larger replay buffer</li>
+                <li><strong>Catastrophic Forgetting:</strong> Increase buffer size, use experience replay</li>
+            </ul>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <ul>
+                    <li>Value-based methods learn Q(s,a) or V(s) and derive policies from values</li>
+                    <li>Monte Carlo methods learn from complete episodes</li>
+                    <li>Temporal Difference learning bootstraps and updates online</li>
+                    <li>Q-Learning is off-policy and learns optimal Q* directly</li>
+                    <li>SARSA is on-policy and learns the value of the behavior policy</li>
+                    <li>DQN extends Q-Learning to high-dimensional spaces with neural networks</li>
+                    <li>Experience replay breaks correlation and improves sample efficiency</li>
+                    <li>Target networks stabilize learning by providing fixed targets</li>
+                    <li>Double DQN, Dueling DQN, and PER further improve DQN</li>
+                    <li>Rainbow combines multiple improvements for state-of-the-art performance</li>
+                </ul>
+            </div>
+
+            <div class="quiz">
+                <h3>Review Questions</h3>
+                <div class="quiz-question">
+                    <strong>1. What's the main difference between Q-Learning and SARSA?</strong>
+                    <p style="color: #94a3b8;">Answer: Q-Learning is off-policy and uses max Q(s',a') in updates (learns optimal policy). SARSA is on-policy and uses Q(s',a') for the action actually taken (learns value of behavior policy).</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>2. Why does DQN use experience replay?</strong>
+                    <p style="color: #94a3b8;">Answer: To break temporal correlations in sequential data and improve sample efficiency by reusing experiences multiple times.</p>
+                </div>
+                <div class="quiz-question">
+                    <strong>3. What problem does Double DQN solve?</strong>
+                    <p style="color: #94a3b8;">Answer: It addresses overestimation bias in Q-Learning by decoupling action selection and evaluation using two networks.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

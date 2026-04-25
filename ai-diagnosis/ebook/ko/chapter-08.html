@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 구현 및 WIA 인증 - WIA-MED-009</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #a855f7;">제8장: 구현 및 WIA 인증</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0;">
+<p style="color: #10b981; font-style: italic;">"훌륭한 AI 모델은 연구실에서 끝나지 않습니다. 실제 병원에 안전하게 배포되고, 의사와 협업하며, 환자를 돕는 것—그것이 진정한 성공입니다. WIA 인증은 그 여정의 증표입니다."</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.1 배포 준비 체크리스트</h2>
+
+<h3 style="color: #a855f7;">✅ 기술적 준비</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">항목</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요구사항</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">상태</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>모델 성능</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">AUC ≥ 0.90, 민감도/특이도 ≥ 85%</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>다기관 검증</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">≥ 3개 독립 기관 테스트</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>공정성 평가</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">하위 그룹 성능 차이 < 5%</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>설명 가능성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">LIME, SHAP, 또는 Grad-CAM 구현</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>보안</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">암호화, 접근 제어, 감사 로그</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>개인정보 보호</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HIPAA, GDPR 준수</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>API 문서</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">입력/출력 형식, 예시</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>사용자 교육</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">의료진 교육 자료</td>
+        <td style="border: 1px solid #475569; color: #10b981;">☐</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">✅ 규제 준비</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">FDA/MFDS/CE 승인</strong> — 규제 기관 승인 완료</li>
+    <li><strong style="color: #e2e8f0;">품질 관리 시스템</strong> — ISO 13485 또는 GMP</li>
+    <li><strong style="color: #e2e8f0;">위험 관리</strong> — ISO 14971 기반 위험 분석</li>
+    <li><strong style="color: #e2e8f0;">사이버 보안</strong> — IEC 62443 또는 FDA 사이버보안 가이드라인</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.2 시스템 통합</h2>
+
+<h3 style="color: #a855f7;">🏥 EHR/PACS 연동</h3>
+
+<p>병원 시스템과의 원활한 통합:</p>
+
+<h4 style="color: #a855f7;">1. DICOM 연동 (영상)</h4>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto; font-size: 0.85em;">
+# PACS에서 영상 받기
+from pydicom import dcmread
+
+dicom_file = dcmread('chest_xray.dcm')
+image = dicom_file.pixel_array
+
+# AI 진단 수행
+diagnosis = ai_model.predict(image)
+
+# DICOM SR (Structured Report)로 결과 저장
+report = create_dicom_sr(
+    diagnosis=diagnosis,
+    confidence=0.92,
+    explanation="좌하엽 침윤 패턴"
+)
+</pre>
+
+<h4 style="color: #a855f7;">2. HL7 FHIR 연동 (진료 기록)</h4>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto; font-size: 0.85em;">
+# FHIR 서버에서 환자 데이터 가져오기
+import requests
+
+patient_id = "12345"
+url = f"https://fhir.hospital.com/Patient/{patient_id}"
+response = requests.get(url)
+patient = response.json()
+
+# AI 분석 후 Observation 리소스로 결과 전송
+observation = {
+    "resourceType": "Observation",
+    "status": "final",
+    "code": {"text": "AI 폐렴 진단"},
+    "valueCodeableConcept": {"text": "폐렴 의심 (92%)"}
+}
+</pre>
+
+<h3 style="color: #a855f7;">🔗 API 설계</h3>
+
+<p>RESTful API로 간편한 통합:</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto; font-size: 0.85em;">
+POST /api/v1/diagnosis
+Content-Type: application/json
+
+{
+    "patient_id": "12345",
+    "image": "base64_encoded_image",
+    "modality": "X-ray",
+    "body_part": "chest"
+}
+
+Response:
+{
+    "diagnosis": "pneumonia",
+    "confidence": 0.92,
+    "severity": "moderate",
+    "explanation": {
+        "method": "Grad-CAM",
+        "heatmap": "base64_encoded_heatmap",
+        "key_features": ["left lower lobe infiltrate"]
+    },
+    "recommendations": ["Antibiotic treatment", "Follow-up X-ray in 1 week"]
+}
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.3 배포 아키텍처</h2>
+
+<h3 style="color: #a855f7;">☁️ 클라우드 vs 온프레미스</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">측면</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">클라우드</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">온프레미스</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>확장성</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">우수 (자동 스케일링)</td>
+        <td style="border: 1px solid #475569; color: #ef4444;">제한적</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>비용</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">종량제 (사용량 기반)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">초기 투자 큼</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>데이터 제어</strong></td>
+        <td style="border: 1px solid #475569; color: #ef4444;">제3자 서버</td>
+        <td style="border: 1px solid #475569; color: #10b981;">병원 내부</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>규제 준수</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HIPAA 준수 클라우드 필요</td>
+        <td style="border: 1px solid #475569; color: #10b981;">더 쉬움</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>지연 시간</strong></td>
+        <td style="border: 1px solid #475569; color: #ef4444;">네트워크 의존</td>
+        <td style="border: 1px solid #475569; color: #10b981;">빠름</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🏗️ 권장 아키텍처 (하이브리드)</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto;">
+┌─────────────────────────────────────────────────┐
+│            병원 (온프레미스)                     │
+│  ┌──────────────┐  ┌──────────────┐             │
+│  │ EHR/PACS     │  │ AI Edge      │             │
+│  │              │→│ (실시간 추론)  │             │
+│  └──────────────┘  └──────┬───────┘             │
+└─────────────────────────────┼──────────────────┘
+                              ↓ (모델 업데이트, 로그)
+┌─────────────────────────────┼──────────────────┐
+│            클라우드                             │
+│  ┌──────────────┐  ┌──────────────┐             │
+│  │ 모델 저장소   │  │ 모니터링     │             │
+│  │ (MLOps)      │  │ & 분석       │             │
+│  └──────────────┘  └──────────────┘             │
+└──────────────────────────────────────────────────┘
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.4 성능 모니터링</h2>
+
+<h3 style="color: #a855f7;">📊 추적 지표</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">지표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">목표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">경고 임계값</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>정확도</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 90%</td>
+        <td style="border: 1px solid #475569; color: #ef4444;">< 85%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>응답 시간</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">< 3초</td>
+        <td style="border: 1px solid #475569; color: #ef4444;">> 5초</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>가동률</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 99.9%</td>
+        <td style="border: 1px solid #475569; color: #ef4444;">< 99.5%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>의사 수용도</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 80%</td>
+        <td style="border: 1px solid #475569; color: #ef4444;">< 70%</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔄 모델 업데이트 프로토콜</h3>
+
+<ol style="color: #94a3b8; line-height: 2;">
+    <li><strong style="color: #e2e8f0;">성능 저하 감지</strong> — 지표가 경고 임계값 도달</li>
+    <li><strong style="color: #e2e8f0;">원인 분석</strong> — 데이터 드리프트, 개념 드리프트 조사</li>
+    <li><strong style="color: #e2e8f0;">재훈련</strong> — 최신 데이터로 모델 업데이트</li>
+    <li><strong style="color: #e2e8f0;">검증</strong> — 테스트 세트에서 성능 확인</li>
+    <li><strong style="color: #e2e8f0;">A/B 테스팅</strong> — 일부 환자에게만 배포</li>
+    <li><strong style="color: #e2e8f0;">전체 배포</strong> — 성능 확인 후 전체 적용</li>
+</ol>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.5 WIA-MED-009 인증 프로세스</h2>
+
+<h3 style="color: #a855f7;">🏆 인증 수준</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">수준</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요구사항</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">배지</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Bronze</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">기본 성능 기준 충족</td>
+        <td style="border: 1px solid #475569; color: #cd7f32;">🥉 WIA Bronze</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Silver</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">+ 공정성 평가 통과</td>
+        <td style="border: 1px solid #475569; color: #c0c0c0;">🥈 WIA Silver</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Gold</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">+ 임상 시험 + 다기관 검증</td>
+        <td style="border: 1px solid #475569; color: #ffd700;">🥇 WIA Gold</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Platinum</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">+ FDA/MFDS 승인 + RCT</td>
+        <td style="border: 1px solid #475569; color: #a855f7;">💎 WIA Platinum</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">📝 인증 신청</h3>
+
+<ol style="color: #94a3b8; line-height: 2;">
+    <li><strong style="color: #e2e8f0;">온라인 신청</strong> — https://cert.wiastandards.com</li>
+    <li><strong style="color: #e2e8f0;">문서 제출</strong> — 기술 문서, 성능 보고서, 테스트 결과</li>
+    <li><strong style="color: #e2e8f0;">심사</strong> — WIA 전문가 패널 검토 (2-4주)</li>
+    <li><strong style="color: #e2e8f0;">실사</strong> — 필요 시 현장 또는 원격 평가</li>
+    <li><strong style="color: #e2e8f0;">인증서 발급</strong> — 합격 시 디지털 인증서 + 배지</li>
+    <li><strong style="color: #e2e8f0;">등록</strong> — WIA 공식 레지스트리에 등록</li>
+</ol>
+
+<h3 style="color: #a855f7;">💰 인증 비용</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">Bronze:</strong> $1,000 USD</li>
+    <li><strong style="color: #e2e8f0;">Silver:</strong> $2,500 USD</li>
+    <li><strong style="color: #e2e8f0;">Gold:</strong> $5,000 USD</li>
+    <li><strong style="color: #e2e8f0;">Platinum:</strong> $10,000 USD</li>
+    <li><strong style="color: #ffd700;">스타트업/학계 할인:</strong> 50% (조건 충족 시)</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.6 윤리적 배포</h2>
+
+<h3 style="color: #a855f7;">⚖️ 윤리 지침</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">환자 동의</strong> — AI 사용 사실 고지 및 동의</li>
+    <li><strong style="color: #e2e8f0;">투명성</strong> — AI 권장 vs 의사 판단 명확히 구분</li>
+    <li><strong style="color: #e2e8f0;">공정한 접근</strong> — 모든 환자에게 동등한 AI 접근</li>
+    <li><strong style="color: #e2e8f0;">인간 감독</strong> — 최종 결정은 항상 의사</li>
+    <li><strong style="color: #e2e8f0;">지속적 개선</strong> — 피드백 반영 및 업데이트</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.7 성공 측정</h2>
+
+<h3 style="color: #a855f7;">📈 핵심 성과 지표 (KPI)</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">KPI</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">측정 방법</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">목표</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>진단 정확도</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">실제 환자 데이터 검증</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 90%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>조기 발견율</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">AI 없이 놓쳤을 케이스</td>
+        <td style="border: 1px solid #475569; color: #10b981;">+20%</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>진단 시간</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">결과까지 걸린 시간</td>
+        <td style="border: 1px solid #475569; color: #10b981;">-50%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>의사 만족도</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">설문 조사</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 4.0/5.0</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>환자 결과 개선</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">사망률, 입원 기간 등</td>
+        <td style="border: 1px solid #475569; color: #10b981;">통계적 유의미한 개선</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">8.8 미래를 향하여</h2>
+
+<blockquote style="background: linear-gradient(135deg, #1e1b4b, #312e81); padding: 25px; border-left: 4px solid #10b981; margin: 20px 0; border-radius: 8px;">
+<p style="color: #e2e8f0; font-size: 1.1em; line-height: 1.8;">WIA-MED-009를 준수하는 AI 진단 시스템은 단순한 도구가 아닙니다. 그것은 더 정확한 진단, 더 빠른 치료, 더 나은 환자 결과를 가능하게 하는 혁신입니다.</p>
+<p style="color: #10b981; font-size: 1.1em; line-height: 1.8; margin-top: 15px;">당신이 개발하는 AI는 수백만 명의 생명을 구할 수 있습니다. WIA와 함께, 우리는 그 미래를 안전하고 공정하게 만들어갑니다.</p>
+<p style="color: #ffd700; font-size: 1.3em; text-align: center; margin-top: 20px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">장 요약</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">핵심 포인트</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요약</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>배포 준비</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">기술, 규제, 교육 체크리스트 완료</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>시스템 통합</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">EHR/PACS 연동, DICOM/HL7 FHIR</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>아키텍처</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">하이브리드 (온프레미스 + 클라우드)</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>모니터링</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">성능, 응답 시간, 가동률 추적</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>WIA 인증</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Bronze → Silver → Gold → Platinum</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>성공 측정</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">정확도, 조기 발견율, 환자 결과 개선</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(16, 185, 129, 0.1)); border: 2px solid #10b981; border-radius: 16px; padding: 40px; margin: 50px 0; text-align: center;">
+    <h2 style="color: #10b981; font-size: 2rem; margin-bottom: 20px;">🎓 축하합니다!</h2>
+    <p style="color: #e2e8f0; font-size: 1.2rem; line-height: 1.8;">WIA-MED-009 AI 진단 표준의 8개 챕터를 모두 완료하셨습니다.</p>
+    <p style="color: #94a3b8; margin-top: 20px;">이제 당신은 세계 최고 수준의 의료 AI 시스템을 개발하고 배포할 준비가 되었습니다.</p>
+    <div style="margin-top: 30px;">
+        <a href="https://cert.wiastandards.com" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 40px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 1.1rem;">🏆 WIA 인증 신청하기</a>
+    </div>
+</div>
+
+<hr style="border-color: #334155;">
+
+<p style="text-align: center; color: #ffd700; margin-top: 40px; font-size: 1.3rem;">弘益人間 · 널리 인간을 이롭게 하라</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA - World Certification Industry Association</p>
+</body>
+</html>

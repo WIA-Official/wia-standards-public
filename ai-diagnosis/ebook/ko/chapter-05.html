@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 의료 기록 NLP - WIA-MED-009</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #a855f7;">제5장: 의료 기록을 위한 자연어 처리 (NLP)</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0;">
+<p style="color: #10b981; font-style: italic;">"의료 기록의 80%는 비정형 텍스트입니다. NLP는 이 방대한 지식 보고를 구조화된 통찰로 변환하여, 숨겨진 패턴과 중요한 정보를 발견합니다."</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.1 의료 NLP란?</h2>
+
+<p><strong style="color: #a855f7;">의료 자연어 처리(Medical NLP)</strong>는 의사의 노트, 진료 기록, 검사 보고서 등 의료 텍스트를 이해하고 분석하는 AI 기술입니다.</p>
+
+<h3 style="color: #a855f7;">🎯 핵심 과제</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">정보 추출</strong> — 증상, 진단, 약물, 검사 결과 추출</li>
+    <li><strong style="color: #e2e8f0;">개체명 인식(NER)</strong> — 질병, 약물, 신체 부위 식별</li>
+    <li><strong style="color: #e2e8f0;">관계 추출</strong> — "환자가 고혈압으로 리시노프릴 복용" 관계 파악</li>
+    <li><strong style="color: #e2e8f0;">의료 코딩</strong> — ICD-10, CPT 코드 자동 할당</li>
+    <li><strong style="color: #e2e8f0;">문서 분류</strong> — 진료 기록 유형 분류</li>
+</ul>
+
+<h3 style="color: #a855f7;">📊 의료 텍스트의 특성</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">특성</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">설명</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">예시</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>전문 용어</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">의학 전문어, 라틴어</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">dyspnea, tachycardia</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>약어</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">극도로 축약된 표현</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">SOB, HTN, DM</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>부정 표현</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">증상 없음 표현</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">"흉통 없음", "발열 부인"</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>시간 표현</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">과거/현재/미래 구분</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">"3일 전 발병", "현재 진행 중"</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>불확실성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">추정, 가능성 표현</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">"의심됨", "가능성 있음"</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.2 NLP 핵심 기술</h2>
+
+<h3 style="color: #a855f7;">🔤 1. 토큰화 및 전처리</h3>
+
+<p>텍스트를 분석 가능한 단위로 분할합니다:</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #06b6d4; margin: 15px 0;">
+<p style="color: #06b6d4; font-size: 0.95em;"><strong>예시:</strong><br>
+<strong>원문:</strong> "Pt c/o SOB and chest pain x3 days."<br>
+<strong>토큰화:</strong> ["Pt", "c/o", "SOB", "and", "chest", "pain", "x3", "days"]<br>
+<strong>정규화:</strong> ["Patient", "complains of", "Shortness of breath", "and", "chest", "pain", "for 3", "days"]</p>
+</blockquote>
+
+<h3 style="color: #a855f7;">🏷️ 2. 개체명 인식 (NER)</h3>
+
+<p>텍스트에서 의료 개체를 식별하고 분류합니다:</p>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">개체 유형</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">예시</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>질병/증상</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">폐렴, 발열, 기침</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>약물</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">아스피린, 메트포르민</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>용량</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">500mg, 하루 2회</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>검사</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">혈압, 혈당, X-ray</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>신체 부위</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">심장, 폐, 간</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔗 3. 관계 추출</h3>
+
+<p>개체 간의 관계를 파악합니다:</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">약물-질병</strong> — "환자가 <strong>고혈압</strong>으로 <strong>리시노프릴</strong> 복용"</li>
+    <li><strong style="color: #e2e8f0;">증상-질병</strong> — "<strong>발열</strong>과 <strong>기침</strong>으로 <strong>폐렴</strong> 진단"</li>
+    <li><strong style="color: #e2e8f0;">검사-결과</strong> — "<strong>혈압</strong> 측정 결과 <strong>150/95</strong>"</li>
+</ul>
+
+<h3 style="color: #a855f7;">❌ 4. 부정 감지</h3>
+
+<p>증상이나 질병의 부재를 올바르게 인식합니다:</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #fbbf24; margin: 15px 0;">
+<p style="color: #fbbf24; font-size: 0.95em;"><strong>예시:</strong><br>
+"환자는 <strong>흉통을 부인</strong>합니다." → 흉통: <strong>없음</strong> ✓<br>
+"<strong>발열이 없습니다</strong>." → 발열: <strong>없음</strong> ✓<br>
+"당뇨병 <strong>병력이 있습니다</strong>." → 당뇨병: <strong>있음</strong> ✓</p>
+</blockquote>
+
+<h3 style="color: #a855f7;">⏰ 5. 시간 정보 추출</h3>
+
+<p>증상 발생 시점 및 지속 기간을 파악합니다:</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">과거:</strong> "3일 전부터 기침" → 발병일: 2025-01-15</li>
+    <li><strong style="color: #e2e8f0;">현재:</strong> "현재 발열 지속 중" → 상태: 진행 중</li>
+    <li><strong style="color: #e2e8f0;">미래:</strong> "2주 후 재진 예정" → 예약일: 2025-02-01</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.3 트랜스포머 및 BERT</h2>
+
+<h3 style="color: #a855f7;">🤖 트랜스포머 모델</h3>
+
+<p>최신 NLP의 핵심 아키텍처:</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">Attention 메커니즘</strong> — 문맥의 중요한 부분에 집중</li>
+    <li><strong style="color: #e2e8f0;">양방향 이해</strong> — 앞뒤 문맥 모두 고려</li>
+    <li><strong style="color: #e2e8f0;">전이 학습</strong> — 대규모 텍스트로 사전 훈련</li>
+</ul>
+
+<h3 style="color: #a855f7;">🏥 의료 BERT 모델</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">모델</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">훈련 데이터</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">특징</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>BioBERT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">PubMed, PMC 논문</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">생물의학 문헌 이해</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>ClinicalBERT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">MIMIC-III 진료 기록</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">임상 텍스트 특화</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>PubMedBERT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">PubMed abstract</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">과학 문헌 분석</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>BlueBERT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">PubMed + MIMIC-III</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">범용 의료 NLP</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">💻 ClinicalBERT 사용 예시</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; border: 1px solid #475569; color: #94a3b8; overflow-x: auto; font-size: 0.85em;">
+from transformers import AutoTokenizer, AutoModel
+import torch
+
+# 1. 모델 로드
+tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
+model = AutoModel.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
+
+# 2. 텍스트 인코딩
+text = "환자는 3일 전부터 발열과 기침을 호소합니다."
+inputs = tokenizer(text, return_tensors="pt")
+
+# 3. 임베딩 추출
+with torch.no_grad():
+    outputs = model(**inputs)
+    embeddings = outputs.last_hidden_state
+
+# 4. NER 또는 분류 작업에 사용
+print(f"임베딩 형태: {embeddings.shape}")
+# 출력: 임베딩 형태: torch.Size([1, 15, 768])
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.4 의료 코딩 자동화</h2>
+
+<h3 style="color: #a855f7;">🏷️ ICD-10 코딩</h3>
+
+<p>진료 기록에서 자동으로 ICD-10 질병 코드를 할당합니다:</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #06b6d4; margin: 15px 0;">
+<p style="color: #06b6d4; font-size: 0.95em;"><strong>예시:</strong><br>
+<strong>진료 기록:</strong> "환자는 제2형 당뇨병으로 메트포르민 복용 중이며, 최근 당화혈색소 7.2%입니다."<br>
+<strong>자동 코드:</strong><br>
+• E11.9 - 제2형 당뇨병, 합병증 없음<br>
+• Z79.84 - 경구 혈당강하제 장기 사용</p>
+</blockquote>
+
+<h3 style="color: #a855f7;">💰 청구 코딩의 중요성</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">정확한 청구</strong> — 부적절한 코딩으로 인한 손실 방지</li>
+    <li><strong style="color: #e2e8f0;">시간 절감</strong> — 수작업 코딩 시간 80% 감소</li>
+    <li><strong style="color: #e2e8f0;">규정 준수</strong> — 청구 거부 및 감사 위험 감소</li>
+</ul>
+
+<h3 style="color: #a855f7;">📊 자동 코딩 성능</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">지표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">수작업</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">AI 자동화</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>정확도</strong></td>
+        <td style="border: 1px solid #475569; color: #ef4444;">85%</td>
+        <td style="border: 1px solid #475569; color: #10b981;">92%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>처리 시간</strong></td>
+        <td style="border: 1px solid #475569; color: #ef4444;">10분/케이스</td>
+        <td style="border: 1px solid #475569; color: #10b981;">< 1분/케이스</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>비용</strong></td>
+        <td style="border: 1px solid #475569; color: #ef4444;">높음</td>
+        <td style="border: 1px solid #475569; color: #10b981;">낮음 (70% 절감)</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.5 임상 정보 추출</h2>
+
+<h3 style="color: #a855f7;">📝 진료 기록 구조화</h3>
+
+<p>비정형 텍스트를 구조화된 데이터로 변환:</p>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">원본 텍스트</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">추출된 정보</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #94a3b8;">"환자는 3일 전부터 고열(38.5℃)과 기침을 호소"</td>
+        <td style="border: 1px solid #475569; color: #10b981;">증상: 발열, 기침<br>발병일: 2025-01-15<br>체온: 38.5℃</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #94a3b8;">"혈압 150/95, 맥박 88bpm, 호흡수 18회/분"</td>
+        <td style="border: 1px solid #475569; color: #10b981;">수축기 혈압: 150<br>이완기 혈압: 95<br>맥박: 88<br>호흡수: 18</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔍 약물 정보 추출</h3>
+
+<p>처방 정보를 상세하게 파싱합니다:</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #a855f7; margin: 15px 0;">
+<p style="color: #a855f7; font-size: 0.95em;"><strong>원문:</strong> "아스피린 100mg 하루 1회 식후 복용"<br>
+<strong>추출:</strong><br>
+• 약물명: 아스피린<br>
+• 용량: 100mg<br>
+• 빈도: 하루 1회<br>
+• 복용 시점: 식후</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.6 의료 질문 응답 시스템</h2>
+
+<h3 style="color: #a855f7;">🤖 AI 의료 Q&A</h3>
+
+<p>의사와 환자의 질문에 증거 기반 답변을 제공합니다:</p>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">질문</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">AI 답변</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">"당뇨병 환자에게 권장되는 HbA1c 목표는?"</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">대부분의 성인 당뇨병 환자의 HbA1c 목표는 < 7%입니다. (ADA 2024)</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">"아스피린과 와파린 병용 시 주의사항은?"</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">출혈 위험 증가. INR 모니터링 강화 필요. 위장 보호제 고려.</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.7 WIA-MED-009 NLP 요구사항</h2>
+
+<h3 style="color: #a855f7;">📋 성능 기준</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">작업</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">지표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">WIA 최소값</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>NER</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">F1 점수</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 0.90</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>관계 추출</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">정확도</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 85%</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>부정 감지</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">F1 점수</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 0.95</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>의료 코딩</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Top-3 정확도</td>
+        <td style="border: 1px solid #475569; color: #10b981;">≥ 90%</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔒 개인정보 보호</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">De-identification</strong> — 이름, 주소, 전화번호 자동 제거/마스킹</li>
+    <li><strong style="color: #e2e8f0;">HIPAA Safe Harbor</strong> — 18개 식별자 제거</li>
+    <li><strong style="color: #e2e8f0;">재식별 위험</strong> — < 0.1% 확률</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">5.8 실제 배포 사례</h2>
+
+<h3 style="color: #a855f7;">🏆 Amazon Comprehend Medical</h3>
+
+<p><strong>기능:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>의료 개체 추출 (질병, 약물, 검사)</li>
+    <li>PHI(개인 건강 정보) 감지 및 제거</li>
+    <li>ICD-10 코드 자동 매핑</li>
+</ul>
+
+<h3 style="color: #a855f7;">🏆 Google Cloud Healthcare NLP API</h3>
+
+<p><strong>기능:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>FHIR 리소스 추출</li>
+    <li>의료 용어 표준화 (SNOMED CT, LOINC)</li>
+    <li>문맥 인식 개체 인식</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">장 요약</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">핵심 포인트</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요약</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>NLP 작업</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">NER, 관계 추출, 부정 감지, 의료 코딩</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>모델</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">BioBERT, ClinicalBERT, PubMedBERT</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>응용</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">자동 코딩, 정보 추출, Q&A</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>WIA 기준</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">NER F1 ≥ 0.90, De-identification 필수</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<p style="text-align: center; color: #ffd700; margin-top: 40px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA - World Certification Industry Association</p>
+</body>
+</html>

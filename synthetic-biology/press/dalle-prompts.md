@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-BIO-012 Press Materials
+
+## Prompt 1: Hero Image - Genetic Circuit Engineering
+A molecular visualization of synthetic biology showing engineered genetic circuit with teal (#14B8A6) glowing DNA: promoter driving gene expression, ribosome binding site controlling translation, coding sequence producing fluorescent proteins, and terminator stopping transcription. Display BioBrick assembly methods (Golden Gate, Gibson, MoClo), metabolic pathways optimized for biofuel production, and cell-free protein synthesis systems. Laboratory showing both wet lab biology and computational design. Futuristic bioengineering photography, clean biosafety aesthetic.
+
+## Prompt 2: Problem Scenario - Traditional Biological Production Limits
+Industrial scene showing limitations of conventional chemical production: petroleum-based manufacturing creating pollution and greenhouse gases, expensive pharmaceutical synthesis using toxic solvents, agricultural limitations in crop yields and disease resistance, and inability to produce complex biomolecules like spider silk. Show environmental damage, high costs, limited capabilities, and unsustainable practices. Documentary industrial photography emphasizing the need for biological alternatives to chemical manufacturing.
+
+## Prompt 3: Solution Visualization - Engineered Biosystems Benefiting Humanity
+A revolutionary biotechnology scene powered by WIA-BIO-012 synthetic biology: engineered microbes producing sustainable biofuels from waste, bacteria synthesizing life-saving medicines at low cost, biosensors detecting environmental pollutants and diseases early, crops with enhanced nutrition and climate resilience, and biomaterials like spider silk being produced sustainably. Laboratory showing E. coli producing green fluorescent protein as proof of concept. Dashboard displays biosafety compliance BSL-1, 80% cost reduction vs. chemical synthesis, zero toxic waste. Clean, sustainable, life-saving biotechnology. Optimistic bioengineering photography celebrating science serving humanity.

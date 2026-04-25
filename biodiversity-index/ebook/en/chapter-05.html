@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface | WIA Standard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --primary: #8B5CF6;
+            --primary: #8B5CF6;
+            --border: #334155;
+        }
+
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 40px 20px;}
+        .container {max-width: 900px; margin: 0 auto;}
+        header {margin-bottom: 50px; padding-bottom: 30px; border-bottom: 2px solid var(--primary);}
+        .chapter-number {color: var(--primary); font-size: 14px; font-weight: 700; margin-bottom: 10px;}
+        h1 {color: var(--primary); font-size: 42px; margin-bottom: 20px;}
+        h2 {color: var(--text); font-size: 28px; margin: 40px 0 20px; padding-top: 20px;}
+        h3 {color: var(--accent); font-size: 22px; margin: 30px 0 15px;}
+        p {color: var(--text-muted); margin-bottom: 20px; font-size: 16px;}
+        .info-box {background: var(--bg-card); border-left: 4px solid var(--primary); padding: 20px; margin: 30px 0; border-radius: 0 8px 8px 0;}
+        .info-box p {color: var(--text); margin-bottom: 10px;}
+        table {width: 100%; border-collapse: collapse; margin: 25px 0; background: var(--bg-card); border-radius: 8px; overflow: hidden;}
+        th, td {padding: 15px; text-align: left; border-bottom: 1px solid var(--border);}
+        th {background: var(--bg); color: var(--primary); font-weight: 600;}
+        td {color: var(--text-muted);}
+        code {background: var(--bg); color: var(--accent); padding: 3px 8px; border-radius: 4px; font-family: 'Monaco', 'Courier New', monospace; font-size: 14px;}
+        pre {background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; margin: 20px 0;}
+        pre code {background: none; padding: 0;}
+        ul, ol {margin: 20px 0; padding-left: 30px;}
+        li {color: var(--text-muted); margin-bottom: 10px;}
+        .summary {background: var(--bg-card); border: 2px solid var(--primary); border-radius: 12px; padding: 30px; margin: 40px 0;}
+        .summary h3 {color: var(--primary); margin-top: 0;}
+        .key-takeaways, .questions {background: var(--bg-card); border-radius: 8px; padding: 25px; margin: 30px 0;}
+        .key-takeaways h4, .questions h4 {color: var(--primary); margin-bottom: 15px;}
+        nav {display: flex; justify-content: space-between; margin-top: 50px; padding-top: 30px; border-top: 1px solid var(--border);}
+        .nav-btn {color: var(--primary); text-decoration: none; padding: 12px 24px; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.3s;}
+        .nav-btn:hover {background: var(--primary); color: white;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 5</div>
+            <h1>Phase 2 - API Interface</h1>
+        </header>
+
+        <main>
+            <p>Building on the standardized data formats established in Phase 1, Phase 2 provides computational services and APIs that make biodiversity data actionable. This chapter details the RESTful and GraphQL APIs, diversity calculation engines, integration services, and real-time analytics capabilities that transform raw observations into meaningful conservation insights.</p>
+
+            <h2>API Architecture</h2>
+
+            <p>The WIA API follows modern REST principles while offering GraphQL for complex queries. This dual approach balances simplicity for basic operations with power for advanced use cases.</p>
+
+            <h3>RESTful Endpoints</h3>
+
+            <p>The REST API organizes resources hierarchically and uses standard HTTP methods:</p>
+
+            <pre><code>Base URL: https://api.biodiversity.wia.org/v1/
+
+# Occurrence endpoints
+GET    /occurrences                    # List occurrences (paginated)
+POST   /occurrences                    # Create new occurrence
+GET    /occurrences/{id}              # Get specific occurrence
+PUT    /occurrences/{id}              # Update occurrence
+DELETE /occurrences/{id}              # Delete occurrence
+
+# Diversity indices
+POST   /indices/calculate              # Calculate diversity indices
+GET    /indices/{calculation_id}       # Retrieve calculated indices
+GET    /indices/trends                 # Temporal trend analysis
+
+# Species endpoints
+GET    /species                        # List species
+GET    /species/{taxon_id}            # Get species details
+GET    /species/{taxon_id}/occurrences # Occurrences for species
+GET    /species/search?q={query}      # Search species
+
+# Spatial queries
+GET    /spatial/region/{polygon}       # Occurrences in polygon
+GET    /spatial/proximity              # Species near coordinates
+POST   /spatial/hotspots              # Identify biodiversity hotspots
+
+# Data validation
+POST   /validate/occurrence            # Validate occurrence data
+POST   /validate/batch                # Batch validation
+
+# Integration
+POST   /export/gbif                    # Export to GBIF format
+POST   /export/geojson                # Export as GeoJSON
+GET    /taxonomy/resolve              # Resolve taxonomic names</code></pre>
+
+            <h3>Authentication and Authorization</h3>
+
+            <p>The API uses OAuth 2.0 with JWT tokens for secure, stateless authentication:</p>
+
+            <pre><code># Obtain access token
+POST https://auth.biodiversity.wia.org/oauth/token
+Content-Type: application/json
+
+{
+  "grant_type": "client_credentials",
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "scope": "read:occurrences write:occurrences calculate:indices"
+}
+
+# Response
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "read:occurrences write:occurrences calculate:indices"
+}
+
+# Use token in requests
+GET https://api.biodiversity.wia.org/v1/occurrences
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>
+
+            <h2>Diversity Index Calculation API</h2>
+
+            <p>The core analytical capability - calculating biodiversity indices from occurrence data:</p>
+
+            <h3>Calculate Diversity Indices</h3>
+
+            <pre><code>POST /v1/indices/calculate
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "dataset_id": "DS-AMAZON-2025",
+  "spatial_filter": {
+    "type": "polygon",
+    "coordinates": [[[-60.5, -3.5], [-60.0, -3.5], [-60.0, -3.0], [-60.5, -3.0], [-60.5, -3.5]]]
+  },
+  "temporal_filter": {
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31"
+  },
+  "indices": [
+    "species_richness",
+    "shannon_diversity",
+    "simpson_index",
+    "pielou_evenness"
+  ],
+  "rarefaction": {
+    "enabled": true,
+    "target_n": 1000
+  },
+  "bootstrap": {
+    "enabled": true,
+    "iterations": 1000,
+    "confidence_level": 0.95
+  }
+}
+
+# Response
+{
+  "calculation_id": "CALC-2025-AZ-1234",
+  "status": "completed",
+  "execution_time_ms": 2847,
+  "results": {
+    "species_richness": {
+      "observed": 156,
+      "rarefied": 142.7,
+      "ci_lower": 138.2,
+      "ci_upper": 147.3
+    },
+    "shannon_diversity": {
+      "value": 4.127,
+      "ci_lower": 3.982,
+      "ci_upper": 4.268
+    },
+    "simpson_index": {
+      "value": 0.0234,
+      "diversity_1_minus_d": 0.9766,
+      "inverse": 42.74
+    },
+    "pielou_evenness": {
+      "value": 0.822,
+      "interpretation": "high_evenness"
+    }
+  },
+  "metadata": {
+    "input_occurrences": 4523,
+    "unique_species": 156,
+    "total_individuals": 8947,
+    "calculation_date": "2025-12-26T10:30:00Z"
+  }
+}</code></pre>
+
+            <h2>GraphQL Interface</h2>
+
+            <p>For complex queries requiring multiple related resources, GraphQL provides efficient single-request access:</p>
+
+            <pre><code>POST https://api.biodiversity.wia.org/graphql
+Content-Type: application/json
+
+{
+  "query": "{
+    species(scientificName: \"Panthera tigris\") {
+      taxonId
+      commonNames
+      conservationStatus {
+        category
+        populationTrend
+      }
+      occurrences(limit: 10, year: 2025) {
+        occurrenceId
+        location {
+          latitude
+          longitude
+          protectedArea
+        }
+        observationDate
+        individualCount
+      }
+      diversityIndices(region: \"India\") {
+        shannonIndex
+        simpsonIndex
+      }
+    }
+  }"
+}
+
+# Response provides exactly requested data structure
+{
+  "data": {
+    "species": {
+      "taxonId": "WIA-TAX-001234",
+      "commonNames": ["Bengal Tiger", "बंगाल टाइगर"],
+      "conservationStatus": {
+        "category": "EN",
+        "populationTrend": "Increasing"
+      },
+      "occurrences": [
+        {
+          "occurrenceId": "OCC-2025-IN-78945",
+          "location": {
+            "latitude": 27.5142,
+            "longitude": 88.7597,
+            "protectedArea": true
+          },
+          "observationDate": "2025-11-15",
+          "individualCount": 1
+        }
+        // ... more occurrences
+      ],
+      "diversityIndices": {
+        "shannonIndex": 3.45,
+        "simpsonIndex": 0.0412
+      }
+    }
+  }
+}</code></pre>
+
+            <h2>Real-Time Analytics</h2>
+
+            <p>WebSocket connections enable real-time biodiversity monitoring and alerts:</p>
+
+            <pre><code>// Connect to WebSocket
+const ws = new WebSocket('wss://stream.biodiversity.wia.org/v1/live');
+
+// Subscribe to endangered species detections
+ws.send(JSON.stringify({
+  "action": "subscribe",
+  "channels": ["endangered_detections"],
+  "filters": {
+    "region": "Southeast_Asia",
+    "iucn_categories": ["CR", "EN"]
+  }
+}));
+
+// Receive real-time alerts
+ws.onmessage = (event) => {
+  const alert = JSON.parse(event.data);
+  console.log('Endangered species detected:', alert);
+  /*
+  {
+    "event_type": "endangered_detection",
+    "timestamp": "2025-12-26T14:23:15Z",
+    "species": {
+      "scientific_name": "Dicerorhinus sumatrensis",
+      "common_name": "Sumatran Rhino",
+      "iucn_status": "CR"
+    },
+    "location": {
+      "latitude": 3.5952,
+      "longitude": 98.6722,
+      "protected_area": "Way Kambas National Park"
+    },
+    "detection_method": "camera_trap",
+    "confidence": 0.96
+  }
+  */
+};</code></pre>
+
+            <h2>Data Validation Services</h2>
+
+            <p>Automated validation ensures data quality before submission:</p>
+
+            <pre><code>POST /v1/validate/occurrence
+
+{
+  "occurrence_id": "OCC-2025-TEST-001",
+  "species": {
+    "scientific_name": "Panthera tigris",
+    "taxon_id": "GBIF:5219404"
+  },
+  "location": {
+    "latitude": 27.5142,
+    "longitude": 88.7597,
+    "country": "India"
+  },
+  "temporal": {
+    "observation_date": "2025-11-15T09:30:00Z"
+  }
+}
+
+# Response
+{
+  "valid": true,
+  "quality_score": 0.94,
+  "checks": [
+    {
+      "check": "coordinate_validity",
+      "status": "passed",
+      "message": "Coordinates within valid range"
+    },
+    {
+      "check": "country_match",
+      "status": "passed",
+      "message": "Coordinates match stated country (India)"
+    },
+    {
+      "check": "species_range",
+      "status": "passed",
+      "message": "Location within known species range"
+    },
+    {
+      "check": "taxonomy_valid",
+      "status": "passed",
+      "message": "Taxon ID resolves to valid GBIF entry"
+    },
+    {
+      "check": "date_reasonable",
+      "status": "passed",
+      "message": "Date not in future, within reasonable historical range"
+    }
+  ],
+  "warnings": [],
+  "errors": []
+}</code></pre>
+
+            <h2>Integration Services</h2>
+
+            <h3>GBIF Upload Service</h3>
+
+            <p>Direct submission to Global Biodiversity Information Facility:</p>
+
+            <pre><code>POST /v1/export/gbif
+
+{
+  "dataset_id": "DS-AMAZON-2025",
+  "gbif_dataset_key": "50c9509d-22c7-4a22-a47d-8c48425ef4a7",
+  "filters": {
+    "date_range": {
+      "start": "2025-01-01",
+      "end": "2025-12-31"
+    }
+  },
+  "mapping_profile": "darwin_core_v1.0",
+  "validate_before_upload": true
+}
+
+# Response
+{
+  "export_id": "EXP-GBIF-2025-1234",
+  "status": "processing",
+  "records_to_export": 4523,
+  "validation_results": {
+    "valid": 4498,
+    "warnings": 25,
+    "errors": 0
+  },
+  "estimated_completion": "2025-12-26T15:00:00Z"
+}</code></pre>
+
+            <h3>IUCN Red List Integration</h3>
+
+            <p>Retrieve conservation status and threat information:</p>
+
+            <pre><code>GET /v1/integration/iucn/species/Panthera%20tigris
+
+# Response
+{
+  "scientific_name": "Panthera tigris",
+  "category": "EN",
+  "criteria": "A2abcd+3cd+4abcd",
+  "population_trend": "Increasing",
+  "systems": ["Terrestrial"],
+  "threats": [
+    {
+      "code": "5.1.1",
+      "title": "Intentional use (species is the target)",
+      "timing": "Ongoing",
+      "scope": "Minority (<50%)",
+      "severity": "Rapid Declines",
+      "score": "Medium Impact: 6"
+    },
+    {
+      "code": "2.1.2",
+      "title": "Small-holder farming",
+      "timing": "Ongoing",
+      "scope": "Majority (50-90%)",
+      "severity": "Slow, Significant Declines",
+      "score": "Medium Impact: 7"
+    }
+  ],
+  "conservation_actions": [
+    {
+      "code": "2.1",
+      "title": "Site/area management"
+    },
+    {
+      "code": "5.4.1",
+      "title": "Awareness & communications"
+    }
+  ],
+  "source": "IUCN Red List API v3",
+  "assessment_date": "2023-06-15"
+}</code></pre>
+
+            <h2>Rate Limiting and Performance</h2>
+
+            <p>To ensure fair access and system stability, the API implements rate limiting:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Rate Limit</th>
+                        <th>Burst Limit</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Free</td>
+                        <td>1,000 req/hour</td>
+                        <td>50 req/minute</td>
+                        <td>Individual researchers, small projects</td>
+                    </tr>
+                    <tr>
+                        <td>Research</td>
+                        <td>10,000 req/hour</td>
+                        <td>200 req/minute</td>
+                        <td>Academic institutions, NGOs</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise</td>
+                        <td>100,000 req/hour</td>
+                        <td>1,000 req/minute</td>
+                        <td>Government agencies, large conservation orgs</td>
+                    </tr>
+                    <tr>
+                        <td>Custom</td>
+                        <td>Negotiable</td>
+                        <td>Negotiable</td>
+                        <td>Global initiatives, long-term partnerships</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>SDK and Client Libraries</h2>
+
+            <p>Official SDKs simplify API integration across programming languages:</p>
+
+            <h3>Python SDK Example</h3>
+
+            <pre><code>from wia_biodiversity import BiodiversityAPI
+
+# Initialize client
+client = BiodiversityAPI(api_key='your_api_key')
+
+# Query occurrences
+occurrences = client.occurrences.list(
+    species='Panthera tigris',
+    country='India',
+    year=2025,
+    limit=100
+)
+
+# Calculate diversity indices
+results = client.indices.calculate(
+    dataset_id='DS-INDIA-2025',
+    indices=['shannon', 'simpson', 'richness'],
+    spatial_filter=client.geo.polygon([
+        [88.0, 27.0], [89.0, 27.0], [89.0, 28.0], [88.0, 28.0]
+    ]),
+    bootstrap_iterations=1000
+)
+
+print(f"Shannon Diversity: {results.shannon.value:.3f}")
+print(f"Species Richness: {results.richness.observed}")</code></pre>
+
+            <h3>TypeScript SDK Example</h3>
+
+            <pre><code>import { BiodiversityClient } from '@wia/biodiversity-sdk';
+
+const client = new BiodiversityClient({
+  apiKey: process.env.WIA_API_KEY
+});
+
+// Real-time species detection monitoring
+const stream = client.stream.subscribe({
+  channels: ['endangered_detections'],
+  filters: {
+    region: 'Southeast_Asia',
+    iucnCategories: ['CR', 'EN']
+  }
+});
+
+stream.on('detection', (event) => {
+  console.log(`${event.species.commonName} detected!`);
+  console.log(`Location: ${event.location.protectedArea}`);
+  console.log(`Confidence: ${event.confidence}`);
+});</code></pre>
+
+            <h2>Error Handling</h2>
+
+            <p>The API uses standard HTTP status codes and structured error responses:</p>
+
+            <pre><code># Error response format
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid species name format",
+    "details": {
+      "field": "species.scientific_name",
+      "value": "panthera tigris",  // lowercase - invalid
+      "expected": "Capitalized binomial nomenclature"
+    },
+    "documentation_url": "https://docs.biodiversity.wia.org/errors/VALIDATION_ERROR"
+  },
+  "request_id": "req_abc123def456"
+}</code></pre>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status Code</th>
+                        <th>Error Code</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>400</td>
+                        <td>VALIDATION_ERROR</td>
+                        <td>Request data fails validation rules</td>
+                    </tr>
+                    <tr>
+                        <td>401</td>
+                        <td>UNAUTHORIZED</td>
+                        <td>Missing or invalid authentication</td>
+                    </tr>
+                    <tr>
+                        <td>403</td>
+                        <td>FORBIDDEN</td>
+                        <td>Valid auth but insufficient permissions</td>
+                    </tr>
+                    <tr>
+                        <td>404</td>
+                        <td>NOT_FOUND</td>
+                        <td>Requested resource doesn't exist</td>
+                    </tr>
+                    <tr>
+                        <td>429</td>
+                        <td>RATE_LIMIT_EXCEEDED</td>
+                        <td>Too many requests</td>
+                    </tr>
+                    <tr>
+                        <td>500</td>
+                        <td>INTERNAL_ERROR</td>
+                        <td>Server-side processing error</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <h3>Chapter Summary</h3>
+
+                <div class="key-takeaways">
+                    <h4>Key Takeaways</h4>
+                    <ul>
+                        <li><strong>Dual API approach</strong> - RESTful endpoints for simple operations, GraphQL for complex queries, providing both ease of use and power.</li>
+                        <li><strong>Comprehensive analytical services</strong> - Automated diversity index calculation with bootstrap confidence intervals and rarefaction support.</li>
+                        <li><strong>Real-time capabilities</strong> - WebSocket streaming enables live monitoring and instant alerts for conservation priorities.</li>
+                        <li><strong>Seamless integration</strong> - Built-in connectors for GBIF, IUCN, and other major biodiversity platforms eliminate manual data transfer.</li>
+                        <li><strong>Production-ready features</strong> - OAuth 2.0 authentication, rate limiting, error handling, and official SDKs ensure enterprise-grade reliability.</li>
+                    </ul>
+                </div>
+
+                <div class="questions">
+                    <h4>Review Questions</h4>
+                    <ol>
+                        <li>Compare REST and GraphQL approaches in the WIA API. When would you choose each for a biodiversity monitoring application?</li>
+                        <li>Explain how the diversity index calculation API handles statistical uncertainty through bootstrap and rarefaction methods.</li>
+                        <li>Describe the authentication flow using OAuth 2.0. Why is this approach more secure than API key-only authentication?</li>
+                        <li>How do WebSocket streams enable real-time conservation responses that traditional polling cannot?</li>
+                        <li>What validation checks are performed before data submission? How does this prevent data quality issues downstream?</li>
+                        <li>Discuss the rate limiting tiers. How do they balance open access principles with system sustainability?</li>
+                    </ol>
+                </div>
+
+                <div class="info-box" style="margin-top: 30px;">
+                    <p><strong>Looking Ahead:</strong> Chapter 6 presents Phase 3: Protocol, detailing standardized field survey methodologies, quality assurance procedures, and certification programs that ensure data quality from the point of collection.</p>
+                </div>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

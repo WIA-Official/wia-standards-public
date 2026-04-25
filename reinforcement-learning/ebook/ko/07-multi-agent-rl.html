@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 다중 에이전트 강화학습 | WIA-AI-025</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #10B981; }
+        h1 { color: #10B981; font-size: 2.2rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; }
+        nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        nav a { color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px; background: #334155; }
+        h2 { color: #10B981; font-size: 1.6rem; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3rem; margin: 1.5rem 0 1rem 0; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        code { color: #10B981; font-family: 'Courier New', monospace; }
+        .info-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+        .warning-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b; }
+        .success-box { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #10B981; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #334155; color: #10B981; padding: 1rem; text-align: left; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        .summary { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 2rem; border-radius: 12px; margin: 2rem 0; border-left: 6px solid #10B981; }
+        footer { text-align: center; margin-top: 3rem; padding: 2rem; background: #1e293b; border-radius: 8px; color: #94a3b8; }
+        .philosophy { color: #10B981; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제7장: 다중 에이전트 강화학습</h1>
+            <div class="chapter-meta">WIA-AI-025 | 협력과 경쟁</div>
+        </header>
+
+        <main>
+            <h2>7.1 다중 에이전트 RL 소개</h2>
+
+            <p>다중 에이전트 강화학습(MARL)은 RL을 여러 학습 에이전트가 서로 상호작용하는 환경으로 확장합니다. 에이전트는 환경뿐만 아니라 다른 에이전트의 변화하는 행동에도 적응해야 합니다.</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">핵심 과제:</strong>
+                <ul>
+                    <li><strong>비정상성:</strong> 다른 에이전트가 학습함에 따라 환경이 변화</li>
+                    <li><strong>기여도 할당:</strong> 어떤 에이전트가 결과를 야기했는가?</li>
+                    <li><strong>확장성:</strong> 에이전트 수에 따라 상태-행동 공간이 지수적으로 증가</li>
+                    <li><strong>통신:</strong> 에이전트가 정보를 어떻게 공유해야 하는가?</li>
+                    <li><strong>창발적 행동:</strong> 복잡한 그룹 역학이 발생</li>
+                </ul>
+            </div>
+
+            <h3>다중 에이전트 설정 유형</h3>
+
+            <ul>
+                <li><strong>완전 협력:</strong> 모든 에이전트가 동일한 보상 공유 (팀 게임)</li>
+                <li><strong>완전 경쟁:</strong> 제로섬 게임 (체스, 포커)</li>
+                <li><strong>혼합:</strong> 협력과 경쟁 모두 존재 (시장, 사회적 딜레마)</li>
+            </ul>
+
+            <h2>7.2 게임 이론 기초</h2>
+
+            <h3>내시 균형</h3>
+
+            <p>내시 균형은 어떤 에이전트도 자신의 정책만 변경해서는 개선할 수 없는 정책의 집합입니다:</p>
+
+            <pre><code>π* = (π₁*, π₂*, ..., πₙ*)가 내시 균형이 되려면:
+
+Q^πᵢ(s, aᵢ, a₋ᵢ) ≥ Q^π(s, a'ᵢ, a₋ᵢ) 모든 i, s, aᵢ, a'ᵢ에 대해
+
+여기서:
+- aᵢ: 에이전트 i의 행동
+- a₋ᵢ: 다른 에이전트들의 행동</code></pre>
+
+            <h3>죄수의 딜레마</h3>
+
+            <p>개인적 합리성과 집단적 합리성 사이의 긴장을 보여주는 고전적 예시:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>에이전트 2: 협력</th>
+                        <th>에이전트 2: 배신</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>에이전트 1: 협력</strong></td>
+                        <td>-1, -1</td>
+                        <td>-3, 0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>에이전트 1: 배신</strong></td>
+                        <td>0, -3</td>
+                        <td>-2, -2</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>내시 균형: 둘 다 배신 (차선책!). 최적: 둘 다 협력.</p>
+
+            <h2>7.3 독립 학습자</h2>
+
+            <p>가장 간단한 접근법: 각 에이전트가 단일 에이전트 RL을 사용하여 독립적으로 학습:</p>
+
+            <pre><code>class IndependentQLearning:
+    def __init__(self, n_agents, state_dim, action_dim):
+        # 각 에이전트는 자체 Q-테이블 보유
+        self.agents = [
+            QLearningAgent(state_dim, action_dim)
+            for _ in range(n_agents)
+        ]
+
+    def step(self, states):
+        # 각 에이전트가 독립적으로 행동 선택
+        actions = []
+        for i, agent in enumerate(self.agents):
+            action = agent.select_action(states[i])
+            actions.append(action)
+        return actions
+
+    def update(self, states, actions, rewards, next_states):
+        # 각 에이전트가 독립적으로 업데이트
+        for i, agent in enumerate(self.agents):
+            agent.update(states[i], actions[i], rewards[i], next_states[i])</code></pre>
+
+            <div class="warning-box">
+                <strong style="color: #f59e0b;">문제점:</strong>
+                <p>독립 학습은 마르코프 가정을 위반합니다! 각 에이전트 관점에서 다른 에이전트도 학습 중이므로 환경이 비정상적입니다.</p>
+            </div>
+
+            <h3>독립 학습이 작동하는 경우</h3>
+
+            <ul>
+                <li>에이전트 간 상호작용이 최소인 경우</li>
+                <li>환경이 충분히 커서 에이전트가 거의 만나지 않는 경우</li>
+                <li>단순한 조정 태스크</li>
+            </ul>
+
+            <h2>7.4 중앙 집중 훈련, 분산 실행 (CTDE)</h2>
+
+            <p>CTDE는 강력한 패러다임입니다: 훈련 중에는 전역 정보를 사용하되, 실행 시에는 에이전트가 독립적으로 행동합니다:</p>
+
+            <div class="success-box">
+                <strong style="color: #10B981;">핵심 아이디어:</strong>
+                <p><strong>훈련:</strong> 전역 상태와 모든 에이전트의 행동에 접근 가능<br>
+                <strong>실행:</strong> 각 에이전트는 지역 관측만 사용</p>
+            </div>
+
+            <h3>QMIX 알고리즘</h3>
+
+            <p>QMIX는 개별 Q-함수 Qᵢ(oᵢ, aᵢ)를 학습하고 이를 Q_tot으로 결합합니다:</p>
+
+            <pre><code>import torch
+import torch.nn as nn
+
+class QMIXNetwork(nn.Module):
+    def __init__(self, n_agents, state_dim, n_actions, mixing_embed_dim=32):
+        super(QMIXNetwork, self).__init__()
+
+        # 개별 Q-네트워크 (에이전트당 하나)
+        self.agent_q_networks = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(state_dim, 128),
+                nn.ReLU(),
+                nn.Linear(128, n_actions)
+            )
+            for _ in range(n_agents)
+        ])
+
+        # 믹싱 네트워크: 개별 Q-값들을 결합
+        self.hyper_w1 = nn.Linear(state_dim, n_agents * mixing_embed_dim)
+        self.hyper_w2 = nn.Linear(state_dim, mixing_embed_dim)
+
+        self.hyper_b1 = nn.Linear(state_dim, mixing_embed_dim)
+        self.hyper_b2 = nn.Sequential(
+            nn.Linear(state_dim, mixing_embed_dim),
+            nn.ReLU(),
+            nn.Linear(mixing_embed_dim, 1)
+        )
+
+    def forward(self, agent_obs, global_state):
+        """
+        개별 Q-값으로부터 Q_tot 계산.
+
+        단조성 제약: ∂Q_tot/∂Qᵢ ≥ 0
+        이는 공동 행동 선택 = 개별 탐욕적 선택을 보장
+        """
+        # 개별 Q-값 획득
+        agent_qs = []
+        for i, q_net in enumerate(self.agent_q_networks):
+            q = q_net(agent_obs[i])
+            agent_qs.append(q)
+
+        agent_qs = torch.stack(agent_qs, dim=1)  # [batch, n_agents, n_actions]
+
+        # 믹싱 네트워크 가중치 (상태 의존적)
+        w1 = torch.abs(self.hyper_w1(global_state))
+        b1 = self.hyper_b1(global_state)
+
+        w2 = torch.abs(self.hyper_w2(global_state))
+        b2 = self.hyper_b2(global_state)
+
+        # 개별 Q-값 믹싱
+        hidden = F.elu(torch.matmul(agent_qs, w1) + b1)
+        q_tot = torch.matmul(hidden, w2) + b2
+
+        return q_tot, agent_qs</code></pre>
+
+            <h2>7.5 MARL에서의 통신</h2>
+
+            <h3>CommNet 아키텍처</h3>
+
+            <p>CommNet은 에이전트가 공유 채널을 통해 통신할 수 있게 합니다:</p>
+
+            <pre><code>class CommNet(nn.Module):
+    def __init__(self, n_agents, obs_dim, hidden_dim, n_actions):
+        super(CommNet, self).__init__()
+        self.n_agents = n_agents
+
+        # 인코딩
+        self.encoder = nn.Linear(obs_dim, hidden_dim)
+
+        # 통신 모듈
+        self.comm_layer = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+
+        # 행동 출력
+        self.actor = nn.Linear(hidden_dim, n_actions)
+
+    def forward(self, observations):
+        """
+        observations: [n_agents, obs_dim]
+        """
+        # 각 에이전트의 관측 인코딩
+        hidden = self.encoder(observations)  # [n_agents, hidden_dim]
+
+        # 평균 통신 (브로드캐스트)
+        comm_mean = hidden.mean(dim=0, keepdim=True)  # [1, hidden_dim]
+
+        # 지역 정보와 통신 정보 결합
+        combined = hidden + comm_mean.expand(self.n_agents, -1)
+        updated = self.comm_layer(combined)
+
+        # 행동 출력
+        actions = self.actor(updated)
+        return actions</code></pre>
+
+            <h3>학습된 통신</h3>
+
+            <pre><code>class LearnedCommAgent(nn.Module):
+    def __init__(self, obs_dim, message_dim, hidden_dim, n_actions):
+        super(LearnedCommAgent, self).__init__()
+
+        # 관측 인코더
+        self.obs_encoder = nn.Linear(obs_dim, hidden_dim)
+
+        # 메시지 생성
+        self.message_gen = nn.Linear(hidden_dim, message_dim)
+
+        # 행동 정책
+        self.policy = nn.Sequential(
+            nn.Linear(hidden_dim + message_dim * (n_agents - 1), hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, n_actions),
+            nn.Softmax(dim=-1)
+        )
+
+    def generate_message(self, obs):
+        """다른 에이전트에 브로드캐스트할 메시지 생성."""
+        hidden = self.obs_encoder(obs)
+        message = self.message_gen(hidden)
+        return message
+
+    def act(self, obs, received_messages):
+        """관측과 메시지를 기반으로 행동 선택."""
+        hidden = self.obs_encoder(obs)
+        messages_concat = torch.cat(received_messages, dim=-1)
+        combined = torch.cat([hidden, messages_concat], dim=-1)
+        action_probs = self.policy(combined)
+        return action_probs</code></pre>
+
+            <h2>7.6 창발적 행동</h2>
+
+            <h3>포식자-피식자</h3>
+
+            <pre><code>class PredatorPreyEnv:
+    """
+    여러 포식자가 협력하여 더 빠른 피식자를 잡아야 함.
+    창발적 행동: 둘러싸기, 조정, 역할 특화
+    """
+    def __init__(self, n_predators=4, grid_size=10):
+        self.n_predators = n_predators
+        self.grid_size = grid_size
+
+        self.predator_positions = []
+        self.prey_position = None
+
+    def reset(self):
+        # 무작위 초기 위치
+        self.predator_positions = [
+            (random.randint(0, self.grid_size-1),
+             random.randint(0, self.grid_size-1))
+            for _ in range(self.n_predators)
+        ]
+        self.prey_position = (random.randint(0, self.grid_size-1),
+                              random.randint(0, self.grid_size-1))
+
+        return self.get_observations()
+
+    def step(self, actions):
+        # 포식자 이동
+        for i, action in enumerate(actions):
+            self.predator_positions[i] = self.move(self.predator_positions[i], action)
+
+        # 피식자 도망 시도 (가장 가까운 포식자에서 멀어짐)
+        self.prey_position = self.move_prey()
+
+        # 포식자가 피식자를 둘러싸면 포획
+        captured = self.check_capture()
+
+        # 보상: 포획 시 +10, 단계당 -0.1
+        rewards = [10 if captured else -0.1] * self.n_predators
+
+        return self.get_observations(), rewards, captured
+
+    def check_capture(self):
+        """피식자가 인접한 포식자 ≥2명이면 포획."""
+        adjacent_predators = 0
+        for pos in self.predator_positions:
+            if self.distance(pos, self.prey_position) <= 1:
+                adjacent_predators += 1
+        return adjacent_predators >= 2</code></pre>
+
+            <h2>7.7 MADDPG (Multi-Agent Deep Deterministic Policy Gradient)</h2>
+
+            <p>MADDPG는 중앙 집중 비평가로 DDPG를 다중 에이전트 설정으로 확장합니다:</p>
+
+            <pre><code>class MADDPG:
+    def __init__(self, n_agents, obs_dim, action_dim):
+        self.agents = []
+
+        for i in range(n_agents):
+            # 각 에이전트는 자체 액터 보유 (분산)
+            actor = Actor(obs_dim, action_dim)
+
+            # 비평가는 모든 관측과 행동 확인 (중앙 집중)
+            critic = Critic(obs_dim * n_agents, action_dim * n_agents)
+
+            self.agents.append({
+                'actor': actor,
+                'critic': critic,
+                'actor_target': copy.deepcopy(actor),
+                'critic_target': copy.deepcopy(critic),
+                'actor_optimizer': optim.Adam(actor.parameters(), lr=1e-3),
+                'critic_optimizer': optim.Adam(critic.parameters(), lr=1e-3)
+            })
+
+    def select_actions(self, observations):
+        """각 에이전트가 지역 관측을 기반으로 행동 선택."""
+        actions = []
+        for i, agent in enumerate(self.agents):
+            obs = torch.FloatTensor(observations[i])
+            action = agent['actor'](obs)
+            actions.append(action)
+        return actions
+
+    def update(self, batch):
+        """
+        중앙 집중 훈련을 사용하여 모든 에이전트 업데이트.
+        """
+        obs, actions, rewards, next_obs, dones = batch
+
+        for i, agent in enumerate(self.agents):
+            # 비평가 업데이트
+            with torch.no_grad():
+                # 타겟 액터들로부터 다음 행동
+                next_actions = [
+                    self.agents[j]['actor_target'](next_obs[:, j])
+                    for j in range(len(self.agents))
+                ]
+                next_actions = torch.cat(next_actions, dim=-1)
+
+                # Q-타겟
+                next_obs_all = next_obs.view(batch_size, -1)
+                q_next = agent['critic_target'](next_obs_all, next_actions)
+                q_target = rewards[:, i:i+1] + gamma * q_next * (1 - dones[:, i:i+1])
+
+            # 현재 Q-값
+            obs_all = obs.view(batch_size, -1)
+            actions_all = actions.view(batch_size, -1)
+            q_value = agent['critic'](obs_all, actions_all)
+
+            # 비평가 손실
+            critic_loss = F.mse_loss(q_value, q_target)
+
+            agent['critic_optimizer'].zero_grad()
+            critic_loss.backward()
+            agent['critic_optimizer'].step()
+
+            # 액터 업데이트
+            current_actions = [
+                self.agents[j]['actor'](obs[:, j]) if j == i else actions[:, j].detach()
+                for j in range(len(self.agents))
+            ]
+            current_actions = torch.cat(current_actions, dim=-1)
+
+            # 액터 손실: Q 최대화
+            actor_loss = -agent['critic'](obs_all, current_actions).mean()
+
+            agent['actor_optimizer'].zero_grad()
+            actor_loss.backward()
+            agent['actor_optimizer'].step()
+
+            # 소프트 타겟 업데이트
+            self.soft_update(agent['actor_target'], agent['actor'])
+            self.soft_update(agent['critic_target'], agent['critic'])</code></pre>
+
+            <h2>7.8 평균장 강화학습</h2>
+
+            <p>대규모 다중 에이전트 시스템(수백/수천 에이전트)의 경우, 평균장 근사가 효율적입니다:</p>
+
+            <div class="info-box">
+                <strong style="color: #3b82f6;">평균장 아이디어:</strong>
+                <p>N개의 모든 에이전트를 개별적으로 모델링하는 대신, 다른 모든 에이전트가 각 에이전트에 미치는 평균 효과를 모델링합니다. 복잡도가 O(N²)에서 O(N)으로 감소합니다.</p>
+            </div>
+
+            <pre><code>class MeanFieldAgent:
+    def __init__(self, obs_dim, action_dim):
+        # 에이전트 정책은 지역 관측과 평균 행동 분포에 의존
+        self.policy = nn.Sequential(
+            nn.Linear(obs_dim + action_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+            nn.Softmax(dim=-1)
+        )
+
+    def forward(self, obs, mean_action):
+        """
+        obs: 지역 관측
+        mean_action: 다른 모든 에이전트의 평균 행동 분포
+        """
+        x = torch.cat([obs, mean_action], dim=-1)
+        return self.policy(x)
+
+def train_mean_field(env, n_agents=100):
+    agent = MeanFieldAgent(obs_dim, action_dim)
+
+    for episode in range(episodes):
+        observations = env.reset(n_agents)
+
+        while not done:
+            # 모든 에이전트로부터 행동 획득
+            actions = [agent(obs, mean_actions) for obs in observations]
+
+            # 평균 행동 분포 계산
+            mean_actions = torch.stack(actions).mean(dim=0)
+
+            # 환경 스텝
+            next_observations, rewards, done = env.step(actions)
+
+            # 업데이트
+            loss = compute_policy_gradient_loss(agent, observations, actions, rewards, mean_actions)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()</code></pre>
+
+            <h2>7.9 실용적 응용</h2>
+
+            <h3>다중 로봇 시스템</h3>
+
+            <ul>
+                <li><strong>창고 로봇:</strong> 효율적인 물품 운송을 위한 조정</li>
+                <li><strong>드론 군집:</strong> 대형 제어, 탐사, 감시</li>
+                <li><strong>자율 주행차:</strong> 교차로 관리, 플래투닝</li>
+            </ul>
+
+            <h3>게임 AI</h3>
+
+            <ul>
+                <li><strong>도타 2 (OpenAI Five):</strong> 5대5 팀 조정</li>
+                <li><strong>스타크래프트 II (AlphaStar):</strong> 유닛 마이크로 관리 및 매크로 전략</li>
+                <li><strong>왕자영요 (JueWu):</strong> MOBA 게임 팀워크</li>
+            </ul>
+
+            <h3>경제 및 사회 시스템</h3>
+
+            <ul>
+                <li><strong>교통 제어:</strong> 적응형 교통 신호등</li>
+                <li><strong>스마트 그리드:</strong> 분산 에너지 관리</li>
+                <li><strong>마켓 메이킹:</strong> 거래 알고리즘 상호작용</li>
+            </ul>
+
+            <h2>7.10 MARL 알고리즘 비교</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>알고리즘</th>
+                        <th>훈련</th>
+                        <th>실행</th>
+                        <th>통신</th>
+                        <th>확장성</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>독립 Q-학습</td>
+                        <td>분산</td>
+                        <td>분산</td>
+                        <td>없음</td>
+                        <td>좋음</td>
+                    </tr>
+                    <tr>
+                        <td>QMIX</td>
+                        <td>중앙 집중</td>
+                        <td>분산</td>
+                        <td>없음</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td>CommNet</td>
+                        <td>분산</td>
+                        <td>분산</td>
+                        <td>학습됨</td>
+                        <td>좋음</td>
+                    </tr>
+                    <tr>
+                        <td>MADDPG</td>
+                        <td>중앙 집중</td>
+                        <td>분산</td>
+                        <td>없음</td>
+                        <td>중간</td>
+                    </tr>
+                    <tr>
+                        <td>평균장</td>
+                        <td>분산</td>
+                        <td>분산</td>
+                        <td>암시적</td>
+                        <td>우수</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <ul>
+                    <li>MARL은 RL을 여러 상호작용하는 에이전트로 확장</li>
+                    <li>핵심 과제: 비정상성, 기여도 할당, 확장성</li>
+                    <li>게임 이론이 기초 제공 (내시 균형, 사회적 딜레마)</li>
+                    <li>독립 학습은 간단하지만 마르코프 가정 위반</li>
+                    <li>CTDE 패러다임은 중앙 집중 훈련과 분산 실행 가능</li>
+                    <li>QMIX는 단조성 제약으로 분해된 가치 함수 학습</li>
+                    <li>통신은 하드코딩 또는 학습 가능</li>
+                    <li>에이전트 상호작용에서 창발적 행동 발생</li>
+                    <li>MADDPG는 중앙 집중 비평가로 액터-크리틱 확장</li>
+                    <li>평균장 방법은 수백/수천 에이전트로 확장 가능</li>
+                </ul>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

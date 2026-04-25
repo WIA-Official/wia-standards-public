@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA - 세상 모든 소통의 시작</title>
+    <meta name="description" content="WIA - 농인과 맹인의 양방향 실시간 소통 플랫폼. 211개 언어 지원.">
+    
+    <!-- 접근성 메타 -->
+    <meta name="theme-color" content="#0a0a0f">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* 스크린리더 전용 (시각적으로 숨김) */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* 스킵 네비게이션 */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            z-index: 100;
+            transition: top 0.3s;
+        }
+        
+        .skip-link:focus {
+            top: 0;
+        }
+        
+        body {
+            background: #0a0a0f;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        /* 애니메이션 줄이기 설정 존중 */
+        @media (prefers-reduced-motion: reduce) {
+            canvas { display: none; }
+            .logo, .tagline, .enter-btn {
+                opacity: 1 !important;
+                transform: none !important;
+                transition: none !important;
+            }
+        }
+        
+        .content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            text-align: center;
+            pointer-events: none;
+        }
+        
+        .logo {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            align-items: center;
+            margin-bottom: 2rem;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+        
+        .logo.visible { opacity: 1; }
+        .logo.hidden { opacity: 0; }
+        
+        .logo-left {
+            font-size: 4rem;
+            filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.8));
+        }
+        
+        /* DALL-E 이미지로 대체 가능 */
+        .logo-left-img {
+            width: 80px;
+            height: 80px;
+            display: none; /* 이미지 있으면 block으로 */
+        }
+        
+        .logo-center {
+            font-size: 2rem;
+            filter: drop-shadow(0 0 15px rgba(180, 150, 255, 0.8));
+        }
+        
+        .logo-right {
+            filter: drop-shadow(0 0 20px rgba(240, 147, 251, 0.8));
+        }
+        
+        /* DALL-E 이미지로 대체 가능 */
+        .logo-right-img {
+            width: 80px;
+            height: 80px;
+            display: none; /* 이미지 있으면 block으로 */
+        }
+        
+        .braille-8dot {
+            display: grid;
+            grid-template-columns: repeat(2, 14px);
+            grid-template-rows: repeat(4, 14px);
+            gap: 5px;
+            padding: 10px;
+            background: rgba(60, 60, 100, 0.4);
+            border-radius: 10px;
+            border: 2px solid rgba(150, 150, 200, 0.4);
+        }
+        
+        .braille-dot {
+            width: 14px;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(255,255,255,0.5);
+        }
+        
+        .tagline {
+            font-size: 1.8rem;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 2rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 1.5s ease;
+            text-shadow: 0 0 30px rgba(255,100,150,0.6);
+        }
+        
+        .tagline.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .enter-btn {
+            display: inline-block;
+            padding: 1.2rem 4rem;
+            font-size: 1.3rem;
+            color: #fff;
+            background: rgba(255,100,150,0.2);
+            border: 2px solid rgba(255,150,180,0.5);
+            border-radius: 50px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: auto;
+        }
+        
+        .enter-btn.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .enter-btn:hover,
+        .enter-btn:focus {
+            background: rgba(255,100,150,0.4);
+            border-color: rgba(255,180,200,0.8);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(255,100,150,0.3);
+            outline: none;
+        }
+        
+        .enter-btn:focus {
+            outline: 3px solid #fff;
+            outline-offset: 3px;
+        }
+        
+        .glow-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradient-shift 3s ease infinite;
+            background-size: 200% 200%;
+        }
+        
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        /* 히어로 이미지 배경 (DALL-E 이미지 넣을 자리) */
+        .hero-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.3;
+            object-fit: cover;
+            display: none; /* 이미지 있으면 block으로 */
+        }
+    </style>
+</head>
+<body>
+    <!-- 스킵 네비게이션 (접근성) -->
+    <a href="#main-content" class="skip-link">본문으로 바로가기</a>
+    
+    <!-- 스크린리더용 설명 -->
+    <div class="sr-only" role="banner">
+        <h1>WIA - 세상 모든 소통의 시작</h1>
+        <p>WIA는 농인과 맹인이 통역사 없이 실시간으로 소통할 수 있는 혁신적인 플랫폼입니다.</p>
+        <p>WIA Talk는 제스처 기반 시각 언어이고, WIA Braille은 8점 점자 시스템입니다.</p>
+        <p>211개 언어를 지원하며, 모든 사람을 위한 소통을 목표로 합니다.</p>
+    </div>
+    
+    <!-- 히어로 배경 이미지 (DALL-E로 생성 후 넣을 자리) -->
+    <!-- 사용법: /images/intro/hero-bg.jpg 또는 hero-bg.png 업로드 후 아래 주석 해제 -->
+    <!-- <img src="/images/intro/hero-bg.jpg" alt="" class="hero-bg" aria-hidden="true"> -->
+    
+    <canvas id="canvas" aria-hidden="true"></canvas>
+    
+    <main id="main-content" class="content" role="main">
+        <div class="logo" id="logo" aria-label="WIA 로고: 제스처와 점자가 연결됩니다">
+            <!-- 이모지 버전 -->
+            <span class="logo-left" aria-hidden="true">🤲</span>
+            
+            <!-- DALL-E 이미지 버전 (이미지 있으면 이걸로 대체) -->
+            <!-- <img src="/images/intro/hand-gesture.png" alt="제스처" class="logo-left-img"> -->
+            
+            <span class="logo-center glow-text" aria-hidden="true">↔</span>
+            
+            <!-- 8점 점자 (이모지 버전) -->
+            <div class="logo-right braille-8dot" aria-hidden="true">
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+                <div class="braille-dot"></div>
+            </div>
+            
+            <!-- DALL-E 이미지 버전 (이미지 있으면 이걸로 대체) -->
+            <!-- <img src="/images/intro/braille-8dot.png" alt="8점 점자" class="logo-right-img"> -->
+        </div>
+        
+        <p class="tagline" id="tagline">세상 모든 소통의 시작</p>
+        
+        <a href="/" class="enter-btn" id="enterBtn" role="button" aria-label="WIA 메인 페이지로 이동">
+            시작하기
+        </a>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 애니메이션 줄이기 설정 확인
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        
+        let width, height;
+        let particles = [];
+        let mouse = { x: null, y: null };
+        let phase = 0;
+        let phaseTimer = 0;
+        
+        const colors = {
+            left: { r: 102, g: 126, b: 234 },
+            right: { r: 240, g: 147, b: 251 },
+            heart: { r: 255, g: 100, b: 150 }
+        };
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        
+        function getHeartPosition(t, scale, offsetX, offsetY) {
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+            return {
+                x: offsetX + x * scale,
+                y: offsetY + y * scale
+            };
+        }
+        
+        class Particle {
+            constructor(side, index, total) {
+                this.side = side;
+                this.index = index;
+                this.total = total;
+                this.reset();
+            }
+            
+            reset() {
+                if (this.side === 'left') {
+                    this.x = Math.random() * width * 0.55;
+                    this.targetX = width * 0.3 + (Math.random() - 0.5) * width * 0.4;
+                    this.color = {...colors.left};
+                } else {
+                    this.x = width * 0.45 + Math.random() * width * 0.55;
+                    this.targetX = width * 0.7 + (Math.random() - 0.5) * width * 0.4;
+                    this.color = {...colors.right};
+                }
+                
+                this.y = Math.random() * height;
+                this.targetY = height * 0.5 + (Math.random() - 0.5) * height * 0.8;
+                this.size = Math.random() * 2.5 + 1.5;
+                this.baseX = this.x;
+                this.baseY = this.y;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = 0.008 + Math.random() * 0.008;
+                this.radius = 15 + Math.random() * 30;
+                this.heartX = 0;
+                this.heartY = 0;
+            }
+            
+            setHeartTarget(totalParticles) {
+                const heartScale = Math.min(width, height) * 0.024;
+                const t = (this.index / (totalParticles / 2)) * Math.PI * 2;
+                const heartPos = getHeartPosition(t, heartScale, width / 2, height / 2 - 20);
+                this.heartX = heartPos.x;
+                this.heartY = heartPos.y;
+            }
+            
+            update() {
+                if (phase < 2) {
+                    this.baseX += (this.targetX - this.baseX) * 0.003;
+                    this.baseY += (this.targetY - this.baseY) * 0.003;
+                    
+                    this.angle += this.speed;
+                    this.x = this.baseX + Math.cos(this.angle) * this.radius * 0.3;
+                    this.y = this.baseY + Math.sin(this.angle) * this.radius * 0.3;
+                } else {
+                    this.x += (this.heartX - this.x) * 0.008;
+                    this.y += (this.heartY - this.y) * 0.008;
+                    
+                    this.color.r += (colors.heart.r - this.color.r) * 0.008;
+                    this.color.g += (colors.heart.g - this.color.g) * 0.008;
+                    this.color.b += (colors.heart.b - this.color.b) * 0.008;
+                }
+                
+                if (mouse.x && mouse.y) {
+                    const dx = this.x - mouse.x;
+                    const dy = this.y - mouse.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 80) {
+                        const force = (80 - dist) / 80;
+                        this.x += dx * force * 0.03;
+                        this.y += dy * force * 0.03;
+                    }
+                }
+            }
+            
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${Math.round(this.color.r)}, ${Math.round(this.color.g)}, ${Math.round(this.color.b)}, 0.85)`;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${Math.round(this.color.r)}, ${Math.round(this.color.g)}, ${Math.round(this.color.b)}, 0.12)`;
+                ctx.fill();
+            }
+        }
+        
+        function init() {
+            resize();
+            particles = [];
+            
+            for (let i = 0; i < 250; i++) {
+                particles.push(new Particle('left', i, 250));
+            }
+            
+            for (let i = 0; i < 250; i++) {
+                particles.push(new Particle('right', i, 250));
+            }
+        }
+        
+        function drawConnections() {
+            if (phase >= 3) return;
+            
+            for (let i = 0; i < particles.length; i += 2) {
+                for (let j = i + 1; j < Math.min(i + 15, particles.length); j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    const maxDist = phase >= 2 ? 30 : 60;
+                    
+                    if (dist < maxDist) {
+                        const alpha = (1 - dist / maxDist) * 0.2;
+                        
+                        if (phase >= 2) {
+                            ctx.strokeStyle = `rgba(255, 150, 180, ${alpha * 0.4})`;
+                        } else if (particles[i].side !== particles[j].side) {
+                            ctx.strokeStyle = `rgba(200, 180, 255, ${alpha})`;
+                        } else {
+                            ctx.strokeStyle = `rgba(150, 150, 200, ${alpha * 0.3})`;
+                        }
+                        
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        function updatePhase() {
+            phaseTimer++;
+            
+            if (phase === 0 && phaseTimer > 90) {
+                phase = 1;
+                document.getElementById('logo').classList.add('visible');
+            }
+            
+            if (phase === 1 && phaseTimer > 300) {
+                phase = 2;
+                document.getElementById('logo').classList.remove('visible');
+                document.getElementById('logo').classList.add('hidden');
+                
+                particles.forEach((p, i) => {
+                    p.setHeartTarget(particles.length);
+                });
+            }
+            
+            if (phase === 2 && phaseTimer > 800) {
+                phase = 3;
+                document.getElementById('tagline').classList.add('visible');
+                setTimeout(() => {
+                    document.getElementById('enterBtn').classList.add('visible');
+                }, 500);
+            }
+        }
+        
+        function animate() {
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, width, height);
+            
+            updatePhase();
+            drawConnections();
+            
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 애니메이션 줄이기 설정 시 즉시 완료 상태로
+        if (prefersReducedMotion) {
+            document.getElementById('logo').classList.add('visible');
+            document.getElementById('tagline').classList.add('visible');
+            document.getElementById('enterBtn').classList.add('visible');
+        } else {
+            window.addEventListener('resize', () => {
+                resize();
+                if (phase >= 2) {
+                    particles.forEach(p => p.setHeartTarget(particles.length));
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                mouse.x = null;
+                mouse.y = null;
+            });
+            
+            init();
+            animate();
+        }
+    </script>
+</body>
+</html>
