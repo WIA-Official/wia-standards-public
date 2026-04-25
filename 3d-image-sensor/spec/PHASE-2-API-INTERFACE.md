@@ -394,6 +394,118 @@ sudo apt install ros-humble-wia-semi-013
 - `/wia/points` (sensor_msgs/PointCloud2): Point cloud
 - `/wia/rgb/image` (sensor_msgs/Image): RGB image (if available)
 
+## 7. API Standards Conformance
+
+### 7.1 Transport and Encoding
+
+All REST endpoints conform to:
+
+- **HTTP/1.1** per RFC 9110 (semantics) and RFC 9112 (HTTP/1.1 over TCP).
+- **HTTP/2** per RFC 9113 with required ALPN negotiation `h2`.
+- **TLS 1.3** per RFC 8446; TLS 1.2 (RFC 5246) is the minimum acceptable for backward compatibility, but new deployments SHOULD prefer 1.3.
+- **JSON request/response bodies** per RFC 8259, with media type `application/json`.
+- **CBOR alternate encoding** per RFC 8949 for bandwidth-constrained edge deployments. Negotiated via `Accept: application/cbor`.
+
+### 7.2 OpenAPI Description
+
+The full machine-readable interface description is published as an OpenAPI 3.1.0 document at `/api/v1/openapi.json`. Schema validation uses JSON Schema draft 2020-12 as embedded in OpenAPI 3.1.
+
+```http
+GET /api/v1/openapi.json HTTP/1.1
+Host: api.example.com
+Accept: application/json
+```
+
+Responses include the `OpenAPI: 3.1.0` declaration and bind every endpoint to a request schema, response schema, and at least one of the security schemes declared in §7.4.
+
+### 7.3 Error Responses
+
+All HTTP error responses (4xx, 5xx) MUST follow RFC 9457 *Problem Details for HTTP APIs*:
+
+```json
+{
+  "type": "https://api.example.com/errors/sensor-offline",
+  "title": "Sensor Offline",
+  "status": 503,
+  "detail": "Sensor sensor-001 has not reported telemetry for 45s.",
+  "instance": "/api/v1/devices/sensor-001"
+}
+```
+
+The `Content-Type` header on error responses is `application/problem+json` per RFC 9457 §3.
+
+### 7.4 Authentication and Authorization
+
+Three security schemes are defined:
+
+| Scheme | Reference | Use case |
+|--------|-----------|----------|
+| `bearerAuth` | RFC 6750 (Bearer Token Usage) | API gateway tokens |
+| `oauth2` | RFC 6749 (OAuth 2.0 Authorization Framework) | Federated client identity |
+| `mutualTLS` | RFC 8705 (OAuth 2.0 Mutual-TLS Client Authentication) | Sensor-to-server attestation |
+
+Bearer tokens follow JWT encoding per RFC 7519 with required claims `iss`, `sub`, `exp`, `iat`. Optional claims `wia:device_class` and `wia:permissions` carry sensor-specific authorization.
+
+OAuth 2.0 flows: deployments MUST support Authorization Code with PKCE (RFC 7636) and Client Credentials (RFC 6749 §4.4). The Resource Owner Password Credentials grant is forbidden for new deployments.
+
+### 7.5 Rate Limiting
+
+Rate-limit headers follow IETF draft conventions used by major clouds and codified for WIA as:
+
+```
+RateLimit-Limit: 1000, 1000;w=60
+RateLimit-Remaining: 947
+RateLimit-Reset: 53
+```
+
+Throttled requests return HTTP 429 with `Retry-After` per RFC 9110 §10.2.3.
+
+### 7.6 Pagination and Filtering
+
+List endpoints use cursor-based pagination per the schema:
+
+```http
+GET /api/v1/devices?cursor=eyJpZCI6Im...&limit=100 HTTP/1.1
+```
+
+Responses include the next cursor in a `Link` header per RFC 8288 *Web Linking*:
+
+```
+Link: <https://api.example.com/api/v1/devices?cursor=eyJpZCI6Im...>; rel="next"
+```
+
+### 7.7 WebSocket Real-Time API
+
+For live streams, the WebSocket transport per RFC 6455 is used. Subprotocol negotiation declares `Sec-WebSocket-Protocol: wia.sensor.v1`. Message framing uses JSON text frames or CBOR binary frames matching the negotiated content type.
+
+### 7.8 Conformance Statement
+
+An implementation is conformant with Phase 2 when:
+
+1. Every endpoint published in OpenAPI 3.1 description validates against its declared schema.
+2. All error responses use RFC 9457 problem details.
+3. All authenticated endpoints accept at least the `bearerAuth` scheme.
+4. Rate-limit headers are emitted on all endpoints subject to throttling.
+
+## 8. Implementation Notes
+
+### 8.1 OpenAPI tooling
+
+Reference tools used during conformance testing:
+
+- **swagger-cli** for syntactic validation of the published `openapi.json`.
+- **Spectral** (Stoplight) with the WIA ruleset (`spectral.yaml`) for stylistic conformance.
+- **Schemathesis** for property-based fuzzing of every endpoint against its declared schema.
+- **k6** for rate-limit conformance load testing.
+
+### 8.2 Versioning policy
+
+API path versioning (`/api/v1`, `/api/v2`) follows semantic-versioning principles aligned with the registry of breaking changes maintained at the published OpenAPI document URL. Minor versions (`v1.1`, `v1.2`) MUST remain wire-compatible with the prior minor of the same major. Major bumps (`v2`) coexist with `v1` for at least 12 months before deprecation.
+
+### 8.3 Header registry
+
+Custom WIA headers are prefixed `X-Wia-` and registered in the appendix of this Phase. Implementations MUST NOT introduce additional `X-Wia-` headers without coordinating with the WIA registry custodian.
+
 ---
 
 **© 2025 SmileStory Inc. / WIA - World Certification Industry Association**  

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: C2PA Standard Integration - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        .warning-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .success-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px;">CHAPTER 07</div>
+            <h1>C2PA Standard Integration</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">Work with Coalition for Content Provenance and Authenticity standards for complete content verification</p>
+        </header>
+
+        <h2>Understanding C2PA</h2>
+        <p>The Coalition for Content Provenance and Authenticity (C2PA) represents a landmark collaboration between technology companies, media organizations, and standards bodies to establish a universal framework for content authentication. Founded by Adobe, Microsoft, Intel, BBC, and Truepic, C2PA has quickly become the de facto standard for embedding provenance information in digital media.</p>
+
+        <p>C2PA addresses a critical gap: while cryptographic signatures prove content integrity and watermarks enable tracking, neither provides a comprehensive, standardized way to communicate "who created this, how, and what happened to it since." C2PA manifests fill this need by embedding rich, structured metadata directly into media files in a tamper-evident format.</p>
+
+        <div class="info-box">
+            <strong>ℹ️ C2PA Mission</strong><br>
+            C2PA aims to create a universal "nutrition label" for digital content, allowing anyone to see the origin and history of images, videos, audio, and documents. This transparency empowers consumers to make informed trust decisions.
+        </div>
+
+        <h3>C2PA Key Concepts</h3>
+        <p>The C2PA specification builds on several fundamental concepts that work together to provide comprehensive authentication:</p>
+
+        <ul>
+            <li><strong>Manifest:</strong> A JSON-LD container that holds all provenance information for a piece of content. Each time content is modified, a new manifest is added, creating a chain of custody.</li>
+            <li><strong>Claims:</strong> Statements about the content's origin, authorship, and modifications. Claims are cryptographically signed to prevent tampering.</li>
+            <li><strong>Assertions:</strong> Specific pieces of structured information within a claim, such as actions taken on content, AI usage declarations, or thumbnail representations.</li>
+            <li><strong>Ingredients:</strong> References to parent content that was used to create the current asset. This creates a directed acyclic graph of content provenance.</li>
+            <li><strong>Signatures:</strong> Cryptographic proofs using public key infrastructure that bind claims to their creators and detect any modifications.</li>
+            <li><strong>Hard Bindings:</strong> Cryptographic connections between the manifest and the actual content bits, ensuring manifests can't be copied to different content.</li>
+            <li><strong>Soft Bindings:</strong> References to related manifests or external resources that provide additional context.</li>
+        </ul>
+
+        <h2>C2PA Manifest Structure</h2>
+        <p>A C2PA manifest follows a well-defined schema that ensures consistency across implementations. Understanding this structure is essential for creating compliant authentication systems.</p>
+
+        <div class="code-block"><pre>
+// Complete C2PA Manifest Example
+{
+  "@context": "https://c2pa.org/context/2.0",
+  "type": "Claim",
+  "dc:title": "Mountain Landscape Photography",
+  "dc:format": "image/jpeg",
+  "claim_generator": "WIA-AI-017 Authenticator/1.0",
+  "instance_id": "xmp:iid:7a9f8b2c-1e3d-4f5a-9b8c-2d1e3f4a5b6c",
+
+  "claim_generator_info": [{
+    "name": "WIA Content Authentication System",
+    "version": "1.0.0",
+    "icon": "data:image/svg+xml;base64,..."
+  }],
+
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.created",
+            "when": "2025-12-25T10:30:00Z",
+            "softwareAgent": {
+              "name": "Canon EOS R5",
+              "version": "1.8.1"
+            },
+            "parameters": {
+              "exposure": "1/500",
+              "aperture": "f/8",
+              "iso": 100,
+              "focal_length": "85mm"
+            }
+          },
+          {
+            "action": "c2pa.color_adjustments",
+            "when": "2025-12-25T11:15:00Z",
+            "softwareAgent": {
+              "name": "Adobe Lightroom",
+              "version": "13.1"
+            },
+            "changes": {
+              "exposure": "+0.5",
+              "contrast": "+15",
+              "saturation": "+10"
+            }
+          },
+          {
+            "action": "c2pa.cropped",
+            "when": "2025-12-25T11:20:00Z",
+            "parameters": {
+              "crop_region": {
+                "x": 100, "y": 150,
+                "width": 4000, "height": 3000
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": "c2pa.hash.data",
+      "data": {
+        "name": "jumbf manifest",
+        "alg": "sha256",
+        "hash": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f"
+      }
+    },
+    {
+      "label": "stds.schema-org.CreativeWork",
+      "data": {
+        "@context": "https://schema.org",
+        "@type": "Photograph",
+        "author": {
+          "@type": "Person",
+          "name": "Jane Smith",
+          "identifier": "did:web:photographer.example.com"
+        },
+        "copyrightHolder": {
+          "@type": "Organization",
+          "name": "Acme Photography Studio"
+        },
+        "license": "https://creativecommons.org/licenses/by-nc/4.0/"
+      }
+    },
+    {
+      "label": "c2pa.ai.generative",
+      "data": {
+        "ai_used": false
+      }
+    },
+    {
+      "label": "c2pa.thumbnail.claim.jpeg",
+      "data": {
+        "format": "image/jpeg",
+        "identifier": "self#jumbf=/c2pa/thumbnail.jpg"
+      }
+    }
+  ],
+
+  "signature_info": {
+    "alg": "es256",
+    "issuer": "WIA Certificate Authority",
+    "cert_serial_number": "0x1A2B3C4D",
+    "time": "2025-12-25T11:25:00Z"
+  },
+
+  "ingredients": []
+}
+</pre></div>
+
+        <h2>Implementing C2PA in WIA-AI-017</h2>
+        <p>Integrating C2PA support into your content authentication system requires several components working in harmony. The WIA-AI-017 standard provides reference implementations and best practices.</p>
+
+        <h3>Manifest Creation</h3>
+        <p>The first step is generating a compliant C2PA manifest when content is created or modified:</p>
+
+        <div class="code-block"><pre>
+import { createC2PA, ManifestBuilder } from '@c2pa/node';
+import { sign } from 'crypto';
+
+class WIA_C2PA_Integrator {
+    constructor(config) {
+        this.c2pa = createC2PA();
+        this.privateKey = config.privateKey;
+        this.certificate = config.certificate;
+    }
+
+    async createAuthenticatedContent(file, metadata) {
+        // Build the manifest
+        const manifest = new ManifestBuilder()
+            .setTitle(metadata.title)
+            .setFormat(this.getMediaType(file))
+            .setClaimGenerator('WIA-AI-017/1.0')
+            .setInstanceId(this.generateUUID());
+
+        // Add creation action
+        manifest.addAssertion('c2pa.actions', {
+            actions: [{
+                action: 'c2pa.created',
+                when: new Date().toISOString(),
+                softwareAgent: metadata.creator || 'Unknown',
+                parameters: metadata.parameters || {}
+            }]
+        });
+
+        // Add AI usage declaration
+        manifest.addAssertion('c2pa.ai.generative', {
+            ai_used: metadata.ai_generated === true,
+            ai_model: metadata.ai_model || null,
+            ai_version: metadata.ai_version || null
+        });
+
+        // Add content hash
+        const contentHash = await this.hashContent(file);
+        manifest.addAssertion('c2pa.hash.data', {
+            name: 'jumbf manifest',
+            alg: 'sha256',
+            hash: contentHash
+        });
+
+        // Add watermark reference
+        if (metadata.watermark_id) {
+            manifest.addAssertion('wia.watermark', {
+                watermark_id: metadata.watermark_id,
+                embedding_method: 'DCT',
+                strength: metadata.watermark_strength
+            });
+        }
+
+        // Add thumbnail
+        const thumbnail = await this.generateThumbnail(file);
+        manifest.addThumbnail(thumbnail);
+
+        // Sign the manifest
+        const signedManifest = await this.signManifest(
+            manifest.build(),
+            this.privateKey,
+            this.certificate
+        );
+
+        // Embed in the file
+        const authenticatedFile = await this.c2pa.embed(
+            file,
+            signedManifest
+        );
+
+        return authenticatedFile;
+    }
+
+    async signManifest(manifest, privateKey, certificate) {
+        const manifestBytes = JSON.stringify(manifest);
+        const signature = sign('sha256', Buffer.from(manifestBytes), {
+            key: privateKey,
+            dsaEncoding: 'ieee-p1363'
+        });
+
+        return {
+            ...manifest,
+            signature_info: {
+                alg: 'es256',
+                signature: signature.toString('base64'),
+                cert_chain: [certificate]
+            }
+        };
+    }
+
+    generateUUID() {
+        return `xmp:iid:${crypto.randomUUID()}`;
+    }
+}
+</pre></div>
+
+        <h2>Manifest Verification</h2>
+        <p>Equally important is the ability to read and verify C2PA manifests from authenticated content. Verification ensures the manifest hasn't been tampered with and the signatures are valid.</p>
+
+        <div class="code-block"><pre>
+class C2PA_Verifier {
+    constructor() {
+        this.c2pa = createC2PA();
+        this.trustedCAs = this.loadTrustedCAs();
+    }
+
+    async verifyContent(file) {
+        // Extract the manifest
+        const manifest = await this.c2pa.read(file);
+
+        if (!manifest) {
+            return {
+                verified: false,
+                error: 'No C2PA manifest found'
+            };
+        }
+
+        // Verify signature
+        const signatureValid = await this.verifySignature(
+            manifest,
+            this.trustedCAs
+        );
+
+        if (!signatureValid) {
+            return {
+                verified: false,
+                error: 'Invalid signature'
+            };
+        }
+
+        // Verify content binding
+        const bindingValid = await this.verifyContentBinding(
+            file,
+            manifest
+        );
+
+        if (!bindingValid) {
+            return {
+                verified: false,
+                error: 'Content has been modified'
+            };
+        }
+
+        // Verify ingredient chain
+        const ingredientsValid = await this.verifyIngredients(
+            manifest
+        );
+
+        // Extract key information
+        const actions = this.extractActions(manifest);
+        const aiUsage = this.extractAIUsage(manifest);
+        const author = this.extractAuthor(manifest);
+
+        return {
+            verified: true,
+            manifest: manifest,
+            actions: actions,
+            ai_used: aiUsage.ai_used,
+            ai_model: aiUsage.ai_model,
+            author: author,
+            ingredients_verified: ingredientsValid,
+            signature_time: manifest.signature_info.time
+        };
+    }
+
+    async verifySignature(manifest, trustedCAs) {
+        const { signature_info } = manifest;
+
+        // Extract certificate
+        const cert = signature_info.cert_chain[0];
+
+        // Verify certificate chain
+        const certValid = await this.verifyCertificateChain(
+            cert,
+            trustedCAs
+        );
+
+        if (!certValid) return false;
+
+        // Verify signature
+        const manifestBytes = this.serializeManifest(manifest);
+        const signature = Buffer.from(signature_info.signature, 'base64');
+
+        return verify(
+            'sha256',
+            Buffer.from(manifestBytes),
+            {
+                key: cert.publicKey,
+                dsaEncoding: 'ieee-p1363'
+            },
+            signature
+        );
+    }
+
+    async verifyContentBinding(file, manifest) {
+        // Compute current content hash
+        const currentHash = await this.hashContent(file);
+
+        // Extract hash from manifest
+        const hashAssertion = manifest.assertions.find(
+            a => a.label === 'c2pa.hash.data'
+        );
+
+        if (!hashAssertion) return false;
+
+        return currentHash === hashAssertion.data.hash;
+    }
+
+    extractActions(manifest) {
+        const actionsAssertion = manifest.assertions.find(
+            a => a.label === 'c2pa.actions'
+        );
+
+        return actionsAssertion?.data.actions || [];
+    }
+
+    extractAIUsage(manifest) {
+        const aiAssertion = manifest.assertions.find(
+            a => a.label === 'c2pa.ai.generative'
+        );
+
+        return aiAssertion?.data || { ai_used: false };
+    }
+}
+</pre></div>
+
+        <h2>Handling Content Edits</h2>
+        <p>One of C2PA's most powerful features is the ability to track content through multiple editing steps. Each edit creates a new manifest that references the previous version as an ingredient.</p>
+
+        <div class="code-block"><pre>
+async function updateAuthenticatedContent(file, edits, metadata) {
+    // Read existing manifest
+    const existingManifest = await c2pa.read(file);
+
+    // Apply edits to content
+    const editedFile = await applyEdits(file, edits);
+
+    // Create new manifest
+    const newManifest = new ManifestBuilder()
+        .setTitle(metadata.title || existingManifest['dc:title'])
+        .setFormat(getMediaType(editedFile))
+        .setClaimGenerator('WIA-AI-017/1.0');
+
+    // Add the original as an ingredient
+    newManifest.addIngredient({
+        title: existingManifest['dc:title'],
+        format: existingManifest['dc:format'],
+        instance_id: existingManifest.instance_id,
+        document_id: existingManifest.instance_id,
+        relationship: 'parentOf',
+        manifest: existingManifest
+    });
+
+    // Add edit actions
+    edits.forEach(edit => {
+        newManifest.addAction({
+            action: edit.action,
+            when: new Date().toISOString(),
+            softwareAgent: edit.software,
+            parameters: edit.parameters
+        });
+    });
+
+    // Add content hash
+    const contentHash = await hashContent(editedFile);
+    newManifest.addAssertion('c2pa.hash.data', {
+        name: 'jumbf manifest',
+        alg: 'sha256',
+        hash: contentHash
+    });
+
+    // Sign and embed
+    const signed = await signManifest(newManifest.build());
+    return await c2pa.embed(editedFile, signed);
+}
+</pre></div>
+
+        <h2>C2PA and Cross-Platform Compatibility</h2>
+        <p>A critical challenge for content authentication is maintaining manifests across different platforms and formats. C2PA addresses this through standardized embedding methods for various media types.</p>
+
+        <h3>Embedding Locations by Media Type</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Media Type</th>
+                    <th>Container Format</th>
+                    <th>Embedding Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>JPEG Images</td>
+                    <td>JUMBF (JPEG Universal Metadata Box Format)</td>
+                    <td>APP11 marker segment</td>
+                </tr>
+                <tr>
+                    <td>PNG Images</td>
+                    <td>JUMBF</td>
+                    <td>iTXt chunk</td>
+                </tr>
+                <tr>
+                    <td>MP4 Video</td>
+                    <td>JUMBF</td>
+                    <td>uuid box in moov atom</td>
+                </tr>
+                <tr>
+                    <td>WebP</td>
+                    <td>JUMBF</td>
+                    <td>EXIF chunk</td>
+                </tr>
+                <tr>
+                    <td>WAV Audio</td>
+                    <td>RIFF</td>
+                    <td>LIST INFO chunk</td>
+                </tr>
+                <tr>
+                    <td>PDF Documents</td>
+                    <td>PDF Objects</td>
+                    <td>Metadata stream</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warning-box">
+            <strong>⚠️ Social Media Challenge</strong><br>
+            Many social media platforms re-encode uploaded content, which can strip C2PA manifests. WIA-AI-017 recommends combining C2PA with robust watermarking that survives transcoding. Platforms are increasingly adopting manifest preservation, but defense-in-depth is essential.
+        </div>
+
+        <h2>Advanced C2PA Features</h2>
+        <p>Beyond basic provenance tracking, C2PA supports several advanced features for specific use cases:</p>
+
+        <h3>Redacted Assertions</h3>
+        <p>Privacy-sensitive information can be redacted from public manifests while maintaining verifiability:</p>
+
+        <div class="code-block"><pre>
+// Create manifest with redactable assertions
+const manifest = new ManifestBuilder()
+    .addAssertion('c2pa.location', {
+        latitude: 37.7749,
+        longitude: -122.4194
+    }, { redactable: true })
+    .addAssertion('c2pa.actions', actions);
+
+// Later, create redacted version
+const redacted = manifest.redact(['c2pa.location']);
+
+// Verification still works, but location is hidden
+const verified = await verifier.verify(redacted);
+// verified.redacted_assertions = ['c2pa.location']
+</pre></div>
+
+        <h3>Ingredient Relationships</h3>
+        <p>Complex content creation often involves multiple source materials. C2PA supports rich relationship modeling:</p>
+
+        <ul>
+            <li><strong>parentOf:</strong> Direct editing relationship</li>
+            <li><strong>componentOf:</strong> Multiple sources combined (e.g., composite image)</li>
+            <li><strong>inputTo:</strong> Source material for generative AI</li>
+            <li><strong>alternativeOf:</strong> Different formats of same content</li>
+        </ul>
+
+        <h2>C2PA Trust Model</h2>
+        <p>C2PA's security relies on a web of trust built from certificate authorities, hardware attestation, and organizational reputation.</p>
+
+        <h3>Trust Establishment</h3>
+        <ol>
+            <li><strong>Hardware Root of Trust:</strong> Secure elements in cameras and devices generate signed content at capture</li>
+            <li><strong>Certificate Authorities:</strong> Trusted CAs issue credentials to verified organizations</li>
+            <li><strong>Credential Management:</strong> Organizations manage signing keys with appropriate security controls</li>
+            <li><strong>Transparency Logs:</strong> Public logs record certificate issuance for accountability</li>
+        </ol>
+
+        <div class="success-box">
+            <strong>✅ Industry Adoption</strong><br>
+            Major camera manufacturers including Canon, Nikon, Sony, and Leica have announced C2PA support in their professional cameras. Content created with these devices carries hardware-attested provenance from the moment of capture.
+        </div>
+
+        <h2>WIA-AI-017 Extensions to C2PA</h2>
+        <p>While WIA-AI-017 fully supports standard C2PA manifests, it also defines extensions for AI-specific use cases:</p>
+
+        <div class="code-block"><pre>
+// WIA-AI-017 specific assertions
+{
+  "label": "wia.ai.training",
+  "data": {
+    "model_name": "GPT-4",
+    "training_data_sources": [
+      "Common Crawl",
+      "WebText",
+      "Books3"
+    ],
+    "training_cutoff": "2023-04",
+    "fine_tuning": "RLHF"
+  }
+}
+
+{
+  "label": "wia.ai.inference",
+  "data": {
+    "prompt": "A mountain landscape at sunset",
+    "seed": 42,
+    "guidance_scale": 7.5,
+    "steps": 50,
+    "model_version": "2.1"
+  }
+}
+
+{
+  "label": "wia.deepfake_detection",
+  "data": {
+    "detector": "WIA-Deepfake-Detector-v3",
+    "confidence": 0.98,
+    "is_synthetic": false,
+    "detection_time": "2025-12-25T12:00:00Z"
+  }
+}
+</pre></div>
+
+        <h2>Testing and Validation</h2>
+        <p>Thorough testing is essential to ensure C2PA implementation correctness:</p>
+
+        <div class="code-block"><pre>
+import { expect } from 'chai';
+import { C2PA_Integrator } from './c2pa';
+
+describe('C2PA Integration Tests', () => {
+    it('creates valid manifest for image', async () => {
+        const image = readFileSync('test.jpg');
+        const metadata = {
+            title: 'Test Image',
+            creator: 'Test Suite'
+        };
+
+        const authenticated = await integrator.createAuthenticatedContent(
+            image,
+            metadata
+        );
+
+        const manifest = await c2pa.read(authenticated);
+        expect(manifest).to.exist;
+        expect(manifest['dc:title']).to.equal('Test Image');
+    });
+
+    it('verifies signature correctly', async () => {
+        const result = await verifier.verifyContent(authenticatedImage);
+        expect(result.verified).to.be.true;
+        expect(result.error).to.be.undefined;
+    });
+
+    it('detects manifest tampering', async () => {
+        const tampered = await modifyManifest(authenticatedImage);
+        const result = await verifier.verifyContent(tampered);
+        expect(result.verified).to.be.false;
+    });
+
+    it('preserves manifests through edits', async () => {
+        const edited = await updateAuthenticatedContent(
+            authenticatedImage,
+            [{ action: 'c2pa.cropped', parameters: {} }]
+        );
+
+        const manifest = await c2pa.read(edited);
+        expect(manifest.ingredients).to.have.length(1);
+        expect(manifest.assertions.find(
+            a => a.label === 'c2pa.actions'
+        ).data.actions).to.have.length.at.least(2);
+    });
+});
+</pre></div>
+
+        <div class="key-takeaways">
+            <h3>📌 Key Takeaways</h3>
+            <ul>
+                <li>C2PA provides standardized, interoperable content provenance through signed manifests</li>
+                <li>Manifests contain structured assertions about actions, authorship, AI usage, and relationships</li>
+                <li>Hard bindings cryptographically connect manifests to content, preventing copying</li>
+                <li>Ingredient chains track content through multiple editing steps</li>
+                <li>Different media types use appropriate embedding methods (JUMBF, RIFF, etc.)</li>
+                <li>Trust models combine hardware attestation, CAs, and organizational reputation</li>
+                <li>WIA-AI-017 extends C2PA with AI-specific assertions for training and inference metadata</li>
+                <li>Comprehensive testing ensures manifest validity and signature verification</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 Review Questions</h3>
+            <ol>
+                <li>What are the main components of a C2PA manifest and how do they work together?</li>
+                <li>Explain the difference between hard bindings and soft bindings in C2PA.</li>
+                <li>How does C2PA handle content that goes through multiple editing steps?</li>
+                <li>What is JUMBF and why is it used for C2PA manifests?</li>
+                <li>How does C2PA's trust model ensure the authenticity of signed content?</li>
+                <li>What challenges do social media platforms present for C2PA manifest preservation?</li>
+                <li>Describe how ingredient relationships work in C2PA and give examples of each relationship type.</li>
+                <li>What WIA-AI-017 specific extensions does the standard add to C2PA?</li>
+                <li>How can privacy-sensitive information be handled in C2PA manifests?</li>
+                <li>Why is hardware-based attestation important for the C2PA trust model?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</p>
+
+        </div>
+</body>
+</html>

@@ -430,6 +430,84 @@ Accept: application/vnd.wia.fl.v1+json
 ---
 
 **Copyright © 2025 SmileStory Inc. / World Certification Industry Association**
+## Reference Standards Alignment
+
+The Phase 2 API surface is layered above well-established IT primitives so that conformant clients interoperate without bespoke integration.
+
+| Concern | Reference |
+|---------|-----------|
+| HTTP semantics | RFC 9110 |
+| HTTP/1.1 | RFC 9112 |
+| HTTP/2 | RFC 9113 |
+| HTTP/3 over QUIC | RFC 9114 / RFC 9000 |
+| TLS 1.3 | RFC 8446 |
+| Certificate format | RFC 5280 (X.509 v3) |
+| OpenAPI description | OpenAPI Specification 3.1 |
+| JSON | RFC 8259 |
+| Errors | RFC 9457 (Problem Details for HTTP APIs) |
+| Pagination linking | RFC 8288 (Web Linking) |
+| Bearer tokens | RFC 6750 |
+| OAuth 2.0 | RFC 6749 + RFC 7636 (PKCE) |
+| Mutual TLS | RFC 8705 |
+| JWT | RFC 7519 |
+| Ed25519 | RFC 8032 |
+| ECDSA | NIST FIPS 186-5 |
+| Hash | FIPS 180-4, FIPS 202 |
+| WebSocket | RFC 6455 |
+| Trace context | W3C Trace Context Recommendation |
+| OpenTelemetry | OpenTelemetry Specification (CNCF) |
+| Locale | BCP 47 (RFC 5646), Unicode CLDR |
+| Time | ISO 8601:2019 |
+| Information security | ISO/IEC 27001:2022 |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 2 implementation is conformant when:
+
+1. The OpenAPI 3.1 description publishes every endpoint with request and response schemas.
+2. Authentication accepts at least the `bearerAuth` (JWT) scheme.
+3. Errors use RFC 9457 problem-detail responses.
+4. Pagination uses `Link` headers per RFC 8288.
+5. Cryptographic primitives match the §Reference Standards Alignment with explicit algorithm identifiers in tokens and signatures.
+
+## Implementation Appendix
+
+### A. Idempotency
+
+Endpoints that schedule rounds, accept client updates, or publish aggregated parameters accept an `Idempotency-Key` request header containing a UUID. The server caches the response for at least 24 hours and returns it on retry, preventing duplicate work when the network is unreliable.
+
+### B. Backpressure
+
+Long-running aggregation rounds expose backpressure semantics so that clients can throttle their submissions when the server is at capacity. The reference protocol uses HTTP 429 with `Retry-After` and rate-limit headers per the IETF rate-limit-headers conventions.
+
+### C. Bulk Operations
+
+Bulk update submission supports up to 64 client updates per request. Bulk responses include per-item success status so the client can retry only the failed records without resubmitting the full batch.
+
+### D. Trace Context
+
+Every request carries a W3C Trace Context `traceparent` so distributed traces span the orchestrator, aggregator, secure-aggregation worker, and client edge runtime. Trace identifiers are emitted in error responses to aid debugging.
+
+### E. Versioning Policy
+
+Path versioning (`/api/v1`, `/api/v2`) follows semantic-versioning principles. Minor versions remain wire-compatible with the prior minor of the same major. Major bumps coexist with the prior major for at least 12 months before deprecation, giving heterogeneous client populations time to migrate.
+
+### F. Cross-Origin Resource Sharing
+
+CORS responses follow the WHATWG Fetch Living Standard. The reference deployment publishes the allow-list of origins, methods, and headers and reviews it quarterly.
+
+### G. Health and Readiness Probes
+
+`GET /health` returns 200 when the service is operational, 503 when not. `GET /ready` returns 200 when the service is ready to accept production traffic. These endpoints are exempt from authentication and follow the conventions documented in the Cloud Native Computing Foundation operator guidance.
+
+### H. SDK Discovery
+
+SDK packages publish their metadata at well-known URLs so that orchestrators can detect supported endpoints, supported aggregation strategies, and supported privacy modes prior to round scheduling. The reference path is `/.well-known/wia-fl/sdk-info`.
+
+---
+
 **弘益人間 (Hongik Ingan) · Benefit All Humanity**
 
 **License:** CC BY 4.0

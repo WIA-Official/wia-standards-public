@@ -370,6 +370,98 @@ API version in URL path: `/api/v1/...`
 
 ---
 
+
+
+## Reference Standards Alignment
+
+The Phase 3 protocols are layered above well-established IoT and IT primitives so that conformant implementations interoperate at the wire.
+
+| Concern | Reference |
+|---------|-----------|
+| Real-Time Transport | RFC 3550 (RTP) |
+| RTP Profiles | RFC 3551 |
+| Secure RTP | RFC 3711 (SRTP) |
+| DTLS for SRTP keying | RFC 5764 (DTLS-SRTP) |
+| QUIC | RFC 9000 |
+| HTTP/3 over QUIC | RFC 9114 |
+| WebSocket | RFC 6455 |
+| Server-Sent Events | W3C EventSource |
+| MQTT 5.0 | OASIS MQTT 5.0 |
+| MQTT-SN | OASIS MQTT-SN |
+| OPC UA | IEC 62541 series |
+| Modbus | Modbus Application Protocol Specification V1.1b3, Modbus over Serial Line Specification V1.02 |
+| BACnet | ASHRAE 135-2020 / ISO 16484-5 |
+| Industrial real-time Ethernet | IEC 61784 series |
+| TSN | IEEE 802.1 Time-Sensitive Networking |
+| TLS 1.3 | RFC 8446 |
+| DTLS 1.3 | RFC 9147 |
+| Time synchronisation (sub-µs) | IEEE 1588-2019 (PTPv2) |
+| Time synchronisation (ms) | RFC 5905 (NTPv4) |
+| Provenance | W3C PROV-O |
+| Sensor metadata | W3C SOSA/SSN |
+| OpenTelemetry | OpenTelemetry Specification (CNCF) |
+| Time encoding | ISO 8601:2019 |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 3 implementation is conformant when:
+
+1. At least one wire protocol from the §Reference Standards Alignment is offered for telemetry and control plane traffic.
+2. TLS 1.3 (or DTLS 1.3 for UDP) is supported, with TLS 1.2 as the minimum acceptable version.
+3. Time synchronisation regime is declared per IEEE 1588-2019 PTPv2 or RFC 5905 NTPv4.
+4. Provenance assertions follow W3C PROV-O.
+5. Telemetry uses OpenTelemetry semantic conventions.
+
+## Implementation Appendix
+
+### A. Latency budgets
+
+Edge AI deployments publish their measured latency budget across capture, inference, transport, and rendering. The reference deployment achieves the budget on commodity edge hardware when each stage is measured with the timers documented in the reference instrumentation.
+
+### B. Backpressure
+
+Telemetry and inference streams expose backpressure semantics so that downstream consumers can throttle when overwhelmed. The reference protocol uses HTTP 429 with `Retry-After` for HTTP-based streams and MQTT QoS 1 with publish-rate limiting for MQTT-based streams.
+
+### C. Network resilience
+
+The protocol assumes unreliable edge networks. Key resilience properties include out-of-order delivery handling, duplicate detection by sequence numbers, store-and-forward buffering during disconnection, and automatic reconciliation on reconnection.
+
+### D. Multi-Sensor Synchronisation
+
+Edge deployments often combine inputs from multiple sensors. Synchronisation across sensors uses two regimes: sub-microsecond IEEE 1588-2019 PTPv2 with hardware timestamping, and millisecond RFC 5905 NTPv4 software timestamping. The active synchronisation regime is recorded in the metadata so downstream consumers know which uncertainty bound to apply.
+
+### E. Industrial Network Compatibility
+
+For factory and machine-vision deployments where edge-AI inference shares a network with PLCs and motion controllers, the implementation supports IEC 61784-2 Real-time Ethernet profiles (EtherCAT IEC 61158-3-12, PROFINET IRT IEC 61158-3-10), IEC 62439-3 PRP/HSR for fault-tolerant cells, and IEEE 802.1 TSN for converged IT/OT links.
+
+### F. MQTT 5.0 Profiles
+
+For fleet telemetry over MQTT, the reference profile uses QoS 1 for at-least-once delivery, retain flags for last-known-state topics, topic alias and shared subscription features of MQTT 5.0, and TLS 1.3 with mutual-TLS authentication for sensor-to-broker pairing.
+
+### G. Diagnostic Logging
+
+All security-relevant events are emitted in structured form per RFC 5424 syslog severity classes, including the `instance` URI from the matching RFC 9457 problem-details object so traces link control-plane errors with data-plane drops.
+
+### H. Compliance Levels
+
+Three compliance levels are defined: Level 1 (Basic) for single-sensor inference with optional encryption, Level 2 (Standard) for multi-sensor synchronisation with TLS encryption, and Level 3 (Advanced) for hardware synchronisation, end-to-end encryption, and real-time FEC.
+
+### I. Reference Test Vectors
+
+The Phase 3 conformance test suite covers wire interoperability against the reference test endpoints. Each test vector documents the input, the expected output, the active synchronisation regime, and the active compliance level so that any implementation can self-assess against the same baseline.
+
+### J. Cross-Reference
+
+Phase 3 protocol parameters interact with Phase 2 API rate limits and Phase 4 deployment topology choices. The reference deployment publishes a cross-reference matrix so operators can match wire profile to deployment scale and security posture without reading the full specification end-to-end.
+
+### K. Future Compatibility
+
+Phase 3 explicitly accepts that wire-protocol primitives will evolve. Implementations declare the wire-protocol version they offer in the metadata so that capability discovery (Phase 2 §I) can negotiate compatible version pairs prior to high-volume traffic.
+
+---
+
 **Copyright © 2025 World Certification Industry Association (WIA)**
 **License:** CC BY 4.0
 **弘益人間** - Benefit All Humanity

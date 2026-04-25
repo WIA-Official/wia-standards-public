@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Provenance and Chain of Custody - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; line-height: 1.8; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 05</div>
+            <h1>Provenance and Chain of Custody</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">Build complete audit trails for content lifecycle tracking</p>
+        </header>
+
+        <h2>Understanding Content Provenance</h2>
+        <p>Provenance records the complete history of content from creation through all modifications to final consumption. It answers critical questions: Who created this? When? What tools were used? Has it been edited? By whom?</p>
+
+        <h3>Provenance Data Elements</h3>
+        <ul>
+            <li><strong>Origin:</strong> Creator identity, timestamp, location</li>
+            <li><strong>Tools:</strong> Software/hardware used, versions, settings</li>
+            <li><strong>Actions:</strong> Creation, editing, enhancement, cropping</li>
+            <li><strong>Assertions:</strong> Claims about authenticity, rights, AI involvement</li>
+            <li><strong>Relationships:</strong> Parent content, derived works, ingredients</li>
+        </ul>
+
+        <h2>C2PA Manifests</h2>
+        <p>The Coalition for Content Provenance and Authenticity (C2PA) defines the standard format for provenance metadata.</p>
+
+        <div class="code-block">
+            <pre>
+// Example: C2PA Manifest Structure
+import { createManifest, addAssertion, signManifest } from 'c2pa';
+
+async function createC2PAManifest(content, metadata) {
+    const manifest = {
+        claim_generator: 'WIA-AI-017 Authenticator/1.0',
+        claim_generator_info: [{
+            name: 'WIA Content Auth',
+            version: '1.0.0'
+        }],
+        title: metadata.title,
+        format: metadata.format,
+        instance_id: generateUUID(),
+
+        assertions: [
+            // Creation assertion
+            {
+                label: 'c2pa.actions',
+                data: {
+                    actions: [{
+                        action: 'c2pa.created',
+                        when: metadata.timestamp,
+                        softwareAgent: metadata.ai_model,
+                        parameters: {
+                            model: metadata.ai_model,
+                            prompt: metadata.prompt,
+                            settings: metadata.settings
+                        }
+                    }]
+                }
+            },
+
+            // AI generation assertion
+            {
+                label: 'c2pa.ai_generative_training',
+                data: {
+                    use: {
+                        ai_generative: true,
+                        ai_training: false
+                    },
+                    entries: [{
+                        name: metadata.ai_model,
+                        version: metadata.model_version
+                    }]
+                }
+            },
+
+            // Creator assertion
+            {
+                label: 'stds.schema-org.CreativeWork',
+                data: {
+                    author: [{
+                        '@type': 'Person',
+                        name: metadata.creator,
+                        identifier: metadata.creator_did
+                    }],
+                    dateCreated: metadata.timestamp
+                }
+            },
+
+            // Hash assertion
+            {
+                label: 'c2pa.hash.data',
+                data: {
+                    hash: computeSHA256(content),
+                    alg: 'sha256'
+                }
+            }
+        ],
+
+        signature_info: {
+            alg: 'es256',
+            issuer: 'WIA Certificate Authority'
+        }
+    };
+
+    // Sign the manifest
+    const signed = await signManifest(manifest, privateKey);
+
+    return signed;
+}
+            </pre>
+        </div>
+
+        <h2>Action History Tracking</h2>
+        <p>Every content modification must be recorded in the provenance chain:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Tracking Content Actions
+class ProvenanceTracker {
+    constructor() {
+        this.actions = [];
+    }
+
+    recordAction(action, params) {
+        const record = {
+            action: action,
+            timestamp: new Date().toISOString(),
+            actor: params.actor || 'system',
+            software: params.software,
+            parameters: params.parameters || {},
+            instanceId: generateUUID()
+        };
+
+        this.actions.push(record);
+        return record;
+    }
+
+    async recordCreation(metadata) {
+        return this.recordAction('c2pa.created', {
+            actor: metadata.creator,
+            software: metadata.tool,
+            parameters: {
+                ai_model: metadata.ai_model,
+                prompt: metadata.prompt,
+                seed: metadata.seed,
+                dimensions: metadata.dimensions
+            }
+        });
+    }
+
+    async recordEdit(editType, params) {
+        const actionMap = {
+            crop: 'c2pa.cropped',
+            resize: 'c2pa.resized',
+            filter: 'c2pa.filtered',
+            color: 'c2pa.color_adjustments',
+            retouch: 'c2pa.edited'
+        };
+
+        return this.recordAction(actionMap[editType], {
+            actor: params.user,
+            software: params.tool,
+            parameters: params.changes
+        });
+    }
+
+    async recordAIEnhancement(model, params) {
+        return this.recordAction('c2pa.ai_inference', {
+            software: model,
+            parameters: {
+                enhancement_type: params.type,
+                model_version: params.version,
+                confidence: params.confidence
+            }
+        });
+    }
+
+    getActionChain() {
+        return {
+            total_actions: this.actions.length,
+            first_action: this.actions[0],
+            last_action: this.actions[this.actions.length - 1],
+            complete_chain: this.actions
+        };
+    }
+
+    exportC2PA() {
+        return {
+            label: 'c2pa.actions',
+            data: {
+                actions: this.actions
+            }
+        };
+    }
+}
+
+// Usage
+const tracker = new ProvenanceTracker();
+
+await tracker.recordCreation({
+    creator: 'Alice Smith',
+    tool: 'DALL-E 3',
+    ai_model: 'dall-e-3',
+    prompt: 'A serene mountain landscape at sunset',
+    seed: 42,
+    dimensions: { width: 1024, height: 1024 }
+});
+
+await tracker.recordEdit('crop', {
+    user: 'Alice Smith',
+    tool: 'Photoshop 2025',
+    changes: {
+        x: 100,
+        y: 50,
+        width: 800,
+        height: 800
+    }
+});
+
+const chain = tracker.getActionChain();
+console.log('Action chain:', chain);
+            </pre>
+        </div>
+
+        <h2>Blockchain-Based Provenance</h2>
+        <p>Blockchain provides immutable, decentralized provenance records:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Blockchain Provenance Anchoring
+import { createHash } from 'crypto';
+
+class BlockchainProvenance {
+    constructor(networkUrl) {
+        this.network = networkUrl;
+    }
+
+    async anchorProvenance(manifest) {
+        // Create Merkle root of all assertions
+        const merkleRoot = this.computeMerkleRoot(manifest.assertions);
+
+        // Create blockchain transaction
+        const transaction = {
+            type: 'PROVENANCE_ANCHOR',
+            data: {
+                manifest_hash: computeSHA256(JSON.stringify(manifest)),
+                merkle_root: merkleRoot,
+                timestamp: new Date().toISOString(),
+                content_id: manifest.instance_id
+            }
+        };
+
+        // Submit to blockchain
+        const txHash = await this.submitTransaction(transaction);
+
+        // Create proof
+        const proof = {
+            blockchain: 'Ethereum',
+            network: 'mainnet',
+            transaction_hash: txHash,
+            block_number: await this.getBlockNumber(txHash),
+            merkle_root: merkleRoot,
+            timestamp: transaction.data.timestamp
+        };
+
+        return proof;
+    }
+
+    computeMerkleRoot(assertions) {
+        const leaves = assertions.map(a =>
+            createHash('sha256').update(JSON.stringify(a)).digest()
+        );
+
+        return this.buildMerkleTree(leaves);
+    }
+
+    buildMerkleTree(leaves) {
+        if (leaves.length === 1) return leaves[0].toString('hex');
+
+        const nextLevel = [];
+        for (let i = 0; i < leaves.length; i += 2) {
+            const left = leaves[i];
+            const right = leaves[i + 1] || left;
+            const combined = Buffer.concat([left, right]);
+            const hash = createHash('sha256').update(combined).digest();
+            nextLevel.push(hash);
+        }
+
+        return this.buildMerkleTree(nextLevel);
+    }
+
+    async verifyProof(manifest, proof) {
+        // Recompute Merkle root
+        const computedRoot = this.computeMerkleRoot(manifest.assertions);
+
+        // Verify on blockchain
+        const onChain = await this.queryBlockchain(proof.transaction_hash);
+
+        return {
+            valid: computedRoot === proof.merkle_root &&
+                   onChain.merkle_root === proof.merkle_root,
+            merkle_match: computedRoot === proof.merkle_root,
+            blockchain_match: onChain.merkle_root === proof.merkle_root,
+            block_confirmed: onChain.confirmations > 6
+        };
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Ingredient Tracking</h2>
+        <p>C2PA supports tracking content ingredients - assets combined to create the final content:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Tracking Content Ingredients
+class IngredientTracker {
+    constructor() {
+        this.ingredients = [];
+    }
+
+    addIngredient(ingredientManifest) {
+        const ingredient = {
+            instance_id: ingredientManifest.instance_id,
+            title: ingredientManifest.title,
+            format: ingredientManifest.format,
+            relationship: 'componentOf',
+            hash: ingredientManifest.assertions.find(
+                a => a.label === 'c2pa.hash.data'
+            )?.data.hash,
+            thumbnail: ingredientManifest.thumbnail
+        };
+
+        this.ingredients.push(ingredient);
+        return ingredient;
+    }
+
+    createIngredientAssertion() {
+        return {
+            label: 'c2pa.ingredient',
+            data: {
+                ingredients: this.ingredients.map(ing => ({
+                    ...ing,
+                    validation_status: [{
+                        code: 'claimSignature.validated',
+                        url: ing.instance_id
+                    }]
+                }))
+            }
+        };
+    }
+}
+
+// Example: Composite content with multiple ingredients
+async function createCompositeContent(baseImage, overlays, metadata) {
+    const tracker = new IngredientTracker();
+
+    // Add base image as ingredient
+    const baseManifest = await loadC2PAManifest(baseImage);
+    tracker.addIngredient(baseManifest);
+
+    // Add overlays
+    for (const overlay of overlays) {
+        const overlayManifest = await loadC2PAManifest(overlay);
+        tracker.addIngredient(overlayManifest);
+    }
+
+    // Create new manifest for composite
+    const compositeManifest = {
+        claim_generator: 'WIA Compositor/1.0',
+        title: metadata.title,
+        assertions: [
+            {
+                label: 'c2pa.actions',
+                data: {
+                    actions: [{
+                        action: 'c2pa.edited',
+                        when: new Date().toISOString(),
+                        softwareAgent: 'Compositor 1.0',
+                        parameters: {
+                            ingredients: tracker.ingredients.length
+                        }
+                    }]
+                }
+            },
+            tracker.createIngredientAssertion()
+        ]
+    };
+
+    return compositeManifest;
+}
+            </pre>
+        </div>
+
+        <h2>Redaction and Privacy</h2>
+        <p>Provenance must balance transparency with privacy. WIA-AI-017 supports selective redaction:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Selective Redaction
+class ProvenanceRedactor {
+    constructor(manifest) {
+        this.manifest = manifest;
+        this.redactions = [];
+    }
+
+    redactAssertion(label, reason) {
+        const assertion = this.manifest.assertions.find(a => a.label === label);
+
+        if (assertion) {
+            const hash = createHash('sha256')
+                .update(JSON.stringify(assertion))
+                .digest('hex');
+
+            this.redactions.push({
+                label: label,
+                hash: hash,
+                reason: reason,
+                redacted_at: new Date().toISOString()
+            });
+
+            // Replace assertion with redacted placeholder
+            const index = this.manifest.assertions.indexOf(assertion);
+            this.manifest.assertions[index] = {
+                label: 'c2pa.redacted',
+                data: {
+                    original_label: label,
+                    hash: hash,
+                    reason: reason
+                }
+            };
+        }
+    }
+
+    redactPersonalData() {
+        // Remove GPS coordinates
+        this.redactAssertion('stds.exif', 'Privacy: Location removed');
+
+        // Remove creator identity
+        this.redactAssertion('stds.schema-org.CreativeWork', 'Privacy: Creator anonymous');
+    }
+
+    createRedactionProof() {
+        return {
+            redaction_count: this.redactions.length,
+            redactions: this.redactions,
+            proof: this.redactions.map(r => r.hash).join('|')
+        };
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Cross-Platform Provenance</h2>
+        <p>Content moves across platforms. Provenance must be preserved during transfers:</p>
+
+        <div class="info-box">
+            <strong>ℹ️ Platform Challenges</strong><br>
+            Social media platforms often strip metadata. WIA-AI-017 recommends: (1) Embed watermarks alongside manifests, (2) Link to external provenance databases, (3) Use platform APIs to preserve metadata when available.
+        </div>
+
+        <h2>Temporal Integrity</h2>
+        <p>Timestamps must be trustworthy. RFC 3161 timestamp authorities provide cryptographic proof of when content was created:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Trusted Timestamping
+async function addTrustedTimestamp(manifest) {
+    const manifestHash = createHash('sha256')
+        .update(JSON.stringify(manifest))
+        .digest();
+
+    // Request timestamp from TSA
+    const tsaResponse = await fetch('https://freetsa.org/tsr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/timestamp-query' },
+        body: createTimestampRequest(manifestHash)
+    });
+
+    const timestampToken = await tsaResponse.arrayBuffer();
+
+    // Parse and verify timestamp
+    const timestamp = parseTimestampToken(timestampToken);
+
+    return {
+        label: 'c2pa.timestamp',
+        data: {
+            time: timestamp.genTime,
+            tsa: timestamp.tsa,
+            policy: timestamp.policy,
+            token: Buffer.from(timestampToken).toString('base64')
+        }
+    };
+}
+            </pre>
+        </div>
+
+        <h2>Provenance Visualization</h2>
+        <p>Complex provenance chains need clear visualization for users:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Provenance Graph Generation
+class ProvenanceVisualizer {
+    constructor(manifest) {
+        this.manifest = manifest;
+    }
+
+    generateGraph() {
+        const nodes = [];
+        const edges = [];
+
+        // Root node (current content)
+        nodes.push({
+            id: this.manifest.instance_id,
+            label: this.manifest.title,
+            type: 'current',
+            timestamp: this.getCreationTime()
+        });
+
+        // Add ingredients as nodes
+        const ingredients = this.getIngredients();
+        for (const ing of ingredients) {
+            nodes.push({
+                id: ing.instance_id,
+                label: ing.title,
+                type: 'ingredient'
+            });
+
+            edges.push({
+                from: ing.instance_id,
+                to: this.manifest.instance_id,
+                label: 'used in'
+            });
+        }
+
+        // Add action nodes
+        const actions = this.getActions();
+        actions.forEach((action, idx) => {
+            const nodeId = `action_${idx}`;
+            nodes.push({
+                id: nodeId,
+                label: action.action,
+                type: 'action',
+                timestamp: action.when
+            });
+
+            if (idx === 0) {
+                edges.push({
+                    from: nodeId,
+                    to: this.manifest.instance_id,
+                    label: 'created'
+                });
+            } else {
+                edges.push({
+                    from: `action_${idx-1}`,
+                    to: nodeId,
+                    label: 'then'
+                });
+            }
+        });
+
+        return {
+            nodes: nodes,
+            edges: edges,
+            format: 'graphviz'
+        };
+    }
+
+    exportDOT() {
+        const graph = this.generateGraph();
+        let dot = 'digraph Provenance {\n';
+
+        for (const node of graph.nodes) {
+            const color = node.type === 'current' ? 'green' :
+                         node.type === 'ingredient' ? 'blue' : 'orange';
+            dot += `  "${node.id}" [label="${node.label}" color="${color}"];\n`;
+        }
+
+        for (const edge of graph.edges) {
+            dot += `  "${edge.from}" -> "${edge.to}" [label="${edge.label}"];\n`;
+        }
+
+        dot += '}';
+        return dot;
+    }
+}
+            </pre>
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 Key Takeaways</h3>
+            <ul>
+                <li>Provenance records complete content history from creation to consumption</li>
+                <li>C2PA manifests provide standardized format for provenance metadata</li>
+                <li>Action tracking captures every modification with timestamps and actors</li>
+                <li>Blockchain anchoring creates immutable provenance records</li>
+                <li>Ingredient tracking maintains relationships between composite content</li>
+                <li>Selective redaction balances transparency with privacy</li>
+                <li>Trusted timestamps provide cryptographic proof of timing</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 Review Questions</h3>
+            <ol>
+                <li>What are the five essential data elements in content provenance?</li>
+                <li>How does C2PA structure provenance information?</li>
+                <li>Why is blockchain useful for provenance anchoring?</li>
+                <li>Explain the concept of "ingredients" in C2PA manifests.</li>
+                <li>How does selective redaction preserve privacy while maintaining verifiability?</li>
+                <li>What role do RFC 3161 timestamp authorities play?</li>
+                <li>Why is cross-platform provenance preservation challenging?</li>
+                <li>How can provenance graphs help users understand content history?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</p>
+
+        </div>
+</body>
+</html>

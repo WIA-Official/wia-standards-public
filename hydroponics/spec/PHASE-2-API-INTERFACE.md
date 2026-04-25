@@ -42,7 +42,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ```bash
 curl -X GET https://api.wia.org/agri027/v1/system/status \
-  -H "Authorization: Bearer sk_live_abcdef123456"
+  -H "Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME"
 ```
 
 ### 2.2 OAuth 2.0 (Optional)

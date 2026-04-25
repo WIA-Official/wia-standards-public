@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>제5장: Phase 2 - API 인터페이스 | WIA-ART-001</title>
+<style>
+:root{--bg:#0f172a;--surface:#1e293b;--surface-2:#283548;--primary:#F59E0B;--primary-dark:#D97706;--text:#f1f5f9;--text-dim:#94a3b8;--border:#334155;--gold:#ffd700;--success:#10b981;--warning:#f59e0b;--error:#ef4444;--info:#3b82f6}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.9;min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:2rem}
+header{text-align:center;padding:3rem 0;border-bottom:2px solid var(--primary);margin-bottom:3rem}
+.badge{display:inline-block;background:var(--primary);color:var(--bg);padding:0.5rem 1.5rem;border-radius:2rem;font-weight:600;margin-bottom:1rem}
+h1{font-size:2.5rem;color:var(--primary);margin-bottom:0.5rem}
+.subtitle{color:var(--text-dim);font-size:1.2rem}
+h2{color:var(--primary);font-size:1.8rem;margin:2.5rem 0 1.5rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)}
+h3{color:var(--gold);font-size:1.4rem;margin:2rem 0 1rem}
+p{margin-bottom:1.2rem;text-align:justify;word-break:keep-all}
+.callout{background:var(--surface);border-left:4px solid var(--primary);padding:1.5rem;margin:1.5rem 0;border-radius:0 0.5rem 0.5rem 0}
+.callout.info{border-color:var(--info);background:rgba(59,130,246,0.1)}
+.callout.success{border-color:var(--success);background:rgba(16,185,129,0.1)}
+.callout-title{font-weight:600;margin-bottom:0.5rem}
+pre{background:var(--surface-2);border:1px solid var(--border);border-radius:0.5rem;padding:1.5rem;overflow-x:auto;margin:1.5rem 0;font-family:'Fira Code',monospace;font-size:0.9rem}
+code{background:var(--surface-2);padding:0.2rem 0.5rem;border-radius:0.25rem;font-family:'Fira Code',monospace}
+table{width:100%;border-collapse:collapse;margin:1.5rem 0;background:var(--surface);border-radius:0.5rem;overflow:hidden}
+th,td{padding:1rem;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--surface-2);color:var(--primary);font-weight:600}
+tr:hover{background:var(--surface-2)}
+ul,ol{margin:1rem 0 1.5rem 1.5rem}
+li{margin-bottom:0.5rem}
+.nav{display:flex;justify-content:space-between;padding:2rem 0;border-top:1px solid var(--border);margin-top:3rem}
+.nav a{color:var(--primary);text-decoration:none;padding:0.75rem 1.5rem;background:var(--surface);border-radius:0.5rem;transition:all 0.3s}
+.nav a:hover{background:var(--primary);color:var(--bg)}
+.philosophy{text-align:center;padding:2rem;background:linear-gradient(135deg,var(--surface),var(--surface-2));border-radius:1rem;margin:2rem 0}
+.philosophy-text{font-size:1.5rem;color:var(--gold);margin-bottom:0.5rem}
+.method{display:inline-block;padding:0.25rem 0.75rem;border-radius:0.25rem;font-weight:600;margin-right:0.5rem}
+.method.get{background:#10b981;color:white}
+.method.post{background:#3b82f6;color:white}
+.method.put{background:#f59e0b;color:white}
+.method.delete{background:#ef4444;color:white}
+.endpoint{background:var(--surface-2);border:1px solid var(--border);border-radius:0.5rem;padding:1rem;margin:1rem 0}
+footer{text-align:center;padding:2rem;color:var(--text-dim);font-size:0.9rem}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<div class="badge">제5장 / 8장</div>
+<h1>Phase 2: API 인터페이스</h1>
+<p class="subtitle">WIA-ART-001 - REST API 및 SDK 명세</p>
+</header>
+
+<section id="overview">
+<h2>5.1 API 인터페이스 개요</h2>
+<p>Phase 2는 개발자가 WIA-ART-001 표준과 프로그래밍 방식으로 상호작용할 수 있는 인터페이스를 정의합니다. REST API 엔드포인트, TypeScript SDK, 인증 메커니즘이 포함됩니다.</p>
+
+<div class="callout info">
+<div class="callout-title">🔧 API 설계 원칙</div>
+<ul>
+<li><strong>RESTful:</strong> 표준 HTTP 메서드와 상태 코드 사용</li>
+<li><strong>타입 안전:</strong> 완전한 TypeScript 타입 정의</li>
+<li><strong>일관성:</strong> 모든 엔드포인트에서 동일한 패턴</li>
+<li><strong>문서화:</strong> OpenAPI/Swagger 명세 제공</li>
+</ul>
+</div>
+</section>
+
+<section id="sdk">
+<h2>5.2 TypeScript SDK</h2>
+
+<h3>5.2.1 설치</h3>
+<pre><code># npm
+npm install @wia/art-001-sdk
+
+# yarn
+yarn add @wia/art-001-sdk
+
+# pnpm
+pnpm add @wia/art-001-sdk</code></pre>
+
+<h3>5.2.2 초기화</h3>
+<pre><code>import { WIAART001, DigitalArtSDK } from '@wia/art-001-sdk';
+
+const sdk = new WIAART001({
+  apiKey: 'wia_art_sk_...',
+  endpoint: 'https://api.wia.org/art-001/v1',
+  timeout: 30000,
+  enableValidation: true,
+  enableCaching: true
+});</code></pre>
+
+<h3>5.2.3 타입 정의</h3>
+<pre><code>// 아트워크 인터페이스
+export interface Artwork {
+  id: string;
+  version: string;
+  metadata: ArtworkMetadata;
+  content: ArtworkContent;
+  provenance: ProvenanceChain;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// 메타데이터 인터페이스
+export interface ArtworkMetadata {
+  title: string;
+  creator: CreatorInfo;
+  description?: string;
+  creationDate?: Date;
+  colorSpace: ColorSpace;
+  dimensions?: Dimensions;
+  keywords?: string[];
+  license?: LicenseInfo;
+}
+
+// 색 공간 타입
+export type ColorSpace = 
+  | 'sRGB' 
+  | 'Adobe RGB' 
+  | 'ProPhoto RGB' 
+  | 'Display P3';
+
+// 품질 등급 타입
+export type QualityTier = 
+  | 'archival' 
+  | 'professional' 
+  | 'web' 
+  | 'preview';</code></pre>
+
+<h3>5.2.4 핵심 메서드</h3>
+<pre><code>// 작품 생성
+const artwork = await sdk.create({
+  title: '디지털 풍경',
+  creator: { name: '김아티스트' },
+  colorSpace: 'Adobe RGB'
+});
+
+// 작품 조회
+const artwork = await sdk.read('art_2xK9mN3pQr5tV7wY');
+
+// 작품 수정
+const updated = await sdk.update('art_id', {
+  metadata: { description: '수정된 설명' }
+});
+
+// 작품 삭제
+await sdk.delete('art_id');
+
+// 검증
+const result = await sdk.validate(artworkData);
+
+// 내보내기
+const buffer = await sdk.export('art_id', {
+  format: 'PNG',
+  quality: 'web',
+  embedMetadata: true
+});</code></pre>
+</section>
+
+<section id="rest">
+<h2>5.3 REST API 엔드포인트</h2>
+
+<h3>5.3.1 작품 생성</h3>
+<div class="endpoint">
+<span class="method post">POST</span>
+<code>/api/v1/digital-art</code>
+</div>
+
+<pre><code>// 요청
+POST /api/v1/digital-art
+Content-Type: application/json
+Authorization: Bearer wia_art_sk_...
+
+{
+  "title": "디지털 풍경 #42",
+  "creator": {
+    "name": "김아티스트",
+    "contact": "artist@example.com"
+  },
+  "colorSpace": "Adobe RGB",
+  "description": "초현실적 풍경화"
+}
+
+// 응답 (201 Created)
+{
+  "success": true,
+  "data": {
+    "id": "art_2xK9mN3pQr5tV7wY",
+    "status": "created",
+    "uploadUrl": "https://upload.wia.org/...",
+    "expiresAt": "2025-01-15T11:30:00Z"
+  }
+}</code></pre>
+
+<h3>5.3.2 작품 조회</h3>
+<div class="endpoint">
+<span class="method get">GET</span>
+<code>/api/v1/digital-art/{id}</code>
+</div>
+
+<pre><code>// 요청
+GET /api/v1/digital-art/art_2xK9mN3pQr5tV7wY
+Authorization: Bearer wia_art_sk_...
+
+// 응답 (200 OK)
+{
+  "success": true,
+  "data": {
+    "id": "art_2xK9mN3pQr5tV7wY",
+    "version": "1.0",
+    "metadata": {
+      "title": "디지털 풍경 #42",
+      "creator": { "name": "김아티스트" },
+      "colorSpace": "Adobe RGB"
+    },
+    "content": {
+      "primary": {
+        "format": "PNG",
+        "url": "https://cdn.wia.org/...",
+        "size": 15728640
+      }
+    }
+  }
+}</code></pre>
+
+<h3>5.3.3 작품 검증</h3>
+<div class="endpoint">
+<span class="method post">POST</span>
+<code>/api/v1/digital-art/validate</code>
+</div>
+
+<pre><code>// 요청
+POST /api/v1/digital-art/validate
+Content-Type: application/json
+
+{
+  "metadata": {
+    "title": "테스트 작품",
+    "creator": { "name": "테스트" },
+    "colorSpace": "sRGB"
+  }
+}
+
+// 응답 (200 OK)
+{
+  "valid": true,
+  "complianceLevel": "full",
+  "checks": [
+    { "rule": "metadata.title.required", "passed": true },
+    { "rule": "metadata.creator.required", "passed": true },
+    { "rule": "metadata.colorSpace.valid", "passed": true }
+  ],
+  "recommendations": [
+    "description 필드 추가 권장"
+  ]
+}</code></pre>
+
+<h3>5.3.4 작품 검색</h3>
+<div class="endpoint">
+<span class="method get">GET</span>
+<code>/api/v1/digital-art?query=...</code>
+</div>
+
+<pre><code>// 쿼리 파라미터
+- q: 전문 검색 쿼리
+- creator: 작가 ID 필터
+- colorSpace: 색 공간 필터
+- format: 파일 형식 필터
+- dateFrom/dateTo: 생성일 범위
+- limit: 페이지당 결과 수 (기본 20, 최대 100)
+- offset: 페이징 오프셋
+
+// 예시
+GET /api/v1/digital-art?q=풍경&colorSpace=sRGB&limit=10
+
+// 응답
+{
+  "results": [...],
+  "pagination": {
+    "total": 42,
+    "limit": 10,
+    "offset": 0,
+    "hasMore": true
+  }
+}</code></pre>
+</section>
+
+<section id="auth">
+<h2>5.4 인증</h2>
+
+<h3>5.4.1 API 키 인증</h3>
+<pre><code>// 헤더 방식 (권장)
+Authorization: Bearer wia_art_sk_1234567890abcdef
+
+// API 키 형식
+- 프로덕션: wia_art_sk_... (secret key)
+- 테스트: wia_art_test_... (test key)
+- 퍼블릭: wia_art_pk_... (public key, 읽기 전용)</code></pre>
+
+<h3>5.4.2 OAuth 2.0</h3>
+<pre><code>// 1단계: 인증 요청
+GET /oauth/authorize
+  ?client_id=YOUR_CLIENT_ID
+  &redirect_uri=https://yourapp.com/callback
+  &response_type=code
+  &scope=art:read art:write
+
+// 2단계: 토큰 교환
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code=AUTH_CODE
+&redirect_uri=https://yourapp.com/callback
+&client_id=YOUR_CLIENT_ID
+&client_secret=YOUR_CLIENT_SECRET
+
+// 3단계: 토큰 사용
+Authorization: Bearer ACCESS_TOKEN</code></pre>
+
+<h3>5.4.3 권한 범위 (Scope)</h3>
+<table>
+<thead>
+<tr><th>범위</th><th>설명</th><th>엔드포인트</th></tr>
+</thead>
+<tbody>
+<tr><td>art:read</td><td>작품 조회</td><td>GET /digital-art/*</td></tr>
+<tr><td>art:write</td><td>작품 생성/수정</td><td>POST, PUT</td></tr>
+<tr><td>art:delete</td><td>작품 삭제</td><td>DELETE</td></tr>
+<tr><td>art:validate</td><td>검증</td><td>POST /validate</td></tr>
+<tr><td>art:export</td><td>내보내기</td><td>GET /export</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rate-limit">
+<h2>5.5 요청 제한</h2>
+
+<h3>5.5.1 등급별 제한</h3>
+<table>
+<thead>
+<tr><th>등급</th><th>시간당 요청</th><th>분당 버스트</th><th>일일 업로드</th></tr>
+</thead>
+<tbody>
+<tr><td>무료</td><td>1,000</td><td>50</td><td>100 MB</td></tr>
+<tr><td>프로</td><td>10,000</td><td>200</td><td>10 GB</td></tr>
+<tr><td>엔터프라이즈</td><td>100,000</td><td>1,000</td><td>무제한</td></tr>
+</tbody>
+</table>
+
+<h3>5.5.2 응답 헤더</h3>
+<pre><code>X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 850
+X-RateLimit-Reset: 1705330800
+X-RateLimit-RetryAfter: 120</code></pre>
+
+<h3>5.5.3 제한 초과 처리</h3>
+<pre><code>// 429 Too Many Requests
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "요청 제한을 초과했습니다",
+    "retryAfter": 120
+  }
+}
+
+// 재시도 로직
+async function requestWithRetry(fn, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.status === 429) {
+        const delay = error.retryAfter || 60;
+        await sleep(delay * 1000);
+      } else {
+        throw error;
+      }
+    }
+  }
+}</code></pre>
+</section>
+
+<section id="errors">
+<h2>5.6 에러 처리</h2>
+
+<h3>5.6.1 에러 응답 형식</h3>
+<pre><code>{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "요청 검증 실패",
+    "details": [
+      {
+        "field": "metadata.colorSpace",
+        "issue": "유효하지 않은 색 공간",
+        "expected": "sRGB | Adobe RGB | ProPhoto RGB | Display P3",
+        "received": "RGB"
+      }
+    ],
+    "requestId": "req_abc123",
+    "timestamp": "2025-01-15T10:30:00Z"
+  }
+}</code></pre>
+
+<h3>5.6.2 HTTP 상태 코드</h3>
+<table>
+<thead>
+<tr><th>코드</th><th>의미</th><th>일반적 원인</th></tr>
+</thead>
+<tbody>
+<tr><td>200</td><td>성공</td><td>요청 정상 처리</td></tr>
+<tr><td>201</td><td>생성됨</td><td>리소스 생성 성공</td></tr>
+<tr><td>400</td><td>잘못된 요청</td><td>JSON 오류, 필수 필드 누락</td></tr>
+<tr><td>401</td><td>인증 필요</td><td>API 키 누락/만료</td></tr>
+<tr><td>403</td><td>권한 없음</td><td>권한 범위 부족</td></tr>
+<tr><td>404</td><td>찾을 수 없음</td><td>리소스 없음</td></tr>
+<tr><td>422</td><td>처리 불가</td><td>검증 실패</td></tr>
+<tr><td>429</td><td>요청 과다</td><td>제한 초과</td></tr>
+<tr><td>500</td><td>서버 오류</td><td>내부 오류</td></tr>
+</tbody>
+</table>
+</section>
+
+
+<section id="korean-cases">
+<h2>한국 사례 및 실무 적용</h2>
+<p>한국 디지털 아트 산업에서 WIA-ART-001 표준이 어떻게 적용되고 있는지 실제 사례를 통해 살펴봅니다.</p>
+
+<table>
+<thead>
+<tr><th>플랫폼/회사</th><th>적용 분야</th><th>도입 효과</th><th>주요 도전 과제</th><th>해결 방안</th></tr>
+</thead>
+<tbody>
+<tr><td>네이버 웹툰</td><td>메타데이터 관리</td><td>다국어 배포 80% 효율화</td><td>50만+ 작품 마이그레이션</td><td>단계별 롤아웃 전략</td></tr>
+<tr><td>카카오페이지</td><td>색상 프로파일</td><td>인쇄 품질 95% 향상</td><td>작가 교육 부담</td><td>자동화 도구 제공</td></tr>
+<tr><td>그라폴리오</td><td>포트폴리오 관리</td><td>채용 연결률 65% 증가</td><td>다양한 파일 형식</td><td>자동 변환 시스템</td></tr>
+<tr><td>아트센터 나비</td><td>디지털 아트 아카이브</td><td>보존성 100년+ 보장</td><td>레거시 파일 변환</td><td>전문가 협력 검증</td></tr>
+<tr><td>넥슨/엔씨소프트</td><td>게임 에셋 파이프라인</td><td>제작 시간 45% 단축</td><td>대용량 3D 파일</td><td>스트리밍 및 LOD</td></tr>
+</tbody>
+</table>
+
+<div class="callout success">
+<div class="callout-title">✅ 성공 사례: 독립 웹툰 작가의 변화</div>
+<p>"이전에는 네이버, 카카오, 레진코믹스에 작품을 올리려면 각각 다른 형식으로 준비해야 했어요. 해상도, 파일 크기, 메타데이터가 모두 달랐죠. WIA-ART-001을 사용하면서 한 번 준비한 파일을 모든 플랫폼에 그대로 사용할 수 있게 됐습니다. 작업 시간이 주당 15시간에서 2시간으로 줄었고, 그 시간에 더 많은 작품을 만들 수 있어요." - 박OO 웹툰 작가 (연재 3년차)</p>
+</div>
+
+<h3>글로벌 시장 진출 사례</h3>
+<p>WIA 표준을 활용한 한국 디지털 아티스트의 해외 진출이 증가하고 있습니다:</p>
+
+<ul>
+<li><strong>북미 시장:</strong> WIA 호환 포트폴리오로 Artstation, Behance에서 채용 기회 3배 증가</li>
+<li><strong>일본 시장:</strong> 메타데이터 다국어 지원으로 Pixiv, NicoNico 진출 용이</li>
+<li><strong>유럽 시장:</strong> GDPR 준수 메타데이터로 EU 플랫폼 접근성 향상</li>
+<li><strong>동남아 시장:</strong> 표준화된 라이선스 정보로 저작권 보호 강화</li>
+</ul>
+</section>
+
+<section id="implementation-guide">
+<h2>실무 구현 가이드</h2>
+<p>프로덕션 환경에서 이 기능을 안전하고 효율적으로 구현하기 위한 실무 지침입니다.</p>
+
+<h3>성능 최적화 전략</h3>
+<div class="callout info">
+<div class="callout-title">💡 성능 벤치마크</div>
+<p>WIA-ART-001 표준 구현 시 예상 성능 지표:</p>
+<ul>
+<li>메타데이터 검증: 평균 50ms (1MB 파일 기준)</li>
+<li>색상 프로파일 변환: 평균 200ms (4K 이미지)</li>
+<li>해시 계산 (SHA-256): 평균 100ms (10MB 파일)</li>
+<li>API 응답 시간: p95 < 500ms, p99 < 1000ms</li>
+</ul>
+</div>
+
+<h4>대용량 파일 처리</h4>
+<pre><code>// TypeScript 예제: 청크 업로드로 대용량 파일 처리
+async function uploadLargeArtwork(file: File) {
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    
+    await uploadChunk(chunk, i, totalChunks);
+  }
+  
+  // 모든 청크 업로드 후 병합 요청
+  await finalizeUpload(file.name);
+}</code></pre>
+
+<h4>캐싱 전략</h4>
+<pre><code>// Redis를 활용한 메타데이터 캐싱
+const cacheKey = `artwork:${artworkId}:metadata`;
+const ttl = 3600; // 1시간
+
+// 캐시에서 먼저 조회
+let metadata = await redis.get(cacheKey);
+
+if (!metadata) {
+  // 캐시 미스 시 DB에서 조회
+  metadata = await db.getArtworkMetadata(artworkId);
+  
+  // 캐시에 저장
+  await redis.setex(cacheKey, ttl, JSON.stringify(metadata));
+}
+
+return JSON.parse(metadata);</code></pre>
+
+<h3>보안 강화 방안</h3>
+<h4>파일 검증 프로세스</h4>
+<pre><code>// 안전한 파일 업로드 검증
+function validateUpload(file: File, metadata: ArtworkMetadata): ValidationResult {
+  const checks = [
+    // 1. MIME 타입 검증
+    validateMimeType(file.type, metadata.format),
+    
+    // 2. 파일 크기 제한
+    validateFileSize(file.size, MAX_FILE_SIZE),
+    
+    // 3. 파일 내용 검사 (매직 넘버)
+    validateFileContent(file),
+    
+    // 4. 바이러스 스캔
+    await scanForVirus(file),
+    
+    // 5. 메타데이터 스키마 검증
+    validateSchema(metadata, WIA_ART_SCHEMA)
+  ];
+  
+  return {
+    valid: checks.every(c => c.passed),
+    errors: checks.filter(c => !c.passed).map(c => c.error)
+  };
+}</code></pre>
+
+<h3>에러 처리 및 복구</h3>
+<p>프로덕션 환경에서 발생할 수 있는 다양한 오류 상황에 대한 처리 전략:</p>
+
+<table>
+<thead>
+<tr><th>오류 유형</th><th>감지 방법</th><th>복구 전략</th><th>사용자 피드백</th></tr>
+</thead>
+<tbody>
+<tr><td>네트워크 오류</td><td>타임아웃, 연결 실패</td><td>지수 백오프 재시도 (3회)</td><td>"연결 문제 발생, 재시도 중..."</td></tr>
+<tr><td>파일 손상</td><td>해시 불일치</td><td>클라이언트 재업로드 요청</td><td>"파일이 손상되었습니다. 다시 업로드해주세요."</td></tr>
+<tr><td>형식 오류</td><td>스키마 검증 실패</td><td>상세 오류 메시지 반환</td><td>"메타데이터 형식 오류: {필드}가 필요합니다."</td></tr>
+<tr><td>할당량 초과</td><td>저장 공간 부족</td><td>정리 또는 업그레이드 안내</td><td>"저장 공간이 부족합니다. 요금제 업그레이드를 고려하세요."</td></tr>
+<tr><td>권한 오류</td><td>인증/인가 실패</td><td>재로그인 유도</td><td>"세션이 만료되었습니다. 다시 로그인해주세요."</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="advanced-topics">
+<h2>고급 주제 및 최신 트렌드</h2>
+
+<h3>AI 생성 아트 지원</h3>
+<p>AI 도구로 생성된 작품을 위한 특별한 메타데이터 필드:</p>
+
+<pre><code>{
+  "aiGeneration": {
+    "model": "Stable Diffusion XL",
+    "version": "1.0",
+    "prompt": "a serene Korean landscape in the style of traditional ink painting",
+    "negativePrompt": "modern buildings, cars, people",
+    "seed": 42,
+    "steps": 50,
+    "cfg_scale": 7.5,
+    "sampler": "DPM++ 2M Karras",
+    "humanContribution": {
+      "promptDesign": 100,
+      "postProcessing": 80,
+      "selection": 100
+    },
+    "trainingDataConsent": true,
+    "ethicalConsiderations": "No copyrighted content used in training"
+  }
+}</code></pre>
+
+<h3>블록체인 통합</h3>
+<p>NFT 및 분산 저장소와의 통합 예제:</p>
+
+<pre><code>// WIA-BLOCKCHAIN 표준과 연동
+async function mintAsNFT(artwork: Artwork) {
+  // 1. IPFS에 작품 업로드
+  const ipfsHash = await ipfs.add(artwork.content.primary);
+  
+  // 2. WIA 메타데이터를 NFT 메타데이터로 변환
+  const nftMetadata = {
+    name: artwork.metadata.title,
+    description: artwork.metadata.description,
+    image: `ipfs://${ipfsHash}`,
+    attributes: [
+      { trait_type: "Artist", value: artwork.metadata.creator.name },
+      { trait_type: "Creation Date", value: artwork.metadata.creationDate },
+      { trait_type: "Medium", value: artwork.metadata.medium }
+    ],
+    wia_standard: "WIA-ART-001",
+    wia_version: "1.0",
+    wia_artwork_id: artwork.id
+  };
+  
+  // 3. 스마트 계약으로 NFT 발행
+  const nft = await contract.mint(metadata, { value: mintingFee });
+  
+  // 4. 출처 정보에 NFT 정보 추가
+  await updateProvenance(artwork.id, {
+    type: "nft_minting",
+    blockchain: "Ethereum",
+    contract: contract.address,
+    tokenId: nft.tokenId,
+    ipfsHash: ipfsHash
+  });
+}</code></pre>
+
+<h3>웹3 통합 및 분산 저장</h3>
+<p>중앙화된 서버 없이 작품을 분산 저장하고 관리하는 방법:</p>
+
+<ul>
+<li><strong>IPFS:</strong> 작품 원본을 불변 저장소에 보관</li>
+<li><strong>Filecoin:</strong> 장기 보존을 위한 유료 스토리지</li>
+<li><strong>Arweave:</strong> 영구 저장을 위한 블록위브 기술</li>
+<li><strong>Ceramic Network:</strong> 분산 메타데이터 관리</li>
+</ul>
+</section>
+
+<section id="summary">
+<h2>5.7 장 요약</h2>
+<div class="callout success">
+<div class="callout-title">✅ 핵심 정리</div>
+<ul>
+<li>TypeScript SDK로 타입 안전한 개발 지원</li>
+<li>REST API는 CRUD, 검증, 검색, 내보내기 제공</li>
+<li>API 키와 OAuth 2.0 인증 지원</li>
+<li>등급별 요청 제한 및 버스트 제어</li>
+<li>일관된 에러 응답 형식</li>
+</ul>
+</div>
+
+<h3>복습 문제</h3>
+<ol>
+<li>SDK 초기화 시 필수 설정은 무엇인가요?</li>
+<li>작품 검증 API의 역할을 설명하세요.</li>
+<li>OAuth 2.0 인증 흐름을 3단계로 설명하세요.</li>
+<li>429 에러 발생 시 어떻게 처리해야 하나요?</li>
+</ol>
+
+<div class="philosophy">
+<div class="philosophy-text">弘益人間</div>
+<p>잘 설계된 API는 개발자의 시간을 절약합니다. 모두가 쉽게 접근할 수 있는 인터페이스가 생태계를 성장시킵니다.</p>
+</div>
+</section>
+
+</div>
+</body>
+</html>

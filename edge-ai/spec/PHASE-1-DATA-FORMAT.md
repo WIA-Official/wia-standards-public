@@ -198,6 +198,128 @@ This specification follows Semantic Versioning (SemVer):
 
 ---
 
+
+
+## Reference Standards Alignment
+
+The Phase 1 data formats are layered above well-established machine-learning, IoT, and IT primitives so that conformant implementations interoperate without vendor lock-in.
+
+| Concern | Reference |
+|---------|-----------|
+| Tensor and model format | ONNX (Open Neural Network Exchange) v1.14+ |
+| Quantised model format | TFLite reference (Google Open Source) |
+| Tensor metadata | Apache Arrow Columnar Format Specification 1.0 |
+| Numeric encoding | IEEE 754-2019 (binary32, binary64) |
+| Reduced-precision encoding | IEEE 754-2019 binary16; bfloat16 informative |
+| Integer types | ISO/IEC 9899:2018 (C18) `<stdint.h>` semantics |
+| Quantisation | INT8, INT16 per the deploying runtime's documented profile |
+| Hash | FIPS 180-4 (SHA-2), FIPS 202 (SHA-3) |
+| JSON | RFC 8259 |
+| CBOR | RFC 8949 |
+| Time encoding | ISO 8601:2019 |
+| Sensor-data ontology | W3C SOSA/SSN |
+| Industrial protocols | IEC 62541 (OPC UA), Modbus Application Protocol Specification V1.1b3 |
+| IoT messaging | OASIS MQTT 5.0 |
+| Real-time clocks | IEEE 1588-2019 (PTPv2), RFC 5905 (NTPv4) |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 1 implementation is conformant when:
+
+1. Model and tensor encodings follow ONNX v1.14+ or a documented profile derived from it.
+2. Numeric encodings match IEEE 754-2019 with explicit precision declarations.
+3. Quantisation parameters are declared in the manifest when reduced-precision arithmetic is used.
+4. Hashes use a FIPS-approved algorithm and are declared in the manifest.
+5. Time fields conform to ISO 8601:2019.
+
+## Implementation Appendix
+
+### A. Tensor canonicalisation
+
+When tensors are signed (for example to attest a model checkpoint), the canonicalisation procedure is:
+
+1. Convert the tensor to its canonical numeric type (defaults: float32 for parameters, int8 for quantised payloads).
+2. Serialise in row-major order with little-endian byte ordering.
+3. Compute the hash over the serialised bytes plus a SHA-256 of the tensor's shape descriptor and the quantisation parameters.
+4. Record the hash, shape, dtype, and quantisation parameters in the manifest.
+
+Canonicalisation is deterministic so any conformant implementation produces the same hash for the same logical tensor.
+
+### B. Edge inference profile
+
+Edge deployments declare a runtime profile that constrains the legal subset of operators and quantisation modes. The reference profiles are:
+
+- **EDGE-MIN** — INT8 quantisation, fixed graph topology, no dynamic shapes, no control flow operators. Suitable for microcontroller-class targets.
+- **EDGE-STD** — Mixed INT8 / FP16 precision, limited dynamic shapes, simple control flow (If, Loop). Suitable for mobile-class targets.
+- **EDGE-MAX** — Full ONNX operator set with hardware-accelerator-specific extensions. Suitable for high-end edge gateways and accelerator-equipped servers.
+
+The profile is declared in the manifest so downstream consumers can decide whether to deploy or to fall back.
+
+### C. Quantisation Parameters
+
+When reduced-precision quantisation is in use, the manifest carries the quantisation parameters per tensor:
+
+- **dtype** — the quantised numeric type (INT8, INT16).
+- **scale** — the scale factor relating quantised integers to floating-point values (IEEE 754-2019 binary32 by default).
+- **zero_point** — the integer zero-point offset.
+- **per_channel** — boolean indicating per-channel vs. per-tensor quantisation.
+- **axis** — the channel axis when per-channel quantisation is used.
+
+Quantisation parameters are signed alongside the tensor bytes so that any change to the parameters invalidates the signature and prevents silent precision drift.
+
+### D. Operator Set Pinning
+
+ONNX opset versions are pinned in the manifest. Implementations MUST refuse to silently substitute a different opset version, since opset upgrades may change operator semantics in ways that affect numerical outputs. Backward compatibility is preserved by allowing producers and consumers to negotiate opset version through capability discovery prior to inference.
+
+### E. Reference Test Vectors
+
+The conformance test suite provides reference test vectors covering:
+
+- Single-operator correctness against published ONNX reference outputs.
+- Cross-implementation consistency between two conformant runtimes.
+- Quantisation round-trip preservation within the documented tolerance.
+- Opset-version interoperability within the supported version range.
+
+Implementations report their test-vector pass rate as part of conformance documentation.
+
+### F. Hardware-Accelerator Profiles
+
+When hardware-accelerator-specific operators are used, the manifest carries:
+
+- **accelerator_family** — the family identifier (e.g., NVIDIA Jetson, Google Coral, Intel Movidius).
+- **accelerator_capabilities** — a structured list of capability identifiers.
+- **fallback_path** — the operator path to use on hardware lacking the declared capabilities.
+
+Fallback paths preserve correctness on heterogeneous fleets where some devices have accelerators and others do not.
+
+### G. Compression and Optimisation
+
+Edge models are typically compressed and optimised for deployment. The manifest records the optimisation pipeline:
+
+- **pruning** — sparsity ratio, sparsity pattern (unstructured / 2:4 / block-sparse).
+- **quantisation** — as documented in §C above.
+- **distillation** — teacher model identifier and distillation loss configuration.
+- **fusion** — operator-fusion passes applied (Conv-BN-ReLU fusion, attention fusion, etc.).
+- **graph_simplification** — algebraic simplification passes (constant folding, common-subexpression elimination).
+
+Optimisation is reproducible: applying the same pipeline to the same input model produces the same optimised model, modulo declared non-deterministic optimisations.
+
+### H. Provenance Linkage
+
+Each model artefact in the manifest carries a provenance link to its origin: the training-data identifier (or a hash of the training-data manifest), the training-script identifier, the training-run identifier, and the responsible-party identifier. Provenance follows the W3C PROV-O ontology so downstream consumers can answer the basic governance questions about what produced this model, with what data, and under whose responsibility.
+
+### I. Model Card
+
+A machine-readable model card accompanies each released model. The card carries the intended use, training-data summary, evaluation summary, ethical-use considerations, known limitations, and the responsible party. Model cards are versioned with the model and travel with the manifest. The reference card schema is informative; the operating organisation may extend it with deployment-specific fields without breaking conformance.
+
+### J. Conformance Reporting
+
+Operating organisations publish a conformance report for each released model that lists the §Reference Standards alignment status, the supported runtime profile, the supported hardware target classes, the conformance test-vector pass rate, and the responsible party.
+
+---
+
 **Copyright © 2025 World Certification Industry Association (WIA)**
 **License:** CC BY 4.0
 **弘益人間** - Benefit All Humanity

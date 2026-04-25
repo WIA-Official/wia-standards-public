@@ -416,6 +416,76 @@ jane-doe_sunset-mountains_v1_thumb.webp
 - Include version number
 - Specify variant (master, web, thumb, print)
 
+## 9. Reference Standards Alignment
+
+### 9.1 File Format References
+
+| Format | Reference |
+|--------|-----------|
+| PNG | ISO 15948 |
+| JPEG | ISO/IEC 10918-1 |
+| JPEG 2000 | ISO/IEC 15444-1 |
+| HEIF / HEIC | ISO/IEC 23008-12 |
+| AVIF | AOMedia AV1 Bitstream & Decoding Process Specification, ISO/IEC 14496-12 container |
+| TIFF | ISO 12234-2:2001 (TIFF/EP) |
+| SVG | W3C SVG 2 |
+| PDF/X | ISO 15930 series |
+| glTF 2.0 | Khronos glTF 2.0 Specification |
+| COLLADA | ISO/PAS 17506:2012 |
+| OpenEXR | High-Dynamic-Range image format under the Academy Software Foundation |
+
+### 9.2 Colour Management References
+
+| Concern | Reference |
+|---------|-----------|
+| ICC profiles | ISO 15076-1:2010 |
+| sRGB | IEC 61966-2-1:1999 |
+| Display P3 | DCI-P3 white point with sRGB transfer; Apple ColorSync reference |
+| Rec. ITU-R BT.2020 | ITU-R Recommendation BT.2020-2 |
+| ProPhoto RGB | ANSI/I3A IT10.7666-2002 (ROMM RGB) |
+| CMYK reference | ISO 12647-2:2013 (offset litho), ISO 15930 (PDF/X) |
+| Colour appearance | CIECAM02 / CIECAM16 |
+
+### 9.3 Hash and Signature
+
+| Concern | Reference |
+|---------|-----------|
+| Content hash | FIPS 180-4 (SHA-2 family), FIPS 202 (SHA-3 family) |
+| Signing | RFC 8032 (EdDSA), NIST FIPS 186-5 (ECDSA), RFC 8017 (RSA-PSS) |
+| Signed manifest container | RFC 9052 (COSE), RFC 8949 (CBOR), RFC 7515 (JWS) |
+
+### 9.4 Provenance and Attribution
+
+| Concern | Reference |
+|---------|-----------|
+| Provenance | W3C PROV-O |
+| Verifiable Credentials | W3C VC Data Model 2.0 |
+| Decentralised Identity | W3C DID Core 1.0 |
+| Catalog vocabulary | W3C DCAT v3 |
+| Schema markup | schema.org `VisualArtwork` / `CreativeWork` |
+| Cross-standard provenance | C2PA technical specification 2.x |
+
+### 9.5 Locale and Time
+
+| Concern | Reference |
+|---------|-----------|
+| Language tags | BCP 47 (RFC 5646) |
+| Locale data | Unicode CLDR |
+| Time encoding | ISO 8601:2019 |
+| Bidirectional text | Unicode Standard Annex #9 |
+
+### 9.6 Conformance
+
+A Phase 1 implementation is conformant when:
+
+1. All files emitted use one of the §9.1 file formats with a declared format identifier in the manifest.
+2. ICC colour profiles are embedded in all raster outputs (§5).
+3. Content hashes are computed using a §9.3 hash algorithm and declared in the manifest.
+4. Signed manifests carry an explicit algorithm identifier from §9.3 and a public-key reference resolvable via the §9.4 identity references.
+5. Time fields conform to ISO 8601:2019 and locale fields conform to BCP 47.
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
 ---
 
 **弘益人間 (Benefit All Humanity)**

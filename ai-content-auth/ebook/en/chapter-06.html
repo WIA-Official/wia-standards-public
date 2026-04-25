@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Deepfake Detection Methods - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; line-height: 1.8; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 06</div>
+            <h1>Deepfake Detection Methods</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">Deploy machine learning models and forensic analysis to detect synthetic media</p>
+        </header>
+
+        <h2>The Deepfake Challenge</h2>
+        <p>Deepfakes use generative AI to create synthetic media that is increasingly difficult to distinguish from authentic content. Detection requires sophisticated analysis across multiple modalities and scales.</p>
+
+        <h3>Types of Synthetic Media</h3>
+        <ul>
+            <li><strong>Face Swapping:</strong> Replacing one person's face with another's</li>
+            <li><strong>Face Reenactment:</strong> Manipulating facial expressions and movements</li>
+            <li><strong>Voice Cloning:</strong> Synthesizing speech in someone's voice</li>
+            <li><strong>Full Synthesis:</strong> Generating entirely fictional people or scenes</li>
+            <li><strong>Lip Syncing:</strong> Modifying mouth movements to match audio</li>
+        </ul>
+
+        <h2>CNN-Based Detection</h2>
+        <p>Convolutional Neural Networks learn to identify subtle artifacts in synthetic images:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: CNN Deepfake Detector with TensorFlow.js
+import * as tf from '@tensorflow/tfjs-node';
+
+class CNNDeepfakeDetector {
+    constructor() {
+        this.model = this.buildModel();
+    }
+
+    buildModel() {
+        const model = tf.sequential();
+
+        // Feature extraction layers
+        model.add(tf.layers.conv2d({
+            inputShape: [224, 224, 3],
+            filters: 32,
+            kernelSize: 3,
+            activation: 'relu'
+        }));
+        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+        model.add(tf.layers.dropout({ rate: 0.25 }));
+
+        model.add(tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu' }));
+        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+        model.add(tf.layers.dropout({ rate: 0.25 }));
+
+        model.add(tf.layers.conv2d({ filters: 128, kernelSize: 3, activation: 'relu' }));
+        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+        model.add(tf.layers.dropout({ rate: 0.25 }));
+
+        // Dense layers
+        model.add(tf.layers.flatten());
+        model.add(tf.layers.dense({ units: 256, activation: 'relu' }));
+        model.add(tf.layers.dropout({ rate: 0.5 }));
+
+        // Output layer (binary classification)
+        model.add(tf.layers.dense({
+            units: 1,
+            activation: 'sigmoid'
+        }));
+
+        model.compile({
+            optimizer: 'adam',
+            loss: 'binaryCrossentropy',
+            metrics: ['accuracy']
+        });
+
+        return model;
+    }
+
+    async detect(imageTensor) {
+        // Preprocess image
+        const normalized = imageTensor.div(255.0);
+        const resized = tf.image.resizeBilinear(normalized, [224, 224]);
+        const batched = resized.expandDims(0);
+
+        // Get prediction
+        const prediction = this.model.predict(batched);
+        const score = await prediction.data();
+
+        const result = {
+            is_deepfake: score[0] > 0.5,
+            confidence: Math.abs(score[0] - 0.5) * 2, // 0 to 1
+            score: score[0],
+            method: 'CNN Binary Classifier'
+        };
+
+        // Cleanup tensors
+        batched.dispose();
+        resized.dispose();
+        normalized.dispose();
+        prediction.dispose();
+
+        return result;
+    }
+
+    async analyzeAttentionMap(imageTensor) {
+        // Generate attention map showing suspicious regions
+        const features = this.extractFeatures(imageTensor);
+        const attention = this.computeGradCAM(features);
+
+        return attention;
+    }
+
+    extractFeatures(imageTensor) {
+        // Extract intermediate layer activations
+        const featureModel = tf.model({
+            inputs: this.model.input,
+            outputs: this.model.getLayer('conv2d_2').output
+        });
+
+        return featureModel.predict(imageTensor);
+    }
+}
+
+// Usage
+const detector = new CNNDeepfakeDetector();
+const result = await detector.detect(imageTensor);
+
+console.log('Deepfake detected:', result.is_deepfake);
+console.log('Confidence:', (result.confidence * 100).toFixed(1) + '%');
+            </pre>
+        </div>
+
+        <h2>Transformer-Based Detection</h2>
+        <p>Vision Transformers excel at capturing long-range dependencies and global inconsistencies:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Vision Transformer for Deepfake Detection
+class ViTDeepfakeDetector {
+    constructor(patchSize = 16, numLayers = 12) {
+        this.patchSize = patchSize;
+        this.numLayers = numLayers;
+        this.model = this.buildTransformer();
+    }
+
+    buildTransformer() {
+        // Simplified ViT architecture
+        const input = tf.input({ shape: [224, 224, 3] });
+
+        // Patch embedding
+        const patches = this.patchify(input);
+        const embedded = tf.layers.dense({
+            units: 768,
+            name: 'patch_embedding'
+        }).apply(patches);
+
+        // Positional encoding
+        const positioned = this.addPositionalEncoding(embedded);
+
+        // Transformer encoder blocks
+        let x = positioned;
+        for (let i = 0; i < this.numLayers; i++) {
+            x = this.transformerBlock(x, i);
+        }
+
+        // Classification head
+        const pooled = tf.layers.globalAveragePooling1d().apply(x);
+        const output = tf.layers.dense({
+            units: 1,
+            activation: 'sigmoid',
+            name: 'classification'
+        }).apply(pooled);
+
+        return tf.model({ inputs: input, outputs: output });
+    }
+
+    transformerBlock(x, blockId) {
+        // Multi-head self-attention
+        const attention = tf.layers.multiHeadAttention({
+            numHeads: 12,
+            keyDim: 64,
+            name: `attention_${blockId}`
+        }).apply(x, x);
+
+        // Add & Norm
+        const normed1 = tf.layers.layerNormalization({
+            name: `norm1_${blockId}`
+        }).apply(tf.layers.add().apply([x, attention]));
+
+        // Feed-forward network
+        const ff1 = tf.layers.dense({
+            units: 3072,
+            activation: 'gelu',
+            name: `ff1_${blockId}`
+        }).apply(normed1);
+
+        const ff2 = tf.layers.dense({
+            units: 768,
+            name: `ff2_${blockId}`
+        }).apply(ff1);
+
+        // Add & Norm
+        const output = tf.layers.layerNormalization({
+            name: `norm2_${blockId}`
+        }).apply(tf.layers.add().apply([normed1, ff2]));
+
+        return output;
+    }
+
+    async detectWithExplanation(imageTensor) {
+        const prediction = await this.model.predict(imageTensor);
+        const score = await prediction.data();
+
+        // Extract attention maps for explanation
+        const attentionMaps = await this.extractAttentionMaps(imageTensor);
+
+        return {
+            is_deepfake: score[0] > 0.5,
+            confidence: Math.abs(score[0] - 0.5) * 2,
+            attention_maps: attentionMaps,
+            suspicious_patches: this.identifySuspiciousPatches(attentionMaps)
+        };
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Forensic Analysis</h2>
+        <p>Traditional forensic techniques detect inconsistencies that betray manipulation:</p>
+
+        <h3>Error Level Analysis (ELA)</h3>
+        <div class="code-block">
+            <pre>
+// Example: Error Level Analysis
+async function errorLevelAnalysis(imagePath) {
+    const original = await Jimp.read(imagePath);
+
+    // Save at specific JPEG quality
+    const tempPath = '/tmp/ela_temp.jpg';
+    await original.quality(95).writeAsync(tempPath);
+
+    // Reload compressed version
+    const compressed = await Jimp.read(tempPath);
+
+    // Compute pixel-wise difference
+    const ela = new Jimp(original.bitmap.width, original.bitmap.height);
+
+    original.scan(0, 0, original.bitmap.width, original.bitmap.height, (x, y, idx) => {
+        const origR = original.bitmap.data[idx];
+        const compR = compressed.bitmap.data[idx];
+
+        const diff = Math.abs(origR - compR);
+        const amplified = Math.min(255, diff * 10); // Amplify differences
+
+        ela.bitmap.data[idx] = amplified;
+        ela.bitmap.data[idx + 1] = amplified;
+        ela.bitmap.data[idx + 2] = amplified;
+        ela.bitmap.data[idx + 3] = 255;
+    });
+
+    return {
+        ela_image: ela,
+        anomaly_score: computeAnomalyScore(ela),
+        suspicious_regions: detectSuspiciousRegions(ela)
+    };
+}
+
+function computeAnomalyScore(elaImage) {
+    let totalDiff = 0;
+    let pixelCount = 0;
+
+    elaImage.scan(0, 0, elaImage.bitmap.width, elaImage.bitmap.height, (x, y, idx) => {
+        totalDiff += elaImage.bitmap.data[idx];
+        pixelCount++;
+    });
+
+    return totalDiff / pixelCount / 255;
+}
+            </pre>
+        </div>
+
+        <h3>Noise Analysis</h3>
+        <p>Different cameras produce different noise patterns. Inconsistent noise suggests manipulation:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Camera Noise Pattern Analysis
+class NoiseAnalyzer {
+    async analyzeNoise(imagePath) {
+        const image = await Jimp.read(imagePath);
+
+        // Extract noise using wavelet denoising
+        const noise = await this.extractNoise(image);
+
+        // Compute noise characteristics
+        const stats = this.computeNoiseStatistics(noise);
+
+        // Check for inconsistencies
+        const inconsistencies = this.detectInconsistencies(noise, stats);
+
+        return {
+            noise_level: stats.stdDev,
+            noise_pattern: stats.pattern,
+            inconsistent_regions: inconsistencies,
+            tampering_likelihood: inconsistencies.length > 0 ? 'HIGH' : 'LOW'
+        };
+    }
+
+    async extractNoise(image) {
+        // Apply median filter to estimate image without noise
+        const denoised = this.medianFilter(image, 3);
+
+        // Subtract to get noise
+        const noise = new Jimp(image.bitmap.width, image.bitmap.height);
+
+        image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, idx) => {
+            const diff = image.bitmap.data[idx] - denoised.bitmap.data[idx];
+            noise.bitmap.data[idx] = 128 + diff; // Center around 128
+            noise.bitmap.data[idx + 3] = 255;
+        });
+
+        return noise;
+    }
+
+    detectInconsistencies(noise, globalStats) {
+        const blockSize = 32;
+        const inconsistencies = [];
+
+        // Divide into blocks and check local statistics
+        for (let y = 0; y < noise.bitmap.height; y += blockSize) {
+            for (let x = 0; x < noise.bitmap.width; x += blockSize) {
+                const blockStats = this.computeBlockStatistics(noise, x, y, blockSize);
+
+                // Check if block statistics deviate significantly
+                if (Math.abs(blockStats.stdDev - globalStats.stdDev) / globalStats.stdDev > 0.3) {
+                    inconsistencies.push({
+                        x, y,
+                        width: blockSize,
+                        height: blockSize,
+                        deviation: Math.abs(blockStats.stdDev - globalStats.stdDev)
+                    });
+                }
+            }
+        }
+
+        return inconsistencies;
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Multi-Modal Detection</h2>
+        <p>Analyzing multiple modalities improves detection accuracy:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Multi-Modal Deepfake Detector
+class MultiModalDetector {
+    constructor() {
+        this.visualDetector = new CNNDeepfakeDetector();
+        this.audioDetector = new AudioDeepfakeDetector();
+        this.syncDetector = new LipSyncDetector();
+    }
+
+    async analyzeVideo(videoPath) {
+        // Extract frames and audio
+        const frames = await extractFrames(videoPath);
+        const audio = await extractAudio(videoPath);
+
+        // Visual analysis
+        const visualResults = [];
+        for (const frame of frames.slice(0, 10)) { // Sample frames
+            const result = await this.visualDetector.detect(frame);
+            visualResults.push(result.score);
+        }
+        const visualScore = average(visualResults);
+
+        // Audio analysis
+        const audioResult = await this.audioDetector.analyze(audio);
+        const audioScore = audioResult.synthetic_probability;
+
+        // Lip sync analysis
+        const syncResult = await this.syncDetector.analyze(videoPath);
+        const syncScore = syncResult.mismatch_score;
+
+        // Combine scores
+        const finalScore = (visualScore * 0.4 +
+                           audioScore * 0.3 +
+                           syncScore * 0.3);
+
+        return {
+            is_deepfake: finalScore > 0.5,
+            confidence: Math.abs(finalScore - 0.5) * 2,
+            breakdown: {
+                visual: visualScore,
+                audio: audioScore,
+                lip_sync: syncScore
+            },
+            suspicious_frames: this.identifySuspiciousFrames(visualResults)
+        };
+    }
+}
+
+class LipSyncDetector {
+    async analyze(videoPath) {
+        // Extract facial landmarks and audio features
+        const landmarks = await extractLandmarks(videoPath);
+        const audioFeatures = await extractMFCC(videoPath);
+
+        // Check synchronization
+        let totalMismatch = 0;
+        const syncWindow = 3; // frames
+
+        for (let i = 0; i < landmarks.length; i++) {
+            const mouthMovement = this.computeMouthMovement(
+                landmarks.slice(i, i + syncWindow)
+            );
+
+            const audioEnergy = this.computeAudioEnergy(
+                audioFeatures.slice(i, i + syncWindow)
+            );
+
+            // Correlation should be high for natural speech
+            const correlation = this.correlate(mouthMovement, audioEnergy);
+
+            if (correlation < 0.6) {
+                totalMismatch += (0.6 - correlation);
+            }
+        }
+
+        return {
+            mismatch_score: totalMismatch / landmarks.length,
+            synchronized: totalMismatch < landmarks.length * 0.1
+        };
+    }
+}
+            </pre>
+        </div>
+
+        <h2>GAN Fingerprinting</h2>
+        <p>Different GAN architectures leave unique fingerprints in generated images:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: GAN Attribution
+class GANAttributor {
+    constructor() {
+        this.knownModels = [
+            'StyleGAN2',
+            'StyleGAN3',
+            'DALL-E',
+            'Midjourney',
+            'Stable Diffusion'
+        ];
+        this.classifier = this.loadAttributionModel();
+    }
+
+    async attributeModel(imageTensor) {
+        // Extract GAN-specific artifacts
+        const features = await this.extractGANFeatures(imageTensor);
+
+        // Classify to specific model
+        const predictions = await this.classifier.predict(features);
+        const probabilities = await predictions.data();
+
+        const results = this.knownModels.map((model, idx) => ({
+            model: model,
+            probability: probabilities[idx]
+        })).sort((a, b) => b.probability - a.probability);
+
+        return {
+            most_likely: results[0].model,
+            confidence: results[0].probability,
+            all_probabilities: results
+        };
+    }
+
+    async extractGANFeatures(imageTensor) {
+        // Frequency domain analysis
+        const fft = await this.computeFFT(imageTensor);
+
+        // Specific artifact patterns
+        const artifacts = {
+            checkerboard: this.detectCheckerboard(fft),
+            spectral_peaks: this.detectSpectralPeaks(fft),
+            color_correlation: this.analyzeColorCorrelation(imageTensor)
+        };
+
+        return tf.tensor([
+            artifacts.checkerboard,
+            artifacts.spectral_peaks,
+            artifacts.color_correlation
+        ]);
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Biological Signal Analysis</h2>
+        <p>Deepfakes often fail to replicate subtle biological signals:</p>
+
+        <ul>
+            <li><strong>Blinking:</strong> Natural blink rate is 15-20 per minute</li>
+            <li><strong>Pulse:</strong> Visible in face via photoplethysmography</li>
+            <li><strong>Micro-expressions:</strong> Involuntary facial movements</li>
+            <li><strong>Eye movements:</strong> Saccades and tracking patterns</li>
+        </ul>
+
+        <h2>Ensemble Detection</h2>
+        <p>Combining multiple detectors improves robustness:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Ensemble Detector
+class EnsembleDeepfakeDetector {
+    constructor() {
+        this.detectors = [
+            new CNNDeepfakeDetector(),
+            new ViTDeepfakeDetector(),
+            new ForensicAnalyzer(),
+            new GANAttributor(),
+            new BiologicalSignalDetector()
+        ];
+    }
+
+    async detect(media) {
+        const results = [];
+
+        // Run all detectors
+        for (const detector of this.detectors) {
+            try {
+                const result = await detector.detect(media);
+                results.push({
+                    detector: detector.constructor.name,
+                    score: result.is_deepfake ? result.confidence : (1 - result.confidence),
+                    details: result
+                });
+            } catch (error) {
+                console.error(`Detector ${detector.constructor.name} failed:`, error);
+            }
+        }
+
+        // Weighted voting
+        const weights = [0.3, 0.25, 0.2, 0.15, 0.1]; // Adjust based on detector reliability
+        let weightedScore = 0;
+        let totalWeight = 0;
+
+        results.forEach((result, idx) => {
+            weightedScore += result.score * weights[idx];
+            totalWeight += weights[idx];
+        });
+
+        const finalScore = weightedScore / totalWeight;
+
+        return {
+            is_deepfake: finalScore > 0.5,
+            confidence: Math.abs(finalScore - 0.5) * 2,
+            ensemble_score: finalScore,
+            individual_results: results,
+            consensus: results.filter(r => r.score > 0.5).length / results.length
+        };
+    }
+}
+            </pre>
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 Key Takeaways</h3>
+            <ul>
+                <li>CNN and Transformer models excel at learning deepfake artifacts</li>
+                <li>Forensic analysis detects inconsistencies in compression and noise</li>
+                <li>Multi-modal detection analyzes video, audio, and synchronization</li>
+                <li>GAN fingerprinting can attribute synthetic content to specific models</li>
+                <li>Biological signals provide additional verification dimensions</li>
+                <li>Ensemble methods combine strengths of multiple detectors</li>
+                <li>Detection is an ongoing arms race requiring continuous model updates</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 Review Questions</h3>
+            <ol>
+                <li>What are the main types of deepfake manipulation techniques?</li>
+                <li>How do CNNs detect deepfakes compared to traditional forensic methods?</li>
+                <li>What advantages do Vision Transformers offer for deepfake detection?</li>
+                <li>Explain Error Level Analysis and what it reveals about image manipulation.</li>
+                <li>Why is multi-modal analysis more effective than single-modality detection?</li>
+                <li>How can GAN fingerprinting attribute synthetic content to specific models?</li>
+                <li>What biological signals are difficult for deepfakes to replicate?</li>
+                <li>Why is ensemble detection more robust than individual detectors?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</p>
+
+        </div>
+</body>
+</html>

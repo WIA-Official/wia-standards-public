@@ -330,6 +330,119 @@ const ErrorCodes = {
 
 ---
 
+
+
+## Reference Standards Alignment
+
+The Phase 2 API surface is layered above well-established IT primitives.
+
+| Concern | Reference |
+|---------|-----------|
+| HTTP semantics | RFC 9110 |
+| HTTP/1.1 | RFC 9112 |
+| HTTP/2 | RFC 9113 |
+| HTTP/3 over QUIC | RFC 9114 / RFC 9000 |
+| TLS 1.3 | RFC 8446 |
+| Certificate format | RFC 5280 (X.509 v3) |
+| OpenAPI description | OpenAPI Specification 3.1 |
+| JSON | RFC 8259 |
+| Errors | RFC 9457 (Problem Details for HTTP APIs) |
+| Pagination linking | RFC 8288 (Web Linking) |
+| Bearer tokens | RFC 6750 |
+| OAuth 2.0 | RFC 6749 + RFC 7636 (PKCE) |
+| Mutual TLS | RFC 8705 |
+| JWT | RFC 7519 |
+| Ed25519 | RFC 8032 |
+| ECDSA | NIST FIPS 186-5 |
+| Hash | FIPS 180-4, FIPS 202 |
+| WebSocket | RFC 6455 |
+| Trace context | W3C Trace Context Recommendation |
+| OpenTelemetry | OpenTelemetry Specification (CNCF) |
+| Locale | BCP 47 (RFC 5646), Unicode CLDR |
+| Time | ISO 8601:2019 |
+| Information security | ISO/IEC 27001:2022 |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 2 implementation is conformant when:
+
+1. The OpenAPI 3.1 description publishes every endpoint with request and response schemas.
+2. Authentication accepts at least the `bearerAuth` (JWT) scheme.
+3. Errors use RFC 9457 problem-detail responses.
+4. Cryptographic primitives match the §Reference Standards Alignment with explicit algorithm identifiers.
+5. Telemetry conforms to the OpenTelemetry semantic conventions.
+
+## Implementation Appendix
+
+### A. Idempotency
+
+Endpoints that create or modify resources accept an `Idempotency-Key` request header carrying a UUID. The server stores the response for at least 24 hours and returns the cached response on retry, guarding against duplicate operations under unreliable networking conditions.
+
+### B. Bulk Operations
+
+Bulk inference submission supports up to 100 inferences per request. Bulk responses include per-item success status so the client can retry only the failed records.
+
+### C. Trace Context
+
+Every request carries a W3C Trace Context `traceparent` header so distributed traces span the edge runtime, gateway, model service, and observability backend. Trace identifiers are emitted in error responses to aid debugging.
+
+### D. Versioning Policy
+
+Path versioning (`/api/v1`, `/api/v2`) follows semantic-versioning principles. Minor versions remain wire-compatible with the prior minor of the same major. Major bumps coexist with the prior major for at least 12 months before deprecation.
+
+### E. Edge-Specific Endpoints
+
+Edge AI deployments need endpoints specific to fleet-management concerns:
+
+- `POST /api/v1/inference` — synchronous inference call with optional batching.
+- `POST /api/v1/inference/async` — asynchronous inference with callback delivery.
+- `POST /api/v1/inference/stream` — streamed inference for time-series inputs.
+- `GET /api/v1/devices` — fleet device inventory (paginated).
+- `GET /api/v1/devices/{id}` — device detail including current model version, runtime profile, hardware capabilities.
+- `POST /api/v1/devices/{id}/deploy` — schedule a model deployment to a specific device.
+- `GET /api/v1/models` — model catalog with version metadata.
+- `POST /api/v1/models` — register a new model with manifest.
+- `GET /api/v1/telemetry` — query device telemetry with time-range filters.
+- `GET /api/v1/health` — service health probe (no authentication required).
+
+### F. Backpressure and Rate Limiting
+
+Rate-limit headers follow IETF rate-limit-headers conventions:
+
+```
+RateLimit-Limit: 1000, 1000;w=60
+RateLimit-Remaining: 947
+RateLimit-Reset: 53
+```
+
+Throttled requests return HTTP 429 with `Retry-After` per RFC 9110.
+
+### G. Pagination
+
+List endpoints use cursor-based pagination with the `Link` header per RFC 8288.
+
+### H. Webhook Conformance
+
+When the API supports outbound webhooks, webhook conformance follows the three-rule contract: HMAC-SHA-256 signatures over the payload, idempotent delivery identifiers, and exponential-backoff retries up to a configurable maximum.
+
+### I. Capability Discovery
+
+Clients discover server capabilities through the `/.well-known/wia-edge-ai/capabilities` endpoint. The response includes supported runtime profiles, supported hardware target classes, supported accelerator families, supported observability protocols, and the active rate-limit policy.
+
+Capability discovery is part of every conformant client's initialisation flow so the client adapts to the server's actual capabilities rather than assuming a fixed superset.
+
+### J. CORS
+
+CORS responses follow the WHATWG Fetch Living Standard. The reference deployment publishes the allow-list of origins, methods, and headers and reviews it quarterly.
+
+### K. Health and Readiness Probes
+
+`GET /health` returns 200 when the service is operational, 503 when not. `GET /ready` returns 200 when the service is ready to accept production traffic. These endpoints are exempt from authentication and follow the conventions documented in the Cloud Native Computing Foundation operator guidance.
+
+---
+
 **Copyright © 2025 World Certification Industry Association (WIA)**
 **License:** CC BY 4.0
 **弘益人間** - Benefit All Humanity

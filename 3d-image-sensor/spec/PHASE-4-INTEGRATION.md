@@ -365,6 +365,76 @@ __global__ void filter_kernel(float3* points, int count) {
 - 5G edge computing integration
 - AR Cloud persistent maps
 
+## 8. Integration Standards Alignment
+
+### 8.1 Functional Safety and Robotics
+
+When a 3D image sensor is integrated into a system with safety implications (autonomous mobile robot, collaborative robot, surgical robot, automotive ADAS), the integration framework conforms to:
+
+| Domain | Reference | Role |
+|--------|-----------|------|
+| Industrial machinery | ISO 13849-1:2023 (Performance Levels) | Sensor failure-rate budget |
+| Functional safety (electrical) | IEC 61508 series | Safety Integrity Level (SIL) classification |
+| Industrial robots | ISO 10218-1:2025 / ISO 10218-2:2025 | Robot integration safety |
+| Collaborative robots | ISO/TS 15066:2016 | Human-robot collaboration force/pressure limits |
+| Service robots | ISO 13482:2014 | Personal-care robot safety |
+| Automotive | ISO 26262 series | ASIL classification, fail-operational |
+| Medical | IEC 60601-1:2005+AMD2:2020 | Basic safety, essential performance |
+| Medical software | IEC 62304:2006+AMD1:2015 | Software lifecycle for medical devices |
+
+### 8.2 Quality and Process
+
+System integrators following WIA-SEMI-013 SHOULD adopt:
+
+- **ISO 9001:2015** quality management for the integration process.
+- **ISO/IEC 27001:2022** information security management for sensor data flows.
+- **IEC 62443 series** for industrial automation cybersecurity, particularly IEC 62443-3-3 (system security requirements) and IEC 62443-4-1 (secure product development lifecycle).
+
+### 8.3 Accessibility
+
+When the integrated system has a human user interface, accessibility conforms to:
+
+- **ISO/IEC 40500:2012** (W3C WCAG 2.0) Level AA, with WCAG 2.1 / 2.2 forward compatibility.
+- **EN 301 549 v3.2.1** for the European public-sector procurement.
+- **Section 508** of the US Rehabilitation Act for US federal procurement.
+
+3D sensor visualization simulators are subject to WCAG 2.2 with particular attention to Success Criterion 1.4.11 (Non-text Contrast) and 2.5.7 (Dragging Movements).
+
+### 8.4 Health and Ergonomics
+
+For systems where users interact at close range (gesture interfaces, AR/VR headsets, human pose estimation):
+
+- **ISO 9241-11:2018** Ergonomics — Usability definitions.
+- **ISO 9241-210:2019** Human-centred design for interactive systems.
+- **IEC 62471:2006** Photobiological safety, when illumination uses IR or visible flood emitters.
+- **IEC 60825 series** Laser product safety for ToF sensors using class-1 or class-2 laser emitters.
+
+### 8.5 Environmental and Lifecycle
+
+- **ISO 14040:2006 / ISO 14044:2006** for life-cycle assessment of integrated camera systems.
+- **IEC 62321 series** for restricted-substance testing (RoHS compliance).
+- **ISO 14064-1:2018** for greenhouse-gas reporting at facility scale, when integrators publish climate data.
+
+### 8.6 Interoperability with Existing Robotics Frameworks
+
+Reference bindings are provided for:
+
+- **ROS 2 (Humble or later)** with sensor_msgs/PointCloud2 publication.
+- **OpenCV 4.x** with cv::rgbd module for depth processing.
+- **PCL (Point Cloud Library) 1.13+** for 3D processing pipelines.
+- **Open3D 0.18+** for higher-level point cloud operations.
+
+These bindings convert WIA frame formats to/from each ecosystem's native representation while preserving conformance with §7 of Phase 1.
+
+### 8.7 Conformance
+
+A complete integrated system is conformant with Phase 4 when:
+
+1. The sensor subsystem is conformant with Phases 1–3.
+2. The integration documentation declares which §8.1 functional safety reference applies.
+3. The integrator has performed and recorded a hazard analysis appropriate to the application domain.
+4. Accessibility conformance level is declared if a human-operated UI is included.
+
 ---
 
 **© 2025 SmileStory Inc. / WIA - World Certification Industry Association**  

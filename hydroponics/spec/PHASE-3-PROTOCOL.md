@@ -253,7 +253,7 @@ X-Request-ID: unique-request-id
 
 ```bash
 curl -X GET https://api.wia.org/agri027/v1/system/HYDRO-SYS-001/sensors/current \
-  -H "Authorization: Bearer sk_live_abcdef123456" \
+  -H "Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME" \
   -H "Content-Type: application/json"
 ```
 
@@ -378,7 +378,7 @@ dtls:
 **API Key Authentication:**
 
 ```http
-Authorization: Bearer sk_live_abcdef123456
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
 ```
 
 **JWT Token Authentication:**

@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 엔터프라이즈 배포 - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        .warning-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .success-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px;">제8장</div>
+            <h1>엔터프라이즈 배포</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">프로덕션 환경을 위한 확장 가능한 인증 시스템 구축</p>
+        </header>
+
+        <h2>엔터프라이즈 아키텍처 설계</h2>
+        <p>대규모 조직에서 AI 콘텐츠 인증 시스템을 배포하려면 확장성, 가용성, 보안을 고려한 아키텍처가 필요합니다.</p>
+
+        <div class="info-box">
+            <strong>ℹ️ 엔터프라이즈 요구사항</strong><br>
+            • <strong>확장성:</strong> 수백만 자산 처리 가능<br>
+            • <strong>가용성:</strong> 99.9% 이상 업타임<br>
+            • <strong>성능:</strong> 낮은 지연시간 (<100ms)<br>
+            • <strong>보안:</strong> 엔터프라이즈급 암호화 및 접근 제어<br>
+            • <strong>규정 준수:</strong> GDPR, SOC 2, ISO 27001<br>
+            • <strong>감사:</strong> 모든 작업 로깅 및 추적
+        </div>
+
+        <h2>마이크로서비스 아키텍처</h2>
+        <p>각 기능을 독립적인 서비스로 분리하여 확장성과 유지보수성을 향상시킵니다.</p>
+
+        <div class="code-block"><pre>
+// 마이크로서비스 구조
+/*
+┌─────────────────────────────────────────┐
+│          API Gateway (Kong/NGINX)        │
+└─────────────────────────────────────────┘
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+    ┌───▼───┐  ┌───▼───┐  ┌───▼────┐
+    │ Auth  │  │ Asset │  │ Process│
+    │Service│  │Service│  │Service │
+    └───────┘  └───────┘  └────────┘
+        │           │           │
+    ┌───▼───────────▼───────────▼───┐
+    │    Message Queue (RabbitMQ)   │
+    └───────────────────────────────┘
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+    ┌───▼────┐ ┌───▼────┐ ┌───▼────┐
+    │Finger  │ │Water   │ │Deepfake│
+    │print   │ │mark    │ │Detector│
+    │Service │ │Service │ │Service │
+    └────────┘ └────────┘ └────────┘
+*/
+
+// Docker Compose 구성
+version: '3.8'
+
+services:
+  # API Gateway
+  gateway:
+    image: kong:latest
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_DATABASE: kong
+    depends_on:
+      - postgres
+
+  # 자산 관리 서비스
+  asset-service:
+    build: ./services/asset
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres/assets
+      - REDIS_URL=redis://redis:6379
+      - S3_BUCKET=content-auth-assets
+    depends_on:
+      - postgres
+      - redis
+
+  # 지문 생성 서비스
+  fingerprint-service:
+    build: ./services/fingerprint
+    deploy:
+      replicas: 3  // 자동 스케일링
+    environment:
+      - QUEUE_URL=amqp://rabbitmq
+    depends_on:
+      - rabbitmq
+
+  # 워터마크 서비스
+  watermark-service:
+    build: ./services/watermark
+    deploy:
+      replicas: 2
+    environment:
+      - QUEUE_URL=amqp://rabbitmq
+    depends_on:
+      - rabbitmq
+
+  # 딥페이크 탐지 서비스
+  deepfake-service:
+    build: ./services/deepfake
+    deploy:
+      replicas: 2
+    environment:
+      - MODEL_PATH=/models
+      - QUEUE_URL=amqp://rabbitmq
+    volumes:
+      - ./models:/models
+    depends_on:
+      - rabbitmq
+
+  # PostgreSQL
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: content_auth
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis (캐싱)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # RabbitMQ (메시지 큐)
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+
+  # Prometheus (모니터링)
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  # Grafana (대시보드)
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+volumes:
+  postgres_data:
+</pre></div>
+
+        <h2>Kubernetes 배포</h2>
+        <p>Kubernetes를 사용하여 자동 스케일링, 로드 밸런싱, 자가 치유 기능을 구현합니다.</p>
+
+        <div class="code-block"><pre>
+# Kubernetes 배포 매니페스트
+# fingerprint-service-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fingerprint-service
+  labels:
+    app: fingerprint
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fingerprint
+  template:
+    metadata:
+      labels:
+        app: fingerprint
+    spec:
+      containers:
+      - name: fingerprint
+        image: wia/fingerprint-service:1.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fingerprint-service
+spec:
+  selector:
+    app: fingerprint
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: ClusterIP
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fingerprint-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fingerprint-service
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+</pre></div>
+
+        <h2>성능 최적화</h2>
+        <p>대규모 트래픽을 처리하기 위한 성능 최적화 전략입니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>영역</th>
+                    <th>기법</th>
+                    <th>기대 효과</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>캐싱</td>
+                    <td>Redis, CDN</td>
+                    <td>응답 시간 90% 감소</td>
+                </tr>
+                <tr>
+                    <td>데이터베이스</td>
+                    <td>읽기 복제본, 샤딩</td>
+                    <td>처리량 5배 증가</td>
+                </tr>
+                <tr>
+                    <td>비동기 처리</td>
+                    <td>메시지 큐</td>
+                    <td>응답성 향상</td>
+                </tr>
+                <tr>
+                    <td>압축</td>
+                    <td>Gzip, Brotli</td>
+                    <td>대역폭 70% 절약</td>
+                </tr>
+                <tr>
+                    <td>병렬 처리</td>
+                    <td>Worker 풀</td>
+                    <td>처리 시간 50% 단축</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block"><pre>
+// Redis 캐싱 전략
+import { createClient } from 'redis';
+
+class ContentAuthCache {
+    private redis: any;
+
+    async connect(): Promise<void> {
+        this.redis = createClient({
+            url: process.env.REDIS_URL
+        });
+        await this.redis.connect();
+        console.log('✅ Redis 연결 완료');
+    }
+
+    // 지문 캐싱
+    async cacheFingerprint(
+        assetId: string,
+        fingerprint: any,
+        ttl: number = 3600  // 1시간
+    ): Promise<void> {
+        const key = `fingerprint:${assetId}`;
+        await this.redis.setEx(
+            key,
+            ttl,
+            JSON.stringify(fingerprint)
+        );
+    }
+
+    // 캐시 조회
+    async getFingerprint(assetId: string): Promise<any | null> {
+        const key = `fingerprint:${assetId}`;
+        const cached = await this.redis.get(key);
+
+        if (cached) {
+            console.log('✅ 캐시 히트');
+            return JSON.parse(cached);
+        }
+
+        console.log('⚠️ 캐시 미스');
+        return null;
+    }
+
+    // 캐시 무효화
+    async invalidate(pattern: string): Promise<void> {
+        const keys = await this.redis.keys(pattern);
+        if (keys.length > 0) {
+            await this.redis.del(keys);
+        }
+    }
+}
+
+// 사용 예제
+const cache = new ContentAuthCache();
+await cache.connect();
+
+// 조회 시 캐시 먼저 확인
+let fingerprint = await cache.getFingerprint('asset-123');
+if (!fingerprint) {
+    // 캐시 미스 - 계산 수행
+    fingerprint = await computeFingerprint('asset-123');
+    await cache.cacheFingerprint('asset-123', fingerprint);
+}
+</pre></div>
+
+        <h2>보안 및 접근 제어</h2>
+        <p>엔터프라이즈급 보안을 구현합니다.</p>
+
+        <div class="code-block"><pre>
+// OAuth 2.0 + JWT 인증
+import { sign, verify } from 'jsonwebtoken';
+import { hash, compare } from 'bcrypt';
+
+class AuthenticationService {
+    private jwtSecret: string;
+
+    constructor(jwtSecret: string) {
+        this.jwtSecret = jwtSecret;
+    }
+
+    // 사용자 인증
+    async authenticate(
+        username: string,
+        password: string
+    ): Promise<string | null> {
+        // 데이터베이스에서 사용자 조회
+        const user = await this.getUserByUsername(username);
+        if (!user) {
+            return null;
+        }
+
+        // 비밀번호 검증
+        const valid = await compare(password, user.passwordHash);
+        if (!valid) {
+            return null;
+        }
+
+        // JWT 토큰 생성
+        const token = sign(
+            {
+                userId: user.id,
+                username: user.username,
+                roles: user.roles
+            },
+            this.jwtSecret,
+            {
+                expiresIn: '1h',
+                issuer: 'WIA-AI-017'
+            }
+        );
+
+        return token;
+    }
+
+    // 토큰 검증
+    async verifyToken(token: string): Promise<any | null> {
+        try {
+            const decoded = verify(token, this.jwtSecret);
+            return decoded;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // 역할 기반 접근 제어 (RBAC)
+    hasPermission(
+        userRoles: string[],
+        requiredPermission: string
+    ): boolean {
+        const permissions: Record<string, string[]> = {
+            'admin': ['read', 'write', 'delete', 'admin'],
+            'editor': ['read', 'write'],
+            'viewer': ['read']
+        };
+
+        for (const role of userRoles) {
+            if (permissions[role]?.includes(requiredPermission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async getUserByUsername(username: string): Promise<any> {
+        // 데이터베이스 조회 (구현 생략)
+        return {
+            id: '123',
+            username,
+            passwordHash: 'hashed_password',
+            roles: ['editor']
+        };
+    }
+}
+
+// Express 미들웨어
+import { Request, Response, NextFunction } from 'express';
+
+function authMiddleware(requiredPermission: string) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+        // Authorization 헤더에서 토큰 추출
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            return res.status(401).json({ error: '인증 필요' });
+        }
+
+        const token = authHeader.substring(7);
+        const auth = new AuthenticationService(process.env.JWT_SECRET!);
+
+        // 토큰 검증
+        const decoded = await auth.verifyToken(token);
+        if (!decoded) {
+            return res.status(401).json({ error: '유효하지 않은 토큰' });
+        }
+
+        // 권한 확인
+        if (!auth.hasPermission(decoded.roles, requiredPermission)) {
+            return res.status(403).json({ error: '권한 없음' });
+        }
+
+        // 요청 객체에 사용자 정보 추가
+        (req as any).user = decoded;
+        next();
+    };
+}
+
+// 사용 예제
+import express from 'express';
+const app = express();
+
+app.post('/api/assets',
+    authMiddleware('write'),
+    async (req, res) => {
+        // 자산 생성 로직
+        res.json({ success: true });
+    }
+);
+</pre></div>
+
+        <h2>모니터링 및 로깅</h2>
+        <p>시스템 상태를 실시간으로 모니터링하고 문제를 조기에 발견합니다.</p>
+
+        <div class="code-block"><pre>
+// Prometheus 메트릭 수집
+import { Counter, Histogram, Registry } from 'prom-client';
+
+class MetricsCollector {
+    private registry: Registry;
+    private httpRequestCounter: Counter;
+    private httpRequestDuration: Histogram;
+    private fingerprintCounter: Counter;
+
+    constructor() {
+        this.registry = new Registry();
+
+        // HTTP 요청 카운터
+        this.httpRequestCounter = new Counter({
+            name: 'http_requests_total',
+            help: '총 HTTP 요청 수',
+            labelNames: ['method', 'route', 'status'],
+            registers: [this.registry]
+        });
+
+        // HTTP 요청 지속 시간
+        this.httpRequestDuration = new Histogram({
+            name: 'http_request_duration_seconds',
+            help: 'HTTP 요청 지속 시간',
+            labelNames: ['method', 'route'],
+            buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+            registers: [this.registry]
+        });
+
+        // 지문 생성 카운터
+        this.fingerprintCounter = new Counter({
+            name: 'fingerprints_generated_total',
+            help: '생성된 지문 수',
+            labelNames: ['algorithm', 'status'],
+            registers: [this.registry]
+        });
+    }
+
+    // HTTP 요청 기록
+    recordRequest(
+        method: string,
+        route: string,
+        status: number,
+        duration: number
+    ): void {
+        this.httpRequestCounter.inc({
+            method,
+            route,
+            status: status.toString()
+        });
+
+        this.httpRequestDuration.observe(
+            { method, route },
+            duration
+        );
+    }
+
+    // 지문 생성 기록
+    recordFingerprint(
+        algorithm: string,
+        success: boolean
+    ): void {
+        this.fingerprintCounter.inc({
+            algorithm,
+            status: success ? 'success' : 'failure'
+        });
+    }
+
+    // 메트릭 노출
+    async getMetrics(): Promise<string> {
+        return await this.registry.metrics();
+    }
+}
+
+// 구조화된 로깅 (Winston)
+import winston from 'winston';
+
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json()
+    ),
+    defaultMeta: { service: 'content-auth' },
+    transports: [
+        // 파일에 에러 로그
+        new winston.transports.File({
+            filename: 'logs/error.log',
+            level: 'error'
+        }),
+        // 파일에 모든 로그
+        new winston.transports.File({
+            filename: 'logs/combined.log'
+        })
+    ]
+});
+
+// 개발 환경에서는 콘솔에도 출력
+if (process.env.NODE_ENV !== 'production') {
+    logger.add(new winston.transports.Console({
+        format: winston.format.simple()
+    }));
+}
+
+// 사용 예제
+logger.info('지문 생성 시작', {
+    assetId: 'asset-123',
+    algorithm: 'pHash'
+});
+
+logger.error('지문 생성 실패', {
+    assetId: 'asset-123',
+    error: error.message,
+    stack: error.stack
+});
+</pre></div>
+
+        <h2>CI/CD 파이프라인</h2>
+        <p>지속적 통합 및 배포로 빠르고 안전한 릴리스를 보장합니다.</p>
+
+        <div class="code-block"><pre>
+# GitHub Actions 워크플로우
+# .github/workflows/deploy.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Node.js 설정
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 의존성 설치
+      run: npm ci
+
+    - name: 린트 실행
+      run: npm run lint
+
+    - name: 단위 테스트
+      run: npm run test:unit
+
+    - name: 통합 테스트
+      run: npm run test:integration
+
+    - name: 코드 커버리지
+      run: npm run test:coverage
+
+    - name: 커버리지 업로드
+      uses: codecov/codecov-action@v3
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Docker 로그인
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Docker 이미지 빌드 및 푸시
+      run: |
+        docker build -t wia/content-auth:${{ github.sha }} .
+        docker tag wia/content-auth:${{ github.sha }} wia/content-auth:latest
+        docker push wia/content-auth:${{ github.sha }}
+        docker push wia/content-auth:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Kubernetes 구성
+      uses: azure/k8s-set-context@v3
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Kubernetes 배포
+      run: |
+        kubectl set image deployment/content-auth \
+          content-auth=wia/content-auth:${{ github.sha }}
+
+        kubectl rollout status deployment/content-auth
+
+    - name: 헬스 체크
+      run: |
+        kubectl wait --for=condition=available --timeout=300s \
+          deployment/content-auth
+</pre></div>
+
+        <h2>재해 복구 및 백업</h2>
+        <p>데이터 손실을 방지하고 서비스 연속성을 보장합니다.</p>
+
+        <div class="code-block"><pre>
+// 자동 백업 시스템
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { createGzip } from 'zlib';
+import { createReadStream, createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+
+class BackupService {
+    private s3: S3Client;
+
+    constructor() {
+        this.s3 = new S3Client({
+            region: process.env.AWS_REGION
+        });
+    }
+
+    // 데이터베이스 백업
+    async backupDatabase(): Promise<void> {
+        const timestamp = new Date().toISOString();
+        const filename = `backup-${timestamp}.sql.gz`;
+
+        // PostgreSQL 덤프
+        const { spawn } = await import('child_process');
+        const pg_dump = spawn('pg_dump', [
+            '-h', process.env.DB_HOST!,
+            '-U', process.env.DB_USER!,
+            '-d', process.env.DB_NAME!,
+            '-F', 'c'  // 커스텀 형식
+        ]);
+
+        // Gzip 압축
+        const gzip = createGzip();
+        const output = createWriteStream(`/tmp/${filename}`);
+
+        await pipeline(
+            pg_dump.stdout,
+            gzip,
+            output
+        );
+
+        // S3에 업로드
+        const fileStream = createReadStream(`/tmp/${filename}`);
+
+        await this.s3.send(new PutObjectCommand({
+            Bucket: 'content-auth-backups',
+            Key: `database/${filename}`,
+            Body: fileStream
+        }));
+
+        console.log(`✅ 백업 완료: ${filename}`);
+    }
+
+    // 자동 백업 스케줄
+    scheduleBackups(): void {
+        // 매일 오전 2시에 백업
+        const cron = require('node-cron');
+
+        cron.schedule('0 2 * * *', async () => {
+            console.log('⏰ 자동 백업 시작');
+            try {
+                await this.backupDatabase();
+            } catch (error) {
+                console.error('❌ 백업 실패:', error);
+                // 알림 전송 (이메일, Slack 등)
+            }
+        });
+    }
+}
+
+// 포인트-인-타임 복구 (PITR)
+class PointInTimeRecovery {
+    async restore(
+        targetTimestamp: string
+    ): Promise<void> {
+        // 1. 가장 가까운 전체 백업 찾기
+        // 2. WAL (Write-Ahead Log) 파일 적용
+        // 3. 목표 시점까지 리플레이
+
+        console.log(`🔄 ${targetTimestamp}로 복구 중...`);
+    }
+}
+</pre></div>
+
+        <h2>규정 준수 및 감사</h2>
+        <p>법적 요구사항을 충족하고 감사 추적을 유지합니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>규정</th>
+                    <th>요구사항</th>
+                    <th>구현</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>GDPR</td>
+                    <td>개인정보 보호</td>
+                    <td>데이터 암호화, 동의 관리</td>
+                </tr>
+                <tr>
+                    <td>SOC 2</td>
+                    <td>보안 제어</td>
+                    <td>접근 로그, 정기 감사</td>
+                </tr>
+                <tr>
+                    <td>ISO 27001</td>
+                    <td>정보 보안</td>
+                    <td>위험 평가, 정책 문서화</td>
+                </tr>
+                <tr>
+                    <td>HIPAA</td>
+                    <td>의료 데이터 보호</td>
+                    <td>암호화, 감사 추적</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block"><pre>
+// 감사 로깅 시스템
+class AuditLogger {
+    async logAction(
+        action: {
+            userId: string;
+            action: string;
+            resourceType: string;
+            resourceId: string;
+            changes?: any;
+            ipAddress: string;
+            userAgent: string;
+        }
+    ): Promise<void> {
+        // 데이터베이스에 감사 로그 저장
+        const auditEntry = {
+            ...action,
+            timestamp: new Date().toISOString(),
+            success: true
+        };
+
+        await this.saveToDatabase(auditEntry);
+
+        // 중요 작업은 별도 알림
+        if (this.isCriticalAction(action.action)) {
+            await this.notifyAdmins(auditEntry);
+        }
+    }
+
+    private isCriticalAction(action: string): boolean {
+        const criticalActions = [
+            'delete_asset',
+            'modify_permissions',
+            'export_data'
+        ];
+        return criticalActions.includes(action);
+    }
+
+    private async saveToDatabase(entry: any): Promise<void> {
+        // PostgreSQL에 저장
+        // (구현 생략)
+    }
+
+    private async notifyAdmins(entry: any): Promise<void> {
+        // Slack, 이메일 등으로 알림
+        // (구현 생략)
+    }
+}
+</pre></div>
+
+        <div class="success-box">
+            <strong>✅ 엔터프라이즈 배포 체크리스트</strong><br>
+            □ 마이크로서비스 아키텍처 설계<br>
+            □ Kubernetes 클러스터 설정<br>
+            □ 자동 스케일링 구성<br>
+            □ 캐싱 및 성능 최적화<br>
+            □ 인증 및 권한 관리<br>
+            □ 모니터링 및 로깅 설정<br>
+            □ CI/CD 파이프라인 구축<br>
+            □ 백업 및 재해 복구 계획<br>
+            □ 보안 감사 수행<br>
+            □ 규정 준수 검증
+        </div>
+
+        <div class="warning-box">
+            <strong>⚠️ 일반적인 함정</strong><br>
+            • 프로덕션에서 충분한 테스트 없이 배포<br>
+            • 백업 복구 절차를 테스트하지 않음<br>
+            • 모니터링 알림 임계값 잘못 설정<br>
+            • 스케일링 한계를 고려하지 않음<br>
+            • 보안 업데이트 지연
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 요약</h3>
+            <ul>
+                <li>마이크로서비스 아키텍처로 확장성과 유지보수성 확보</li>
+                <li>Kubernetes로 자동 스케일링 및 고가용성 구현</li>
+                <li>캐싱과 비동기 처리로 성능 최적화</li>
+                <li>OAuth 2.0 + JWT로 엔터프라이즈급 보안 구현</li>
+                <li>Prometheus와 Grafana로 실시간 모니터링</li>
+                <li>CI/CD로 안전하고 빠른 배포 자동화</li>
+                <li>정기 백업과 재해 복구 계획으로 데이터 보호</li>
+                <li>GDPR, SOC 2 등 규정 준수 및 감사 추적 유지</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 복습 문제</h3>
+            <ol>
+                <li>마이크로서비스 아키텍처의 주요 장점은 무엇입니까?</li>
+                <li>Kubernetes HPA(Horizontal Pod Autoscaler)는 어떻게 작동합니까?</li>
+                <li>캐싱이 성능에 미치는 영향을 설명하십시오.</li>
+                <li>OAuth 2.0와 JWT의 차이점은 무엇입니까?</li>
+                <li>Prometheus가 수집하는 메트릭 유형을 나열하십시오.</li>
+                <li>CI/CD 파이프라인의 주요 단계는 무엇입니까?</li>
+                <li>포인트-인-타임 복구(PITR)란 무엇입니까?</li>
+                <li>GDPR 준수를 위해 구현해야 할 기능은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</p>
+
+        </div>
+</body>
+</html>

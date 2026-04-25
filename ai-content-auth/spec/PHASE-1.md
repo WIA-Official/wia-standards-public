@@ -305,5 +305,95 @@ An implementation conforming to WIA-AI-017 Phase 1 MUST:
 
 ---
 
+## 10. Reference Standards Alignment
+
+### 10.1 Cryptographic Foundations
+
+The Phase 1 authentication framework is layered above the following established cryptographic and identity standards:
+
+| Concern | Reference | Role |
+|---------|-----------|------|
+| Hash functions | FIPS 180-4 / ISO/IEC 10118-3:2018 | SHA-256 / SHA-384 / SHA-512 fingerprints |
+| SHA-3 family | FIPS 202 / ISO/IEC 10118-3:2018 | SHA3-256 / SHA3-512 fingerprints |
+| EdDSA | RFC 8032 | Ed25519 default signing |
+| ECDSA | NIST FIPS 186-5 / ISO/IEC 14888-3:2018 | P-256 / P-384 legacy interoperability |
+| RSA-PSS | RFC 8017 §8.1 | Hardware-constrained deployments |
+| X.509 certificates | RFC 5280 | Creator and platform identity |
+| Time-stamping | RFC 3161 / RFC 5816 | Verifiable creation time |
+| Key derivation | RFC 5869 (HKDF), RFC 8018 (PBKDF2) | Key material expansion |
+
+### 10.2 Container and Manifest Encodings
+
+The signed manifest follows COSE per RFC 9052 with CBOR per RFC 8949 as the canonical binary representation. JOSE alternatives are recognised: JWS per RFC 7515, JWE per RFC 7516, JWK per RFC 7517, JWT claims per RFC 7519. Implementations MUST emit either COSE or JOSE; mixed manifests are not conformant.
+
+### 10.3 Provenance Vocabulary
+
+Authentication metadata interoperates with the C2PA technical specification 2.x for content credentials, the W3C PROV-O ontology for provenance graphs, and the W3C Verifiable Credentials Data Model 2.0 for creator attestations. C2PA-compatible manifests place the WIA-AI-017 authentication assertion under the `wia.auth.v1` label.
+
+### 10.4 Identity and Decentralised Resolution
+
+Creator identity uses W3C DID Core 1.0 with did:web (URL-rooted) and did:key (self-certifying public key) as the recommended methods. Verifiable Credentials carrying creator claims follow W3C VC-Data-Model 2.0, signed under §10.1 algorithms.
+
+### 10.5 Image and Media Encoding Standards
+
+When the authenticated content is an image, video, or audio asset, the relevant codec standards apply:
+
+- **JPEG** — ISO/IEC 10918-1.
+- **JPEG 2000** — ISO/IEC 15444-1.
+- **HEIF / HEIC** — ISO/IEC 23008-12.
+- **PNG** — ISO/IEC 15948.
+- **AVC / H.264** — ISO/IEC 14496-10.
+- **HEVC / H.265** — ISO/IEC 23008-2.
+- **MP3** — ISO/IEC 11172-3.
+- **AAC** — ISO/IEC 14496-3.
+- **Opus** — RFC 6716.
+
+### 10.6 Implementation Notes
+
+Reference baselines on a modern x86_64 server (8 cores, 32 GB RAM):
+
+- Ed25519 sign: > 60,000 ops/sec single thread.
+- Ed25519 verify: > 25,000 ops/sec single thread.
+- SHA-256 (1 MiB input): > 1.5 GiB/sec aggregate throughput.
+- COSE_Sign1 envelope around an Ed25519 signature: < 200 µs.
+
+Conformance tests reuse the public test vectors of the underlying primitives: RFC 8032 §7 for Ed25519, NIST CAVP submissions for ECDSA and RSA-PSS, FIPS 180-4 examples for SHA-2, and FIPS 202 examples for SHA-3.
+
+### 10.7 Migration from C2PA-only manifests
+
+Existing C2PA-only manifests can adopt WIA-AI-017 by adding the `wia.auth.v1` assertion alongside the existing C2PA assertions. The base C2PA assertions remain authoritative for provenance; the WIA assertion contributes detection and watermark metadata not covered by the base C2PA spec.
+
+### 10.8 Algorithm identifier registry
+
+Algorithm identifiers used in WIA-AI-017 manifests are drawn from the IANA registries where one exists, and from the WIA registry otherwise:
+
+| Concern | Registry | Notes |
+|---------|----------|-------|
+| COSE algorithm identifiers | IANA `cose-algorithms` | Used in COSE_Sign1 envelopes |
+| JOSE algorithm identifiers | IANA `jose` | Used in JWS / JWE envelopes |
+| JOSE web-key types | IANA `jose` | JWK encoding |
+| Hash function names | IANA `hash-function-textual-names` | Used in JSON-encoded manifests |
+| C2PA assertion labels | C2PA assertion-label registry | Labels prefixed `c2pa.` |
+| WIA assertion labels | WIA registry | Labels prefixed `wia.` |
+| W3C VC types | W3C VC vocabulary | Verifiable Credential types |
+
+Implementations MUST NOT introduce private algorithm identifiers without prefixing them with the `wia.private.<vendor>.` namespace.
+
+The registry custodian publishes the active identifier set on a quarterly cadence and accepts public proposals at any time, with technical review and editorial review as separate gates. Identifier names are immutable once published; deprecated identifiers are marked but never removed, so historical manifests remain interpretable indefinitely.
+
+This immutability discipline is the operational guarantee that any manifest signed today can still be verified by a conformant implementation in any future calendar year, regardless of the algorithmic and procedural changes that may have occurred in the meantime.
+
+### 10.9 Backward compatibility considerations
+
+When verifying a manifest produced under an earlier minor version of WIA-AI-017 Phase 1, a verifier MUST:
+
+1. Honour the algorithm identifier present in the manifest, even if a newer default has since been adopted.
+2. Treat unrecognised optional fields as informational rather than failing the validation.
+3. Surface a deprecation warning when the manifest's declared spec version is older than the latest minor version published at verification time.
+
+This three-rule contract eliminates the vast majority of cross-version interoperability incidents observed in similar provenance and signing standards.
+
+---
+
 © 2025 SmileStory Inc. / WIA
 弘益人間 (홍익인간) · Benefit All Humanity

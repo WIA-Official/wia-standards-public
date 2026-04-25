@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Stereo Vision Systems | WIA-SEMI-013</title>
+    <style>
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #8B5CF6; --text: #f1f5f9; --text-secondary: #cbd5e1; --border: #475569; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-secondary); padding: 3rem; border-radius: 10px; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 2rem 0 1rem; }
+        .chapter-number { color: var(--text-secondary); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        .info-box { background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; margin: 2rem 0; border-radius: 5px; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: bold; }
+        tr:hover { background: var(--bg-tertiary); }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--primary); color: var(--bg); text-decoration: none; border-radius: 5px; }
+        .btn:hover { background: var(--success); }
+        code { background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Monaco', monospace; color: var(--success); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p class="chapter-number">Chapter 4</p>
+        <h1>Stereo Vision and Passive Sensing</h1>
+
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-top: 1rem;">
+            Stereo vision systems mimic human binocular vision using two or more cameras to perceive depth through parallax.
+            As a passive technique requiring no active illumination, stereo vision excels in outdoor environments and
+            applications where adding light sources is impractical.
+        </p>
+
+        <h2>Fundamental Principles</h2>
+
+        <p>
+            Stereo vision operates on the principle of triangulation using disparity - the difference in position of the
+            same point when viewed from two different perspectives. Human vision uses this exact mechanism: our two eyes
+            separated by approximately 6.5cm baseline provide slightly different views of the world, which our brain
+            processes to perceive depth.
+        </p>
+
+        <p>
+            In a stereo camera system, two cameras are separated by a known baseline distance. When both cameras observe
+            the same point in 3D space, that point appears at different pixel coordinates in each camera's image. The
+            horizontal displacement between these corresponding points is the disparity, which is inversely proportional
+            to depth.
+        </p>
+
+        <p>
+            The mathematical relationship is elegantly simple: Depth = (Baseline × Focal Length) / Disparity. This means
+            that to measure depth precisely, we must: accurately calibrate the baseline distance between cameras, know the
+            cameras' focal lengths precisely, and determine disparity with sub-pixel accuracy.
+        </p>
+
+        <h2>Stereo Matching Algorithms</h2>
+
+        <p>
+            The core challenge in stereo vision is the correspondence problem: given a pixel in the left image, find the
+            corresponding pixel in the right image that represents the same physical point in the scene. This is
+            computationally intensive, as each pixel in one image must potentially be compared with many pixels in the
+            other image.
+        </p>
+
+        <h3>Block Matching Methods</h3>
+
+        <p>
+            Block matching algorithms compare small rectangular regions (blocks) between left and right images to find
+            correspondences. Sum of Absolute Differences (SAD) and Sum of Squared Differences (SSD) are common similarity
+            metrics. These methods are computationally efficient and well-suited for hardware implementation, but they
+            assume that corresponding regions have similar intensities and textures, which may not hold for specular
+            surfaces, occlusions, or regions with repetitive patterns.
+        </p>
+
+        <h3>Semi-Global Matching (SGM)</h3>
+
+        <p>
+            SGM represents a more sophisticated approach that balances accuracy and computational efficiency. Instead of
+            making independent matching decisions for each pixel, SGM enforces smoothness constraints: neighboring pixels
+            should have similar disparities unless there's an edge in the image. The algorithm aggregates matching costs
+            along multiple 1D paths through the image, approximating a computationally expensive 2D global optimization
+            with efficient 1D optimizations.
+        </p>
+
+        <p>
+            SGM has become the de facto standard for high-quality real-time stereo matching, used in Intel RealSense D400
+            series and many autonomous vehicle perception systems. Modern implementations achieve dense disparity maps at
+            VGA resolution and 30+ fps using GPU or FPGA acceleration.
+        </p>
+
+        <h3>Deep Learning Approaches</h3>
+
+        <p>
+            Recent advances in deep learning have produced stereo matching networks that outperform classical algorithms,
+            especially in challenging conditions like textureless regions, occlusions, and reflective surfaces. Networks
+            like PSMNet, GCNet, and GANet learn to extract features and compute matching costs from large datasets of
+            stereo images with ground truth depth.
+        </p>
+
+        <p>
+            The advantage of learned approaches is their ability to handle challenging scenarios that violate traditional
+            assumptions. For instance, they can correctly match regions with different apparent intensities due to surface
+            properties or lighting variations. The disadvantage is computational cost - deep networks require significant
+            GPU resources for real-time operation.
+        </p>
+
+        <h2>Calibration</h2>
+
+        <p>
+            Accurate calibration is absolutely critical for stereo vision systems. Calibration determines both intrinsic
+            parameters (focal length, principal point, lens distortion for each camera) and extrinsic parameters (relative
+            position and orientation between cameras).
+        </p>
+
+        <h3>Intrinsic Calibration</h3>
+
+        <p>
+            Each camera is calibrated individually using a known pattern, typically a checkerboard. By capturing multiple
+            images of the pattern at different positions and orientations, the calibration algorithm can solve for the
+            camera's internal parameters. Modern calibration uses the Zhang method or similar techniques, achieving
+            sub-pixel accuracy for distortion correction.
+        </p>
+
+        <h3>Stereo Calibration</h3>
+
+        <p>
+            After individual camera calibration, stereo calibration determines the 3D transformation (rotation and
+            translation) between the two cameras. This establishes the baseline - the most critical parameter for depth
+            accuracy. A 1% error in baseline translates directly to 1% error in depth measurements.
+        </p>
+
+        <p>
+            The calibration process produces rectification parameters that transform the images so corresponding points
+            lie on the same horizontal scan line (epipolar rectification). This reduces the 2D correspondence search to
+            a 1D search along scan lines, dramatically improving computational efficiency and reliability.
+        </p>
+
+        <h2>Intel RealSense D400 Series</h2>
+
+        <p>
+            Intel's RealSense D400 series represents one of the most successful commercial stereo vision products, with
+            millions of units deployed in robotics, drones, retail analytics, and industrial automation. Understanding
+            its architecture illustrates practical stereo system design.
+        </p>
+
+        <h3>Hardware Architecture</h3>
+
+        <p>
+            The D435, the most popular D400 model, integrates:
+        </p>
+
+        <ul>
+            <li><strong>Dual Global Shutter Cameras:</strong> Two 1280x720 global shutter cameras with 87° diagonal FOV,
+                separated by 50mm baseline. Global shutter (all pixels exposed simultaneously) prevents motion artifacts
+                that rolling shutter sensors exhibit with moving objects.</li>
+            <li><strong>Infrared Projector:</strong> A pattern projector that adds texture to otherwise featureless
+                surfaces, improving stereo matching in textureless environments like white walls. This active stereo
+                approach combines the robustness of passive stereo with the texture advantages of structured light.</li>
+            <li><strong>Vision Processor:</strong> An ASIC (Application Specific Integrated Circuit) that implements
+                hardware-accelerated SGM for real-time depth computation. The processor generates depth maps at up to
+                90 fps at 1280x720 resolution.</li>
+            <li><strong>RGB Camera:</strong> A separate 1920x1080 color camera for texture mapping and traditional
+                computer vision tasks, aligned with the stereo cameras' field of view.</li>
+            <li><strong>IMU:</strong> 6-axis inertial measurement unit (accelerometer + gyroscope) for motion tracking
+                and visual-inertial odometry applications.</li>
+        </ul>
+
+        <h3>Performance Characteristics</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>D435 Value</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Depth Range</strong></td>
+                    <td>0.3 - 10m</td>
+                    <td>Optimal accuracy 0.5-3m</td>
+                </tr>
+                <tr>
+                    <td><strong>Depth Accuracy</strong></td>
+                    <td>±2% @ 2m</td>
+                    <td>±40mm error at 2m distance</td>
+                </tr>
+                <tr>
+                    <td><strong>Resolution</strong></td>
+                    <td>1280x720</td>
+                    <td>Adjustable, down to 640x480</td>
+                </tr>
+                <tr>
+                    <td><strong>Frame Rate</strong></td>
+                    <td>Up to 90 fps</td>
+                    <td>Resolution dependent</td>
+                </tr>
+                <tr>
+                    <td><strong>Baseline</strong></td>
+                    <td>50mm</td>
+                    <td>Fixed, factory calibrated</td>
+                </tr>
+                <tr>
+                    <td><strong>Field of View</strong></td>
+                    <td>87° × 58°</td>
+                    <td>Diagonal 95°</td>
+                </tr>
+                <tr>
+                    <td><strong>Power</strong></td>
+                    <td>~3W typical</td>
+                    <td>USB bus powered</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Active vs Passive Stereo</h2>
+
+        <p>
+            Pure passive stereo relies entirely on natural scene texture for matching. While this works well for
+            outdoor scenes with rich visual detail, it fails on textureless surfaces like painted walls or uniform
+            materials. Active stereo projects a pattern to create artificial texture.
+        </p>
+
+        <h3>Pattern Projection Strategies</h3>
+
+        <p>
+            Different systems use different pattern projection approaches:
+        </p>
+
+        <ul>
+            <li><strong>Random Dots:</strong> Intel RealSense projects a pseudo-random pattern of infrared dots, similar
+                to structured light but optimized for stereo matching rather than triangulation. The dots add high-
+                frequency texture that improves correlation matching.</li>
+            <li><strong>Structured Patterns:</strong> Some systems project line patterns or coded patterns that provide
+                both stereo correspondence and structured light triangulation depth as complementary modalities.</li>
+            <li><strong>Adaptive Projection:</strong> Advanced systems analyze the scene and project patterns only in
+                regions lacking natural texture, saving power and reducing interference.</li>
+        </ul>
+
+        <h2>Multi-Camera Systems</h2>
+
+        <p>
+            While two cameras define the minimum stereo system, multi-camera configurations provide advantages:
+        </p>
+
+        <h3>Triple Camera Systems</h3>
+
+        <p>
+            Three cameras in a linear arrangement enable dual baseline operation: a short baseline (cameras 1-2) provides
+            dense matching for close objects, while a long baseline (cameras 1-3) extends maximum range and improves
+            accuracy at distance. This configuration is popular in automotive applications where the system must handle
+            both near-field obstacle detection and far-field object tracking.
+        </p>
+
+        <h3>Omnidirectional Stereo</h3>
+
+        <p>
+            Multiple stereo pairs arranged around a platform create 360-degree depth sensing. This is critical for
+            autonomous vehicles and mobile robots that need complete environmental awareness. Challenges include
+            calibrating many cameras, managing data bandwidth, and fusing overlapping depth maps.
+        </p>
+
+        <h2>Stereo Matching Algorithms Comparison</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Approach</th>
+                    <th>Accuracy</th>
+                    <th>Speed</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Block Matching (SAD/SSD)</strong></td>
+                    <td>Local window comparison</td>
+                    <td>Moderate</td>
+                    <td>Very Fast</td>
+                    <td>Real-time embedded systems</td>
+                </tr>
+                <tr>
+                    <td><strong>Semi-Global Matching (SGM)</strong></td>
+                    <td>1D path aggregation</td>
+                    <td>High</td>
+                    <td>Fast</td>
+                    <td>Automotive, robotics</td>
+                </tr>
+                <tr>
+                    <td><strong>Graph Cut</strong></td>
+                    <td>Global energy minimization</td>
+                    <td>Very High</td>
+                    <td>Slow</td>
+                    <td>Offline 3D reconstruction</td>
+                </tr>
+                <tr>
+                    <td><strong>Deep Learning (PSMNet)</strong></td>
+                    <td>CNN-based feature matching</td>
+                    <td>Very High</td>
+                    <td>Moderate (GPU)</td>
+                    <td>Challenging scenes, research</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Applications</h2>
+
+        <h3>Robotics and Drones</h3>
+
+        <p>
+            Stereo vision is the dominant depth sensing technology for mobile robots and drones due to its passive
+            operation (no laser power required), outdoor capability (insensitive to ambient light), and simultaneous
+            color and depth capture. Applications include:
+        </p>
+
+        <ul>
+            <li>Obstacle detection and avoidance for autonomous navigation</li>
+            <li>3D mapping and SLAM (Simultaneous Localization and Mapping)</li>
+            <li>Object recognition and grasping in warehouse automation</li>
+            <li>Precision landing for delivery drones</li>
+            <li>Agricultural robots for crop monitoring and harvesting</li>
+        </ul>
+
+        <h3>Autonomous Vehicles</h3>
+
+        <p>
+            Many autonomous vehicles use stereo cameras as a low-cost complement to lidar. While lidar provides superior
+            range and accuracy, stereo cameras offer color information for traffic sign recognition, lane marking detection,
+            and semantic scene understanding. The Subaru EyeSight system, deployed in millions of vehicles, uses stereo
+            vision for collision avoidance, adaptive cruise control, and lane keeping assistance.
+        </p>
+
+        <h3>Augmented Reality</h3>
+
+        <p>
+            AR headsets like Microsoft HoloLens use stereo depth sensing for spatial mapping and hand tracking. The
+            stereo cameras enable the system to understand room geometry, detect surfaces for virtual object placement,
+            and track hand gestures for interaction - all critical capabilities for immersive AR experiences.
+        </p>
+
+        <h2>Challenges and Limitations</h2>
+
+        <div class="info-box">
+            <h3 style="color: var(--primary); margin-top: 0;">Common Challenges</h3>
+            <ul>
+                <li><strong>Textureless Regions:</strong> Uniform surfaces like white walls lack features for matching,
+                    producing unreliable depth. Active pattern projection helps but adds complexity and power.</li>
+                <li><strong>Occlusions:</strong> Regions visible to one camera but not the other (near depth
+                    discontinuities) cannot be matched. Algorithms must detect and handle these gracefully.</li>
+                <li><strong>Repetitive Patterns:</strong> Regularly spaced features (like windows on a building facade)
+                    can cause matching ambiguities. Global optimization methods help but don't fully solve this.</li>
+                <li><strong>Reflective Surfaces:</strong> Mirrors, glass, and shiny metals violate stereo assumptions,
+                    as the reflected image content differs between cameras.</li>
+                <li><strong>Computational Cost:</strong> Dense stereo matching is computationally expensive, requiring
+                    dedicated hardware acceleration for real-time performance.</li>
+                <li><strong>Calibration Stability:</strong> Mechanical stress, thermal expansion, and shock can shift
+                    cameras out of calibration, degrading accuracy. Robust mechanical design is essential.</li>
+            </ul>
+        </div>
+
+        <h2>Depth Accuracy Analysis</h2>
+
+        <p>
+            The depth accuracy of stereo systems is governed by fundamental geometric relationships. For a given baseline
+            (B) and focal length (f), the depth resolution (δz) depends on disparity measurement uncertainty (δd):
+        </p>
+
+        <p style="text-align: center; font-family: Monaco; color: var(--success);">
+            δz = (z² × δd) / (B × f)
+        </p>
+
+        <p>
+            This shows that depth error grows quadratically with distance. At 1 meter with 50mm baseline, 1280 pixel width,
+            and 0.1 pixel disparity uncertainty, depth resolution is approximately 3mm. At 5 meters, this degrades to 75mm -
+            a 25× worse resolution despite only 5× more distance.
+        </p>
+
+        <p>
+            To improve depth resolution, systems can: increase baseline (but this reduces minimum range and increases
+            occlusion issues), increase focal length (but this reduces field of view), increase sensor resolution (but
+            this increases computation), or improve matching accuracy through better algorithms.
+        </p>
+
+        <h2>Future Directions</h2>
+
+        <ul>
+            <li><strong>Event-Based Stereo:</strong> Neuromorphic cameras that generate events on brightness changes
+                enable ultra-low latency stereo matching and operation in high-speed scenarios.</li>
+            <li><strong>Learning-Based Refinement:</strong> Hybrid approaches using classical stereo for initial depth
+                estimation and neural networks for refinement, occlusion filling, and confidence estimation.</li>
+            <li><strong>Multi-Modal Fusion:</strong> Combining stereo depth with other modalities (ToF, lidar, radar)
+                to leverage complementary strengths.</li>
+            <li><strong>Self-Calibration:</strong> Algorithms that detect and compensate for calibration drift using
+                visual odometry and scene consistency constraints.</li>
+        </ul>
+
+        
+        <h2>Summary</h2>
+
+        <div class="highlight-box">
+            <h3 style="margin-top:0">Key Takeaways:</h3>
+            <ul>
+                <li><strong>Standardization Enables Interoperability:</strong> The WIA-SEMI-013 standard provides a common framework for 3D sensors, ensuring compatibility across vendors and applications.</li>
+                <li><strong>Technology-Agnostic Approach:</strong> The standard supports multiple sensing technologies including ToF, structured light, and stereo vision, allowing developers to choose the best technology for their needs.</li>
+                <li><strong>Comprehensive Coverage:</strong> From data formats to API interfaces, communication protocols, and certification, the standard covers all aspects of 3D sensing systems.</li>
+                <li><strong>Real-World Applications:</strong> 3D sensing technology enables diverse applications across consumer electronics, automotive, robotics, industrial automation, and healthcare sectors.</li>
+                <li><strong>Performance and Quality:</strong> Proper calibration, accuracy management, and testing are essential for achieving reliable 3D sensing in production systems.</li>
+                <li><strong>Future-Ready Architecture:</strong> The phased approach allows the standard to evolve with emerging technologies while maintaining backward compatibility.</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li><strong>What are the key advantages of standardizing 3D image sensor technologies? How does it benefit manufacturers, developers, and end users?</strong></li>
+            <li><strong>Compare and contrast Time-of-Flight (ToF) and structured light sensing technologies. What are the strengths and limitations of each approach?</strong></li>
+            <li><strong>Explain the four-phase architecture of WIA standards. Why is this progressive approach beneficial for adoption and evolution?</strong></li>
+            <li><strong>Describe the main sources of error in 3D depth sensing. How can systematic errors be distinguished from random errors, and what techniques address each type?</strong></li>
+            <li><strong>What role does calibration play in achieving accurate 3D measurements? Describe the difference between factory calibration and field verification.</strong></li>
+            <li><strong>How do point cloud processing techniques transform raw sensor data into useful information for applications? Give examples of common processing operations.</strong></li>
+            <li><strong>Explain how sensor fusion can improve 3D sensing performance. What are some examples of complementary sensor combinations?</strong></li>
+            <li><strong>What factors should be considered when integrating 3D sensors into real-time systems? Discuss latency, power consumption, and computational requirements.</strong></li>
+        </ol>
+
+</div>
+</body>
+</html>

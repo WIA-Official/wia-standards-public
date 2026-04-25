@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Content Fingerprinting Techniques - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        .chapter-intro { color: #94a3b8; font-size: 1.1em; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; line-height: 1.8; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        .warning-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .success-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .key-takeaways h3 { color: #10B981; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review-questions h3 { color: #10B981; margin-top: 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.3s; }
+        .nav-button:hover { background: #059669; transform: translateY(-2px); }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 03</div>
+            <h1>Content Fingerprinting Techniques</h1>
+            <p class="chapter-intro">Learn perceptual hashing algorithms and similarity detection for multimedia authentication</p>
+        </header>
+
+        <h2>Introduction to Perceptual Hashing</h2>
+        <p>Unlike cryptographic hashes that produce completely different outputs for even tiny input changes, perceptual hashes generate similar fingerprints for perceptually similar content. This makes them ideal for detecting modified, compressed, or reformatted copies of original content.</p>
+
+        <p>A good perceptual hash should be:</p>
+        <ul>
+            <li><strong>Robust:</strong> Resistant to common transformations (compression, resizing, rotation)</li>
+            <li><strong>Discriminative:</strong> Different content produces different hashes</li>
+            <li><strong>Efficient:</strong> Fast to compute and compare</li>
+            <li><strong>Compact:</strong> Small fingerprint size for storage and transmission</li>
+        </ul>
+
+        <div class="info-box">
+            <strong>ℹ️ Use Case Difference</strong><br>
+            Cryptographic hashes verify exact integrity (did this byte change?). Perceptual hashes detect semantic similarity (is this the same image after JPEG compression?). Both are essential for comprehensive content authentication.
+        </div>
+
+        <h2>Image Fingerprinting Algorithms</h2>
+        <p>Several algorithms exist for generating image fingerprints, each with different trade-offs.</p>
+
+        <h3>Average Hash (aHash)</h3>
+        <p>The simplest perceptual hash compares each pixel to the average luminance:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Average Hash Implementation
+import Jimp from 'jimp';
+
+async function averageHash(imagePath, hashSize = 8) {
+    // Load and resize image
+    const image = await Jimp.read(imagePath);
+    image.resize(hashSize, hashSize).greyscale();
+
+    // Calculate average luminance
+    let sum = 0;
+    const pixels = [];
+
+    image.scan(0, 0, hashSize, hashSize, (x, y, idx) => {
+        const luminance = image.bitmap.data[idx];
+        pixels.push(luminance);
+        sum += luminance;
+    });
+
+    const average = sum / (hashSize * hashSize);
+
+    // Generate hash: 1 if above average, 0 if below
+    let hash = '';
+    for (const pixel of pixels) {
+        hash += pixel > average ? '1' : '0';
+    }
+
+    return {
+        algorithm: 'aHash',
+        hash: BigInt('0b' + hash).toString(16),
+        size: hashSize * hashSize
+    };
+}
+
+// Usage
+const hash1 = await averageHash('original.jpg');
+const hash2 = await averageHash('compressed.jpg');
+console.log('Hash 1:', hash1.hash);
+console.log('Hash 2:', hash2.hash);
+            </pre>
+        </div>
+
+        <h3>Difference Hash (dHash)</h3>
+        <p>dHash compares adjacent pixels to detect gradients, making it more robust to gamma correction:</p>
+
+        <div class="code-block">
+            <pre>
+async function differenceHash(imagePath, hashSize = 8) {
+    const image = await Jimp.read(imagePath);
+    image.resize(hashSize + 1, hashSize).greyscale();
+
+    let hash = '';
+
+    // Compare each pixel to its right neighbor
+    for (let y = 0; y < hashSize; y++) {
+        for (let x = 0; x < hashSize; x++) {
+            const leftPixel = image.getPixelColor(x, y);
+            const rightPixel = image.getPixelColor(x + 1, y);
+
+            const leftLum = Jimp.intToRGBA(leftPixel).r;
+            const rightLum = Jimp.intToRGBA(rightPixel).r;
+
+            hash += leftLum > rightLum ? '1' : '0';
+        }
+    }
+
+    return {
+        algorithm: 'dHash',
+        hash: BigInt('0b' + hash).toString(16),
+        size: hashSize * hashSize
+    };
+}
+            </pre>
+        </div>
+
+        <h3>Perceptual Hash (pHash)</h3>
+        <p>pHash uses Discrete Cosine Transform (DCT) to capture frequency domain features:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: pHash with DCT
+function dct2D(matrix) {
+    const N = matrix.length;
+    const result = Array(N).fill(0).map(() => Array(N).fill(0));
+
+    for (let u = 0; u < N; u++) {
+        for (let v = 0; v < N; v++) {
+            let sum = 0;
+            for (let x = 0; x < N; x++) {
+                for (let y = 0; y < N; y++) {
+                    sum += matrix[x][y] *
+                           Math.cos(Math.PI * u * (2 * x + 1) / (2 * N)) *
+                           Math.cos(Math.PI * v * (2 * y + 1) / (2 * N));
+                }
+            }
+            const cu = u === 0 ? 1 / Math.sqrt(2) : 1;
+            const cv = v === 0 ? 1 / Math.sqrt(2) : 1;
+            result[u][v] = 0.25 * cu * cv * sum;
+        }
+    }
+    return result;
+}
+
+async function perceptualHash(imagePath, hashSize = 8) {
+    const image = await Jimp.read(imagePath);
+    const size = 32; // DCT size
+    image.resize(size, size).greyscale();
+
+    // Extract luminance matrix
+    const matrix = Array(size).fill(0).map(() => Array(size).fill(0));
+    image.scan(0, 0, size, size, (x, y, idx) => {
+        matrix[y][x] = image.bitmap.data[idx];
+    });
+
+    // Compute DCT
+    const dct = dct2D(matrix);
+
+    // Extract top-left 8x8 (low frequencies)
+    const lowFreq = [];
+    for (let y = 0; y < hashSize; y++) {
+        for (let x = 0; x < hashSize; x++) {
+            lowFreq.push(dct[y][x]);
+        }
+    }
+
+    // Compute median
+    const sorted = [...lowFreq].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+
+    // Generate hash
+    let hash = '';
+    for (const val of lowFreq) {
+        hash += val > median ? '1' : '0';
+    }
+
+    return {
+        algorithm: 'pHash',
+        hash: BigInt('0b' + hash).toString(16),
+        size: hashSize * hashSize
+    };
+}
+            </pre>
+        </div>
+
+        <h2>Hamming Distance and Similarity</h2>
+        <p>To compare perceptual hashes, we calculate Hamming distance - the number of differing bits:</p>
+
+        <div class="code-block">
+            <pre>
+function hammingDistance(hash1, hash2) {
+    // Convert hex to binary
+    const bin1 = BigInt('0x' + hash1).toString(2).padStart(64, '0');
+    const bin2 = BigInt('0x' + hash2).toString(2).padStart(64, '0');
+
+    // Count differing bits
+    let distance = 0;
+    for (let i = 0; i < bin1.length; i++) {
+        if (bin1[i] !== bin2[i]) distance++;
+    }
+
+    return distance;
+}
+
+function calculateSimilarity(hash1, hash2, hashBits = 64) {
+    const distance = hammingDistance(hash1, hash2);
+    const similarity = ((hashBits - distance) / hashBits) * 100;
+    return {
+        distance,
+        similarity: similarity.toFixed(2) + '%',
+        isMatch: similarity >= 90 // 90% threshold
+    };
+}
+
+// Usage
+const result = calculateSimilarity(hash1.hash, hash2.hash);
+console.log('Similarity:', result.similarity);
+console.log('Match:', result.isMatch);
+            </pre>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Hamming Distance</th>
+                    <th>Interpretation</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0-5 bits</td>
+                    <td>Identical or minimal difference</td>
+                    <td>Same image, different compression</td>
+                </tr>
+                <tr>
+                    <td>6-10 bits</td>
+                    <td>Very similar</td>
+                    <td>Slight edits, color adjustments</td>
+                </tr>
+                <tr>
+                    <td>11-20 bits</td>
+                    <td>Similar</td>
+                    <td>Cropped or resized versions</td>
+                </tr>
+                <tr>
+                    <td>21+ bits</td>
+                    <td>Different content</td>
+                    <td>Unrelated images</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Video Fingerprinting</h2>
+        <p>Video fingerprinting extracts hashes from keyframes and analyzes temporal patterns.</p>
+
+        <h3>Keyframe Extraction</h3>
+        <div class="code-block">
+            <pre>
+// Example: Video Fingerprinting
+import ffmpeg from 'fluent-ffmpeg';
+
+async function extractKeyframes(videoPath, interval = 1) {
+    return new Promise((resolve, reject) => {
+        const keyframes = [];
+
+        ffmpeg(videoPath)
+            .on('filenames', (filenames) => {
+                keyframes.push(...filenames);
+            })
+            .on('end', () => resolve(keyframes))
+            .on('error', reject)
+            .screenshots({
+                count: 10,
+                folder: './temp',
+                filename: 'frame-%i.png'
+            });
+    });
+}
+
+async function videoFingerprint(videoPath) {
+    // Extract keyframes
+    const frames = await extractKeyframes(videoPath);
+
+    // Hash each frame
+    const frameHashes = [];
+    for (const frame of frames) {
+        const hash = await perceptualHash(`./temp/${frame}`);
+        frameHashes.push(hash.hash);
+    }
+
+    // Compute temporal hash
+    const temporalHash = hashSequence(frameHashes);
+
+    return {
+        algorithm: 'video-pHash',
+        keyframes: frameHashes.length,
+        frameHashes: frameHashes,
+        temporalHash: temporalHash,
+        duration: await getVideoDuration(videoPath)
+    };
+}
+
+function hashSequence(hashes) {
+    // Create hash representing frame sequence
+    const combined = hashes.join('');
+    return createHash('sha256').update(combined).digest('hex');
+}
+            </pre>
+        </div>
+
+        <h2>Audio Fingerprinting</h2>
+        <p>Audio fingerprinting analyzes spectral features to create robust acoustic signatures.</p>
+
+        <h3>Chromaprint Algorithm</h3>
+        <p>Chromaprint is widely used for audio fingerprinting:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Audio Fingerprinting with Chromaprint
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+async function audioFingerprint(audioPath) {
+    // Use fpcalc (Chromaprint command-line tool)
+    const { stdout } = await execAsync(`fpcalc -json "${audioPath}"`);
+    const result = JSON.parse(stdout);
+
+    return {
+        algorithm: 'Chromaprint',
+        duration: result.duration,
+        fingerprint: result.fingerprint,
+        bitrate: await getAudioBitrate(audioPath)
+    };
+}
+
+async function compareAudioFingerprints(fp1, fp2) {
+    // Compute similarity score
+    const similarity = computeChromaprintSimilarity(fp1, fp2);
+
+    return {
+        similarity: (similarity * 100).toFixed(2) + '%',
+        isMatch: similarity >= 0.85,
+        algorithm: 'Chromaprint'
+    };
+}
+
+function computeChromaprintSimilarity(fp1, fp2) {
+    // Chromaprint uses compressed integer sequences
+    // This is a simplified comparison
+    const arr1 = fp1.split(',').map(Number);
+    const arr2 = fp2.split(',').map(Number);
+
+    let matches = 0;
+    const minLength = Math.min(arr1.length, arr2.length);
+
+    for (let i = 0; i < minLength; i++) {
+        const xor = arr1[i] ^ arr2[i];
+        const bits = countBits(xor);
+        matches += (32 - bits) / 32; // Assuming 32-bit integers
+    }
+
+    return matches / minLength;
+}
+
+function countBits(n) {
+    let count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
+    }
+    return count;
+}
+            </pre>
+        </div>
+
+        <h2>Text Fingerprinting</h2>
+        <p>Text fingerprinting detects plagiarism, paraphrasing, and unauthorized copying.</p>
+
+        <h3>N-gram Shingling</h3>
+        <div class="code-block">
+            <pre>
+// Example: Text Fingerprinting with Shingling
+function generateShingles(text, n = 3) {
+    // Normalize text
+    const normalized = text.toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/);
+
+    // Create n-grams
+    const shingles = new Set();
+    for (let i = 0; i <= normalized.length - n; i++) {
+        const shingle = normalized.slice(i, i + n).join(' ');
+        shingles.add(shingle);
+    }
+
+    return shingles;
+}
+
+function jaccardSimilarity(set1, set2) {
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+
+    return intersection.size / union.size;
+}
+
+function textFingerprint(text) {
+    const shingles = generateShingles(text, 3);
+
+    // MinHash for efficient similarity estimation
+    const minhash = computeMinHash(shingles, 128);
+
+    return {
+        algorithm: 'MinHash',
+        shingleCount: shingles.size,
+        signature: minhash,
+        wordCount: text.split(/\s+/).length
+    };
+}
+
+function computeMinHash(shingles, numHashes) {
+    const signature = Array(numHashes).fill(Infinity);
+
+    for (const shingle of shingles) {
+        for (let i = 0; i < numHashes; i++) {
+            const hash = hashWithSeed(shingle, i);
+            signature[i] = Math.min(signature[i], hash);
+        }
+    }
+
+    return signature;
+}
+
+function hashWithSeed(str, seed) {
+    let hash = seed;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+}
+
+// Usage
+const fp1 = textFingerprint("This is original content about AI authentication.");
+const fp2 = textFingerprint("This is original text about AI verification.");
+
+const similarity = estimateSimilarity(fp1.signature, fp2.signature);
+console.log('Text similarity:', (similarity * 100).toFixed(2) + '%');
+            </pre>
+        </div>
+
+        <h2>Neural Hashing with Deep Learning</h2>
+        <p>Modern neural networks can learn optimal hash functions for specific content types.</p>
+
+        <h3>Siamese Networks for Similarity Learning</h3>
+        <p>Siamese networks learn embeddings where similar content has nearby representations:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Neural Hash with TensorFlow.js
+import * as tf from '@tensorflow/tfjs-node';
+
+class NeuralHasher {
+    constructor() {
+        this.model = this.buildModel();
+    }
+
+    buildModel() {
+        // CNN-based feature extractor
+        const input = tf.input({ shape: [224, 224, 3] });
+
+        let x = tf.layers.conv2d({
+            filters: 32,
+            kernelSize: 3,
+            activation: 'relu'
+        }).apply(input);
+
+        x = tf.layers.maxPooling2d({ poolSize: 2 }).apply(x);
+        x = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu' }).apply(x);
+        x = tf.layers.maxPooling2d({ poolSize: 2 }).apply(x);
+        x = tf.layers.flatten().apply(x);
+        x = tf.layers.dense({ units: 256, activation: 'relu' }).apply(x);
+
+        // Hash layer (binary output)
+        const hash = tf.layers.dense({
+            units: 64,
+            activation: 'tanh',
+            name: 'hash_layer'
+        }).apply(x);
+
+        return tf.model({ inputs: input, outputs: hash });
+    }
+
+    async computeHash(imageTensor) {
+        // Forward pass
+        const embedding = this.model.predict(imageTensor);
+
+        // Binarize (threshold at 0)
+        const binary = embedding.greater(0).asType('int32');
+
+        // Convert to hex string
+        const hashArray = await binary.data();
+        let hashString = '';
+        for (let i = 0; i < hashArray.length; i += 4) {
+            const nibble = hashArray.slice(i, i + 4).reduce((acc, bit, idx) =>
+                acc + (bit << idx), 0);
+            hashString += nibble.toString(16);
+        }
+
+        return hashString;
+    }
+
+    async compareHashes(hash1, hash2) {
+        const distance = hammingDistance(hash1, hash2);
+        const similarity = (64 - distance) / 64;
+
+        return {
+            distance,
+            similarity: (similarity * 100).toFixed(2) + '%',
+            isMatch: similarity >= 0.9
+        };
+    }
+}
+
+// Usage
+const hasher = new NeuralHasher();
+const hash1 = await hasher.computeHash(imageTensor1);
+const hash2 = await hasher.computeHash(imageTensor2);
+const result = await hasher.compareHashes(hash1, hash2);
+            </pre>
+        </div>
+
+        <h2>Robustness Testing</h2>
+        <p>Fingerprinting algorithms must be tested against various transformations:</p>
+
+        <h3>Common Transformations</h3>
+        <ul>
+            <li><strong>Compression:</strong> JPEG quality 10-100, WebP, AVIF</li>
+            <li><strong>Resizing:</strong> 50%-200% scaling</li>
+            <li><strong>Rotation:</strong> -15° to +15°</li>
+            <li><strong>Color adjustments:</strong> Brightness, contrast, saturation</li>
+            <li><strong>Cropping:</strong> 10%-30% removal</li>
+            <li><strong>Noise:</strong> Gaussian, salt-and-pepper</li>
+            <li><strong>Blur:</strong> Gaussian, motion blur</li>
+            <li><strong>Filters:</strong> Sharpen, edge detection</li>
+        </ul>
+
+        <div class="code-block">
+            <pre>
+// Example: Robustness Testing Suite
+async function testRobustness(originalImage) {
+    const originalHash = await perceptualHash(originalImage);
+    const results = [];
+
+    // Test JPEG compression
+    for (let quality = 10; quality <= 100; quality += 10) {
+        const compressed = await compressJPEG(originalImage, quality);
+        const hash = await perceptualHash(compressed);
+        const similarity = calculateSimilarity(originalHash.hash, hash.hash);
+
+        results.push({
+            transformation: `JPEG Q${quality}`,
+            similarity: similarity.similarity,
+            passed: similarity.isMatch
+        });
+    }
+
+    // Test resizing
+    for (let scale of [0.5, 0.75, 1.25, 1.5, 2.0]) {
+        const resized = await resizeImage(originalImage, scale);
+        const hash = await perceptualHash(resized);
+        const similarity = calculateSimilarity(originalHash.hash, hash.hash);
+
+        results.push({
+            transformation: `Resize ${scale}x`,
+            similarity: similarity.similarity,
+            passed: similarity.isMatch
+        });
+    }
+
+    // Generate report
+    const passRate = results.filter(r => r.passed).length / results.length;
+
+    return {
+        totalTests: results.length,
+        passed: results.filter(r => r.passed).length,
+        passRate: (passRate * 100).toFixed(2) + '%',
+        results: results
+    };
+}
+            </pre>
+        </div>
+
+        <h2>Distributed Fingerprint Databases</h2>
+        <p>Large-scale content authentication requires efficient fingerprint storage and retrieval.</p>
+
+        <h3>Locality-Sensitive Hashing (LSH)</h3>
+        <p>LSH enables approximate nearest neighbor search in high-dimensional spaces:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: LSH Index for Fast Similarity Search
+class LSHIndex {
+    constructor(numTables = 10, hashSize = 8) {
+        this.numTables = numTables;
+        this.hashSize = hashSize;
+        this.tables = Array(numTables).fill(null).map(() => new Map());
+        this.randomProjections = this.generateProjections();
+    }
+
+    generateProjections() {
+        const projections = [];
+        for (let i = 0; i < this.numTables; i++) {
+            const projection = [];
+            for (let j = 0; j < this.hashSize; j++) {
+                projection.push(Math.floor(Math.random() * 64));
+            }
+            projections.push(projection);
+        }
+        return projections;
+    }
+
+    hash(fingerprint, tableIdx) {
+        const projection = this.randomProjections[tableIdx];
+        let hash = '';
+
+        for (const bitPos of projection) {
+            const bit = (BigInt('0x' + fingerprint) >> BigInt(bitPos)) & 1n;
+            hash += bit.toString();
+        }
+
+        return hash;
+    }
+
+    insert(fingerprint, contentId) {
+        for (let i = 0; i < this.numTables; i++) {
+            const bucket = this.hash(fingerprint, i);
+
+            if (!this.tables[i].has(bucket)) {
+                this.tables[i].set(bucket, []);
+            }
+
+            this.tables[i].get(bucket).push({
+                fingerprint,
+                contentId
+            });
+        }
+    }
+
+    query(fingerprint, threshold = 10) {
+        const candidates = new Map();
+
+        // Check all tables
+        for (let i = 0; i < this.numTables; i++) {
+            const bucket = this.hash(fingerprint, i);
+            const items = this.tables[i].get(bucket) || [];
+
+            for (const item of items) {
+                const distance = hammingDistance(fingerprint, item.fingerprint);
+
+                if (distance <= threshold) {
+                    if (!candidates.has(item.contentId) ||
+                        candidates.get(item.contentId) > distance) {
+                        candidates.set(item.contentId, distance);
+                    }
+                }
+            }
+        }
+
+        // Return sorted results
+        return Array.from(candidates.entries())
+            .sort((a, b) => a[1] - b[1])
+            .map(([contentId, distance]) => ({
+                contentId,
+                distance,
+                similarity: ((64 - distance) / 64 * 100).toFixed(2) + '%'
+            }));
+    }
+}
+
+// Usage
+const lsh = new LSHIndex(10, 8);
+
+// Index content
+lsh.insert(hash1, 'content-001');
+lsh.insert(hash2, 'content-002');
+
+// Search for similar content
+const matches = lsh.query(queryHash, 5);
+console.log('Similar content:', matches);
+            </pre>
+        </div>
+
+        <h2>Real-World Implementation</h2>
+        <p>Complete fingerprinting system combining multiple algorithms:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Production Fingerprinting Service
+class ContentFingerprintService {
+    constructor() {
+        this.lshIndex = new LSHIndex();
+        this.db = new Database();
+    }
+
+    async fingerprintContent(file, metadata) {
+        const type = detectContentType(file);
+        let fingerprints;
+
+        switch (type) {
+            case 'image':
+                fingerprints = await this.fingerprintImage(file);
+                break;
+            case 'video':
+                fingerprints = await this.fingerprintVideo(file);
+                break;
+            case 'audio':
+                fingerprints = await this.fingerprintAudio(file);
+                break;
+            case 'text':
+                fingerprints = await this.fingerprintText(file);
+                break;
+            default:
+                throw new Error('Unsupported content type');
+        }
+
+        // Store in database
+        const contentId = generateUUID();
+        await this.db.insert({
+            id: contentId,
+            type: type,
+            fingerprints: fingerprints,
+            metadata: metadata,
+            timestamp: new Date().toISOString()
+        });
+
+        // Index for similarity search
+        for (const fp of fingerprints) {
+            this.lshIndex.insert(fp.hash, contentId);
+        }
+
+        return {
+            contentId,
+            fingerprints,
+            indexed: true
+        };
+    }
+
+    async findSimilarContent(queryFile, threshold = 0.85) {
+        const type = detectContentType(queryFile);
+        const fingerprints = await this[`fingerprint${capitalize(type)}`](queryFile);
+
+        const results = [];
+
+        for (const fp of fingerprints) {
+            const matches = this.lshIndex.query(fp.hash, 10);
+            results.push(...matches);
+        }
+
+        // Deduplicate and filter by threshold
+        const unique = new Map();
+        for (const result of results) {
+            const similarity = parseFloat(result.similarity) / 100;
+            if (similarity >= threshold) {
+                if (!unique.has(result.contentId) ||
+                    unique.get(result.contentId) < similarity) {
+                    unique.set(result.contentId, similarity);
+                }
+            }
+        }
+
+        // Fetch full metadata
+        const finalResults = [];
+        for (const [contentId, similarity] of unique.entries()) {
+            const metadata = await this.db.get(contentId);
+            finalResults.push({
+                contentId,
+                similarity: (similarity * 100).toFixed(2) + '%',
+                metadata
+            });
+        }
+
+        return finalResults.sort((a, b) =>
+            parseFloat(b.similarity) - parseFloat(a.similarity));
+    }
+
+    async fingerprintImage(file) {
+        return [
+            await averageHash(file),
+            await differenceHash(file),
+            await perceptualHash(file)
+        ];
+    }
+
+    async fingerprintVideo(file) {
+        return await videoFingerprint(file);
+    }
+
+    async fingerprintAudio(file) {
+        return await audioFingerprint(file);
+    }
+
+    async fingerprintText(file) {
+        return textFingerprint(file);
+    }
+}
+            </pre>
+        </div>
+
+        <div class="success-box">
+            <strong>✅ Best Practices</strong>
+            <ul>
+                <li>Use multiple hash algorithms for robustness</li>
+                <li>Test against realistic transformations</li>
+                <li>Index fingerprints with LSH for scalability</li>
+                <li>Store original hashes alongside cryptographic hashes</li>
+                <li>Monitor false positive/negative rates in production</li>
+            </ul>
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 Key Takeaways</h3>
+            <ul>
+                <li>Perceptual hashes detect similar content despite transformations</li>
+                <li>Different algorithms (aHash, dHash, pHash) have different robustness characteristics</li>
+                <li>Hamming distance measures similarity between binary hashes</li>
+                <li>Video and audio fingerprinting require specialized techniques</li>
+                <li>Neural hashing can learn optimal representations for specific domains</li>
+                <li>LSH enables efficient similarity search in large databases</li>
+                <li>Production systems should combine multiple fingerprinting methods</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 Review Questions</h3>
+            <ol>
+                <li>What is the fundamental difference between cryptographic and perceptual hashing?</li>
+                <li>Explain how the pHash algorithm uses DCT for robustness.</li>
+                <li>Why is Hamming distance appropriate for comparing perceptual hashes?</li>
+                <li>How does video fingerprinting differ from image fingerprinting?</li>
+                <li>What is the purpose of Locality-Sensitive Hashing in content authentication?</li>
+                <li>Describe three transformations that a robust fingerprint should survive.</li>
+                <li>How do neural hashing approaches differ from traditional algorithms?</li>
+                <li>Why is it beneficial to use multiple fingerprinting algorithms together?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</p>
+
+        </div>
+</body>
+</html>

@@ -273,5 +273,97 @@ Phase 2 will introduce advanced AI threat detection, behavioral analysis, and pr
 
 ---
 
+## 11. Reference Standards Alignment
+
+### 11.1 Privacy and Child Rights
+
+The Phase 1 architecture is anchored in international and national child-rights and privacy frameworks:
+
+| Concern | Reference | Role |
+|---------|-----------|------|
+| Child rights | UN Convention on the Rights of the Child (UNCRC) | Foundational rights framework |
+| Online child privacy (US) | 15 U.S.C. §6501–6506 (COPPA), 16 CFR Part 312 | Mandatory rules for under-13 services |
+| Child consent (EU) | Regulation (EU) 2016/679 (GDPR) Article 8 | Age-of-consent rules |
+| Children's Code | UK ICO Age Appropriate Design Code | Children's data-handling expectations |
+| Educational records (US) | 20 U.S.C. §1232g (FERPA) | Educational-context data |
+| Privacy framework | ISO/IEC 29100:2011 | Privacy concepts and design |
+| PII protection guidance | ISO/IEC 29151:2017 | PII protection code of practice |
+
+### 11.2 Information Security
+
+| Concern | Reference |
+|---------|-----------|
+| Information security management | ISO/IEC 27001:2022 |
+| Security controls | ISO/IEC 27002:2022 |
+| Cloud-services security | ISO/IEC 27017:2015 |
+| Cloud PII protection | ISO/IEC 27018:2019 |
+| Privacy management | ISO/IEC 27701:2019 |
+| Cryptographic algorithms | NIST FIPS 186-5 (signatures), FIPS 197 (AES), FIPS 180-4 / FIPS 202 (hash) |
+| Transport security | RFC 8446 (TLS 1.3), RFC 9147 (DTLS 1.3) |
+| Token formats | RFC 7515 (JWS), RFC 7519 (JWT), RFC 9052 (COSE) |
+
+### 11.3 Accessibility
+
+User-facing surfaces conform to W3C WCAG 2.2 Level AA. Conformance evidence is part of the deployment's compliance artefacts.
+
+### 11.4 Locale and Internationalisation
+
+Locale data follows BCP 47 (RFC 5646) for language tagging and Unicode CLDR (Common Locale Data Repository) for locale-specific formatting. Date and time storage follows ISO 8601:2019.
+
+### 11.5 Conformance with This Phase
+
+A Phase 1 implementation is conformant when:
+
+1. The text, image, video, and URL filtering subsystems are deployed and exercised on the published reference benchmark.
+2. The privacy-first architecture is implemented with the §2 controls and is mapped to a published statement of applicability against the §11.2 references.
+3. The platform integrations covered in §3 follow standardised APIs and authentication.
+4. Parent and child onboarding follow the §4 flows with the rule-required identity and age-verification controls.
+5. Performance targets in §6 are met under the reference load test.
+6. Security measures in §7 are verified by the operating organisation's annual security review.
+
+All citations conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+---
+
+## 12. Implementation Appendix
+
+### 12.1 Identity and Age Verification
+
+Age verification is the single most consequential design decision in any child-safety platform. The reference programme treats age verification as a layered, privacy-preserving exercise:
+
+- **Self-declaration** alone is insufficient for any consequential decision; it is acceptable as a starting point only.
+- **Parental consent flow** for under-13 (or the deploying jurisdiction's threshold) follows the COPPA-defined verifiable parental consent procedures, with documented audit trails.
+- **Tokenised age claims** issued by recognised identity providers (national identity systems, school identity systems, mobile-network identity assertions where legally available) are accepted under the deploying jurisdiction's law.
+- **No collection of biometric identifiers** is performed on minors for age-verification purposes, in line with the precautionary principle of the UK ICO Age Appropriate Design Code.
+
+The platform publishes the methods accepted in each deploying jurisdiction so that families can choose the path most acceptable to them.
+
+### 12.2 Default Settings (Privacy by Default)
+
+The reference defaults for child accounts follow GDPR Article 25 and the UK Children's Code:
+
+- **Geolocation precision** — Off by default; coarse location only when explicitly required.
+- **Profile visibility** — Private by default; visibility extensions require explicit guardian approval.
+- **Direct messaging** — Limited to approved contacts by default.
+- **Personalised advertising** — Off for under-18 accounts.
+- **Behavioural profiling** — Off by default; opt-in mechanisms reviewed for child-appropriate language.
+- **Analytics** — Aggregate only; no per-account profiling.
+
+Defaults are reviewed annually as part of the operating organisation's privacy review.
+
+### 12.3 Cryptographic Implementation Details
+
+Cryptographic operations follow established primitives:
+
+- **Hashing** — SHA-256 (FIPS 180-4) by default, SHA-3 (FIPS 202) where rule or partner requires.
+- **Symmetric encryption** — AES-256-GCM (NIST SP 800-38D, FIPS 197) for at-rest data. ChaCha20-Poly1305 (RFC 8439) for performance-constrained mobile contexts.
+- **Asymmetric signing** — Ed25519 (RFC 8032) by default; ECDSA P-256 (NIST FIPS 186-5) for legacy compatibility.
+- **Key wrapping** — AES Key Wrap (RFC 3394) for storage of long-lived keys.
+- **Key derivation** — HKDF (RFC 5869) for derivation; PBKDF2 (RFC 8018) for password-based derivation.
+
+Key material is stored in HSMs (FIPS 140-3 Level 3 or equivalent for production deployments).
+
+---
+
 **WIA-CHILD-001 PHASE 1** | Foundation
 © 2025 SmileStory Inc. / WIA | 弘益人間 (Benefit All Humanity)

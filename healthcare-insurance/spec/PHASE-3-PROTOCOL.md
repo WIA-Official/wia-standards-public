@@ -504,5 +504,45 @@ Log all:
 
 ---
 
+## Reference Standards Alignment
+
+The Phase 3 protocols are layered above well-established healthcare and IT primitives so that conformant implementations can rely on broadly available libraries and tooling.
+
+| Concern | Reference |
+|---------|-----------|
+| Health-data interoperability | HL7 FHIR R5 |
+| Health-data exchange (US) | 45 CFR Part 162 (HIPAA Transactions and Code Sets) |
+| Patient-data privacy (US) | 45 CFR Part 164 (HIPAA Privacy Rule), 45 CFR Part 160 (Security Rule) |
+| Patient-data privacy (EU) | Regulation (EU) 2016/679 (GDPR) Article 9 |
+| Patient-data privacy (KR) | 개인정보 보호법 §23 |
+| Transport security | RFC 8446 (TLS 1.3); RFC 5246 (TLS 1.2 minimum) |
+| Certificate format | RFC 5280 (X.509 v3) |
+| OCSP stapling | RFC 6066 §8 |
+| HTTP semantics | RFC 9110 |
+| HTTP/2 | RFC 9113 |
+| HTTP/3 over QUIC | RFC 9114 / RFC 9000 |
+| WebSocket | RFC 6455 |
+| Server-Sent Events | W3C EventSource specification |
+| Token formats | RFC 7515 (JWS), RFC 7519 (JWT), RFC 9052 (COSE) |
+| Provenance | W3C PROV-O |
+| Identity | W3C DID Core 1.0, RFC 7519 (JWT), RFC 8693 (Token Exchange) |
+| Health-information security | ISO 27799:2016 |
+| Information security | ISO/IEC 27001:2022 |
+| Time encoding | ISO 8601:2019 |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 3 implementation is conformant when:
+
+1. Wire payloads conform to HL7 FHIR R5 resource definitions or to a WIA-SOC-019 derivative profile.
+2. TLS 1.3 (or 1.2 minimum) is supported with RFC 5280 certificate verification.
+3. Token formats follow JWT (RFC 7519) with explicit algorithm identifiers.
+4. Provenance assertions follow W3C PROV-O.
+5. Information-security controls map to a published ISO/IEC 27001 statement of applicability.
+
+---
+
 © 2025 SmileStory Inc. / WIA
 弘益人間 (홍익인간) · Benefit All Humanity

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Production Deployment | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 8</div>
+            <h1>Production Deployment and Operations</h1>
+        </header>
+
+        <article>
+            <h2>From Prototype to Production</h2>
+            <p>Successfully deploying edge AI in production requires more than a working model. You must consider scalability (deploying to thousands or millions of devices), reliability (handling failures gracefully), monitoring (observing real-world performance), updating (improving models over time), and cost (optimizing infrastructure expenses). This chapter covers the complete deployment lifecycle.</p>
+
+            <h2>Deployment Strategies</h2>
+
+            <h3>Application-Bundled Models</h3>
+            <p>Include model files directly in the application package (APK, IPA, executable):</p>
+
+            <p><strong>Advantages:</strong></p>
+            <ul>
+                <li>Immediate availability on first launch</li>
+                <li>No network dependency for initial deployment</li>
+                <li>Guaranteed model version matches app version</li>
+            </ul>
+
+            <p><strong>Disadvantages:</strong></p>
+            <ul>
+                <li>Increases application size (can be significant for large models)</li>
+                <li>Model updates require full app updates</li>
+                <li>App store review cycles delay model improvements</li>
+            </ul>
+
+            <pre><code>// iOS: Bundle model in app
+// Add model.mlmodel to Xcode project
+// Access at runtime:
+guard let modelURL = Bundle.main.url(forResource: "model", withExtension: "mlmodelc") else {
+    fatalError("Model not found in bundle")
+}
+let model = try VNCoreMLModel(for: MLModel(contentsOf: modelURL))</code></pre>
+
+            <h3>On-Demand Model Download</h3>
+            <p>Download models after app installation, typically on first launch or when needed:</p>
+
+            <p><strong>Advantages:</strong></p>
+            <ul>
+                <li>Smaller initial app size</li>
+                <li>Update models independently of app updates</li>
+                <li>A/B test multiple model versions</li>
+                <li>Download only models needed for user's use case</li>
+            </ul>
+
+            <p><strong>Disadvantages:</strong></p>
+            <ul>
+                <li>Requires network connectivity for first use</li>
+                <li>Download failures need graceful handling</li>
+                <li>Must manage model versioning and storage</li>
+            </ul>
+
+            <pre><code>// Android: Download model on first launch
+class ModelManager {
+    private val modelURL = "https://cdn.example.com/models/v2.tflite"
+    private val modelPath = "${context.filesDir}/model.tflite"
+
+    suspend fun ensureModelDownloaded() {
+        if (!File(modelPath).exists()) {
+            downloadModel()
+        }
+        // Validate model integrity
+        if (!validateModel(modelPath)) {
+            downloadModel()  // Re-download if corrupted
+        }
+    }
+
+    private suspend fun downloadModel() {
+        withContext(Dispatchers.IO) {
+            val connection = URL(modelURL).openConnection() as HttpsURLConnection
+            connection.inputStream.use { input ->
+                FileOutputStream(modelPath).use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+    }
+}</code></pre>
+
+            <h3>Progressive Model Loading</h3>
+            <p>Start with a lightweight model, upgrade to heavier models as needed:</p>
+
+            <ol>
+                <li><strong>Tier 1:</strong> 1MB model bundled in app (fast, low accuracy)</li>
+                <li><strong>Tier 2:</strong> 10MB model downloaded on Wi-Fi (good accuracy)</li>
+                <li><strong>Tier 3:</strong> 50MB model for power users (best accuracy)</li>
+            </ol>
+
+            <p>Users get immediate functionality with tier 1, seamlessly upgrade in background.</p>
+
+            <h2>Continuous Integration and Deployment (CI/CD)</h2>
+
+            <h3>ML Model CI/CD Pipeline</h3>
+            <p>Automated pipeline from training to deployment:</p>
+
+            <pre><code># GitHub Actions workflow for model deployment
+name: Model Training and Deployment
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday
+
+jobs:
+  train-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Train Model
+        run: |
+          python train.py --dataset datasets/latest --epochs 50
+
+      - name: Evaluate Model
+        run: |
+          python evaluate.py --model output/model.h5
+          # Fail if accuracy < 90%
+          python check_accuracy.py --threshold 0.90
+
+      - name: Convert to TFLite
+        run: |
+          python convert_tflite.py --input output/model.h5 \
+                                   --output output/model.tflite \
+                                   --quantize int8
+
+      - name: Optimize for Edge
+        run: |
+          python optimize.py --model output/model.tflite
+
+      - name: Benchmark on Target Hardware
+        run: |
+          # Run on emulator or connected device
+          python benchmark.py --model output/model.tflite \
+                             --device pixel_8
+
+      - name: Upload to CDN
+        run: |
+          aws s3 cp output/model.tflite \
+                    s3://models-cdn/production/model-v${{ github.sha }}.tflite
+          # Update model metadata
+          python update_model_registry.py --version ${{ github.sha }}
+
+      - name: Deploy via A/B Test
+        run: |
+          python deploy.py --model model-v${{ github.sha }}.tflite \
+                          --rollout 10%  # Start with 10% of users</code></pre>
+
+            <h3>Model Validation Gates</h3>
+            <p>Automated checks before deployment:</p>
+
+            <ul>
+                <li><strong>Accuracy Threshold:</strong> Reject models below baseline (e.g., 90% accuracy)</li>
+                <li><strong>Latency Budget:</strong> Ensure inference completes within time limit (e.g., 50ms)</li>
+                <li><strong>Size Constraint:</strong> Verify model fits within target size (e.g., <25MB)</li>
+                <li><strong>Compatibility:</strong> Test on minimum supported hardware</li>
+                <li><strong>Adversarial Robustness:</strong> Validate against known adversarial examples</li>
+            </ul>
+
+            <h2>Monitoring and Observability</h2>
+
+            <h3>Key Metrics to Track</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>What it Measures</th>
+                        <th>Alert Threshold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Inference Latency (P95)</td>
+                        <td>95th percentile inference time</td>
+                        <td>> 2x expected latency</td>
+                    </tr>
+                    <tr>
+                        <td>Model Load Time</td>
+                        <td>Time to initialize model</td>
+                        <td>> 5 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>Memory Usage (Peak)</td>
+                        <td>Maximum RAM consumption</td>
+                        <td>> 80% of available</td>
+                    </tr>
+                    <tr>
+                        <td>Crash Rate</td>
+                        <td>Inference failures / total inferences</td>
+                        <td>> 0.1%</td>
+                    </tr>
+                    <tr>
+                        <td>Model Confidence</td>
+                        <td>Average prediction confidence</td>
+                        <td>< 60% (model uncertain)</td>
+                    </tr>
+                    <tr>
+                        <td>Battery Impact</td>
+                        <td>Energy consumed per inference</td>
+                        <td>> 50mAh per hour</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>On-Device Telemetry</h3>
+            <p>Collect metrics directly from edge devices:</p>
+
+            <pre><code>// Telemetry SDK for edge AI monitoring
+class EdgeAITelemetry {
+    func logInference(modelVersion: String, latency: TimeInterval,
+                     confidence: Float, success: Bool) {
+        let event = InferenceEvent(
+            modelVersion: modelVersion,
+            latency: latency,
+            confidence: confidence,
+            success: success,
+            deviceModel: UIDevice.current.model,
+            osVersion: UIDevice.current.systemVersion,
+            timestamp: Date()
+        )
+
+        // Batch events, upload periodically (not per-inference)
+        eventBuffer.append(event)
+
+        if eventBuffer.count >= 100 || shouldFlush() {
+            uploadEvents(eventBuffer)
+            eventBuffer.removeAll()
+        }
+    }
+
+    private func shouldFlush() -> Bool {
+        // Upload when on Wi-Fi and charging
+        return isOnWiFi() && isCharging()
+    }
+}</code></pre>
+
+            <h3>Data Drift Detection</h3>
+            <p>Monitor for distribution shift—real-world data differs from training data:</p>
+
+            <pre><code>// Detect data drift using statistical tests
+class DriftDetector {
+    private var referenceDistribution: [Float]  // From training set
+
+    func detectDrift(liveInferences: [Prediction]) -> Bool {
+        // Extract confidence scores
+        let confidences = liveInferences.map { $0.confidence }
+
+        // Kolmogorov-Smirnov test for distribution difference
+        let ksStatistic = kolmogorovSmirnov(confidences, referenceDistribution)
+        let pValue = computePValue(ksStatistic)
+
+        // Significant drift detected if p < 0.01
+        if pValue < 0.01 {
+            logAlert("Data drift detected: p-value = \\(pValue)")
+            return true
+        }
+
+        return false
+    }
+}</code></pre>
+
+            <p>If drift detected, consider retraining model on newer data.</p>
+
+            <h2>A/B Testing and Gradual Rollouts</h2>
+
+            <h3>Canary Deployments</h3>
+            <p>Deploy new model to small percentage of users first:</p>
+
+            <ol>
+                <li><strong>Stage 1:</strong> 5% of users get new model v2</li>
+                <li><strong>Monitor:</strong> Track metrics for 24-48 hours</li>
+                <li><strong>Stage 2:</strong> If metrics look good, increase to 25%</li>
+                <li><strong>Stage 3:</strong> Increase to 50%</li>
+                <li><strong>Stage 4:</strong> Full rollout to 100%</li>
+            </ol>
+
+            <p>At any stage, rollback to previous model if problems detected.</p>
+
+            <pre><code>// Server-side model serving with gradual rollout
+app.get('/api/model-config', (req, res) => {
+    const userId = req.user.id;
+    const rolloutPercentage = 25;  // 25% on new model
+
+    // Deterministic assignment based on user ID
+    const bucket = hashUserId(userId) % 100;
+    const modelVersion = bucket < rolloutPercentage ? 'v2.tflite' : 'v1.tflite';
+
+    res.json({
+        modelUrl: `https://cdn.example.com/models/${modelVersion}`,
+        version: modelVersion
+    });
+});</code></pre>
+
+            <h3>A/B Testing Model Variants</h3>
+            <p>Compare multiple models simultaneously:</p>
+
+            <ul>
+                <li><strong>Model A:</strong> Baseline (current production model)</li>
+                <li><strong>Model B:</strong> Faster but slightly less accurate</li>
+                <li><strong>Model C:</strong> More accurate but larger size</li>
+            </ul>
+
+            <p>Measure user engagement, task completion, satisfaction for each variant. Deploy winner to all users.</p>
+
+            <h2>Error Handling and Fallbacks</h2>
+
+            <h3>Graceful Degradation</h3>
+            <p>Handle edge AI failures without breaking user experience:</p>
+
+            <pre><code>// Robust inference with fallbacks
+async function robustInference(input) {
+    try {
+        // Attempt on-device inference
+        const result = await edgeModel.infer(input);
+
+        if (result.confidence > 0.8) {
+            return result;  // High confidence, use edge result
+        }
+
+        // Low confidence, fall back to cloud for verification
+        const cloudResult = await cloudAPI.infer(input);
+        return cloudResult;
+
+    } catch (error) {
+        console.error('Edge inference failed:', error);
+
+        // Fallback 1: Try alternative on-device model
+        try {
+            return await lightweightModel.infer(input);
+        } catch (fallbackError) {
+            // Fallback 2: Cloud API (if connected)
+            if (navigator.onLine) {
+                return await cloudAPI.infer(input);
+            }
+
+            // Fallback 3: Return cached result or default
+            return getCachedResult(input) || getDefaultPrediction();
+        }
+    }
+}</code></pre>
+
+            <h3>Model Version Compatibility</h3>
+            <p>Handle scenarios where device has outdated model:</p>
+
+            <pre><code>// Model version negotiation
+const MINIMUM_MODEL_VERSION = 2;
+const CURRENT_MODEL_VERSION = 5;
+
+async function loadModel() {
+    const localVersion = getLocalModelVersion();
+
+    if (localVersion < MINIMUM_MODEL_VERSION) {
+        // Force update - app won't work with this old model
+        await downloadLatestModel();
+    } else if (localVersion < CURRENT_MODEL_VERSION) {
+        // Opportunistic update in background
+        scheduleBackgroundUpdate();
+    }
+
+    return loadLocalModel();
+}</code></pre>
+
+            <h2>Cost Optimization</h2>
+
+            <h3>Edge vs. Cloud Cost Analysis</h3>
+
+            <pre><code>// Cost comparison: 1 million inferences/month
+Edge AI:
+- Development: $50,000 (one-time)
+- Model optimization: $10,000 (one-time)
+- CDN hosting: $100/month
+- Monitoring: $200/month
+Total first year: $63,600
+Subsequent years: $3,600/year
+
+Cloud AI:
+- API calls: $0.002 per inference
+- 1M inferences × $0.002 = $2,000/month
+- Bandwidth: ~$500/month
+Total yearly: $30,000/year
+
+Break-even: ~2.5 years
+At 10M inferences/month: Edge AI saves $290,000/year</code></pre>
+
+            <h3>Hybrid Optimization</h3>
+            <p>Optimize cost by routing intelligently:</p>
+
+            <ul>
+                <li><strong>Simple queries:</strong> On-device (free marginal cost)</li>
+                <li><strong>Complex queries:</strong> Cloud (better accuracy justifies cost)</li>
+                <li><strong>Bulk operations:</strong> On-device (avoid per-query cloud fees)</li>
+            </ul>
+
+            <h2>Case Studies</h2>
+
+            <h3>Case Study 1: Smart Home Camera</h3>
+
+            <p><strong>Challenge:</strong> Deploy person detection to 100,000 cameras, minimize false alerts.</p>
+
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Edge AI model (MobileNet SSD) detects persons on-camera</li>
+                <li>Only upload 5-second clips when person detected</li>
+                <li>Cloud model verifies (reduces false positives by 80%)</li>
+                <li>Gradual rollout: 1% → 10% → 50% → 100% over 3 weeks</li>
+                <li>Monitoring: P95 latency 45ms, 0.02% crash rate</li>
+            </ul>
+
+            <p><strong>Results:</strong></p>
+            <ul>
+                <li>95% reduction in bandwidth (uploads only relevant clips)</li>
+                <li>12ms average detection latency vs. 350ms cloud-only</li>
+                <li>$280,000/year cloud cost savings</li>
+                <li>Works during internet outages</li>
+            </ul>
+
+            <h3>Case Study 2: Mobile Health App</h3>
+
+            <p><strong>Challenge:</strong> Detect irregular heart rhythms from wearable ECG, FDA clearance required.</p>
+
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>TinyML model on wearable (ARM Cortex-M4)</li>
+                <li>Analyzes ECG in real-time (30 second windows)</li>
+                <li>Alert on potential atrial fibrillation</li>
+                <li>Cloud verification for high-stakes decisions</li>
+                <li>Extensive validation: 500,000 ECG samples, 98.7% sensitivity</li>
+            </ul>
+
+            <p><strong>Results:</strong></p>
+            <ul>
+                <li>FDA 510(k) clearance obtained</li>
+                <li>10mW power consumption (20+ days battery life)</li>
+                <li>Detected afib in 47 early cases across 5,000 users</li>
+                <li>100% patient data privacy (no ECG uploaded)</li>
+            </ul>
+
+            <h3>Case Study 3: Retail Analytics</h3>
+
+            <p><strong>Challenge:</strong> Analyze customer behavior in 500 stores without transmitting video.</p>
+
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Edge AI on NVIDIA Jetson Nano per store</li>
+                <li>Person counting, heatmap generation, dwell time analysis</li>
+                <li>Transmit only aggregate statistics, no video</li>
+                <li>Federated learning improves model from all stores</li>
+            </ul>
+
+            <p><strong>Results:</strong></p>
+            <ul>
+                <li>99.8% counting accuracy</li>
+                <li>Privacy-compliant (GDPR, CCPA) - no identifiable data collected</li>
+                <li>Insights previously required manual counting</li>
+                <li>$2,500 per store (one-time) vs. $500/month cloud alternative</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>弘익人間 Deployment Principle:</strong></p>
+                <p>Production edge AI systems should empower users while preserving their privacy and dignity. Monitor system health, not individual users. Collect telemetry for improvement, not surveillance. Fail gracefully, protecting user experience even when technology fails.</p>
+            </div>
+
+            <h2>Future of Edge AI Deployment</h2>
+
+            <h3>Emerging Trends</h3>
+            <ul>
+                <li><strong>Edge-Native MLOps:</strong> Tools purpose-built for edge deployment (vs. adapting cloud tools)</li>
+                <li><strong>Zero-Touch Deployment:</strong> Fully automated pipelines from training to production</li>
+                <li><strong>Multi-Model Orchestration:</strong> Dynamically compose models based on context</li>
+                <li><strong>Edge Mesh Networks:</strong> Devices collaborate, sharing computation and models peer-to-peer</li>
+                <li><strong>WebAssembly for Edge AI:</strong> Portable, sandboxed ML inference across platforms</li>
+            </ul>
+
+            <h3>Standardization Efforts</h3>
+            <ul>
+                <li><strong>ONNX:</strong> Cross-framework model format</li>
+                <li><strong>OpenVINO:</strong> Unified inference across Intel edge devices</li>
+                <li><strong>TensorFlow Lite:</strong> De facto standard for mobile AI</li>
+                <li><strong>WIA Edge AI Standard:</strong> Interoperability for edge deployment (this standard!)</li>
+            </ul>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <p>Production edge AI deployment encompasses the full lifecycle from training to monitoring. Key considerations:</p>
+                <ul>
+                    <li><strong>Deployment Strategies:</strong> Bundled models, on-demand download, progressive loading based on use case</li>
+                    <li><strong>CI/CD Pipelines:</strong> Automated training, validation, optimization, and deployment with quality gates</li>
+                    <li><strong>Monitoring:</strong> Track latency, memory, crashes, confidence, data drift; detect and respond to issues</li>
+                    <li><strong>Gradual Rollouts:</strong> Canary deployments (5% → 25% → 50% → 100%) with rollback capability</li>
+                    <li><strong>Error Handling:</strong> Graceful degradation, multiple fallback layers, model version compatibility</li>
+                    <li><strong>Cost Optimization:</strong> Edge AI has high upfront cost but low marginal cost; breaks even at scale</li>
+                </ul>
+                <p>Real-world case studies demonstrate edge AI success across domains—smart home (95% bandwidth reduction), healthcare (FDA clearance), retail (privacy-compliant analytics). Future trends include edge-native MLOps, zero-touch deployment, and emerging standards for interoperability.</p>
+                <p>Production edge AI is not just about models—it's about building reliable, observable, maintainable systems that benefit users at scale.</p>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Compare application-bundled models vs. on-demand download. When would you use each?</li>
+                    <li>What are the key stages in an ML model CI/CD pipeline?</li>
+                    <li>Name five metrics that should be monitored for production edge AI systems.</li>
+                    <li>What is data drift, and how can it be detected?</li>
+                    <li>Explain the canary deployment strategy and why it's useful.</li>
+                    <li>How does A/B testing work for edge AI models?</li>
+                    <li>What is graceful degradation, and what fallback layers should be considered?</li>
+                    <li>At what scale does edge AI become cost-effective compared to cloud AI?</li>
+                    <li>Describe a real-world edge AI deployment and its key success metrics.</li>
+                    <li>What are three emerging trends in edge AI deployment?</li>
+                </ol>
+            </div>
+
+            <div style="margin-top: 4rem; padding: 2rem; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 12px; text-align: center;">
+                <h2 style="color: #10B981; margin-bottom: 1rem;">Congratulations!</h2>
+                <p style="font-size: 1.2rem; color: #cbd5e1;">You've completed the Edge AI comprehensive guide.</p>
+                <p style="margin-top: 1rem; color: #94a3b8;">You now understand edge AI fundamentals, optimization techniques, hardware accelerators, federated learning, privacy & security, and production deployment.</p>
+                <p style="margin-top: 2rem; font-size: 1.5rem; color: #10B981;">弘益人間</p>
+                <p style="color: #94a3b8;">"Benefit All Humanity"</p>
+            </div>
+        </article>
+
+        </div>
+</body>
+</html>

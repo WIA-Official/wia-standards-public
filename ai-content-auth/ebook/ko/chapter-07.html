@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: C2PA 통합 - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        .warning-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .success-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px;">제7장</div>
+            <h1>C2PA 통합</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">콘텐츠 출처 및 진위성 연합 표준 구현</p>
+        </header>
+
+        <h2>C2PA 소개</h2>
+        <p>C2PA(Coalition for Content Provenance and Authenticity)는 Adobe, Microsoft, BBC 등이 주도하는 업계 표준으로, 디지털 콘텐츠의 출처와 편집 이력을 추적하는 개방형 기술 표준입니다.</p>
+
+        <div class="info-box">
+            <strong>ℹ️ C2PA의 핵심 개념</strong><br>
+            • <strong>매니페스트:</strong> 콘텐츠에 대한 메타데이터와 어설션의 컨테이너<br>
+            • <strong>어설션:</strong> 콘텐츠에 대한 검증 가능한 주장<br>
+            • <strong>서명:</strong> 어설션을 암호화적으로 보호<br>
+            • <strong>하드 바인딩:</strong> 콘텐츠와 매니페스트의 불가분한 연결<br>
+            • <strong>신뢰 체인:</strong> 생성부터 현재까지의 완전한 이력
+        </div>
+
+        <h2>C2PA 아키텍처</h2>
+        <p>C2PA는 계층화된 아키텍처를 사용합니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>계층</th>
+                    <th>구성요소</th>
+                    <th>역할</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>자산</td>
+                    <td>이미지, 비디오, 오디오, 문서</td>
+                    <td>보호할 콘텐츠</td>
+                </tr>
+                <tr>
+                    <td>매니페스트</td>
+                    <td>메타데이터, 어설션, 서명</td>
+                    <td>콘텐츠 이력 및 주장</td>
+                </tr>
+                <tr>
+                    <td>매니페스트 스토어</td>
+                    <td>매니페스트 컬렉션</td>
+                    <td>편집 이력 관리</td>
+                </tr>
+                <tr>
+                    <td>신뢰 앵커</td>
+                    <td>인증서, 공개키</td>
+                    <td>서명자 검증</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>C2PA SDK 설치 및 설정</h2>
+        <p>C2PA JavaScript SDK를 사용하여 콘텐츠에 매니페스트를 추가합니다.</p>
+
+        <div class="code-block"><pre>
+// C2PA SDK 설치
+// npm install c2pa-node
+
+import { createC2pa, SigningAlgorithm } from 'c2pa-node';
+import { readFileSync, writeFileSync } from 'fs';
+
+class C2PAManager {
+    private c2pa: any;
+
+    async initialize(): Promise<void> {
+        // C2PA 인스턴스 생성
+        this.c2pa = createC2pa({
+            // 사용자 에이전트 식별
+            userAgent: 'WIA-AI-017/1.0'
+        });
+
+        console.log('✅ C2PA SDK 초기화 완료');
+    }
+
+    // 매니페스트 읽기
+    async readManifest(filePath: string): Promise<any> {
+        const fileBuffer = readFileSync(filePath);
+
+        const result = await this.c2pa.read({
+            buffer: fileBuffer,
+            mimeType: this.getMimeType(filePath)
+        });
+
+        if (result.manifestStore) {
+            console.log('✅ 매니페스트 발견');
+            return result.manifestStore;
+        }
+
+        console.log('⚠️ 매니페스트 없음');
+        return null;
+    }
+
+    // MIME 타입 결정
+    private getMimeType(filePath: string): string {
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        const mimeTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'mp4': 'video/mp4',
+            'mp3': 'audio/mpeg'
+        };
+        return mimeTypes[ext || ''] || 'application/octet-stream';
+    }
+}
+
+// 사용 예제
+const c2pa = new C2PAManager();
+await c2pa.initialize();
+
+const manifest = await c2pa.readManifest('photo.jpg');
+if (manifest) {
+    console.log('활성 매니페스트:', manifest.activeManifest);
+}
+</pre></div>
+
+        <h2>매니페스트 생성 및 삽입</h2>
+        <p>콘텐츠에 C2PA 매니페스트를 추가하여 출처와 편집 이력을 기록합니다.</p>
+
+        <div class="code-block"><pre>
+// 매니페스트 생성 및 삽입
+import { createC2pa } from 'c2pa-node';
+
+class C2PAManifestCreator {
+    // 매니페스트 정의 생성
+    createManifestDefinition(
+        assetInfo: {
+            title: string;
+            creator: string;
+            aiGenerated: boolean;
+            aiModel?: string;
+        }
+    ): any {
+        const manifest = {
+            // 클레임 생성자
+            claim_generator: 'WIA-AI-017/1.0',
+
+            // 제목
+            title: assetInfo.title,
+
+            // 어설션
+            assertions: [
+                // 크리에이티브 워크 어설션
+                {
+                    label: 'stds.schema-org.CreativeWork',
+                    data: {
+                        '@context': 'https://schema.org',
+                        '@type': 'CreativeWork',
+                        'author': [{
+                            '@type': 'Person',
+                            'name': assetInfo.creator
+                        }]
+                    }
+                }
+            ],
+
+            // 재료 (부모 자산)
+            ingredients: []
+        };
+
+        // AI 생성 어설션 추가
+        if (assetInfo.aiGenerated) {
+            manifest.assertions.push({
+                label: 'c2pa.ai.generated',
+                data: {
+                    aiModel: assetInfo.aiModel || 'Unknown',
+                    generatedAt: new Date().toISOString()
+                }
+            });
+        }
+
+        return manifest;
+    }
+
+    // 매니페스트를 자산에 삽입
+    async embedManifest(
+        inputPath: string,
+        outputPath: string,
+        manifestDef: any,
+        signingKey: string,
+        signingCert: string
+    ): Promise<void> {
+        const c2pa = createC2pa();
+
+        // 입력 파일 읽기
+        const sourceBuffer = readFileSync(inputPath);
+
+        // 서명 설정
+        const signer = {
+            algorithm: SigningAlgorithm.ES256,
+            privateKey: readFileSync(signingKey),
+            certificate: readFileSync(signingCert),
+            timestampAuthority: {
+                url: 'http://timestamp.digicert.com'
+            }
+        };
+
+        // 매니페스트 삽입
+        const result = await c2pa.sign({
+            buffer: sourceBuffer,
+            manifest: manifestDef,
+            signer,
+            options: {
+                // 자산 하드 바인딩 생성
+                reserve_size: 40960  // 40KB 예약
+            }
+        });
+
+        // 서명된 자산 저장
+        writeFileSync(outputPath, result.buffer);
+
+        console.log('✅ C2PA 매니페스트 삽입 완료');
+    }
+}
+
+// 사용 예제
+const creator = new C2PAManifestCreator();
+
+const manifestDef = creator.createManifestDefinition({
+    title: 'AI로 생성한 풍경',
+    creator: 'Jane Doe',
+    aiGenerated: true,
+    aiModel: 'DALL-E-3'
+});
+
+await creator.embedManifest(
+    'original.jpg',
+    'signed.jpg',
+    manifestDef,
+    'signing-key.pem',
+    'signing-cert.pem'
+);
+</pre></div>
+
+        <h2>어설션 타입</h2>
+        <p>C2PA는 다양한 어설션 타입을 지원합니다.</p>
+
+        <div class="code-block"><pre>
+// 일반적인 C2PA 어설션들
+class C2PAAssertions {
+    // 액션 어설션 (편집 작업)
+    createActionAssertion(
+        action: string,
+        software: string,
+        when: string
+    ): any {
+        return {
+            label: 'c2pa.actions',
+            data: {
+                actions: [{
+                    action,  // 'c2pa.edited', 'c2pa.filtered', etc.
+                    softwareAgent: software,
+                    when
+                }]
+            }
+        };
+    }
+
+    // 데이터 해시 어설션
+    createDataHashAssertion(
+        hash: string,
+        algorithm: string = 'sha256'
+    ): any {
+        return {
+            label: 'c2pa.hash.data',
+            data: {
+                alg: algorithm,
+                hash,
+                name: 'jumbf manifest'
+            }
+        };
+    }
+
+    // 트레이닝 마이닝 어설션 (AI 훈련 동의)
+    createTrainingMiningAssertion(
+        allowed: boolean
+    ): any {
+        return {
+            label: 'c2pa.training-mining',
+            data: {
+                entries: {
+                    'c2pa.ai.training': allowed,
+                    'c2pa.ai.inference': allowed,
+                    'c2pa.data_mining': allowed
+                }
+            }
+        };
+    }
+
+    // 위치 어설션
+    createLocationAssertion(
+        latitude: number,
+        longitude: number
+    ): any {
+        return {
+            label: 'stds.exif',
+            data: {
+                'exif:GPSLatitude': latitude,
+                'exif:GPSLongitude': longitude
+            }
+        };
+    }
+
+    // 생성형 AI 어설션
+    createGenerativeAIAssertion(
+        modelName: string,
+        version: string,
+        prompt?: string
+    ): any {
+        return {
+            label: 'c2pa.ai.generative',
+            data: {
+                model: modelName,
+                version,
+                prompt: prompt ? {
+                    // 프롬프트는 해시로 저장 (개인정보 보호)
+                    hash: 'sha256:' + prompt
+                } : undefined
+            }
+        };
+    }
+}
+
+// 사용 예제
+const assertions = new C2PAAssertions();
+
+// 편집 액션 추가
+const editAssertion = assertions.createActionAssertion(
+    'c2pa.color_adjustments',
+    'Adobe Photoshop 2025',
+    new Date().toISOString()
+);
+
+// AI 생성 표시
+const aiAssertion = assertions.createGenerativeAIAssertion(
+    'DALL-E-3',
+    '1.0',
+    'sha256_of_prompt'
+);
+
+// 훈련 동의 표시
+const trainingAssertion = assertions.createTrainingMiningAssertion(false);
+</pre></div>
+
+        <h2>재료(Ingredients) 관리</h2>
+        <p>부모 자산을 재료로 참조하여 편집 체인을 구축합니다.</p>
+
+        <div class="code-block"><pre>
+// 재료 관리
+class C2PAIngredientsManager {
+    // 재료 추가 (부모 자산 참조)
+    async addIngredient(
+        parentAssetPath: string,
+        relationship: 'parentOf' | 'componentOf'
+    ): Promise<any> {
+        // 부모 자산의 매니페스트 읽기
+        const c2pa = createC2pa();
+        const parentBuffer = readFileSync(parentAssetPath);
+
+        const parentManifest = await c2pa.read({
+            buffer: parentBuffer,
+            mimeType: this.getMimeType(parentAssetPath)
+        });
+
+        // 재료 정의 생성
+        const ingredient = {
+            title: 'Parent Asset',
+            relationship,
+
+            // 부모 자산의 해시 포함
+            hash: parentManifest?.activeManifest?.claim_generator_info?.name || '',
+
+            // 부모 매니페스트 참조
+            manifest_data: parentManifest?.activeManifest
+        };
+
+        return ingredient;
+    }
+
+    // 합성 매니페스트 생성 (여러 재료)
+    async createCompositeManifest(
+        ingredients: string[],
+        outputInfo: any
+    ): Promise<any> {
+        const manifestDef = {
+            claim_generator: 'WIA-AI-017/1.0',
+            title: outputInfo.title,
+
+            assertions: [
+                // 합성 액션
+                {
+                    label: 'c2pa.actions',
+                    data: {
+                        actions: [{
+                            action: 'c2pa.composed',
+                            softwareAgent: outputInfo.software,
+                            when: new Date().toISOString()
+                        }]
+                    }
+                }
+            ],
+
+            // 모든 재료 추가
+            ingredients: await Promise.all(
+                ingredients.map(path =>
+                    this.addIngredient(path, 'componentOf')
+                )
+            )
+        };
+
+        return manifestDef;
+    }
+
+    private getMimeType(filePath: string): string {
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        const mimeTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png'
+        };
+        return mimeTypes[ext || ''] || 'image/jpeg';
+    }
+}
+
+// 사용 예제
+const ingredientsManager = new C2PAIngredientsManager();
+
+// 여러 이미지를 합성한 경우
+const compositeManifest = await ingredientsManager.createCompositeManifest(
+    ['photo1.jpg', 'photo2.jpg', 'background.jpg'],
+    {
+        title: '합성 이미지',
+        software: 'Adobe Photoshop 2025'
+    }
+);
+</pre></div>
+
+        <h2>매니페스트 검증</h2>
+        <p>C2PA 매니페스트의 무결성과 신뢰 체인을 검증합니다.</p>
+
+        <div class="code-block"><pre>
+// 매니페스트 검증
+class C2PAValidator {
+    async validate(filePath: string): Promise<{
+        valid: boolean;
+        errors: string[];
+        warnings: string[];
+        details: any;
+    }> {
+        const c2pa = createC2pa();
+        const fileBuffer = readFileSync(filePath);
+
+        const result = await c2pa.read({
+            buffer: fileBuffer,
+            mimeType: this.getMimeType(filePath)
+        });
+
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        if (!result.manifestStore) {
+            errors.push('매니페스트 없음');
+            return { valid: false, errors, warnings, details: null };
+        }
+
+        const manifest = result.manifestStore.activeManifest;
+
+        // 1. 서명 검증
+        if (manifest.signature_info) {
+            const sigValid = await this.verifySignature(
+                manifest.signature_info
+            );
+            if (!sigValid) {
+                errors.push('서명 검증 실패');
+            }
+        } else {
+            errors.push('서명 없음');
+        }
+
+        // 2. 해시 무결성 검증
+        const hashValid = await this.verifyAssetHash(
+            fileBuffer,
+            manifest
+        );
+        if (!hashValid) {
+            errors.push('자산 해시 불일치 - 변조 가능성');
+        }
+
+        // 3. 타임스탬프 검증
+        if (manifest.signature_info?.time) {
+            const time = new Date(manifest.signature_info.time);
+            if (time > new Date()) {
+                errors.push('미래 타임스탬프 - 의심스러움');
+            }
+        }
+
+        // 4. 인증서 체인 검증
+        if (manifest.signature_info?.cert_chain) {
+            const certValid = await this.verifyCertChain(
+                manifest.signature_info.cert_chain
+            );
+            if (!certValid) {
+                errors.push('인증서 체인 검증 실패');
+            }
+        }
+
+        // 5. 재료 검증
+        if (manifest.ingredients) {
+            for (const ingredient of manifest.ingredients) {
+                // 각 재료의 매니페스트도 검증
+                // (재귀적 검증)
+            }
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings,
+            details: {
+                claimGenerator: manifest.claim_generator,
+                signatureInfo: manifest.signature_info,
+                assertionCount: manifest.assertions?.length || 0
+            }
+        };
+    }
+
+    private async verifySignature(signatureInfo: any): Promise<boolean> {
+        // 실제 구현에서는 암호화 라이브러리 사용
+        // 서명을 공개키로 검증
+        return true;  // 간소화
+    }
+
+    private async verifyAssetHash(
+        buffer: Buffer,
+        manifest: any
+    ): Promise<boolean> {
+        // 자산의 실제 해시 계산
+        const crypto = await import('crypto');
+        const hash = crypto.createHash('sha256');
+        hash.update(buffer);
+        const actualHash = hash.digest('hex');
+
+        // 매니페스트의 해시와 비교
+        // (실제로는 더 복잡한 하드 바인딩 검증)
+        return true;  // 간소화
+    }
+
+    private async verifyCertChain(certChain: any[]): Promise<boolean> {
+        // 인증서 체인 검증
+        // 1. 각 인증서가 상위 인증서로 서명되었는지 확인
+        // 2. 루트 CA가 신뢰할 수 있는지 확인
+        // 3. 인증서가 유효 기간 내인지 확인
+        return true;  // 간소화
+    }
+
+    private getMimeType(filePath: string): string {
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        const mimeTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png'
+        };
+        return mimeTypes[ext || ''] || 'image/jpeg';
+    }
+}
+
+// 사용 예제
+const validator = new C2PAValidator();
+const validation = await validator.validate('signed.jpg');
+
+if (validation.valid) {
+    console.log('✅ 매니페스트 유효');
+} else {
+    console.log('❌ 매니페스트 무효');
+    console.log('오류:', validation.errors);
+}
+</pre></div>
+
+        <h2>WIA-AI-017과 C2PA 통합</h2>
+        <p>WIA-AI-017 표준을 C2PA 매니페스트에 통합합니다.</p>
+
+        <div class="code-block"><pre>
+// WIA-AI-017 확장 어설션
+class WIAC2PAIntegration {
+    // WIA-AI-017 커스텀 어설션 생성
+    createWIAAssertion(
+        wiaRecord: any
+    ): any {
+        return {
+            label: 'wia.ai.content-auth',
+            data: {
+                standardVersion: 'WIA-AI-017-v1.0',
+
+                // 지문 정보
+                fingerprints: wiaRecord.fingerprints,
+
+                // 워터마크 정보
+                watermarks: wiaRecord.watermarks,
+
+                // 딥페이크 검출 결과
+                deepfakeDetection: wiaRecord.deepfakeDetection,
+
+                // WIA 출처 체인 URI
+                provenanceURI: wiaRecord.provenanceURI
+            }
+        };
+    }
+
+    // C2PA + WIA 통합 매니페스트 생성
+    async createIntegratedManifest(
+        assetInfo: any,
+        wiaData: any
+    ): Promise<any> {
+        const manifest = {
+            claim_generator: 'WIA-AI-017/1.0',
+            title: assetInfo.title,
+
+            assertions: [
+                // 표준 C2PA 어설션들
+                {
+                    label: 'stds.schema-org.CreativeWork',
+                    data: {
+                        '@context': 'https://schema.org',
+                        '@type': 'CreativeWork',
+                        'author': [{
+                            '@type': 'Person',
+                            'name': assetInfo.creator
+                        }]
+                    }
+                },
+
+                // WIA 확장 어설션
+                this.createWIAAssertion(wiaData)
+            ],
+
+            ingredients: []
+        };
+
+        return manifest;
+    }
+}
+
+// 사용 예제
+const integration = new WIAC2PAIntegration();
+
+const wiaData = {
+    fingerprints: [
+        { algorithm: 'pHash', hash: 'abc123...', confidence: 0.95 }
+    ],
+    watermarks: [
+        { algorithm: 'DCT', strength: 15, payload: 'WIA-AI-017' }
+    ],
+    deepfakeDetection: {
+        isDeepfake: false,
+        confidence: 0.98,
+        methods: ['CNN', 'GAN-Fingerprint']
+    },
+    provenanceURI: 'ipfs://QmXxx...'
+};
+
+const integratedManifest = await integration.createIntegratedManifest(
+    { title: 'My Photo', creator: 'Jane Doe' },
+    wiaData
+);
+</pre></div>
+
+        <h2>크로스 플랫폼 호환성</h2>
+        <p>C2PA 매니페스트는 다양한 플랫폼과 도구에서 인식됩니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>플랫폼/도구</th>
+                    <th>C2PA 지원</th>
+                    <th>기능</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Adobe Photoshop</td>
+                    <td>✅ 완전</td>
+                    <td>생성, 편집, 검증</td>
+                </tr>
+                <tr>
+                    <td>Content Credentials</td>
+                    <td>✅ 완전</td>
+                    <td>브라우저 검증</td>
+                </tr>
+                <tr>
+                    <td>Microsoft Designer</td>
+                    <td>✅ 완전</td>
+                    <td>AI 생성 표시</td>
+                </tr>
+                <tr>
+                    <td>Leica 카메라</td>
+                    <td>✅ 하드웨어</td>
+                    <td>촬영 시 생성</td>
+                </tr>
+                <tr>
+                    <td>BBC News</td>
+                    <td>✅ 뉴스</td>
+                    <td>진위성 검증</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="success-box">
+            <strong>✅ C2PA 모범 사례</strong><br>
+            • 모든 콘텐츠에 매니페스트 추가<br>
+            • 편집마다 새 매니페스트 생성<br>
+            • 신뢰할 수 있는 CA의 인증서 사용<br>
+            • 타임스탬프 서비스 활용<br>
+            • 재료로 부모 자산 참조<br>
+            • 정기적인 매니페스트 검증
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 요약</h3>
+            <ul>
+                <li>C2PA는 콘텐츠 출처 및 진위성을 위한 업계 표준</li>
+                <li>매니페스트는 메타데이터와 어설션의 컨테이너</li>
+                <li>어설션은 콘텐츠에 대한 검증 가능한 주장</li>
+                <li>재료를 통해 편집 체인 구축</li>
+                <li>암호화 서명으로 무결성 보장</li>
+                <li>크로스 플랫폼 호환성 제공</li>
+                <li>WIA-AI-017과 통합하여 확장 기능 제공</li>
+                <li>검증 프로세스로 신뢰 체인 유지</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 복습 문제</h3>
+            <ol>
+                <li>C2PA의 주요 목적은 무엇입니까?</li>
+                <li>매니페스트와 어설션의 차이를 설명하십시오.</li>
+                <li>하드 바인딩이란 무엇이며 왜 중요합니까?</li>
+                <li>재료(Ingredients)를 사용하는 이유는 무엇입니까?</li>
+                <li>C2PA 매니페스트를 검증할 때 확인하는 항목은 무엇입니까?</li>
+                <li>WIA-AI-017을 C2PA와 통합하는 방법을 설명하십시오.</li>
+                <li>C2PA를 지원하는 주요 플랫폼과 도구를 나열하십시오.</li>
+                <li>C2PA 사용 시 모범 사례는 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</p>
+
+        </div>
+</body>
+</html>

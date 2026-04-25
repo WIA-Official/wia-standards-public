@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Data Catalog Simulator - WIA-DATA-007</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 15px;
+            border: 2px solid #10B981;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #10B981;
+            margin-bottom: 0.5rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            color: #10B981;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 2px solid #10B981;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            background: #10B981;
+            color: #0f172a;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #334155;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            color: #cbd5e1;
+        }
+
+        .tab:hover {
+            border-color: #10B981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .tab.active {
+            background: #10B981;
+            color: #0f172a;
+            border-color: #10B981;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 2px solid #334155;
+            min-height: 500px;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #334155;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #10B981;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .data-card {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border: 2px solid #10B981;
+            transition: all 0.3s ease;
+        }
+
+        .data-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+        }
+
+        .data-card h3 {
+            color: #10B981;
+            margin-bottom: 0.5rem;
+        }
+
+        .data-card .label {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: rgba(16, 185, 129, 0.2);
+            border-radius: 5px;
+            font-size: 0.85rem;
+            margin: 0.25rem;
+        }
+
+        .metadata-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .metadata-table th,
+        .metadata-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+
+        .metadata-table th {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10B981;
+        }
+
+        .metadata-table tr:hover {
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .lineage-container {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        .lineage-flow {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+        }
+
+        .lineage-node {
+            min-width: 150px;
+            padding: 1rem;
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10B981;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .lineage-arrow {
+            color: #10B981;
+            font-size: 2rem;
+        }
+
+        .glossary-item {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid #10B981;
+            margin-bottom: 1rem;
+        }
+
+        .glossary-item h3 {
+            color: #10B981;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: #10B981;
+            color: #0f172a;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border: 2px solid #10B981;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            color: #10B981;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            margin-top: 0.5rem;
+        }
+
+        .result-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(16, 185, 129, 0.2);
+            border-radius: 8px;
+            border-left: 4px solid #10B981;
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Data Catalog</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <a href="../index.html" class="back-link">← Back to Home</a>
+
+        <header>
+            <h1>📚 Data Catalog Simulator</h1>
+            <p>WIA-DATA-007 Interactive Experience</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('discovery')">🔍 Data Discovery</div>
+            <div class="tab" onclick="switchTab('metadata')">📋 Metadata Management</div>
+            <div class="tab" onclick="switchTab('lineage')">🔗 Data Lineage</div>
+            <div class="tab" onclick="switchTab('glossary')">📚 Business Glossary</div>
+            <div class="tab" onclick="switchTab('classification')">🏷️ Classification</div>
+        </div>
+
+        <!-- Tab 1: Data Discovery -->
+        <div id="discovery" class="tab-content active">
+            <h2>🔍 Data Discovery & Search</h2>
+            <p>조직의 모든 데이터 자산을 검색하고 발견하세요.</p>
+
+            <input type="text" id="searchInput" class="search-box" placeholder="데이터셋, 테이블, 컬럼을 검색하세요... (예: customer, order, user)" onkeyup="searchData()">
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">1,247</div>
+                    <div class="stat-label">Total Datasets</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">8,934</div>
+                    <div class="stat-label">Tables</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">124,567</div>
+                    <div class="stat-label">Columns</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">89%</div>
+                    <div class="stat-label">Documented</div>
+                </div>
+            </div>
+
+            <div id="searchResults" class="data-grid">
+                <div class="data-card">
+                    <h3>customers</h3>
+                    <p>고객 정보를 저장하는 메인 테이블</p>
+                    <div>
+                        <span class="label">Database: prod_db</span>
+                        <span class="label">Schema: public</span>
+                        <span class="label">Type: Table</span>
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #94a3b8;">
+                        Owner: data-team@company.com | Updated: 2025-12-20
+                    </p>
+                </div>
+
+                <div class="data-card">
+                    <h3>orders</h3>
+                    <p>주문 정보 및 트랜잭션 데이터</p>
+                    <div>
+                        <span class="label">Database: prod_db</span>
+                        <span class="label">Schema: sales</span>
+                        <span class="label">Type: Table</span>
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #94a3b8;">
+                        Owner: sales-team@company.com | Updated: 2025-12-25
+                    </p>
+                </div>
+
+                <div class="data-card">
+                    <h3>user_behavior_logs</h3>
+                    <p>사용자 행동 로그 및 이벤트 데이터</p>
+                    <div>
+                        <span class="label">Database: analytics_db</span>
+                        <span class="label">Schema: events</span>
+                        <span class="label">Type: Table</span>
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #94a3b8;">
+                        Owner: analytics-team@company.com | Updated: 2025-12-26
+                    </p>
+                </div>
+
+                <div class="data-card">
+                    <h3>product_catalog</h3>
+                    <p>제품 카탈로그 및 재고 정보</p>
+                    <div>
+                        <span class="label">Database: prod_db</span>
+                        <span class="label">Schema: inventory</span>
+                        <span class="label">Type: Table</span>
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #94a3b8;">
+                        Owner: product-team@company.com | Updated: 2025-12-24
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Metadata Management -->
+        <div id="metadata" class="tab-content">
+            <h2>📋 Metadata Management</h2>
+            <p>데이터 자산의 메타데이터를 관리하고 문서화하세요.</p>
+
+            <h3 style="color: #10B981; margin: 2rem 0 1rem 0;">Table: customers</h3>
+
+            <table class="metadata-table">
+                <thead>
+                    <tr>
+                        <th>Column Name</th>
+                        <th>Data Type</th>
+                        <th>Description</th>
+                        <th>Classification</th>
+                        <th>Quality Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>customer_id</strong></td>
+                        <td>BIGINT</td>
+                        <td>고객 고유 식별자 (Primary Key)</td>
+                        <td><span class="label">Identifier</span></td>
+                        <td style="color: #10B981;">98%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>email</strong></td>
+                        <td>VARCHAR(255)</td>
+                        <td>고객 이메일 주소</td>
+                        <td><span class="label">PII</span></td>
+                        <td style="color: #10B981;">95%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>full_name</strong></td>
+                        <td>VARCHAR(200)</td>
+                        <td>고객 전체 이름</td>
+                        <td><span class="label">PII</span></td>
+                        <td style="color: #10B981;">92%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>phone_number</strong></td>
+                        <td>VARCHAR(20)</td>
+                        <td>고객 전화번호</td>
+                        <td><span class="label">PII</span></td>
+                        <td style="color: #f59e0b;">78%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>registration_date</strong></td>
+                        <td>TIMESTAMP</td>
+                        <td>계정 등록 일시</td>
+                        <td><span class="label">Temporal</span></td>
+                        <td style="color: #10B981;">100%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>customer_segment</strong></td>
+                        <td>VARCHAR(50)</td>
+                        <td>고객 세그먼트 (VIP, Regular, New)</td>
+                        <td><span class="label">Business</span></td>
+                        <td style="color: #10B981;">89%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>lifetime_value</strong></td>
+                        <td>DECIMAL(10,2)</td>
+                        <td>고객 생애 가치 (LTV)</td>
+                        <td><span class="label">Financial</span></td>
+                        <td style="color: #10B981;">94%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <button class="btn" style="margin-top: 2rem;" onclick="updateMetadata()">Update Metadata</button>
+            <div id="metadataResult"></div>
+        </div>
+
+        <!-- Tab 3: Data Lineage -->
+        <div id="lineage" class="tab-content">
+            <h2>🔗 Data Lineage Tracking</h2>
+            <p>데이터의 흐름과 변환 과정을 추적하세요.</p>
+
+            <h3 style="color: #10B981; margin: 2rem 0 1rem 0;">Lineage: customer_analytics_report</h3>
+
+            <div class="lineage-container">
+                <div class="lineage-flow">
+                    <div class="lineage-node">
+                        <strong>Source</strong><br>
+                        customers<br>
+                        <small>PostgreSQL</small>
+                    </div>
+                    <div class="lineage-arrow">→</div>
+                    <div class="lineage-node">
+                        <strong>ETL</strong><br>
+                        customer_transform<br>
+                        <small>Apache Spark</small>
+                    </div>
+                    <div class="lineage-arrow">→</div>
+                    <div class="lineage-node">
+                        <strong>Staging</strong><br>
+                        stg_customers<br>
+                        <small>Data Warehouse</small>
+                    </div>
+                    <div class="lineage-arrow">→</div>
+                    <div class="lineage-node">
+                        <strong>Analytics</strong><br>
+                        customer_analytics<br>
+                        <small>BigQuery</small>
+                    </div>
+                    <div class="lineage-arrow">→</div>
+                    <div class="lineage-node">
+                        <strong>Report</strong><br>
+                        customer_report<br>
+                        <small>Tableau</small>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="color: #10B981; margin: 2rem 0 1rem 0;">Transformation Details</h3>
+
+            <div class="glossary-item">
+                <h3>Step 1: Data Extraction</h3>
+                <p><strong>Source:</strong> PostgreSQL customers table</p>
+                <p><strong>Tool:</strong> Apache Airflow DAG</p>
+                <p><strong>Schedule:</strong> Daily at 02:00 UTC</p>
+                <p><strong>Records:</strong> ~500K rows</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Step 2: Data Transformation</h3>
+                <p><strong>Process:</strong> customer_transform Spark job</p>
+                <p><strong>Operations:</strong> Cleansing, standardization, enrichment</p>
+                <p><strong>Business Rules:</strong> Customer segmentation, LTV calculation</p>
+                <p><strong>Output:</strong> Cleaned and enriched customer data</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Step 3: Data Loading</h3>
+                <p><strong>Destination:</strong> BigQuery customer_analytics table</p>
+                <p><strong>Load Type:</strong> Incremental (SCD Type 2)</p>
+                <p><strong>Partition:</strong> By registration_date</p>
+                <p><strong>Update Frequency:</strong> Daily</p>
+            </div>
+
+            <button class="btn" onclick="trackLineage()">Track Complete Lineage</button>
+            <div id="lineageResult"></div>
+        </div>
+
+        <!-- Tab 4: Business Glossary -->
+        <div id="glossary" class="tab-content">
+            <h2>📚 Business Glossary</h2>
+            <p>비즈니스 용어의 정의와 의미를 표준화하세요.</p>
+
+            <input type="text" class="search-box" placeholder="비즈니스 용어를 검색하세요...">
+
+            <div class="glossary-item">
+                <h3>Customer Lifetime Value (LTV)</h3>
+                <p><strong>정의:</strong> 고객이 기업과의 관계 동안 창출할 것으로 예상되는 총 수익</p>
+                <p><strong>계산식:</strong> (평균 주문 금액) × (연간 구매 빈도) × (고객 유지 기간)</p>
+                <p><strong>비즈니스 목적:</strong> 마케팅 투자 ROI 측정, 고객 세그먼테이션</p>
+                <p><strong>관련 데이터:</strong> customers.lifetime_value, orders.total_amount</p>
+                <p><strong>Owner:</strong> Marketing Analytics Team</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Customer Segment</h3>
+                <p><strong>정의:</strong> 고객을 특정 기준에 따라 분류한 그룹</p>
+                <p><strong>카테고리:</strong></p>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li><strong>VIP:</strong> LTV > $10,000, 활동 점수 > 90</li>
+                    <li><strong>Regular:</strong> LTV $1,000-$10,000, 활동 점수 50-90</li>
+                    <li><strong>New:</strong> 등록 후 3개월 이내</li>
+                    <li><strong>At-Risk:</strong> 최근 6개월 구매 없음</li>
+                </ul>
+                <p><strong>비즈니스 목적:</strong> 타겟 마케팅, 개인화된 서비스 제공</p>
+                <p><strong>관련 데이터:</strong> customers.customer_segment</p>
+                <p><strong>Owner:</strong> Customer Success Team</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Active User</h3>
+                <p><strong>정의:</strong> 지정된 기간 내에 서비스를 이용한 사용자</p>
+                <p><strong>측정 기준:</strong></p>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li><strong>DAU (Daily Active User):</strong> 하루 동안 1회 이상 로그인</li>
+                    <li><strong>WAU (Weekly Active User):</strong> 주간 1회 이상 로그인</li>
+                    <li><strong>MAU (Monthly Active User):</strong> 월간 1회 이상 로그인</li>
+                </ul>
+                <p><strong>비즈니스 목적:</strong> 서비스 건강도 모니터링, 성장 지표</p>
+                <p><strong>관련 데이터:</strong> user_behavior_logs.event_type, users.last_login_date</p>
+                <p><strong>Owner:</strong> Product Analytics Team</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Conversion Rate</h3>
+                <p><strong>정의:</strong> 특정 행동을 완료한 사용자의 비율</p>
+                <p><strong>계산식:</strong> (전환 수 / 전체 방문자 수) × 100</p>
+                <p><strong>예시:</strong></p>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li>회원가입 전환율: 회원가입 완료 / 랜딩 페이지 방문</li>
+                    <li>구매 전환율: 구매 완료 / 제품 페이지 조회</li>
+                </ul>
+                <p><strong>비즈니스 목적:</strong> 퍼널 최적화, A/B 테스트 평가</p>
+                <p><strong>관련 데이터:</strong> events.conversion_events, orders.completed</p>
+                <p><strong>Owner:</strong> Growth Team</p>
+            </div>
+
+            <button class="btn" onclick="addGlossaryTerm()">Add New Term</button>
+            <div id="glossaryResult"></div>
+        </div>
+
+        <!-- Tab 5: Classification & Tagging -->
+        <div id="classification" class="tab-content">
+            <h2>🏷️ Data Classification & Tagging</h2>
+            <p>데이터를 분류하고 태그를 부여하여 관리하세요.</p>
+
+            <h3 style="color: #10B981; margin: 2rem 0 1rem 0;">Classification Categories</h3>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">2,145</div>
+                    <div class="stat-label">PII (Personal Info)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">1,876</div>
+                    <div class="stat-label">Financial</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">4,523</div>
+                    <div class="stat-label">Business</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">3,390</div>
+                    <div class="stat-label">Operational</div>
+                </div>
+            </div>
+
+            <h3 style="color: #10B981; margin: 2rem 0 1rem 0;">Auto-Classification Rules</h3>
+
+            <div class="glossary-item">
+                <h3>Rule 1: PII Detection</h3>
+                <p><strong>Pattern:</strong> email, phone, ssn, address, name</p>
+                <p><strong>Classification:</strong> PII (Personally Identifiable Information)</p>
+                <p><strong>Security Level:</strong> High</p>
+                <p><strong>Actions:</strong> Encryption required, Access logging enabled</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Rule 2: Financial Data</h3>
+                <p><strong>Pattern:</strong> amount, price, revenue, cost, payment</p>
+                <p><strong>Classification:</strong> Financial</p>
+                <p><strong>Security Level:</strong> High</p>
+                <p><strong>Actions:</strong> Audit trail required, Restricted access</p>
+            </div>
+
+            <div class="glossary-item">
+                <h3>Rule 3: Temporal Data</h3>
+                <p><strong>Pattern:</strong> date, timestamp, time, created_at, updated_at</p>
+                <p><strong>Classification:</strong> Temporal</p>
+                <p><strong>Security Level:</strong> Low</p>
+                <p><strong>Actions:</strong> Time-based partitioning recommended</p>
+            </div>
+
+            <h3 style="color: #10B981; margin: 2rem 0 1rem 0;">Tag Management</h3>
+
+            <div class="data-grid">
+                <div class="data-card">
+                    <h3>customers table</h3>
+                    <div>
+                        <span class="label">Domain: Customer</span>
+                        <span class="label">Team: CRM</span>
+                        <span class="label">Criticality: High</span>
+                        <span class="label">Compliance: GDPR</span>
+                        <span class="label">Compliance: CCPA</span>
+                        <span class="label">Quality: Gold</span>
+                    </div>
+                </div>
+
+                <div class="data-card">
+                    <h3>orders table</h3>
+                    <div>
+                        <span class="label">Domain: Sales</span>
+                        <span class="label">Team: Sales Ops</span>
+                        <span class="label">Criticality: High</span>
+                        <span class="label">Compliance: PCI-DSS</span>
+                        <span class="label">Quality: Gold</span>
+                    </div>
+                </div>
+
+                <div class="data-card">
+                    <h3>user_behavior_logs</h3>
+                    <div>
+                        <span class="label">Domain: Analytics</span>
+                        <span class="label">Team: Data Science</span>
+                        <span class="label">Criticality: Medium</span>
+                        <span class="label">Compliance: GDPR</span>
+                        <span class="label">Quality: Silver</span>
+                    </div>
+                </div>
+
+                <div class="data-card">
+                    <h3>product_catalog</h3>
+                    <div>
+                        <span class="label">Domain: Product</span>
+                        <span class="label">Team: Product Ops</span>
+                        <span class="label">Criticality: Medium</span>
+                        <span class="label">Quality: Gold</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn" style="margin-top: 2rem;" onclick="classifyData()">Run Auto-Classification</button>
+            <div id="classificationResult"></div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+
+            // Deactivate all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Activate selected tab
+            event.target.classList.add('active');
+        }
+
+        function searchData() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('#searchResults .data-card');
+
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(input)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function updateMetadata() {
+            const result = document.getElementById('metadataResult');
+            result.innerHTML = `
+                <div class="result-message">
+                    ✅ <strong>Success!</strong> Metadata has been updated successfully.<br>
+                    - Updated 7 column descriptions<br>
+                    - Applied 4 PII classifications<br>
+                    - Data quality scores recalculated<br>
+                    - Timestamp: ${new Date().toLocaleString('ko-KR')}
+                </div>
+            `;
+        }
+
+        function trackLineage() {
+            const result = document.getElementById('lineageResult');
+            result.innerHTML = `
+                <div class="result-message">
+                    ✅ <strong>Lineage Tracked!</strong> Complete data flow has been mapped.<br>
+                    - 5 transformation steps identified<br>
+                    - 3 data systems involved<br>
+                    - 2 business rules applied<br>
+                    - Impact analysis: 12 downstream dependencies
+                </div>
+            `;
+        }
+
+        function addGlossaryTerm() {
+            const result = document.getElementById('glossaryResult');
+            result.innerHTML = `
+                <div class="result-message">
+                    ✅ <strong>Term Added!</strong> New business term has been registered.<br>
+                    - Term awaiting approval from Data Governance Team<br>
+                    - Notification sent to stakeholders<br>
+                    - Review period: 5 business days
+                </div>
+            `;
+        }
+
+        function classifyData() {
+            const result = document.getElementById('classificationResult');
+            result.innerHTML = `
+                <div class="result-message">
+                    ✅ <strong>Classification Complete!</strong> Auto-classification scan finished.<br>
+                    - Scanned: 8,934 tables<br>
+                    - Classified: 124,567 columns<br>
+                    - PII detected: 2,145 columns<br>
+                    - Financial data: 1,876 columns<br>
+                    - New tags applied: 15,234<br>
+                    - Execution time: 47 seconds
+                </div>
+            `;
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 디지털 서명과 암호화 - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        .warning-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .success-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px;">제2장</div>
+            <h1>디지털 서명과 암호화</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">콘텐츠 진위성과 무결성을 보장하는 암호화 기법</p>
+        </header>
+
+        <h2>암호화 기초</h2>
+        <p>디지털 서명은 콘텐츠 인증의 핵심 기술입니다. 이는 공개 키 암호화(PKI)를 기반으로 하여 두 가지 핵심 보장을 제공합니다: 진위성(authenticity)과 무결성(integrity)입니다. 진위성은 콘텐츠가 주장된 생성자로부터 실제로 왔다는 것을 증명하고, 무결성은 서명 후 콘텐츠가 변경되지 않았음을 보장합니다.</p>
+
+        <p>디지털 서명의 작동 방식을 이해하기 위해서는 먼저 비대칭 암호화의 기본 개념을 파악해야 합니다.</p>
+
+        <h3>공개 키 암호화 원리</h3>
+        <p>비대칭 암호화는 수학적으로 연결되지만 서로 다른 두 개의 키를 사용합니다:</p>
+
+        <ul>
+            <li><strong>개인 키(Private Key):</strong> 비밀로 유지되며 서명 생성에 사용</li>
+            <li><strong>공개 키(Public Key):</strong> 공개적으로 공유되며 서명 검증에 사용</li>
+        </ul>
+
+        <p>이 비대칭성은 강력한 보안 속성을 가능하게 합니다. 공개 키를 알고 있어도 개인 키를 계산하는 것은 컴퓨터적으로 불가능합니다.</p>
+
+        <div class="code-block"><pre>
+// 키 쌍 생성 예제 (Ed25519 사용)
+import { generateKeyPairSync } from 'crypto';
+
+// Ed25519 키 쌍 생성
+const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
+    publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem'
+    },
+    privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem'
+    }
+});
+
+console.log('공개 키:', publicKey);
+console.log('개인 키:', privateKey);
+</pre></div>
+
+        <h2>해시 함수의 역할</h2>
+        <p>디지털 서명은 전체 콘텐츠에 직접 서명하지 않습니다. 대신 암호화 해시 함수를 사용하여 콘텐츠의 고정 크기 지문을 생성합니다. 이 접근 방식은 효율성과 보안을 모두 제공합니다.</p>
+
+        <h3>암호화 해시 함수의 속성</h3>
+        <ul>
+            <li><strong>결정론적:</strong> 동일한 입력은 항상 동일한 해시를 생성</li>
+            <li><strong>고정 크기:</strong> 입력 크기에 관계없이 출력 크기는 일정</li>
+            <li><strong>일방향:</strong> 해시에서 원본 데이터를 역산하는 것이 불가능</li>
+            <li><strong>충돌 저항성:</strong> 동일한 해시를 생성하는 두 개의 다른 입력을 찾기 극도로 어려움</li>
+            <li><strong>눈사태 효과:</strong> 입력의 작은 변경이 완전히 다른 해시를 생성</li>
+        </ul>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>알고리즘</th>
+                    <th>출력 크기</th>
+                    <th>보안 상태</th>
+                    <th>권장 사용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>MD5</td>
+                    <td>128 비트</td>
+                    <td>❌ 손상됨</td>
+                    <td>사용 금지</td>
+                </tr>
+                <tr>
+                    <td>SHA-1</td>
+                    <td>160 비트</td>
+                    <td>⚠️ 약함</td>
+                    <td>레거시만</td>
+                </tr>
+                <tr>
+                    <td>SHA-256</td>
+                    <td>256 비트</td>
+                    <td>✅ 안전함</td>
+                    <td>범용</td>
+                </tr>
+                <tr>
+                    <td>SHA-512</td>
+                    <td>512 비트</td>
+                    <td>✅ 매우 안전함</td>
+                    <td>높은 보안</td>
+                </tr>
+                <tr>
+                    <td>SHA-3</td>
+                    <td>224-512 비트</td>
+                    <td>✅ 최신</td>
+                    <td>미래 보장</td>
+                </tr>
+                <tr>
+                    <td>BLAKE3</td>
+                    <td>256 비트</td>
+                    <td>✅ 고속</td>
+                    <td>대용량 파일</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block"><pre>
+// 다양한 해시 알고리즘으로 콘텐츠 해싱
+import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
+
+// 이미지 파일 읽기
+const imageBuffer = readFileSync('photo.jpg');
+
+// SHA-256 해시 계산
+const sha256Hash = createHash('sha256')
+    .update(imageBuffer)
+    .digest('hex');
+
+// SHA-512 해시 계산
+const sha512Hash = createHash('sha512')
+    .update(imageBuffer)
+    .digest('hex');
+
+// SHA-3 해시 계산
+const sha3Hash = createHash('sha3-256')
+    .update(imageBuffer)
+    .digest('hex');
+
+console.log('SHA-256:', sha256Hash);
+console.log('SHA-512:', sha512Hash);
+console.log('SHA-3:', sha3Hash);
+</pre></div>
+
+        <h2>디지털 서명 알고리즘</h2>
+        <p>여러 디지털 서명 알고리즘이 있으며 각각 고유한 강점과 트레이드오프가 있습니다. WIA-AI-017은 세 가지 주요 알고리즘군을 지원합니다.</p>
+
+        <h3>RSA (Rivest-Shamir-Adleman)</h3>
+        <p>RSA는 가장 오래되고 널리 배포된 디지털 서명 알고리즘입니다. 큰 소수의 곱셈은 쉽지만 인수분해는 어렵다는 수학적 어려움에 기반합니다.</p>
+
+        <ul>
+            <li><strong>장점:</strong> 광범위한 지원, 잘 이해됨, 성숙한 구현</li>
+            <li><strong>단점:</strong> 큰 키 크기(2048-4096 비트), 느린 서명/검증</li>
+            <li><strong>사용 사례:</strong> 레거시 시스템, PKI 인프라</li>
+        </ul>
+
+        <div class="code-block"><pre>
+// RSA 서명 생성 및 검증
+import { createSign, createVerify } from 'crypto';
+
+// 콘텐츠 해시 계산
+const content = readFileSync('document.pdf');
+const hash = createHash('sha256').update(content).digest();
+
+// RSA 서명 생성
+const sign = createSign('RSA-SHA256');
+sign.update(hash);
+const signature = sign.sign(privateKey, 'hex');
+
+// 서명 검증
+const verify = createVerify('RSA-SHA256');
+verify.update(hash);
+const isValid = verify.verify(publicKey, signature, 'hex');
+
+console.log('서명 유효성:', isValid);
+</pre></div>
+
+        <h3>ECDSA (Elliptic Curve Digital Signature Algorithm)</h3>
+        <p>ECDSA는 타원 곡선 암호화를 사용하여 RSA보다 훨씬 작은 키로 동등한 보안을 제공합니다. 이는 대역폭과 저장 공간을 절약합니다.</p>
+
+        <ul>
+            <li><strong>장점:</strong> 작은 키 크기(256 비트), 빠른 연산, 낮은 대역폭</li>
+            <li><strong>단점:</strong> 구현 복잡성, 부채널 공격에 취약할 수 있음</li>
+            <li><strong>사용 사례:</strong> 모바일 앱, IoT 장치, 블록체인</li>
+        </ul>
+
+        <div class="warning-box">
+            <strong>⚠️ 곡선 선택</strong><br>
+            모든 타원 곡선이 동등하게 안전한 것은 아닙니다. NIST P-256, P-384, P-521 또는 Curve25519와 같은 잘 연구된 곡선을 사용하십시오. 사용자 정의 곡선이나 검증되지 않은 매개변수는 피하십시오.
+        </div>
+
+        <div class="code-block"><pre>
+// ECDSA 서명 (P-256 곡선 사용)
+import { generateKeyPairSync, createSign, createVerify } from 'crypto';
+
+// P-256 곡선으로 ECDSA 키 쌍 생성
+const { publicKey, privateKey } = generateKeyPairSync('ec', {
+    namedCurve: 'P-256',
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+});
+
+// 콘텐츠에 서명
+const content = '인증할 중요한 콘텐츠';
+const sign = createSign('SHA256');
+sign.update(content);
+const signature = sign.sign(privateKey, 'base64');
+
+// 서명 검증
+const verify = createVerify('SHA256');
+verify.update(content);
+const isValid = verify.verify(publicKey, signature, 'base64');
+
+console.log('ECDSA 서명 검증:', isValid);
+</pre></div>
+
+        <h3>EdDSA (Edwards-curve Digital Signature Algorithm)</h3>
+        <p>Ed25519는 최신 서명 알고리즘으로 보안, 성능 및 단순성에 최적화되었습니다. 많은 일반적인 구현 실수에 대해 저항력이 있습니다.</p>
+
+        <ul>
+            <li><strong>장점:</strong> 매우 빠름, 결정론적, 부채널 공격 저항성</li>
+            <li><strong>단점:</strong> 새로운 표준(일부 레거시 시스템에서 지원 부족)</li>
+            <li><strong>사용 사례:</strong> 새로운 프로젝트, 고성능 시스템, 암호화 화폐</li>
+        </ul>
+
+        <div class="success-box">
+            <strong>✅ WIA-AI-017 권장사항</strong><br>
+            새로운 구현의 경우 Ed25519를 권장합니다. 이는 우수한 성능, 강력한 보안 및 구현 용이성을 제공합니다. 레거시 호환성이 필요한 경우에만 RSA 또는 ECDSA를 사용하십시오.
+        </div>
+
+        <div class="code-block"><pre>
+// Ed25519 서명 - 권장 접근 방식
+import { generateKeyPairSync, sign, verify } from 'crypto';
+
+// Ed25519 키 쌍 생성
+const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+
+// 콘텐츠 준비
+const content = Buffer.from('인증할 이미지 데이터');
+
+// 서명 생성 (해싱이 내부적으로 처리됨)
+const signature = sign(null, content, privateKey);
+
+// 서명 검증
+const isValid = verify(null, content, publicKey, signature);
+
+console.log('Ed25519 서명 검증:', isValid);
+console.log('서명 크기:', signature.length, '바이트');
+</pre></div>
+
+        <h2>서명 메타데이터 구조</h2>
+        <p>디지털 서명은 단지 암호화 바이트만이 아닙니다. 검증 가능성을 위해 풍부한 메타데이터와 함께 제공되어야 합니다.</p>
+
+        <h3>필수 서명 필드</h3>
+        <div class="code-block"><pre>
+// WIA-AI-017 서명 매니페스트 구조
+interface SignatureManifest {
+    // 서명 식별
+    signatureId: string;              // 고유 서명 ID (UUID)
+    version: string;                  // 매니페스트 버전 (예: "1.0")
+
+    // 콘텐츠 참조
+    contentHash: string;              // SHA-256 콘텐츠 해시
+    contentType: string;              // MIME 타입 (image/jpeg 등)
+    contentSize: number;              // 바이트 단위 크기
+
+    // 암호화 정보
+    algorithm: string;                // 서명 알고리즘 (Ed25519, ECDSA, RSA)
+    hashAlgorithm: string;            // 해시 알고리즘 (SHA-256, SHA-512)
+    signature: string;                // Base64 인코딩된 서명
+    publicKey: string;                // Base64 인코딩된 공개 키
+
+    // 서명자 정보
+    signer: {
+        name: string;                 // 서명자 이름/조직
+        email?: string;               // 연락 이메일
+        did?: string;                 // 분산 식별자 (선택)
+    };
+
+    // 타임스탬프
+    signedAt: string;                 // ISO 8601 타임스탬프
+    expiresAt?: string;               // 서명 만료 (선택)
+
+    // 추가 컨텍스트
+    purpose?: string;                 // 서명 목적
+    chain?: SignatureManifest[];      // 이전 서명 체인
+}
+</pre></div>
+
+        <h3>서명 생성 완전한 예제</h3>
+        <div class="code-block"><pre>
+// 완전한 서명 매니페스트 생성
+import { v4 as uuidv4 } from 'uuid';
+import { generateKeyPairSync, sign, createHash } from 'crypto';
+import { readFileSync } from 'fs';
+
+class ContentSigner {
+    private privateKey: Buffer;
+    private publicKey: Buffer;
+
+    constructor() {
+        // 키 쌍 생성
+        const keys = generateKeyPairSync('ed25519');
+        this.privateKey = keys.privateKey;
+        this.publicKey = keys.publicKey;
+    }
+
+    signContent(filePath: string, signerName: string): SignatureManifest {
+        // 콘텐츠 읽기
+        const content = readFileSync(filePath);
+
+        // 콘텐츠 해시 계산
+        const contentHash = createHash('sha256')
+            .update(content)
+            .digest('base64');
+
+        // 서명 생성
+        const signature = sign(null, content, this.privateKey);
+
+        // 매니페스트 구성
+        const manifest: SignatureManifest = {
+            signatureId: uuidv4(),
+            version: '1.0',
+            contentHash: contentHash,
+            contentType: 'image/jpeg',
+            contentSize: content.length,
+            algorithm: 'Ed25519',
+            hashAlgorithm: 'SHA-256',
+            signature: signature.toString('base64'),
+            publicKey: this.publicKey.toString('base64'),
+            signer: {
+                name: signerName,
+                email: 'signer@example.com'
+            },
+            signedAt: new Date().toISOString(),
+            purpose: 'AI 콘텐츠 인증'
+        };
+
+        return manifest;
+    }
+}
+
+// 사용 예제
+const signer = new ContentSigner();
+const manifest = signer.signContent('photo.jpg', 'WIA 콘텐츠 연구소');
+console.log('서명 매니페스트:', JSON.stringify(manifest, null, 2));
+</pre></div>
+
+        <h2>서명 검증 프로세스</h2>
+        <p>서명 생성보다 검증이 더 중요합니다. 검증 프로세스는 여러 단계를 거쳐 진위성과 무결성을 모두 확인해야 합니다.</p>
+
+        <h3>검증 단계</h3>
+        <ol>
+            <li><strong>매니페스트 파싱:</strong> 서명 메타데이터의 유효성 검사</li>
+            <li><strong>타임스탬프 검사:</strong> 서명이 만료되지 않았는지 확인</li>
+            <li><strong>콘텐츠 해싱:</strong> 현재 콘텐츠 해시 재계산</li>
+            <li><strong>해시 비교:</strong> 매니페스트의 해시와 비교</li>
+            <li><strong>공개 키 복구:</strong> Base64 공개 키 디코딩</li>
+            <li><strong>서명 검증:</strong> 암호화 검증 수행</li>
+            <li><strong>신뢰 체인 검사:</strong> 서명자 인증 검증</li>
+        </ol>
+
+        <div class="code-block"><pre>
+// 서명 검증 구현
+import { verify, createHash } from 'crypto';
+import { readFileSync } from 'fs';
+
+class SignatureVerifier {
+    verifyContent(filePath: string, manifest: SignatureManifest): boolean {
+        try {
+            // 1. 콘텐츠 읽기
+            const content = readFileSync(filePath);
+
+            // 2. 콘텐츠 해시 재계산
+            const calculatedHash = createHash('sha256')
+                .update(content)
+                .digest('base64');
+
+            // 3. 해시 무결성 검사
+            if (calculatedHash !== manifest.contentHash) {
+                console.error('❌ 콘텐츠 해시 불일치');
+                return false;
+            }
+
+            // 4. 만료 시간 검사
+            if (manifest.expiresAt) {
+                const expiry = new Date(manifest.expiresAt);
+                if (expiry < new Date()) {
+                    console.error('❌ 서명 만료됨');
+                    return false;
+                }
+            }
+
+            // 5. 공개 키 및 서명 디코딩
+            const publicKey = Buffer.from(manifest.publicKey, 'base64');
+            const signature = Buffer.from(manifest.signature, 'base64');
+
+            // 6. 암호화 서명 검증
+            const isValid = verify(null, content, publicKey, signature);
+
+            if (isValid) {
+                console.log('✅ 서명 검증 성공');
+                console.log('서명자:', manifest.signer.name);
+                console.log('서명 시각:', manifest.signedAt);
+            }
+
+            return isValid;
+
+        } catch (error) {
+            console.error('❌ 검증 오류:', error.message);
+            return false;
+        }
+    }
+}
+
+// 사용 예제
+const verifier = new SignatureVerifier();
+const manifest = JSON.parse(readFileSync('signature.json', 'utf-8'));
+const isValid = verifier.verifyContent('photo.jpg', manifest);
+</pre></div>
+
+        <h2>타임스탬프 서비스</h2>
+        <p>신뢰할 수 있는 타임스탬프는 콘텐츠가 특정 시점에 존재했음을 증명합니다. 이는 날짜 조작을 방지하고 법적 비거부성을 제공합니다.</p>
+
+        <h3>RFC 3161 타임스탬프 프로토콜</h3>
+        <p>RFC 3161은 디지털 타임스탬프를 위한 표준 프로토콜을 정의합니다. TSA(Time Stamping Authority)는 콘텐츠 해시에 서명하고 정확한 시간을 인증합니다.</p>
+
+        <div class="code-block"><pre>
+// RFC 3161 타임스탬프 요청
+import axios from 'axios';
+import { createHash } from 'crypto';
+
+async function requestTimestamp(content: Buffer): Promise<string> {
+    // 콘텐츠 해시 생성
+    const hash = createHash('sha256').update(content).digest();
+
+    // TSA 엔드포인트
+    const tsaUrl = 'https://freetsa.org/tsr';
+
+    // TSR (타임스탬프 요청) 생성
+    const tsrRequest = {
+        version: 1,
+        messageImprint: {
+            hashAlgorithm: 'SHA-256',
+            hashedMessage: hash.toString('base64')
+        },
+        nonce: Math.floor(Math.random() * 1000000),
+        certReq: true
+    };
+
+    // TSA에 요청 전송
+    const response = await axios.post(tsaUrl, tsrRequest, {
+        headers: { 'Content-Type': 'application/timestamp-query' },
+        responseType: 'arraybuffer'
+    });
+
+    // TST (타임스탬프 토큰) 반환
+    return Buffer.from(response.data).toString('base64');
+}
+
+// 사용 예제
+const content = readFileSync('document.pdf');
+const timestamp = await requestTimestamp(content);
+console.log('타임스탬프 토큰:', timestamp);
+</pre></div>
+
+        <h2>키 관리 및 순환</h2>
+        <p>암호화 키는 조직의 가장 중요한 자산입니다. 적절한 키 관리는 장기적인 보안에 필수적입니다.</p>
+
+        <h3>키 저장 모범 사례</h3>
+        <ul>
+            <li><strong>하드웨어 보안 모듈(HSM):</strong> 변조 방지 하드웨어에 키 저장</li>
+            <li><strong>키 관리 서비스(KMS):</strong> AWS KMS, Azure Key Vault, Google Cloud KMS</li>
+            <li><strong>암호화된 키 저장:</strong> 최소한 강력한 암호로 개인 키 암호화</li>
+            <li><strong>접근 제어:</strong> 키 접근에 대한 엄격한 권한 관리</li>
+            <li><strong>감사 로그:</strong> 모든 키 사용 기록</li>
+        </ul>
+
+        <div class="warning-box">
+            <strong>⚠️ 절대 하지 말아야 할 것</strong><br>
+            ❌ 개인 키를 버전 관리(Git)에 커밋<br>
+            ❌ 평문으로 개인 키 이메일 전송<br>
+            ❌ 하드코딩된 키를 소스 코드에 삽입<br>
+            ❌ 백업 없이 키 생성<br>
+            ❌ 여러 환경에서 동일한 키 공유
+        </div>
+
+        <h3>키 순환 전략</h3>
+        <p>정기적인 키 순환은 손상의 영향을 제한합니다. WIA-AI-017은 다음 순환 정책을 권장합니다:</p>
+
+        <div class="code-block"><pre>
+// 키 순환 시스템
+class KeyRotationManager {
+    private keyStore: Map<string, KeyPair> = new Map();
+    private currentKeyId: string;
+
+    // 새 키 생성 및 활성화
+    rotateKeys(): string {
+        const newKeyId = `key-${Date.now()}`;
+        const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+
+        // 새 키 저장
+        this.keyStore.set(newKeyId, { publicKey, privateKey });
+
+        // 이전 키는 검증용으로만 유지
+        const oldKeyId = this.currentKeyId;
+        if (oldKeyId) {
+            const oldKey = this.keyStore.get(oldKeyId);
+            // 이전 개인 키는 안전하게 보관만 (서명에는 사용 안함)
+            console.log(`이전 키 ${oldKeyId}는 검증 전용`);
+        }
+
+        // 현재 키 업데이트
+        this.currentKeyId = newKeyId;
+
+        console.log(`✅ 새 키 활성화: ${newKeyId}`);
+        return newKeyId;
+    }
+
+    // 서명에 현재 키 사용
+    sign(content: Buffer): { signature: string; keyId: string } {
+        const key = this.keyStore.get(this.currentKeyId);
+        const signature = sign(null, content, key.privateKey);
+
+        return {
+            signature: signature.toString('base64'),
+            keyId: this.currentKeyId
+        };
+    }
+
+    // 모든 키로 검증 (이전 서명 지원)
+    verify(content: Buffer, signature: string, keyId: string): boolean {
+        const key = this.keyStore.get(keyId);
+        if (!key) {
+            console.error('키를 찾을 수 없음:', keyId);
+            return false;
+        }
+
+        const sig = Buffer.from(signature, 'base64');
+        return verify(null, content, key.publicKey, sig);
+    }
+}
+</pre></div>
+
+        <h2>분산 신뢰 모델</h2>
+        <p>중앙 집중식 PKI에만 의존하는 대신 WIA-AI-017은 분산 신뢰 모델을 지원합니다.</p>
+
+        <h3>Web of Trust</h3>
+        <p>PGP/GPG 모델에서 사용자는 서로의 공개 키를 직접 검증하고 서명합니다. 신뢰는 소셜 그래프를 통해 전이됩니다.</p>
+
+        <h3>분산 식별자(DID)</h3>
+        <p>DID는 블록체인 또는 분산 원장에 등록된 자체 주권적 디지털 신원을 제공합니다.</p>
+
+        <div class="code-block"><pre>
+// DID 기반 서명자 정보
+{
+    "signer": {
+        "did": "did:wia:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+        "didDocument": {
+            "@context": "https://www.w3.org/ns/did/v1",
+            "id": "did:wia:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+            "publicKey": [{
+                "id": "did:wia:...#key-1",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:wia:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+                "publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
+            }]
+        }
+    }
+}
+</pre></div>
+
+        <h2>양자 저항성</h2>
+        <p>양자 컴퓨터는 RSA 및 ECDSA를 포함한 현재 공개 키 암호화 시스템에 위협이 됩니다. WIA-AI-017은 양자 이후 암호화로의 전환을 준비합니다.</p>
+
+        <h3>양자 이후 서명 알고리즘</h3>
+        <ul>
+            <li><strong>CRYSTALS-Dilithium:</strong> NIST 표준화, 격자 기반</li>
+            <li><strong>FALCON:</strong> 빠른 검증, 작은 서명</li>
+            <li><strong>SPHINCS+:</strong> 상태 비저장, 해시 기반</li>
+        </ul>
+
+        <div class="info-box">
+            <strong>ℹ️ 하이브리드 접근 방식</strong><br>
+            전환 기간 동안 전통적 알고리즘과 양자 이후 알고리즘을 모두 사용하는 하이브리드 서명을 권장합니다. 이는 기존 시스템과의 호환성을 유지하면서 미래 보장을 제공합니다.
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 요약</h3>
+            <ul>
+                <li>디지털 서명은 공개 키 암호화를 사용하여 진위성과 무결성을 제공합니다</li>
+                <li>암호화 해시 함수는 효율적인 서명을 위해 콘텐츠의 고정 크기 지문을 생성합니다</li>
+                <li>Ed25519는 새로운 구현을 위한 권장 서명 알고리즘입니다</li>
+                <li>서명 매니페스트는 검증을 위해 풍부한 메타데이터를 포함해야 합니다</li>
+                <li>타임스탬프 서비스는 신뢰할 수 있는 시간 증명을 제공합니다</li>
+                <li>적절한 키 관리 및 순환은 장기적인 보안에 필수적입니다</li>
+                <li>분산 신뢰 모델은 중앙 집중식 PKI의 대안을 제공합니다</li>
+                <li>양자 이후 암호화로의 전환 계획이 필요합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 복습 문제</h3>
+            <ol>
+                <li>디지털 서명이 제공하는 두 가지 핵심 보장을 설명하십시오.</li>
+                <li>공개 키 암호화에서 개인 키와 공개 키의 역할은 무엇입니까?</li>
+                <li>암호화 해시 함수의 다섯 가지 필수 속성을 나열하십시오.</li>
+                <li>Ed25519가 새로운 구현에 권장되는 이유는 무엇입니까?</li>
+                <li>서명 매니페스트에 타임스탬프가 중요한 이유를 설명하십시오.</li>
+                <li>개인 키 저장 시 절대 하지 말아야 할 다섯 가지는 무엇입니까?</li>
+                <li>키 순환이 보안을 향상시키는 방법을 설명하십시오.</li>
+                <li>양자 컴퓨터가 현재 디지털 서명 알고리즘에 미치는 위협은 무엇입니까?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</p>
+
+        </div>
+</body>
+</html>

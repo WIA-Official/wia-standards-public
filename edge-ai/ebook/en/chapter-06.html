@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Federated Edge Learning | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 6</div>
+            <h1>Federated Edge Learning</h1>
+        </header>
+
+        <article>
+            <h2>Beyond Static Models</h2>
+            <p>Traditional edge AI deploys static models—trained once in the cloud, frozen, then distributed. These models never improve from real-world usage. Federated learning enables collaborative model training across thousands of edge devices while keeping data local, combining the benefits of centralized learning (model improvement from diverse data) with edge AI (privacy preservation, offline capability).</p>
+
+            <h2>Federated Learning Fundamentals</h2>
+
+            <h3>The Core Concept</h3>
+            <p>Instead of collecting data centrally for training, federated learning brings training to the data. The process:</p>
+
+            <ol>
+                <li><strong>Distribution:</strong> Server sends current global model to participating devices</li>
+                <li><strong>Local Training:</strong> Each device trains on its private data for a few epochs</li>
+                <li><strong>Update Sharing:</strong> Devices send only model updates (gradients or weights) to server, not raw data</li>
+                <li><strong>Aggregation:</strong> Server combines updates from many devices using averaging or weighted schemes</li>
+                <li><strong>Broadcasting:</strong> Improved global model is sent back to devices</li>
+                <li><strong>Iteration:</strong> Process repeats until convergence</li>
+            </ol>
+
+            <pre><code>// Federated learning workflow (pseudo-code)
+// Server side
+global_model = initialize_model()
+
+for round in range(num_rounds):
+    # Select participating devices
+    selected_devices = sample(all_devices, participation_rate=0.1)
+
+    # Send global model to devices
+    for device in selected_devices:
+        send_model(device, global_model)
+
+    # Wait for local updates
+    updates = []
+    for device in selected_devices:
+        local_update = receive_update(device)
+        updates.append(local_update)
+
+    # Aggregate updates (FedAvg algorithm)
+    global_model = federated_averaging(global_model, updates)
+
+// Device side
+def local_training(global_model, local_data, epochs=5):
+    model = download_model(global_model)
+
+    for epoch in range(epochs):
+        for batch in local_data:
+            loss = model.forward(batch)
+            gradients = model.backward(loss)
+            model.update_weights(gradients)
+
+    local_update = compute_update(global_model, model)
+    send_update(server, local_update)
+    return model</code></pre>
+
+            <h3>Privacy Preservation</h3>
+            <p>Federated learning preserves privacy because:</p>
+            <ul>
+                <li>Raw data never leaves the device</li>
+                <li>Only model updates are transmitted (aggregated gradients or weight differences)</li>
+                <li>Updates from many users are combined, preventing individual user reconstruction</li>
+                <li>Differential privacy can add noise to updates for mathematical privacy guarantees</li>
+                <li>Secure aggregation protocols prevent server from seeing individual updates</li>
+            </ul>
+
+            <h2>Federated Averaging (FedAvg)</h2>
+
+            <h3>The Standard Algorithm</h3>
+            <p>FedAvg, introduced by Google in 2016, is the foundational federated learning algorithm:</p>
+
+            <pre><code>// FedAvg aggregation on server
+def federated_averaging(global_weights, device_updates):
+    """
+    device_updates: List of (device_id, local_weights, num_samples)
+    """
+    total_samples = sum(num_samples for _, _, num_samples in device_updates)
+
+    # Weighted average based on local dataset size
+    aggregated_weights = {}
+    for layer_name in global_weights.keys():
+        weighted_sum = 0
+        for device_id, local_weights, num_samples in device_updates:
+            weight = num_samples / total_samples
+            weighted_sum += weight * local_weights[layer_name]
+
+        aggregated_weights[layer_name] = weighted_sum
+
+    return aggregated_weights</code></pre>
+
+            <p>Devices with more data have proportionally higher influence on the global model. This ensures the model reflects the true data distribution across all participants.</p>
+
+            <h3>Convergence Challenges</h3>
+            <p>Federated learning converges slower than centralized training due to:</p>
+            <ul>
+                <li><strong>Non-IID Data:</strong> Each device's data is not identically distributed (e.g., users have different typing patterns, photo preferences)</li>
+                <li><strong>Unbalanced Datasets:</strong> Some devices have 1000s of samples, others have 10s</li>
+                <li><strong>Limited Participation:</strong> Only a fraction of devices participate each round (due to battery, connectivity)</li>
+                <li><strong>Staleness:</strong> Some devices are offline for extended periods, working with outdated models</li>
+            </ul>
+
+            <h2>Federated Learning on Edge Devices</h2>
+
+            <h3>On-Device Training Constraints</h3>
+            <p>Training (even for a few epochs) is more demanding than inference:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Resource</th>
+                        <th>Inference</th>
+                        <th>Training</th>
+                        <th>Ratio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Memory</td>
+                        <td>Model size only</td>
+                        <td>Model + gradients + optimizer state</td>
+                        <td>3-5x</td>
+                    </tr>
+                    <tr>
+                        <td>Computation</td>
+                        <td>Forward pass</td>
+                        <td>Forward + backward pass</td>
+                        <td>2-3x</td>
+                    </tr>
+                    <tr>
+                        <td>Power</td>
+                        <td>Milliseconds</td>
+                        <td>Minutes</td>
+                        <td>1000x total</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Strategies to enable edge training:</p>
+            <ul>
+                <li><strong>Partial Model Updates:</strong> Only train last few layers, freeze early layers</li>
+                <li><strong>Smaller Models:</strong> Use compact architectures suitable for edge training</li>
+                <li><strong>Lower Precision:</strong> FP16 or even INT8 training reduces memory and computation</li>
+                <li><strong>Scheduled Training:</strong> Train only when device is plugged in and connected to Wi-Fi</li>
+            </ul>
+
+            <h3>TensorFlow Federated</h3>
+            <p>Google's open-source framework for federated learning research and deployment:</p>
+
+            <pre><code>// TensorFlow Federated example
+import tensorflow_federated as tff
+
+# Define model
+def model_fn():
+    return tff.learning.from_keras_model(
+        keras_model=create_keras_model(),
+        input_spec=input_spec,
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
+    )
+
+# Federated averaging process
+iterative_process = tff.learning.build_federated_averaging_process(
+    model_fn,
+    client_optimizer_fn=lambda: tf.keras.optimizers.SGD(0.02),
+    server_optimizer_fn=lambda: tf.keras.optimizers.SGD(1.0)
+)
+
+# Initialize
+state = iterative_process.initialize()
+
+# Training round
+for round_num in range(num_rounds):
+    state, metrics = iterative_process.next(state, federated_train_data)
+    print(f'Round {round_num}: loss={metrics["loss"]}, accuracy={metrics["accuracy"]}')</code></pre>
+
+            <h3>Flower: Scalable Federated Learning</h3>
+            <p>Open-source framework supporting diverse platforms and frameworks:</p>
+
+            <pre><code># Flower client (runs on edge device)
+import flwr as fl
+
+class EdgeClient(fl.client.NumPyClient):
+    def get_parameters(self):
+        return get_model_weights()
+
+    def fit(self, parameters, config):
+        set_model_weights(parameters)
+        train_model(local_data, epochs=5)
+        return get_model_weights(), len(local_data), {}
+
+    def evaluate(self, parameters, config):
+        set_model_weights(parameters)
+        loss, accuracy = evaluate_model(test_data)
+        return loss, len(test_data), {"accuracy": accuracy}
+
+# Start client
+fl.client.start_numpy_client(server_address="server:8080", client=EdgeClient())</code></pre>
+
+            <h2>Privacy-Enhancing Technologies</h2>
+
+            <h3>Differential Privacy</h3>
+            <p>Add calibrated noise to model updates to prevent reconstruction of individual data points:</p>
+
+            <pre><code>// Differential privacy for federated learning
+def add_differential_privacy(gradients, epsilon=1.0, delta=1e-5):
+    """
+    epsilon: Privacy budget (lower = more privacy, less accuracy)
+    delta: Probability of privacy breach
+    """
+    sensitivity = compute_l2_sensitivity(gradients)
+
+    # Gaussian mechanism for (ε, δ)-differential privacy
+    sigma = (sensitivity * sqrt(2 * log(1.25 / delta))) / epsilon
+
+    noisy_gradients = {}
+    for layer_name, gradient in gradients.items():
+        noise = np.random.normal(0, sigma, gradient.shape)
+        noisy_gradients[layer_name] = gradient + noise
+
+    return noisy_gradients</code></pre>
+
+            <p>Trade-off: Stronger privacy (lower epsilon) reduces model accuracy. Typical values: epsilon=1-10.</p>
+
+            <h3>Secure Aggregation</h3>
+            <p>Cryptographic protocol ensuring the server can only see aggregated updates, never individual device updates:</p>
+
+            <ol>
+                <li>Devices generate random pairwise masks</li>
+                <li>Each device encrypts its update with these masks</li>
+                <li>Server receives masked updates from all devices</li>
+                <li>Masks cancel out when aggregating, revealing only the sum</li>
+                <li>Individual updates remain hidden from server</li>
+            </ol>
+
+            <p>This prevents the server from singling out any individual contribution, even though it computes the global aggregate.</p>
+
+            <h2>Real-World Applications</h2>
+
+            <h3>Gboard (Google Keyboard)</h3>
+            <p>Google's mobile keyboard uses federated learning to improve next-word prediction:</p>
+            <ul>
+                <li>Learns from billions of typed messages across millions of devices</li>
+                <li>User typing patterns never leave the device</li>
+                <li>Model improves weekly from collective learning</li>
+                <li>Training occurs only when device is idle, charging, and on Wi-Fi</li>
+            </ul>
+
+            <h3>Apple Siri and QuickType</h3>
+            <p>Apple uses federated learning for:</p>
+            <ul>
+                <li>QuickType keyboard suggestions</li>
+                <li>"Hey Siri" voice recognition personalization</li>
+                <li>Photo scene classification</li>
+            </ul>
+
+            <p>Updates are uploaded anonymously when devices are locked and charging. Apple's differential privacy adds noise to ensure individual contributions can't be identified.</p>
+
+            <h3>Healthcare: Disease Prediction</h3>
+            <p>Hospitals collaborate on predictive models without sharing patient data:</p>
+            <ul>
+                <li>Each hospital trains on local patient records</li>
+                <li>Only model updates are shared, never patient data</li>
+                <li>Global model benefits from diverse patient populations</li>
+                <li>HIPAA and GDPR compliance through data localization</li>
+            </ul>
+
+            <h3>Finance: Fraud Detection</h3>
+            <p>Banks improve fraud detection across institutions:</p>
+            <ul>
+                <li>Detect novel fraud patterns seen by any participating bank</li>
+                <li>Individual transaction data remains confidential</li>
+                <li>Faster response to emerging threats</li>
+            </ul>
+
+            <h2>Challenges and Solutions</h2>
+
+            <h3>Communication Efficiency</h3>
+            <p><strong>Problem:</strong> Transmitting full model updates (megabytes) for every round consumes bandwidth and battery.</p>
+
+            <p><strong>Solutions:</strong></p>
+            <ul>
+                <li><strong>Gradient Compression:</strong> Quantize gradients to INT8 or use sparsification (send only top-k gradients)</li>
+                <li><strong>Federated Dropout:</strong> Train and update only a random subset of layers each round</li>
+                <li><strong>Sketching:</strong> Use probabilistic data structures to compress updates</li>
+            </ul>
+
+            <pre><code>// Gradient compression: Top-K sparsification
+def compress_gradients(gradients, k=0.01):
+    """Keep only top k% of gradients by magnitude"""
+    flat_grads = flatten(gradients)
+    threshold = np.percentile(np.abs(flat_grads), 100 * (1 - k))
+
+    compressed = {}
+    for layer_name, grad in gradients.items():
+        mask = np.abs(grad) >= threshold
+        compressed[layer_name] = {
+            'values': grad[mask],
+            'indices': np.where(mask)
+        }
+
+    # Typical compression: 100x smaller updates
+    return compressed</code></pre>
+
+            <h3>Non-IID Data</h3>
+            <p><strong>Problem:</strong> Device data distributions differ significantly (e.g., language preferences, photo content).</p>
+
+            <p><strong>Solutions:</strong></p>
+            <ul>
+                <li><strong>FedProx:</strong> Add proximal term to loss function to prevent divergence from global model</li>
+                <li><strong>Personalization Layers:</strong> Keep some layers personalized per device, share only common layers</li>
+                <li><strong>Clustered Federated Learning:</strong> Group similar devices and train separate models per cluster</li>
+            </ul>
+
+            <h3>Device Heterogeneity</h3>
+            <p><strong>Problem:</strong> Devices have vastly different computational capabilities and availability.</p>
+
+            <p><strong>Solutions:</strong></p>
+            <ul>
+                <li><strong>Tiered Models:</strong> Smaller models for resource-constrained devices</li>
+                <li><strong>Adaptive Aggregation:</strong> Weight updates by device reliability and data quality</li>
+                <li><strong>Asynchronous Federated Learning:</strong> Don't wait for all devices, aggregate as updates arrive</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>弘益人間 Federated Learning Principle:</strong></p>
+                <p>Federated learning embodies "benefit all humanity" by enabling collective intelligence while preserving individual privacy. Healthcare models improve from global patient data without violating confidentiality. Language models learn from billions of users without collecting their personal messages.</p>
+            </div>
+
+            <h2>Future Directions</h2>
+
+            <h3>Federated Analytics</h3>
+            <p>Beyond model training—compute statistics and insights across distributed data without centralization. Example: Aggregate usage statistics while preserving individual privacy.</p>
+
+            <h3>Cross-Device and Cross-Silo</h3>
+            <ul>
+                <li><strong>Cross-Device:</strong> Millions of mobile devices (current focus: Gboard, Siri)</li>
+                <li><strong>Cross-Silo:</strong> Tens of institutions (hospitals, banks) with large datasets each</li>
+            </ul>
+
+            <h3>Federated Transfer Learning</h3>
+            <p>Combine federated learning with transfer learning—pre-train foundation models on public data, fine-tune collaboratively on private edge data.</p>
+
+            <h3>Blockchain-Based Federated Learning</h3>
+            <p>Use blockchain for decentralized aggregation, removing need for trusted central server. Participants verify and record updates on distributed ledger.</p>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <p>Federated edge learning enables collaborative model training across distributed devices while preserving privacy. Key concepts:</p>
+                <ul>
+                    <li><strong>Federated Averaging:</strong> Devices train locally, share only model updates, server aggregates into global model</li>
+                    <li><strong>Privacy Preservation:</strong> Raw data never leaves device, differential privacy adds mathematical guarantees</li>
+                    <li><strong>On-Device Training:</strong> Requires optimization for edge constraints (memory, computation, power)</li>
+                    <li><strong>Communication Efficiency:</strong> Gradient compression and sparsification reduce bandwidth</li>
+                </ul>
+                <p>Real-world deployments include Google Gboard, Apple Siri/QuickType, healthcare collaborations, and financial fraud detection. Challenges include non-IID data, device heterogeneity, and communication costs—addressed through algorithm improvements (FedProx), personalization, and compression.</p>
+                <p>Federated learning represents the future of privacy-preserving AI, enabling collective intelligence without data centralization.</p>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Explain the federated learning workflow from model distribution to aggregation.</li>
+                    <li>How does federated learning preserve privacy compared to centralized training?</li>
+                    <li>What is FedAvg (Federated Averaging), and how does it work?</li>
+                    <li>Why is training on edge devices more resource-intensive than inference?</li>
+                    <li>What strategies enable training on resource-constrained edge devices?</li>
+                    <li>How does differential privacy enhance federated learning?</li>
+                    <li>What is secure aggregation, and what problem does it solve?</li>
+                    <li>Describe two real-world applications of federated learning.</li>
+                    <li>What is the non-IID data problem in federated learning, and how can it be addressed?</li>
+                    <li>How does gradient compression reduce communication costs in federated learning?</li>
+                </ol>
+            </div>
+        </article>
+
+        </div>
+</body>
+</html>

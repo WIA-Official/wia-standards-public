@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Model Optimization | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { margin-bottom: 3rem; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; font-size: 0.9rem; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; transition: all 0.3s; }
+        .nav-button:hover { background: #059669; transform: translateY(-2px); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 3</div>
+            <h1>Model Optimization for Edge</h1>
+        </header>
+
+        <article>
+            <h2>The Optimization Challenge</h2>
+            <p>State-of-the-art neural networks often contain hundreds of millions or billions of parameters, requiring gigabytes of memory and massive computational resources. Edge devices, conversely, have strict constraints: limited RAM (1-8GB), modest computational power (10-100 TOPS), and tight power budgets (0.1-5W). Deploying cloud-scale models directly to edge devices is impossible.</p>
+
+            <p>Model optimization bridges this gap, transforming large, accurate models into compact, efficient versions suitable for edge deployment while preserving as much accuracy as possible. The goal: achieve 10-100x size reduction and 3-10x speed improvement with minimal accuracy loss (<1-3%).</p>
+
+            <h2>Quantization</h2>
+
+            <h3>Understanding Numerical Precision</h3>
+            <p>Neural networks traditionally use 32-bit floating-point (FP32) numbers for weights and activations. Each parameter requires 4 bytes of storage. Quantization reduces numerical precision to smaller data types:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>Bits</th>
+                        <th>Range</th>
+                        <th>Size Reduction</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>FP32</td>
+                        <td>32</td>
+                        <td>±3.4×10³⁸</td>
+                        <td>Baseline (1x)</td>
+                    </tr>
+                    <tr>
+                        <td>FP16</td>
+                        <td>16</td>
+                        <td>±6.5×10⁴</td>
+                        <td>2x smaller</td>
+                    </tr>
+                    <tr>
+                        <td>INT8</td>
+                        <td>8</td>
+                        <td>-128 to 127</td>
+                        <td>4x smaller</td>
+                    </tr>
+                    <tr>
+                        <td>INT4</td>
+                        <td>4</td>
+                        <td>-8 to 7</td>
+                        <td>8x smaller</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Post-Training Quantization (PTQ)</h3>
+            <p>PTQ converts a trained FP32 model to lower precision without retraining. The process:</p>
+
+            <ol>
+                <li>Calibrate: Run representative data through the model to collect activation statistics</li>
+                <li>Determine ranges: Calculate min/max values for each layer</li>
+                <li>Map: Convert FP32 values to INT8 range</li>
+                <li>Validate: Measure accuracy degradation</li>
+            </ol>
+
+            <pre><code>// TensorFlow Lite post-training INT8 quantization
+import tensorflow as tf
+
+converter = tf.lite.TFLiteConverter.from_saved_model('model/')
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+def representative_dataset():
+    for data in calibration_samples:
+        yield [data.astype(np.float32)]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.int8
+converter.inference_output_type = tf.int8
+
+quantized_model = converter.convert()
+with open('model_int8.tflite', 'wb') as f:
+    f.write(quantized_model)</code></pre>
+
+            <p><strong>Results:</strong> PTQ typically achieves 4x size reduction (FP32 → INT8) with 1-2% accuracy loss. No retraining required, fast conversion (minutes).</p>
+
+            <h3>Quantization-Aware Training (QAT)</h3>
+            <p>QAT simulates quantization during training, allowing the model to adapt to reduced precision. This minimizes accuracy loss compared to PTQ.</p>
+
+            <pre><code>// PyTorch quantization-aware training
+import torch.quantization as quant
+
+model = YourModel()
+model.qconfig = quant.get_default_qat_qconfig('fbgemm')
+model_prepared = quant.prepare_qat(model)
+
+# Train as normal with simulated quantization
+for epoch in range(num_epochs):
+    train(model_prepared, train_loader)
+
+# Convert to quantized model
+model_quantized = quant.convert(model_prepared)</code></pre>
+
+            <p><strong>Results:</strong> QAT achieves 4x size reduction with <0.5% accuracy loss. Requires retraining (hours to days), better accuracy preservation than PTQ.</p>
+
+            <h3>Mixed-Precision Quantization</h3>
+            <p>Not all layers tolerate quantization equally. Sensitive layers (first, last, attention) may use FP16, while middle layers use INT8. This balances size reduction and accuracy.</p>
+
+            <h2>Pruning</h2>
+
+            <h3>Unstructured Pruning</h3>
+            <p>Remove individual weights with small magnitudes. Weights near zero contribute minimally to model output and can be set to exactly zero.</p>
+
+            <pre><code>// Simple magnitude-based pruning
+import torch.nn.utils.prune as prune
+
+# Prune 50% of weights in Conv layer
+prune.l1_unstructured(model.conv1, name='weight', amount=0.5)
+
+# Make pruning permanent
+prune.remove(model.conv1, 'weight')</code></pre>
+
+            <p>Pruning 50-90% of weights is common for large networks. The pruned model requires sparse matrix formats to actually reduce size (CSR, CSC).</p>
+
+            <p><strong>Challenge:</strong> Sparse matrices aren't well-supported on many edge accelerators. Unstructured pruning may not improve inference speed without specialized hardware.</p>
+
+            <h3>Structured Pruning</h3>
+            <p>Remove entire channels, filters, or neurons rather than individual weights. This creates models that run efficiently on standard hardware.</p>
+
+            <pre><code>// Channel pruning example
+# Remove 30% of channels based on L1 norm
+for layer in model.conv_layers:
+    channel_importance = compute_channel_norms(layer)
+    keep_channels = select_top_k(channel_importance, k=0.7)
+    layer.weight = layer.weight[keep_channels, :, :, :]
+    layer.bias = layer.bias[keep_channels]</code></pre>
+
+            <p><strong>Results:</strong> 30-50% parameter reduction with 2-5% accuracy loss. Actual speedup on edge hardware since model structure remains dense.</p>
+
+            <h3>Iterative Pruning and Fine-Tuning</h3>
+            <p>Best practice: prune gradually with fine-tuning between iterations.</p>
+
+            <ol>
+                <li>Prune 10-20% of parameters</li>
+                <li>Fine-tune for 5-10 epochs to recover accuracy</li>
+                <li>Repeat until target compression reached</li>
+            </ol>
+
+            <h2>Knowledge Distillation</h2>
+
+            <h3>Teacher-Student Framework</h3>
+            <p>Train a small "student" model to mimic a large "teacher" model. The student learns from both ground truth labels and the teacher's soft predictions.</p>
+
+            <pre><code>// Knowledge distillation loss
+def distillation_loss(student_logits, teacher_logits, labels, temp=3.0, alpha=0.7):
+    # Soft targets from teacher (smoothed probabilities)
+    soft_targets = F.softmax(teacher_logits / temp, dim=1)
+    soft_student = F.log_softmax(student_logits / temp, dim=1)
+    distillation = F.kl_div(soft_student, soft_targets, reduction='batchmean')
+
+    # Hard targets from ground truth
+    hard_loss = F.cross_entropy(student_logits, labels)
+
+    # Combined loss
+    return alpha * (temp ** 2) * distillation + (1 - alpha) * hard_loss
+
+# Training loop
+for images, labels in dataloader:
+    with torch.no_grad():
+        teacher_logits = teacher_model(images)
+
+    student_logits = student_model(images)
+    loss = distillation_loss(student_logits, teacher_logits, labels)
+    loss.backward()
+    optimizer.step()</code></pre>
+
+            <p>The teacher's soft predictions provide richer information than hard labels. For an image classified as "dog" with 95% confidence, the teacher also reveals it's 3% "wolf", 1% "cat"—structural knowledge the student can learn.</p>
+
+            <h3>Choosing Student Architecture</h3>
+            <p>Common approaches:</p>
+            <ul>
+                <li><strong>Scaled-down version:</strong> Same architecture as teacher but fewer layers/channels (e.g., ResNet-152 → ResNet-18)</li>
+                <li><strong>Efficient architecture:</strong> Different architecture optimized for edge (e.g., ResNet-50 → MobileNetV3)</li>
+                <li><strong>Task-specific:</strong> Specialized architecture for target hardware</li>
+            </ul>
+
+            <p><strong>Results:</strong> 5-20x model size reduction while retaining 95-99% of teacher accuracy. Student often outperforms directly training the small architecture.</p>
+
+            <h2>Neural Architecture Search (NAS)</h2>
+
+            <h3>Hardware-Aware NAS</h3>
+            <p>Automatically discover neural architectures optimized for target edge hardware. The search objective balances:</p>
+            <ul>
+                <li>Accuracy on validation set</li>
+                <li>Latency on target device</li>
+                <li>Model size (parameters, storage)</li>
+                <li>Energy consumption</li>
+            </ul>
+
+            <p>Popular NAS methods:</p>
+            <ul>
+                <li><strong>EfficientNet:</strong> Balances depth, width, resolution using compound scaling</li>
+                <li><strong>MobileNetV3:</strong> Discovered via platform-aware NAS for mobile devices</li>
+                <li><strong>FBNet:</strong> Facebook's NAS for mobile deployment</li>
+                <li><strong>Once-for-All (OFA):</strong> Train once, deploy to multiple hardware targets</li>
+            </ul>
+
+            <h3>AutoML for Edge</h3>
+            <p>Tools like TensorFlow Model Optimization Toolkit and Neural Network Intelligence (NNI) automate the optimization process, applying quantization, pruning, and NAS systematically.</p>
+
+            <h2>Operator Fusion and Graph Optimization</h2>
+
+            <h3>Layer Fusion</h3>
+            <p>Combine sequential operations into single kernels to reduce memory traffic and overhead.</p>
+
+            <p>Common fusions:</p>
+            <ul>
+                <li><strong>Conv + BatchNorm + ReLU:</strong> Three operations → one fused kernel</li>
+                <li><strong>MatMul + Bias + Activation:</strong> Dense layer with activation</li>
+                <li><strong>Add + ReLU:</strong> Residual connection with activation</li>
+            </ul>
+
+            <pre><code>// Before fusion (3 operations, 3 memory passes)
+x = conv2d(input, weights)
+x = batch_norm(x, bn_params)
+output = relu(x)
+
+// After fusion (1 operation, 1 memory pass)
+output = fused_conv_bn_relu(input, weights, bn_params)</code></pre>
+
+            <p>Fusion reduces latency by 20-40% by minimizing memory reads/writes.</p>
+
+            <h3>Constant Folding</h3>
+            <p>Pre-compute operations with constant inputs at compile time.</p>
+
+            <pre><code>// Before: computed at runtime
+scale = 0.5
+output = input * scale * 2.0
+
+// After constant folding: 0.5 * 2.0 = 1.0 pre-computed
+output = input  // Multiplication eliminated entirely!</code></pre>
+
+            <h3>Dead Code Elimination</h3>
+            <p>Remove unused outputs, unreachable operations, and redundant computations from the graph.</p>
+
+            <h2>Low-Rank Factorization</h2>
+
+            <h3>Tensor Decomposition</h3>
+            <p>Approximate weight matrices using low-rank decompositions. For a weight matrix W ∈ R^(m×n), decompose into W ≈ U × V where U ∈ R^(m×k), V ∈ R^(k×n), and k ≪ min(m,n).</p>
+
+            <pre><code>// Singular Value Decomposition (SVD) for compression
+U, S, V = torch.svd(weight_matrix)
+
+# Keep only top k singular values
+k = 64
+U_reduced = U[:, :k]
+S_reduced = S[:k]
+V_reduced = V[:, :k]
+
+# Approximate original weight
+weight_approx = U_reduced @ torch.diag(S_reduced) @ V_reduced.t()
+
+# Replace one large layer with two smaller layers
+layer1.weight = U_reduced @ torch.diag(torch.sqrt(S_reduced))
+layer2.weight = torch.diag(torch.sqrt(S_reduced)) @ V_reduced.t()</code></pre>
+
+            <p><strong>Results:</strong> 2-5x compression for fully connected layers with minimal accuracy loss.</p>
+
+            <h2>Compression Pipelines</h2>
+
+            <h3>Combining Techniques</h3>
+            <p>Maximum compression comes from combining multiple techniques:</p>
+
+            <ol>
+                <li><strong>Pruning:</strong> Remove 50% of parameters (2x reduction)</li>
+                <li><strong>Quantization:</strong> FP32 → INT8 (4x reduction)</li>
+                <li><strong>Knowledge Distillation:</strong> Train efficient student (3x reduction)</li>
+                <li><strong>Total:</strong> 2 × 4 × 3 = 24x overall compression</li>
+            </ol>
+
+            <pre><code>// Complete optimization pipeline
+// 1. Start with pre-trained model
+model = load_pretrained_model()
+
+// 2. Prune 60% of weights
+model = iterative_prune(model, target_sparsity=0.6, epochs=10)
+
+// 3. Knowledge distillation to efficient architecture
+student = MobileNetV3()
+student = distill(teacher=model, student=student, epochs=50)
+
+// 4. Quantization-aware training
+student = quantization_aware_train(student, epochs=20)
+
+// 5. Convert to INT8
+model_int8 = convert_to_int8(student)
+
+// 6. Export for edge deployment
+export_to_tflite(model_int8, 'optimized_model.tflite')</code></pre>
+
+            <h2>Accuracy-Efficiency Trade-offs</h2>
+
+            <h3>Pareto Frontier</h3>
+            <p>Plot model variants on accuracy vs. latency/size. The Pareto frontier shows non-dominated models—those where you can't improve one metric without harming the other.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Model Variant</th>
+                        <th>Accuracy</th>
+                        <th>Latency</th>
+                        <th>Size</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Original FP32</td>
+                        <td>92.5%</td>
+                        <td>120ms</td>
+                        <td>98 MB</td>
+                    </tr>
+                    <tr>
+                        <td>+ Pruning 50%</td>
+                        <td>91.8%</td>
+                        <td>100ms</td>
+                        <td>50 MB</td>
+                    </tr>
+                    <tr>
+                        <td>+ INT8 Quant</td>
+                        <td>91.2%</td>
+                        <td>35ms</td>
+                        <td>12 MB</td>
+                    </tr>
+                    <tr>
+                        <td>+ Distillation</td>
+                        <td>89.5%</td>
+                        <td>18ms</td>
+                        <td>4 MB</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Task-Specific Requirements</h3>
+            <p>Choose optimization level based on application needs:</p>
+            <ul>
+                <li><strong>Medical diagnosis:</strong> Prioritize accuracy (91%+), accept higher latency/size</li>
+                <li><strong>Real-time AR:</strong> Prioritize latency (<16ms for 60fps), accept some accuracy loss</li>
+                <li><strong>IoT sensors:</strong> Prioritize size/power (sub-100KB models), accept significant accuracy reduction</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>弘益人間 Optimization Principle:</strong></p>
+                <p>Optimize models to run on the widest range of devices, making AI accessible to everyone regardless of their hardware. Every 10x size reduction brings AI to 10x more devices worldwide.</p>
+            </div>
+
+            <h2>Tools and Frameworks</h2>
+
+            <h3>TensorFlow Model Optimization Toolkit</h3>
+            <p>Comprehensive toolkit for quantization, pruning, and clustering. Supports post-training and training-time optimization.</p>
+
+            <h3>PyTorch Quantization</h3>
+            <p>Built-in support for PTQ and QAT. Integration with TorchScript for deployment.</p>
+
+            <h3>ONNX Runtime</h3>
+            <p>Graph optimization and quantization for ONNX models. Cross-framework compatibility.</p>
+
+            <h3>Neural Network Compression Framework (NNCF)</h3>
+            <p>Intel's toolkit for compression with minimal accuracy loss. Supports PyTorch and TensorFlow.</p>
+
+            <h2>Measuring Optimization Impact</h2>
+
+            <h3>Before-After Comparison</h3>
+            <pre><code>// Benchmark original vs optimized model
+Original Model:
+- Size: 245 MB
+- Latency: 178ms (CPU), 45ms (GPU)
+- Accuracy: 94.2%
+- Power: 2.8W
+
+Optimized Model (INT8 + Pruning + Distillation):
+- Size: 12 MB (20.4x smaller)
+- Latency: 18ms (CPU), 8ms (NPU)
+- Accuracy: 92.1% (-2.1%)
+- Power: 0.4W (7x more efficient)
+
+Result: 20x compression, 10x faster, 7x more power-efficient
+Trade-off: 2.1% accuracy reduction (acceptable for most use cases)</code></pre>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <p>Model optimization is essential for edge AI deployment. Key techniques include:</p>
+                <ul>
+                    <li><strong>Quantization:</strong> Reduce numerical precision (FP32 → INT8) for 4x size reduction with minimal accuracy loss</li>
+                    <li><strong>Pruning:</strong> Remove unnecessary weights/channels for 2-10x parameter reduction</li>
+                    <li><strong>Knowledge Distillation:</strong> Train small models to mimic large ones, achieving 5-20x compression</li>
+                    <li><strong>NAS:</strong> Automatically discover hardware-optimized architectures</li>
+                    <li><strong>Graph Optimization:</strong> Fuse operations, eliminate dead code, fold constants</li>
+                </ul>
+                <p>Combining techniques yields 10-100x total compression. The optimization pipeline: prune → distill → quantize → optimize graph. Trade-offs between accuracy, latency, size, and power are application-specific.</p>
+                <p>Modern frameworks (TensorFlow Lite, PyTorch, ONNX Runtime) provide robust tooling for automated optimization. Measure results on target hardware to validate real-world performance gains.</p>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>What is the difference between post-training quantization (PTQ) and quantization-aware training (QAT)?</li>
+                    <li>How much size reduction does INT8 quantization achieve compared to FP32?</li>
+                    <li>Explain the difference between structured and unstructured pruning. Which is better for edge deployment?</li>
+                    <li>How does knowledge distillation work, and why does the student often outperform directly training a small model?</li>
+                    <li>What is Neural Architecture Search (NAS), and how does hardware-aware NAS differ from traditional NAS?</li>
+                    <li>Name three common operator fusions and explain how they improve performance.</li>
+                    <li>If you apply 50% pruning and INT8 quantization, what is the theoretical total compression ratio?</li>
+                    <li>What is the Pareto frontier in the context of model optimization?</li>
+                    <li>Describe a complete optimization pipeline combining multiple techniques.</li>
+                    <li>How do you choose the appropriate optimization level for a specific application?</li>
+                </ol>
+            </div>
+        </article>
+
+        </div>
+</body>
+</html>

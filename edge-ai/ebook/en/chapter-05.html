@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Hardware Accelerators for Edge AI | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 5</div>
+            <h1>Hardware Accelerators for Edge AI</h1>
+        </header>
+
+        <article>
+            <h2>Why Specialized Hardware?</h2>
+            <p>Neural networks perform billions of multiply-accumulate (MAC) operations—the same mathematical operation repeated trillions of times. General-purpose CPUs, designed for diverse workloads, are inefficient at this highly parallel, repetitive computation. Specialized hardware accelerators deliver 10-100x better performance and 50-1000x better energy efficiency for AI workloads.</p>
+
+            <p>Edge AI accelerators must balance: computational throughput (TOPS), power efficiency (TOPS/W), silicon area (cost), and programmability (supporting diverse model architectures).</p>
+
+            <h2>Neural Processing Units (NPUs)</h2>
+
+            <h3>Architecture Fundamentals</h3>
+            <p>NPUs are ASICs (Application-Specific Integrated Circuits) optimized for neural network inference. Core design principles:</p>
+
+            <ul>
+                <li><strong>Massively Parallel MAC Arrays:</strong> Thousands of multiply-accumulate units operating simultaneously</li>
+                <li><strong>Low-Precision Arithmetic:</strong> INT8, INT4, even binary operations instead of FP32</li>
+                <li><strong>Specialized Memory Hierarchy:</strong> On-chip SRAM minimizes off-chip memory access</li>
+                <li><strong>Dataflow Optimization:</strong> Reuse activations and weights to reduce data movement</li>
+                <li><strong>Layer-Specific Engines:</strong> Dedicated hardware for convolution, pooling, normalization</li>
+            </ul>
+
+            <h3>Apple Neural Engine</h3>
+            <p>Apple's proprietary NPU integrated into A-series and M-series chips:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Chip</th>
+                        <th>Neural Engine</th>
+                        <th>Performance</th>
+                        <th>Devices</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>A17 Pro</td>
+                        <td>16-core</td>
+                        <td>35 TOPS</td>
+                        <td>iPhone 15 Pro</td>
+                    </tr>
+                    <tr>
+                        <td>M3 Max</td>
+                        <td>16-core</td>
+                        <td>18 TOPS</td>
+                        <td>MacBook Pro</td>
+                    </tr>
+                    <tr>
+                        <td>A15 Bionic</td>
+                        <td>16-core</td>
+                        <td>15.8 TOPS</td>
+                        <td>iPhone 13/14</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>The Neural Engine integrates tightly with Core ML, Apple's ML framework. Operations unsupported by the Neural Engine fall back to GPU or CPU transparently.</p>
+
+            <pre><code>// Core ML automatically uses Neural Engine
+import CoreML
+
+let model = try VNCoreMLModel(for: YourModel().model)
+let request = VNCoreMLRequest(model: model) { request, error in
+    guard let results = request.results as? [VNClassificationObservation] else {
+        return
+    }
+    // Neural Engine executes inference transparently
+    print("Top result: \\(results.first?.identifier ?? "unknown")")
+}</code></pre>
+
+            <h3>Google Tensor / Edge TPU</h3>
+            <p>Google's custom AI accelerators:</p>
+
+            <ul>
+                <li><strong>Tensor G3 (Pixel 8):</strong> Integrated TPU for on-device AI in Pixel phones</li>
+                <li><strong>Edge TPU (Coral):</strong> Standalone accelerator for IoT and embedded systems. 4 TOPS at 0.5-2W</li>
+            </ul>
+
+            <p>Edge TPU supports TensorFlow Lite models with quantized INT8 operations. Optimized for convolutional neural networks and transformers.</p>
+
+            <pre><code># Python with Edge TPU (Coral Dev Board)
+from pycoral.adapters import common
+from pycoral.adapters import classify
+from pycoral.utils.edgetpu import make_interpreter
+
+interpreter = make_interpreter('model_edgetpu.tflite')
+interpreter.allocate_tensors()
+
+# Set input
+common.set_input(interpreter, image)
+
+# Invoke on Edge TPU
+interpreter.invoke()
+
+# Get output
+classes = classify.get_classes(interpreter, top_k=3)
+print(f'Top result: {classes[0].id} (confidence: {classes[0].score})')</code></pre>
+
+            <h3>Qualcomm AI Engine</h3>
+            <p>Qualcomm integrates AI acceleration across three heterogeneous processors:</p>
+
+            <ul>
+                <li><strong>Hexagon DSP:</strong> Digital Signal Processor with vector extensions for AI</li>
+                <li><strong>Adreno GPU:</strong> Graphics processor with compute shaders for AI</li>
+                <li><strong>Kryo CPU:</strong> Application processor with NEON SIMD</li>
+            </ul>
+
+            <p>Snapdragon 8 Gen 3 delivers 45 TOPS combined. The Snapdragon Neural Processing SDK allows developers to target specific processors or let the runtime auto-schedule.</p>
+
+            <h2>Mobile GPUs</h2>
+
+            <h3>GPU Architecture for AI</h3>
+            <p>Mobile GPUs weren't designed for AI but adapt well due to parallel architecture:</p>
+
+            <ul>
+                <li><strong>Hundreds of cores:</strong> Massive parallelism for matrix operations</li>
+                <li><strong>FP16 precision:</strong> Half-precision floating point balances accuracy and performance</li>
+                <li><strong>Texture memory:</strong> Optimized memory access patterns beneficial for CNNs</li>
+                <li><strong>Shader programmability:</strong> Flexible enough for diverse model architectures</li>
+            </ul>
+
+            <h3>OpenCL and Vulkan Compute</h3>
+            <p>Cross-platform APIs for GPU compute:</p>
+
+            <pre><code>// OpenCL kernel for matrix multiplication (simplified)
+__kernel void matmul(__global float* A, __global float* B, __global float* C,
+                     int M, int N, int K) {
+    int row = get_global_id(0);
+    int col = get_global_id(1);
+
+    float sum = 0.0f;
+    for (int k = 0; k < K; k++) {
+        sum += A[row * K + k] * B[k * N + col];
+    }
+    C[row * N + col] = sum;
+}</code></pre>
+
+            <p>TensorFlow Lite GPU delegate and PyTorch Mobile GPU backend leverage these APIs for cross-platform acceleration.</p>
+
+            <h3>Metal and Direct3D</h3>
+            <p>Platform-specific GPU APIs offering tighter integration:</p>
+
+            <ul>
+                <li><strong>Metal (Apple):</strong> Low-level GPU access on iOS/macOS. Metal Performance Shaders include optimized AI kernels.</li>
+                <li><strong>Direct3D (Microsoft):</strong> DirectML provides GPU-accelerated ML on Windows devices.</li>
+            </ul>
+
+            <h2>Digital Signal Processors (DSPs)</h2>
+
+            <h3>DSP Characteristics</h3>
+            <p>DSPs specialize in signal processing—filtering, FFT, convolution—operations central to AI:</p>
+
+            <ul>
+                <li><strong>Fixed-point arithmetic:</strong> Integer math for efficiency</li>
+                <li><strong>SIMD vector units:</strong> Process multiple data points simultaneously</li>
+                <li><strong>Low power:</strong> 0.5-2W for always-on processing</li>
+                <li><strong>Real-time guarantees:</strong> Deterministic execution timing</li>
+            </ul>
+
+            <h3>Qualcomm Hexagon DSP</h3>
+            <p>Hexagon 780 (in Snapdragon 888) includes Hexagon Vector eXtensions (HVX) and Hexagon Tensor Accelerator (HTA):</p>
+
+            <ul>
+                <li>HVX: 1024-bit SIMD for vector operations</li>
+                <li>HTA: Dedicated tensor accelerator for INT8 inference</li>
+                <li>Power: ~1W for continuous AI workloads</li>
+            </ul>
+
+            <p>Ideal for always-on use cases: voice activity detection, sensor fusion, contextual awareness.</p>
+
+            <h2>Edge TPU and Standalone Accelerators</h2>
+
+            <h3>Google Coral</h3>
+            <p>Standalone Edge TPU modules for embedding into custom hardware:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Form Factor</th>
+                        <th>Performance</th>
+                        <th>Power</th>
+                        <th>Interface</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>USB Accelerator</td>
+                        <td>4 TOPS</td>
+                        <td>0.5W</td>
+                        <td>USB 3.0</td>
+                    </tr>
+                    <tr>
+                        <td>M.2 Module</td>
+                        <td>4 TOPS</td>
+                        <td>2W</td>
+                        <td>PCIe/USB</td>
+                    </tr>
+                    <tr>
+                        <td>Dev Board</td>
+                        <td>4 TOPS</td>
+                        <td>5W total</td>
+                        <td>Integrated</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Intel Movidius Myriad X</h3>
+            <p>Vision Processing Unit (VPU) for computer vision tasks:</p>
+
+            <ul>
+                <li>16 SHAVE cores (specialized vector processors)</li>
+                <li>Neural Compute Engine for CNN acceleration</li>
+                <li>1 TOPS at 1.5W</li>
+                <li>Used in Intel Neural Compute Stick 2</li>
+            </ul>
+
+            <h3>NVIDIA Jetson</h3>
+            <p>Powerful edge AI platform for robotics and autonomous machines:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Module</th>
+                        <th>GPU</th>
+                        <th>Performance</th>
+                        <th>Power</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Jetson Nano</td>
+                        <td>128-core Maxwell</td>
+                        <td>0.5 TFLOPS</td>
+                        <td>5-10W</td>
+                    </tr>
+                    <tr>
+                        <td>Jetson Xavier NX</td>
+                        <td>384-core Volta</td>
+                        <td>21 TOPS</td>
+                        <td>10-15W</td>
+                    </tr>
+                    <tr>
+                        <td>Jetson Orin</td>
+                        <td>1024-core Ampere</td>
+                        <td>275 TOPS</td>
+                        <td>15-60W</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Jetson runs full Linux stack with TensorRT for optimized inference. Suitable for drones, robots, smart cameras requiring desktop-class AI in embedded form factor.</p>
+
+            <h2>Choosing the Right Accelerator</h2>
+
+            <h3>Decision Matrix</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Use Case</th>
+                        <th>Recommended Accelerator</th>
+                        <th>Rationale</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Mobile App (iOS)</td>
+                        <td>Neural Engine</td>
+                        <td>Integrated, optimized for Core ML</td>
+                    </tr>
+                    <tr>
+                        <td>Mobile App (Android)</td>
+                        <td>NPU via NNAPI</td>
+                        <td>Vendor-agnostic API</td>
+                    </tr>
+                    <tr>
+                        <td>Always-On Sensing</td>
+                        <td>DSP (Hexagon)</td>
+                        <td>Ultra-low power continuous operation</td>
+                    </tr>
+                    <tr>
+                        <td>Computer Vision (IoT)</td>
+                        <td>Edge TPU / Myriad X</td>
+                        <td>Optimized for CNN inference</td>
+                    </tr>
+                    <tr>
+                        <td>Robotics / Autonomous</td>
+                        <td>Jetson</td>
+                        <td>High performance, flexible software</td>
+                    </tr>
+                    <tr>
+                        <td>General Purpose</td>
+                        <td>Mobile GPU</td>
+                        <td>Available everywhere, good performance</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Performance vs. Power Trade-off</h3>
+            <p>Efficiency (TOPS/W) varies dramatically:</p>
+
+            <ul>
+                <li><strong>CPU (ARM Cortex-A):</strong> 0.01 TOPS/W</li>
+                <li><strong>Mobile GPU:</strong> 0.1-1 TOPS/W</li>
+                <li><strong>DSP (Hexagon):</strong> 5-10 TOPS/W</li>
+                <li><strong>NPU (Neural Engine, Edge TPU):</strong> 10-50 TOPS/W</li>
+            </ul>
+
+            <p>For battery-powered devices, choose the most efficient accelerator compatible with your models.</p>
+
+            <h2>Programming Accelerators</h2>
+
+            <h3>High-Level Frameworks</h3>
+            <p>Most developers use abstraction layers:</p>
+
+            <ul>
+                <li><strong>TensorFlow Lite + Delegates:</strong> Automatically targets available accelerators (GPU, NPU, DSP)</li>
+                <li><strong>Core ML:</strong> Routes operations to Neural Engine, GPU, or CPU transparently</li>
+                <li><strong>ONNX Runtime:</strong> Execution providers for different accelerators</li>
+                <li><strong>Android NNAPI:</strong> Vendor-agnostic API for Android NPUs</li>
+            </ul>
+
+            <pre><code>// TensorFlow Lite with GPU delegate
+#include "tensorflow/lite/delegates/gpu/delegate.h"
+
+TfLiteDelegate* delegate = TfLiteGpuDelegateV2Create(nullptr);
+interpreter->ModifyGraphWithDelegate(delegate);
+interpreter->Invoke();  // Runs on GPU
+TfLiteGpuDelegateV2Delete(delegate);</code></pre>
+
+            <h3>Low-Level Optimization</h3>
+            <p>For maximum performance, use vendor-specific SDKs:</p>
+
+            <ul>
+                <li><strong>TensorRT (NVIDIA):</strong> Optimize and deploy models on Jetson/GPUs</li>
+                <li><strong>SNPE (Qualcomm):</strong> Direct access to Hexagon DSP and Adreno GPU</li>
+                <li><strong>OpenVINO (Intel):</strong> Optimize for Intel CPUs, GPUs, VPUs</li>
+                <li><strong>Arm NN:</strong> Optimize for Arm Mali GPUs and Ethos NPUs</li>
+            </ul>
+
+            <h2>Benchmarking Accelerators</h2>
+
+            <h3>MLPerf Inference (Edge)</h3>
+            <p>Industry-standard benchmark for edge AI performance. Measures latency and throughput across standardized models:</p>
+
+            <ul>
+                <li>ResNet-50 (image classification)</li>
+                <li>SSD-MobileNet (object detection)</li>
+                <li>BERT (natural language processing)</li>
+            </ul>
+
+            <h3>Measuring Real-World Performance</h3>
+            <pre><code>// Benchmark on target hardware
+import time
+import numpy as np
+
+model = load_model('model.tflite')
+interpreter = make_interpreter(model, device='npu')  # or 'gpu', 'cpu'
+
+# Warmup
+for _ in range(10):
+    interpreter.invoke()
+
+# Benchmark
+latencies = []
+for _ in range(100):
+    start = time.perf_counter()
+    interpreter.invoke()
+    latencies.append(time.perf_counter() - start)
+
+print(f"Mean: {np.mean(latencies)*1000:.2f}ms")
+print(f"P50: {np.percentile(latencies, 50)*1000:.2f}ms")
+print(f"P95: {np.percentile(latencies, 95)*1000:.2f}ms")
+print(f"P99: {np.percentile(latencies, 99)*1000:.2f}ms")</code></pre>
+
+            <div class="info-box">
+                <p><strong>弘益人間 Hardware Principle:</strong></p>
+                <p>Specialized hardware accelerators democratize edge AI by making inference efficient and affordable. A $3 microcontroller with NPU can run models that previously required $1000 GPUs—bringing AI to billions of devices worldwide.</p>
+            </div>
+
+            <h2>Future of Edge AI Accelerators</h2>
+
+            <h3>Emerging Technologies</h3>
+            <ul>
+                <li><strong>In-Memory Computing:</strong> Compute within memory arrays using memristors, eliminating data movement bottleneck</li>
+                <li><strong>Photonic AI Accelerators:</strong> Use light instead of electrons for ultra-high-speed, low-power computation</li>
+                <li><strong>Neuromorphic Chips:</strong> Brain-inspired architectures (Intel Loihi, IBM TrueNorth) for event-driven processing</li>
+                <li><strong>Quantum AI:</strong> Long-term potential for specific AI workloads</li>
+            </ul>
+
+            <h3>Industry Trends</h3>
+            <ul>
+                <li><strong>Heterogeneous Integration:</strong> Combining CPU, GPU, NPU, DSP on single die for optimal workload distribution</li>
+                <li><strong>Reconfigurable Hardware:</strong> FPGAs and CGRAs that can be programmed for specific models</li>
+                <li><strong>Chiplet Architectures:</strong> Modular silicon building blocks for scalable AI accelerators</li>
+                <li><strong>Open-Source Accelerators:</strong> RISC-V based AI accelerators for customization</li>
+            </ul>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <p>Hardware accelerators are essential for efficient edge AI, delivering 10-100x better performance and energy efficiency than CPUs. Key accelerator types:</p>
+                <ul>
+                    <li><strong>NPUs:</strong> Specialized ASICs optimized for neural networks (Apple Neural Engine, Edge TPU)</li>
+                    <li><strong>GPUs:</strong> Parallel processors adaptable for AI (mobile GPUs, NVIDIA Jetson)</li>
+                    <li><strong>DSPs:</strong> Signal processors for low-power always-on AI (Qualcomm Hexagon)</li>
+                    <li><strong>Standalone Modules:</strong> Add-on accelerators for custom hardware (Coral, Myriad X)</li>
+                </ul>
+                <p>Choose accelerators based on use case requirements—mobile apps use integrated NPUs, IoT devices use Edge TPU or DSP, robotics uses Jetson. High-level frameworks (TensorFlow Lite, Core ML, ONNX Runtime) abstract hardware differences, while low-level SDKs enable maximum optimization.</p>
+                <p>Efficiency (TOPS/W) ranges from 0.01 (CPU) to 50+ (specialized NPUs). For battery-powered devices, efficiency is critical. Benchmark on target hardware to validate real-world performance.</p>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Why are specialized hardware accelerators more efficient than CPUs for neural network inference?</li>
+                    <li>Compare NPUs, GPUs, and DSPs in terms of performance, power efficiency, and use cases.</li>
+                    <li>What is the Apple Neural Engine, and how does it integrate with Core ML?</li>
+                    <li>Explain the architecture components that make NPUs efficient for AI workloads.</li>
+                    <li>What is Google Edge TPU, and what types of applications is it designed for?</li>
+                    <li>How do mobile GPUs adapt for AI inference despite not being designed for it?</li>
+                    <li>When would you choose a DSP over an NPU for edge AI deployment?</li>
+                    <li>What is NVIDIA Jetson, and what distinguishes it from mobile AI accelerators?</li>
+                    <li>How do high-level frameworks like TensorFlow Lite abstract hardware differences?</li>
+                    <li>What is TOPS/W, and why is it an important metric for edge AI accelerators?</li>
+                </ol>
+            </div>
+        </article>
+
+        </div>
+</body>
+</html>

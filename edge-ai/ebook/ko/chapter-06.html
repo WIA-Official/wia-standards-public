@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 연합 엣지 학습 | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">6장</div>
+            <h1>연합 엣지 학습</h1>
+        </header>
+        <article>
+            <h2>연합 학습이란?</h2>
+            <p>연합 학습(Federated Learning)은 데이터를 중앙 서버로 전송하지 않고 여러 엣지 디바이스에서 협업하여 모델을 훈련하는 분산 머신러닝 기법입니다. Google이 2016년 제안했으며, 프라이버시 보호가 핵심 목표입니다.</p>
+
+            <h3>핵심 개념</h3>
+            <ul>
+                <li><strong>로컬 훈련:</strong> 각 디바이스가 자신의 데이터로 모델 훈련</li>
+                <li><strong>모델 집계:</strong> 서버가 업데이트를 수집하고 평균화</li>
+                <li><strong>데이터 프라이버시:</strong> 원본 데이터는 디바이스에 유지</li>
+                <li><strong>통신 효율:</strong> 모델 가중치만 전송 (데이터 대비 작음)</li>
+            </ul>
+
+            <h3>전통적 학습 vs 연합 학습</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>특성</th>
+                        <th>전통적 학습</th>
+                        <th>연합 학습</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>데이터 위치</td>
+                        <td>중앙 서버</td>
+                        <td>엣지 디바이스</td>
+                    </tr>
+                    <tr>
+                        <td>프라이버시</td>
+                        <td>낮음 (데이터 전송)</td>
+                        <td>높음 (데이터 유지)</td>
+                    </tr>
+                    <tr>
+                        <td>통신량</td>
+                        <td>매우 높음</td>
+                        <td>중간 (모델만)</td>
+                    </tr>
+                    <tr>
+                        <td>훈련 속도</td>
+                        <td>빠름</td>
+                        <td>느림 (비동기)</td>
+                    </tr>
+                    <tr>
+                        <td>데이터 다양성</td>
+                        <td>균일</td>
+                        <td>비균일 (Non-IID)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>FedAvg 알고리즘</h2>
+
+            <h3>기본 원리</h3>
+            <p>Federated Averaging(FedAvg)는 가장 기본적인 연합 학습 알고리즘입니다:</p>
+
+            <pre><code># FedAvg 알고리즘 의사 코드
+
+# 서버측
+global_model = 초기_모델()
+
+for round in range(총_라운드):
+    # 1. 클라이언트 샘플링
+    selected_clients = random.sample(전체_클라이언트, K개)
+
+    # 2. 글로벌 모델 배포
+    for client in selected_clients:
+        client.receive_model(global_model)
+
+    # 3. 로컬 훈련 (병렬)
+    local_updates = []
+    for client in selected_clients:
+        update = client.local_train(E개_에포크)
+        local_updates.append(update)
+
+    # 4. 집계 (가중 평균)
+    global_model = aggregate(local_updates)
+
+# 클라이언트측
+def local_train(global_model, E개_에포크):
+    local_model = copy(global_model)
+
+    for epoch in range(E개_에포크):
+        for batch in 로컬_데이터:
+            loss = compute_loss(local_model, batch)
+            gradients = compute_gradients(loss)
+            local_model = apply_gradients(local_model, gradients)
+
+    # 업데이트만 전송 (전체 모델 또는 델타)
+    update = local_model - global_model
+    return update</code></pre>
+
+            <h3>PyTorch 구현</h3>
+            <pre><code>import torch
+import torch.nn as nn
+import copy
+
+class FederatedServer:
+    def __init__(self, model, num_clients=100, fraction=0.1):
+        self.global_model = model
+        self.num_clients = num_clients
+        self.clients_per_round = int(num_clients * fraction)
+
+    def aggregate(self, client_models, client_weights):
+        """가중 평균으로 모델 집계"""
+        global_dict = self.global_model.state_dict()
+
+        for key in global_dict.keys():
+            global_dict[key] = torch.zeros_like(global_dict[key])
+
+            # 각 클라이언트 모델의 가중 합
+            for client_model, weight in zip(client_models, client_weights):
+                client_dict = client_model.state_dict()
+                global_dict[key] += client_dict[key] * weight
+
+        self.global_model.load_state_dict(global_dict)
+        return self.global_model
+
+    def train_round(self, clients):
+        """한 라운드 훈련"""
+        # 1. 클라이언트 선택
+        selected = random.sample(clients, self.clients_per_round)
+
+        # 2. 로컬 훈련
+        client_models = []
+        client_weights = []
+
+        for client in selected:
+            local_model = client.train(copy.deepcopy(self.global_model))
+            client_models.append(local_model)
+            client_weights.append(len(client.dataset))
+
+        # 3. 정규화
+        total_weight = sum(client_weights)
+        client_weights = [w / total_weight for w in client_weights]
+
+        # 4. 집계
+        self.aggregate(client_models, client_weights)
+
+class FederatedClient:
+    def __init__(self, dataset, client_id):
+        self.dataset = dataset
+        self.client_id = client_id
+
+    def train(self, model, epochs=5, lr=0.01):
+        """로컬 훈련"""
+        model.train()
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
+
+        for epoch in range(epochs):
+            for data, target in self.dataset:
+                optimizer.zero_grad()
+                output = model(data)
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+
+        return model
+
+# 사용 예
+model = MyModel()
+server = FederatedServer(model, num_clients=100)
+clients = [FederatedClient(dataset_i, i) for i in range(100)]
+
+for round_num in range(100):
+    print(f"라운드 {round_num}")
+    server.train_round(clients)
+
+    # 평가
+    accuracy = evaluate(server.global_model, test_data)
+    print(f"정확도: {accuracy:.2%}")</code></pre>
+
+            <h2>차등 프라이버시</h2>
+
+            <h3>개념</h3>
+            <p>차등 프라이버시(Differential Privacy)는 개별 데이터를 보호하면서 전체 통계를 공개할 수 있게 합니다:</p>
+            <ul>
+                <li><strong>ε-차등 프라이버시:</strong> 프라이버시 손실 한계 (ε이 작을수록 강한 보호)</li>
+                <li><strong>노이즈 추가:</strong> Gaussian 또는 Laplace 노이즈</li>
+                <li><strong>Gradient Clipping:</strong> 민감도 제한</li>
+                <li><strong>Privacy Budget:</strong> 누적 프라이버시 손실 관리</li>
+            </ul>
+
+            <h3>DP-SGD 구현</h3>
+            <pre><code>import torch
+import torch.nn as nn
+import numpy as np
+
+class DPOptimizer:
+    """차등 프라이버시가 적용된 옵티마이저"""
+
+    def __init__(self, optimizer, noise_multiplier=1.0, max_grad_norm=1.0):
+        self.optimizer = optimizer
+        self.noise_multiplier = noise_multiplier
+        self.max_grad_norm = max_grad_norm
+
+    def clip_gradients(self, model):
+        """그래디언트 클리핑"""
+        total_norm = 0.0
+        for p in model.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+
+        # 클리핑
+        clip_coef = self.max_grad_norm / (total_norm + 1e-6)
+        if clip_coef < 1:
+            for p in model.parameters():
+                if p.grad is not None:
+                    p.grad.data.mul_(clip_coef)
+
+        return total_norm
+
+    def add_noise(self, model):
+        """그래디언트에 Gaussian 노이즈 추가"""
+        for p in model.parameters():
+            if p.grad is not None:
+                noise = torch.normal(
+                    mean=0,
+                    std=self.noise_multiplier * self.max_grad_norm,
+                    size=p.grad.shape,
+                    device=p.grad.device
+                )
+                p.grad.data.add_(noise)
+
+    def step(self, model):
+        """DP 최적화 스텝"""
+        # 1. 그래디언트 클리핑
+        self.clip_gradients(model)
+
+        # 2. 노이즈 추가
+        self.add_noise(model)
+
+        # 3. 옵티마이저 스텝
+        self.optimizer.step()
+
+# 사용 예
+model = MyModel()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+dp_optimizer = DPOptimizer(optimizer, noise_multiplier=1.0, max_grad_norm=1.0)
+
+for data, target in dataloader:
+    optimizer.zero_grad()
+    output = model(data)
+    loss = criterion(output, target)
+    loss.backward()
+
+    # DP 적용된 업데이트
+    dp_optimizer.step(model)</code></pre>
+
+            <h3>프라이버시 예산 계산</h3>
+            <pre><code>import math
+
+def compute_privacy_budget(steps, batch_size, total_data,
+                          noise_multiplier, delta=1e-5):
+    """
+    RDP(Rényi Differential Privacy) 기반 ε 계산
+    """
+    q = batch_size / total_data  # 샘플링 비율
+
+    # RDP 계산 (간소화된 버전)
+    orders = [1 + x / 10.0 for x in range(1, 100)]
+    rdp = []
+
+    for alpha in orders:
+        rdp_alpha = (q ** 2 * alpha) / (2 * noise_multiplier ** 2)
+        rdp.append(rdp_alpha * steps)
+
+    # RDP → DP 변환
+    eps_values = []
+    for alpha, rdp_val in zip(orders, rdp):
+        eps = rdp_val + math.log(1/delta) / (alpha - 1)
+        eps_values.append(eps)
+
+    epsilon = min(eps_values)
+
+    print(f"프라이버시 보장: ({epsilon:.2f}, {delta})-DP")
+    return epsilon
+
+# 예: 1000 스텝, 배치 64, 총 10000개 데이터
+epsilon = compute_privacy_budget(
+    steps=1000,
+    batch_size=64,
+    total_data=10000,
+    noise_multiplier=1.1,
+    delta=1e-5
+)
+# 출력: 프라이버시 보장: (2.43, 1e-05)-DP</code></pre>
+
+            <h2>비동기 연합 학습</h2>
+
+            <h3>동기 vs 비동기</h3>
+            <p>연합 학습은 동기 또는 비동기 방식으로 작동할 수 있습니다:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>방식</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>동기 (FedAvg)</td>
+                        <td>안정적, 이해하기 쉬움</td>
+                        <td>느린 클라이언트 대기</td>
+                    </tr>
+                    <tr>
+                        <td>비동기 (FedAsync)</td>
+                        <td>빠른 수렴, Straggler 무시</td>
+                        <td>모델 불일치, 복잡함</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>FedAsync 구현</h3>
+            <pre><code>import threading
+import queue
+import time
+
+class AsyncFederatedServer:
+    def __init__(self, model, mixing_parameter=0.9):
+        self.global_model = model
+        self.mixing_param = mixing_parameter
+        self.update_queue = queue.Queue()
+        self.version = 0
+        self.lock = threading.Lock()
+
+    def apply_update(self, client_model, client_version):
+        """비동기 업데이트 적용"""
+        with self.lock:
+            # Staleness 계산
+            staleness = self.version - client_version
+
+            # Staleness에 따른 가중치 조정
+            alpha = self.mixing_param * (0.9 ** staleness)
+
+            # 모델 업데이트
+            global_dict = self.global_model.state_dict()
+            client_dict = client_model.state_dict()
+
+            for key in global_dict.keys():
+                # 혼합: new = (1-α)*global + α*client
+                global_dict[key] = (
+                    (1 - alpha) * global_dict[key] +
+                    alpha * client_dict[key]
+                )
+
+            self.global_model.load_state_dict(global_dict)
+            self.version += 1
+
+            print(f"업데이트 적용 (staleness={staleness}, α={alpha:.3f})")
+
+    def get_model(self):
+        """현재 글로벌 모델 반환"""
+        with self.lock:
+            return copy.deepcopy(self.global_model), self.version
+
+class AsyncFederatedClient:
+    def __init__(self, dataset, server):
+        self.dataset = dataset
+        self.server = server
+
+    def run(self):
+        """비동기로 계속 훈련"""
+        while True:
+            # 1. 현재 모델 가져오기
+            local_model, version = self.server.get_model()
+
+            # 2. 로컬 훈련
+            trained_model = self.train(local_model)
+
+            # 3. 업데이트 전송
+            self.server.apply_update(trained_model, version)
+
+# 사용 예
+server = AsyncFederatedServer(model)
+
+# 클라이언트를 별도 스레드로 실행
+clients = [AsyncFederatedClient(dataset_i, server) for i in range(10)]
+threads = [threading.Thread(target=c.run) for c in clients]
+
+for t in threads:
+    t.start()</code></pre>
+
+            <h2>Non-IID 데이터 처리</h2>
+
+            <h3>Non-IID 문제</h3>
+            <p>실제 엣지 환경에서 데이터는 Independent and Identically Distributed(IID)가 아닙니다:</p>
+            <ul>
+                <li><strong>Label Skew:</strong> 각 디바이스가 특정 클래스 편향</li>
+                <li><strong>Feature Skew:</strong> 센서, 지역, 사용자 차이</li>
+                <li><strong>Quantity Skew:</strong> 데이터량 불균형</li>
+                <li><strong>Temporal Skew:</strong> 시간에 따른 분포 변화</li>
+            </ul>
+
+            <h3>FedProx 알고리즘</h3>
+            <p>Non-IID 데이터를 위한 개선된 연합 학습:</p>
+            <pre><code>def fedprox_local_train(global_model, local_data, mu=0.01):
+    """
+    FedProx: 글로벌 모델과의 차이를 제한
+    Loss = Data_Loss + (μ/2) * ||w - w_global||²
+    """
+    local_model = copy.deepcopy(global_model)
+    optimizer = torch.optim.SGD(local_model.parameters(), lr=0.01)
+
+    # 글로벌 모델 파라미터 저장
+    global_params = {
+        name: param.clone().detach()
+        for name, param in global_model.named_parameters()
+    }
+
+    for epoch in range(epochs):
+        for data, target in local_data:
+            optimizer.zero_grad()
+            output = local_model(data)
+
+            # 데이터 손실
+            data_loss = criterion(output, target)
+
+            # Proximal 항 추가
+            proximal_term = 0.0
+            for name, param in local_model.named_parameters():
+                proximal_term += torch.norm(
+                    param - global_params[name]
+                ) ** 2
+
+            # 총 손실
+            loss = data_loss + (mu / 2) * proximal_term
+
+            loss.backward()
+            optimizer.step()
+
+    return local_model</code></pre>
+
+            <h2>통신 효율 최적화</h2>
+
+            <h3>압축 기법</h3>
+            <pre><code>import torch
+
+def quantize_model(model, bits=8):
+    """모델 가중치 양자화"""
+    quantized = {}
+
+    for name, param in model.state_dict().items():
+        # FP32 → INT8 변환
+        param_flat = param.flatten()
+        min_val = param_flat.min()
+        max_val = param_flat.max()
+
+        # 양자화
+        scale = (max_val - min_val) / (2 ** bits - 1)
+        quantized_param = torch.round(
+            (param - min_val) / scale
+        ).to(torch.int8)
+
+        quantized[name] = {
+            'data': quantized_param,
+            'min': min_val,
+            'scale': scale
+        }
+
+    return quantized
+
+def dequantize_model(quantized_dict):
+    """역양자화"""
+    model_dict = {}
+
+    for name, qdata in quantized_dict.items():
+        # INT8 → FP32 변환
+        dequantized = (
+            qdata['data'].float() * qdata['scale'] + qdata['min']
+        )
+        model_dict[name] = dequantized.reshape(qdata['shape'])
+
+    return model_dict
+
+# Gradient Sparsification
+def sparsify_gradients(gradients, top_k_percent=0.1):
+    """상위 K% 그래디언트만 전송"""
+    flat_grads = torch.cat([g.flatten() for g in gradients])
+
+    # 상위 K% 인덱스 찾기
+    k = int(len(flat_grads) * top_k_percent)
+    threshold = torch.topk(flat_grads.abs(), k).values.min()
+
+    # 마스크 생성
+    sparse_grads = []
+    for grad in gradients:
+        mask = grad.abs() >= threshold
+        sparse_grads.append(grad * mask)
+
+    return sparse_grads</code></pre>
+
+            <h2>실제 응용 사례</h2>
+
+            <h3>Gboard (Google 키보드)</h3>
+            <p>Google의 연합 학습 응용:</p>
+            <ul>
+                <li><strong>목적:</strong> 차세대 단어 예측 개선</li>
+                <li><strong>디바이스:</strong> 수백만 Android 기기</li>
+                <li><strong>프라이버시:</strong> 타이핑 데이터를 서버로 전송하지 않음</li>
+                <li><strong>결과:</strong> 개인화된 예측, 향상된 프라이버시</li>
+            </ul>
+
+            <h3>Apple Siri 및 QuickType</h3>
+            <p>Apple의 온디바이스 학습:</p>
+            <ul>
+                <li>사용자별 음성 인식 개인화</li>
+                <li>키보드 예측 개선</li>
+                <li>Face ID 얼굴 인식 업데이트</li>
+                <li>모든 데이터 디바이스에 유지</li>
+            </ul>
+
+            <h3>의료 연합 학습</h3>
+            <p>병원 간 협업 없이 모델 훈련:</p>
+            <ul>
+                <li>환자 데이터 공유 없이 질병 예측 모델 개선</li>
+                <li>HIPAA, GDPR 준수</li>
+                <li>희귀 질병 진단 (소수 병원에만 데이터 존재)</li>
+            </ul>
+
+            <h2>연합 학습 프레임워크</h2>
+
+            <h3>TensorFlow Federated (TFF)</h3>
+            <pre><code>import tensorflow_federated as tff
+
+# 1. 모델 정의
+def create_keras_model():
+    return tf.keras.models.Sequential([
+        tf.keras.layers.Dense(10, activation='relu', input_shape=(784,)),
+        tf.keras.layers.Dense(10, activation='softmax')
+    ])
+
+# 2. TFF 모델 래퍼
+def model_fn():
+    keras_model = create_keras_model()
+    return tff.learning.from_keras_model(
+        keras_model,
+        input_spec=...,
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
+    )
+
+# 3. 연합 학습 프로세스 구축
+iterative_process = tff.learning.build_federated_averaging_process(
+    model_fn,
+    client_optimizer_fn=lambda: tf.keras.optimizers.SGD(0.02),
+    server_optimizer_fn=lambda: tf.keras.optimizers.SGD(1.0)
+)
+
+# 4. 훈련
+state = iterative_process.initialize()
+
+for round_num in range(10):
+    state, metrics = iterative_process.next(state, federated_train_data)
+    print(f'라운드 {round_num}: loss={metrics["loss"]}')</code></pre>
+
+            <h3>PySyft</h3>
+            <p>프라이버시 보존 머신러닝 라이브러리:</p>
+            <pre><code>import syft as sy
+import torch
+
+hook = sy.TorchHook(torch)
+
+# 가상 워커 생성 (실제로는 엣지 디바이스)
+alice = sy.VirtualWorker(hook, id="alice")
+bob = sy.VirtualWorker(hook, id="bob")
+
+# 데이터를 워커에 분산
+data_alice = torch.tensor([[0, 0], [0, 1]]).send(alice)
+data_bob = torch.tensor([[1, 0], [1, 1]]).send(bob)
+
+# 모델 훈련 (데이터를 가져오지 않음)
+model = nn.Linear(2, 1)
+
+for epoch in range(100):
+    # Alice의 데이터로 훈련
+    model.send(alice)
+    output = model(data_alice)
+    loss = criterion(output, target_alice)
+    loss.backward()
+    model.get()
+
+    # Bob의 데이터로 훈련
+    model.send(bob)
+    output = model(data_bob)
+    loss = criterion(output, target_bob)
+    loss.backward()
+    model.get()
+
+    optimizer.step()</code></pre>
+
+            <div class="info-box">
+                <p><strong>弘益人間 연합 학습 원칙:</strong></p>
+                <p>연합 학습은 프라이버시를 보호하면서도 집단 지식의 힘을 활용합니다. 개인 의료 기록을 공유하지 않고도 더 나은 진단 모델을, 타이핑 데이터를 서버로 보내지 않고도 더 스마트한 키보드를 만들어 모든 인류에게 이익을 가져다줍니다.</p>
+            </div>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <p>연합 엣지 학습은 프라이버시를 보호하면서 협업 AI를 실현합니다:</p>
+                <ul>
+                    <li><strong>핵심:</strong> 데이터를 이동하지 않고 모델을 이동</li>
+                    <li><strong>FedAvg:</strong> 로컬 훈련 + 서버 집계 (가중 평균)</li>
+                    <li><strong>차등 프라이버시:</strong> DP-SGD, 노이즈 추가, 그래디언트 클리핑</li>
+                    <li><strong>Non-IID:</strong> FedProx로 데이터 불균형 처리</li>
+                    <li><strong>통신 최적화:</strong> 양자화, 스파시피케이션, 압축</li>
+                    <li><strong>응용:</strong> Gboard, Siri, 의료 진단, 금융</li>
+                    <li><strong>프레임워크:</strong> TensorFlow Federated, PySyft, Flower</li>
+                </ul>
+                <p>연합 학습은 엣지 AI의 미래이며 프라이버시 보호 AI의 핵심 기술입니다.</p>
+            </div>
+
+            <div class="summary">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>연합 학습과 전통적 중앙 집중식 학습의 주요 차이점은 무엇입니까?</li>
+                    <li>FedAvg 알고리즘의 4가지 주요 단계를 설명하세요.</li>
+                    <li>차등 프라이버시에서 ε(엡실론) 값의 의미는 무엇입니까?</li>
+                    <li>DP-SGD가 그래디언트에 노이즈를 추가하는 이유는?</li>
+                    <li>동기 vs 비동기 연합 학습의 장단점을 비교하세요.</li>
+                    <li>Non-IID 데이터가 연합 학습에 미치는 영향은?</li>
+                    <li>FedProx가 FedAvg와 다른 점은 무엇입니까?</li>
+                    <li>연합 학습에서 통신 비용을 줄이는 3가지 방법은?</li>
+                    <li>Gboard가 연합 학습을 사용하는 이유와 이점은?</li>
+                    <li>연합 학습이 弘益人間 철학을 어떻게 실현합니까?</li>
+                </ol>
+            </div>
+        </article>
+        </div>
+</body>
+</html>

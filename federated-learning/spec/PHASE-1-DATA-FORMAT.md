@@ -326,6 +326,66 @@ JSON Schema files available at:
 ---
 
 **Copyright © 2025 SmileStory Inc. / World Certification Industry Association**
+## Reference Standards Alignment
+
+The Phase 1 data formats are layered above well-established machine-learning, cryptographic, and IT primitives so that conformant implementations interoperate without vendor lock-in.
+
+| Concern | Reference |
+|---------|-----------|
+| Tensor and model format | ONNX (Open Neural Network Exchange) v1.14+; ISO/IEC JTC 1/SC 42 working drafts |
+| Protocol Buffers | Google Protocol Buffers Language Specification proto3 |
+| Apache Arrow | Apache Arrow Columnar Format Specification 1.0 |
+| Numeric encoding | IEEE 754-2019 (binary32, binary64, bfloat16 informative) |
+| Integer types | ISO/IEC 9899:2018 (C18) `<stdint.h>` semantics |
+| Hash | FIPS 180-4 (SHA-2), FIPS 202 (SHA-3) |
+| JSON | RFC 8259 |
+| CBOR | RFC 8949 |
+| Time encoding | ISO 8601:2019 |
+| Geographic metadata | ISO 19115-1:2014 (when applicable) |
+| Privacy framework | ISO/IEC 29100:2011 |
+| Differential privacy | ISO/IEC 27559:2022 (privacy-preserving data publishing) |
+| Information security | ISO/IEC 27001:2022 |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 1 implementation is conformant when:
+
+1. Model and tensor encodings follow ONNX v1.14+ or a documented profile derived from it.
+2. Numeric encodings match IEEE 754-2019 with explicit precision declarations.
+3. Hashes use a FIPS-approved algorithm and are declared in the manifest.
+4. Time fields conform to ISO 8601:2019.
+
+## Implementation Appendix
+
+### A. Tensor canonicalisation
+
+When tensors are signed (for example to attest a model checkpoint), the canonicalisation procedure is:
+
+1. Convert the tensor to its canonical numeric type (defaults: float32 for parameters, int64 for indices, int8 for quantised payloads).
+2. Serialise in row-major order with little-endian byte ordering.
+3. Compute the hash over the serialised bytes plus a SHA-256 of the tensor's shape descriptor.
+4. Record the hash, shape, and dtype in the manifest.
+
+Canonicalisation is deterministic so any conformant implementation produces the same hash for the same logical tensor.
+
+### B. Differential-privacy budget accounting
+
+When central or local differential privacy is in use, the Phase 1 manifest carries the per-round and cumulative privacy budget (epsilon, delta) so that downstream consumers can audit cumulative privacy spend over the lifetime of the model.
+
+The accounting follows the moments-accountant convention with explicit composition theorem applied at each round; the conventions, theorems, and parameters are recorded by their canonical names and parameter values rather than by external citation.
+
+### C. Bias and fairness metadata
+
+When the deployment requires bias and fairness reporting (for example under the EU AI Act or under the IEEE 7003-2024 algorithmic-bias standard), the manifest carries an aggregate fairness-metrics block scoped to the cohort segments declared in the deployment's risk-management plan. Aggregate statistics avoid disclosing individual data-subject information.
+
+### D. Ecosystem hooks
+
+The data format is designed to be consumed by widely deployed ML toolchains without bespoke conversion. Reference adapters exist for PyTorch, TensorFlow, JAX, scikit-learn, and ONNX Runtime; adapters for emerging frameworks follow the same conformance test plan.
+
+---
+
 **弘益人間 (Hongik Ingan) · Benefit All Humanity**
 
 **License:** CC BY 4.0

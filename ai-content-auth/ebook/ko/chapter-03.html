@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: 콘텐츠 지문 기술 - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        .warning-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .success-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; color: #10B981; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px;">제3장</div>
+            <h1>콘텐츠 지문 기술</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">지각적 해싱과 유사성 검출을 통한 콘텐츠 식별</p>
+        </header>
+
+        <h2>지각적 해싱 개요</h2>
+        <p>암호화 해시(SHA-256 등)는 단일 비트 변경에도 완전히 다른 출력을 생성합니다. 이는 무결성 검증에는 완벽하지만, 압축되거나 크기가 조정되거나 약간 수정된 콘텐츠를 인식하는 데는 쓸모가 없습니다. 지각적 해시는 이 문제를 해결합니다.</p>
+
+        <p>지각적 해시(perceptual hash 또는 pHash)는 원시 바이트가 아닌 시각적, 청각적 또는 의미적 특징을 기반으로 콘텐츠의 지문을 생성합니다. 유사한 콘텐츠는 유사한 해시를 생성하므로 다음을 가능하게 합니다:</p>
+
+        <ul>
+            <li><strong>중복 감지:</strong> 약간 다른 버전의 동일한 콘텐츠 찾기</li>
+            <li><strong>변조 검출:</strong> 원본에서 파생된 수정된 콘텐츠 식별</li>
+            <li><strong>유사성 검색:</strong> 시각적 또는 청각적으로 유사한 콘텐츠 검색</li>
+            <li><strong>저작권 모니터링:</strong> 무단 재배포 추적</li>
+        </ul>
+
+        <div class="info-box">
+            <strong>ℹ️ 암호화 vs 지각적 해시</strong><br>
+            <strong>암호화 해시:</strong> 입력의 1비트 변경 → 완전히 다른 해시<br>
+            <strong>지각적 해시:</strong> 유사한 입력 → 유사한 해시<br>
+            이 두 가지는 상호 보완적이며 콘텐츠 인증에서 함께 사용됩니다.
+        </div>
+
+        <h2>이미지 지문 알고리즘</h2>
+        <p>이미지 지문은 가장 성숙하고 널리 배포된 지각적 해싱 분야입니다. 여러 알고리즘이 있으며 각각 다른 변환에 대한 강인성이 다릅니다.</p>
+
+        <h3>평균 해시 (aHash)</h3>
+        <p>가장 간단한 지각적 해시 알고리즘입니다. 이미지를 작은 크기(예: 8x8)로 축소하고 회색조로 변환한 다음 각 픽셀을 평균과 비교합니다.</p>
+
+        <div class="code-block"><pre>
+// aHash 구현
+import sharp from 'sharp';
+
+async function averageHash(imagePath: string): Promise<string> {
+    // 1. 이미지를 8x8 회색조로 축소
+    const buffer = await sharp(imagePath)
+        .resize(8, 8, { fit: 'fill' })
+        .grayscale()
+        .raw()
+        .toBuffer();
+
+    // 2. 픽셀 평균 계산
+    const pixels = Array.from(buffer);
+    const average = pixels.reduce((a, b) => a + b, 0) / pixels.length;
+
+    // 3. 각 픽셀을 평균과 비교하여 비트 생성
+    let hash = '';
+    for (const pixel of pixels) {
+        hash += pixel >= average ? '1' : '0';
+    }
+
+    // 4. 이진수를 16진수로 변환
+    const hexHash = BigInt('0b' + hash).toString(16).padStart(16, '0');
+
+    return hexHash;
+}
+
+// 사용 예제
+const hash1 = await averageHash('original.jpg');
+const hash2 = await averageHash('compressed.jpg');
+
+console.log('원본 해시:', hash1);
+console.log('압축 해시:', hash2);
+</pre></div>
+
+        <h3>차이 해시 (dHash)</h3>
+        <p>dHash는 절대값 대신 인접 픽셀 간의 그래디언트를 비교합니다. 이는 감마 보정 및 색상 프로필에 더 강인합니다.</p>
+
+        <div class="code-block"><pre>
+// dHash 구현
+async function differenceHash(imagePath: string): Promise<string> {
+    // 1. 이미지를 9x8 회색조로 축소 (수평 그래디언트용 추가 열)
+    const buffer = await sharp(imagePath)
+        .resize(9, 8, { fit: 'fill' })
+        .grayscale()
+        .raw()
+        .toBuffer();
+
+    const pixels = Array.from(buffer);
+
+    // 2. 수평 그래디언트 계산
+    let hash = '';
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const idx = row * 9 + col;
+            const left = pixels[idx];
+            const right = pixels[idx + 1];
+            // 왼쪽 픽셀이 오른쪽보다 작으면 1, 아니면 0
+            hash += left < right ? '1' : '0';
+        }
+    }
+
+    // 3. 16진수로 변환
+    const hexHash = BigInt('0b' + hash).toString(16).padStart(16, '0');
+
+    return hexHash;
+}
+
+// 사용 예제
+const dhash = await differenceHash('photo.jpg');
+console.log('dHash:', dhash);
+</pre></div>
+
+        <h3>지각적 해시 (pHash)</h3>
+        <p>pHash는 이산 코사인 변환(DCT)을 사용하여 저주파수 성분을 캡처합니다. 이는 크기 조정, 종횡비 변경 및 경미한 색상 조정에 매우 강인합니다.</p>
+
+        <div class="code-block"><pre>
+// pHash 구현 (DCT 기반)
+import sharp from 'sharp';
+
+async function perceptualHash(imagePath: string): Promise<string> {
+    // 1. 이미지를 32x32 회색조로 축소
+    const buffer = await sharp(imagePath)
+        .resize(32, 32, { fit: 'fill' })
+        .grayscale()
+        .raw()
+        .toBuffer();
+
+    // 2. 픽셀을 2D 배열로 변환
+    const pixels: number[][] = [];
+    for (let i = 0; i < 32; i++) {
+        pixels[i] = Array.from(buffer.slice(i * 32, (i + 1) * 32));
+    }
+
+    // 3. 2D DCT 적용
+    const dctMatrix = dct2d(pixels);
+
+    // 4. 좌상단 8x8 저주파수 성분 추출
+    const lowFreq: number[] = [];
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            lowFreq.push(dctMatrix[i][j]);
+        }
+    }
+
+    // 5. 중앙값 계산
+    const sorted = [...lowFreq].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+
+    // 6. 각 계수를 중앙값과 비교
+    let hash = '';
+    for (const coef of lowFreq) {
+        hash += coef > median ? '1' : '0';
+    }
+
+    // 7. 16진수로 변환
+    const hexHash = BigInt('0b' + hash).toString(16).padStart(16, '0');
+
+    return hexHash;
+}
+
+// DCT 헬퍼 함수
+function dct2d(matrix: number[][]): number[][] {
+    const N = matrix.length;
+    const result: number[][] = Array(N).fill(0).map(() => Array(N).fill(0));
+
+    for (let u = 0; u < N; u++) {
+        for (let v = 0; v < N; v++) {
+            let sum = 0;
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < N; j++) {
+                    sum += matrix[i][j] *
+                           Math.cos(((2*i+1) * u * Math.PI) / (2*N)) *
+                           Math.cos(((2*j+1) * v * Math.PI) / (2*N));
+                }
+            }
+            const cu = u === 0 ? 1/Math.sqrt(2) : 1;
+            const cv = v === 0 ? 1/Math.sqrt(2) : 1;
+            result[u][v] = (2/N) * cu * cv * sum;
+        }
+    }
+    return result;
+}
+</pre></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>알고리즘</th>
+                    <th>강인성</th>
+                    <th>속도</th>
+                    <th>권장 사용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>aHash</td>
+                    <td>낮음</td>
+                    <td>매우 빠름</td>
+                    <td>빠른 중복 검사</td>
+                </tr>
+                <tr>
+                    <td>dHash</td>
+                    <td>중간</td>
+                    <td>빠름</td>
+                    <td>범용</td>
+                </tr>
+                <tr>
+                    <td>pHash</td>
+                    <td>높음</td>
+                    <td>중간</td>
+                    <td>강인한 매칭</td>
+                </tr>
+                <tr>
+                    <td>wHash</td>
+                    <td>매우 높음</td>
+                    <td>느림</td>
+                    <td>고급 응용</td>
+                </tr>
+                <tr>
+                    <td>Neural Hash</td>
+                    <td>최고</td>
+                    <td>매우 느림</td>
+                    <td>정밀 검출</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>해밍 거리를 통한 유사성 측정</h2>
+        <p>지각적 해시를 생성한 후에는 두 해시 간의 유사성을 측정해야 합니다. 해밍 거리는 이를 위한 표준 메트릭입니다.</p>
+
+        <h3>해밍 거리란?</h3>
+        <p>해밍 거리는 동일한 길이의 두 문자열에서 서로 다른 위치의 수입니다. 이진 해시의 경우 XOR 연산 후 1의 개수를 세면 됩니다.</p>
+
+        <div class="code-block"><pre>
+// 해밍 거리 계산
+function hammingDistance(hash1: string, hash2: string): number {
+    if (hash1.length !== hash2.length) {
+        throw new Error('해시 길이가 동일해야 합니다');
+    }
+
+    // 16진수를 BigInt로 변환
+    const num1 = BigInt('0x' + hash1);
+    const num2 = BigInt('0x' + hash2);
+
+    // XOR 연산
+    let xor = num1 ^ num2;
+
+    // 1 비트 개수 세기 (Brian Kernighan 알고리즘)
+    let distance = 0;
+    while (xor > 0n) {
+        distance++;
+        xor &= xor - 1n;  // 가장 오른쪽 1 비트 제거
+    }
+
+    return distance;
+}
+
+// 사용 예제
+const hash1 = 'a4b3c2d1e5f6a7b8';
+const hash2 = 'a4b3c2d1e5f6a7b9';  // 마지막 비트만 다름
+const distance = hammingDistance(hash1, hash2);
+
+console.log('해밍 거리:', distance);
+console.log('유사도:', (1 - distance / 64) * 100 + '%');
+</pre></div>
+
+        <h3>임계값 결정</h3>
+        <p>이미지가 "유사"한 것으로 간주되는 해밍 거리를 결정하는 것은 응용 프로그램에 따라 다릅니다:</p>
+
+        <ul>
+            <li><strong>0-5:</strong> 거의 동일 (압축, 크기 조정만)</li>
+            <li><strong>6-10:</strong> 매우 유사 (경미한 편집)</li>
+            <li><strong>11-15:</strong> 유사 (상당한 수정)</li>
+            <li><strong>16-20:</strong> 다소 유사 (주요 변경)</li>
+            <li><strong>21+:</strong> 다름</li>
+        </ul>
+
+        <div class="warning-box">
+            <strong>⚠️ 위양성 vs 위음성</strong><br>
+            낮은 임계값(< 5): 위음성 증가 (실제 복제본 놓침)<br>
+            높은 임계값(> 15): 위양성 증가 (다른 이미지를 유사하다고 판단)<br>
+            응용 프로그램에 맞게 조정하고 실제 데이터로 테스트하십시오.
+        </div>
+
+        <h2>비디오 지문</h2>
+        <p>비디오는 이미지의 시퀀스이므로 비디오 지문은 시간적 및 공간적 특징을 모두 고려해야 합니다.</p>
+
+        <h3>프레임 샘플링 전략</h3>
+        <p>모든 프레임을 해싱하는 것은 계산적으로 비효율적입니다. 다음 샘플링 전략을 사용합니다:</p>
+
+        <ul>
+            <li><strong>고정 간격:</strong> N초마다 프레임 추출 (예: 매초 1프레임)</li>
+            <li><strong>키프레임:</strong> 비디오 인코더가 식별한 키프레임만</li>
+            <li><strong>장면 변화:</strong> 장면 전환 감지 후 대표 프레임</li>
+            <li><strong>적응형:</strong> 콘텐츠 복잡도에 따라 샘플링 비율 조정</li>
+        </ul>
+
+        <div class="code-block"><pre>
+// FFmpeg를 사용한 비디오 지문 생성
+import { spawn } from 'child_process';
+import { writeFileSync, unlinkSync } from 'fs';
+
+async function videoFingerprint(videoPath: string): Promise<string[]> {
+    const hashes: string[] = [];
+
+    // 1. FFmpeg로 1초당 1프레임 추출
+    const ffmpeg = spawn('ffmpeg', [
+        '-i', videoPath,
+        '-vf', 'fps=1',  // 1초당 1프레임
+        '-f', 'image2pipe',
+        '-vcodec', 'png',
+        '-'
+    ]);
+
+    let frameBuffer = Buffer.alloc(0);
+    let frameCount = 0;
+
+    // 2. 각 프레임 처리
+    for await (const chunk of ffmpeg.stdout) {
+        frameBuffer = Buffer.concat([frameBuffer, chunk]);
+
+        // PNG 경계 찾기 (IEND 청크)
+        const iendIndex = frameBuffer.indexOf(Buffer.from('IEND', 'ascii'));
+        if (iendIndex !== -1) {
+            // 완전한 프레임 추출
+            const frame = frameBuffer.slice(0, iendIndex + 8);
+            frameBuffer = frameBuffer.slice(iendIndex + 8);
+
+            // 프레임 임시 저장 및 해시 생성
+            const tempPath = `/tmp/frame-${frameCount}.png`;
+            writeFileSync(tempPath, frame);
+
+            const hash = await perceptualHash(tempPath);
+            hashes.push(hash);
+
+            // 임시 파일 삭제
+            unlinkSync(tempPath);
+
+            frameCount++;
+        }
+    }
+
+    console.log(`✅ ${frameCount}개 프레임 처리 완료`);
+    return hashes;
+}
+
+// 사용 예제
+const fingerprint = await videoFingerprint('video.mp4');
+console.log('비디오 지문:', fingerprint);
+</pre></div>
+
+        <h3>시간적 해싱</h3>
+        <p>프레임 해시를 단순히 연결하는 것 외에도 시간적 패턴을 캡처할 수 있습니다:</p>
+
+        <div class="code-block"><pre>
+// 시간적 지문 생성
+function temporalFingerprint(frameHashes: string[]): string {
+    // 연속 프레임 간의 해밍 거리 계산
+    const temporalSignature: number[] = [];
+
+    for (let i = 1; i < frameHashes.length; i++) {
+        const distance = hammingDistance(frameHashes[i - 1], frameHashes[i]);
+        temporalSignature.push(distance);
+    }
+
+    // 시간적 변화 패턴을 해시로 변환
+    const avgChange = temporalSignature.reduce((a, b) => a + b, 0) / temporalSignature.length;
+
+    let temporalHash = '';
+    for (const change of temporalSignature) {
+        temporalHash += change > avgChange ? '1' : '0';
+    }
+
+    return temporalHash;
+}
+
+// 사용 예제
+const frameHashes = await videoFingerprint('movie.mp4');
+const temporal = temporalFingerprint(frameHashes);
+console.log('시간적 지문:', temporal);
+</pre></div>
+
+        <h2>오디오 지문</h2>
+        <p>오디오 지문은 음악 인식(Shazam 등)에서 널리 사용되며 스펙트럼 분석을 기반으로 합니다.</p>
+
+        <h3>스펙트로그램 기반 해싱</h3>
+        <p>오디오를 스펙트로그램(시간-주파수 표현)으로 변환한 다음 피크 또는 특징적인 패턴을 추출합니다.</p>
+
+        <div class="code-block"><pre>
+// 오디오 지문 생성 (간소화된 버전)
+import { spawn } from 'child_process';
+
+async function audioFingerprint(audioPath: string): Promise<string> {
+    // 1. FFmpeg로 오디오를 PCM으로 디코딩
+    const ffmpeg = spawn('ffmpeg', [
+        '-i', audioPath,
+        '-f', 's16le',  // 16비트 PCM
+        '-ac', '1',     // 모노
+        '-ar', '11025', // 11kHz 샘플링
+        '-'
+    ]);
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of ffmpeg.stdout) {
+        chunks.push(chunk);
+    }
+
+    // 2. PCM 데이터 버퍼 결합
+    const pcmData = Buffer.concat(chunks);
+    const samples = new Int16Array(pcmData.buffer);
+
+    // 3. 단시간 푸리에 변환 (STFT)
+    const windowSize = 1024;
+    const hopSize = 512;
+    const spectrogram: number[][] = [];
+
+    for (let i = 0; i < samples.length - windowSize; i += hopSize) {
+        const window = Array.from(samples.slice(i, i + windowSize));
+        const magnitudes = fft(window);  // FFT 수행
+        spectrogram.push(magnitudes);
+    }
+
+    // 4. 스펙트로그램에서 피크 추출
+    const peaks = extractPeaks(spectrogram);
+
+    // 5. 피크를 해시로 변환
+    const hash = peaksToHash(peaks);
+
+    return hash;
+}
+
+// 피크 추출 (로컬 최대값)
+function extractPeaks(spectrogram: number[][]): Array<[number, number]> {
+    const peaks: Array<[number, number]> = [];
+
+    for (let t = 1; t < spectrogram.length - 1; t++) {
+        for (let f = 1; f < spectrogram[t].length - 1; f++) {
+            const current = spectrogram[t][f];
+
+            // 인접한 모든 값보다 크면 피크
+            if (current > spectrogram[t-1][f] &&
+                current > spectrogram[t+1][f] &&
+                current > spectrogram[t][f-1] &&
+                current > spectrogram[t][f+1]) {
+                peaks.push([t, f]);
+            }
+        }
+    }
+
+    return peaks;
+}
+
+// 피크를 해시로 변환
+function peaksToHash(peaks: Array<[number, number]>): string {
+    // 각 피크에 대해 인접 피크와의 관계를 해시
+    let hashBits = '';
+
+    for (let i = 0; i < peaks.length - 1; i++) {
+        const [t1, f1] = peaks[i];
+        const [t2, f2] = peaks[i + 1];
+
+        const deltaT = t2 - t1;
+        const deltaF = f2 - f1;
+
+        // 시간차와 주파수차를 비트로 인코딩
+        hashBits += deltaT > 10 ? '1' : '0';
+        hashBits += deltaF > 0 ? '1' : '0';
+    }
+
+    // 16진수로 변환
+    return BigInt('0b' + hashBits).toString(16);
+}
+</pre></div>
+
+        <h2>텍스트 유사성 해싱</h2>
+        <p>텍스트 콘텐츠의 경우 의미적 유사성을 캡처하는 기술이 필요합니다.</p>
+
+        <h3>MinHash (자카드 유사도)</h3>
+        <p>MinHash는 집합의 자카드 유사도를 효율적으로 추정합니다. 텍스트를 n-그램 또는 단어 집합으로 처리합니다.</p>
+
+        <div class="code-block"><pre>
+// MinHash 구현
+class MinHash {
+    private numHashes: number;
+    private hashFunctions: Array<(x: string) => number>;
+    private signature: number[];
+
+    constructor(numHashes: number = 128) {
+        this.numHashes = numHashes;
+        this.signature = new Array(numHashes).fill(Infinity);
+
+        // 해시 함수 생성 (서로 다른 시드 사용)
+        this.hashFunctions = [];
+        for (let i = 0; i < numHashes; i++) {
+            const seed = i;
+            this.hashFunctions.push((s: string) => {
+                let hash = seed;
+                for (let j = 0; j < s.length; j++) {
+                    hash = ((hash << 5) - hash) + s.charCodeAt(j);
+                    hash |= 0; // 32비트 정수로 변환
+                }
+                return Math.abs(hash);
+            });
+        }
+    }
+
+    // 텍스트에서 MinHash 서명 계산
+    update(text: string): void {
+        // 텍스트를 3-그램으로 분할
+        const ngrams = this.getNgrams(text, 3);
+
+        // 각 n-그램에 대해
+        for (const ngram of ngrams) {
+            // 모든 해시 함수 적용
+            for (let i = 0; i < this.numHashes; i++) {
+                const hashValue = this.hashFunctions[i](ngram);
+                // 최소값 유지
+                if (hashValue < this.signature[i]) {
+                    this.signature[i] = hashValue;
+                }
+            }
+        }
+    }
+
+    // n-그램 생성
+    private getNgrams(text: string, n: number): Set<string> {
+        const ngrams = new Set<string>();
+        const normalized = text.toLowerCase().replace(/\s+/g, ' ');
+
+        for (let i = 0; i <= normalized.length - n; i++) {
+            ngrams.add(normalized.slice(i, i + n));
+        }
+
+        return ngrams;
+    }
+
+    // 서명 가져오기
+    getSignature(): number[] {
+        return [...this.signature];
+    }
+
+    // 두 MinHash 서명의 유사도 계산
+    static similarity(sig1: number[], sig2: number[]): number {
+        let matches = 0;
+        for (let i = 0; i < sig1.length; i++) {
+            if (sig1[i] === sig2[i]) {
+                matches++;
+            }
+        }
+        return matches / sig1.length;
+    }
+}
+
+// 사용 예제
+const text1 = "AI 콘텐츠 인증은 디지털 신뢰의 핵심입니다.";
+const text2 = "디지털 신뢰를 위해서는 AI 콘텐츠 인증이 필수입니다.";
+
+const mh1 = new MinHash();
+mh1.update(text1);
+
+const mh2 = new MinHash();
+mh2.update(text2);
+
+const similarity = MinHash.similarity(mh1.getSignature(), mh2.getSignature());
+console.log('텍스트 유사도:', (similarity * 100).toFixed(2) + '%');
+</pre></div>
+
+        <h2>지문 데이터베이스 및 검색</h2>
+        <p>수백만 개의 지문에서 효율적으로 검색하려면 특수한 인덱싱 구조가 필요합니다.</p>
+
+        <h3>BK-트리 (해밍 거리 검색)</h3>
+        <p>BK-트리는 편집 거리 메트릭에 최적화된 트리 구조로 해밍 거리 검색에 적합합니다.</p>
+
+        <div class="code-block"><pre>
+// BK-트리 구현
+class BKTreeNode {
+    hash: string;
+    children: Map<number, BKTreeNode>;
+
+    constructor(hash: string) {
+        this.hash = hash;
+        this.children = new Map();
+    }
+}
+
+class BKTree {
+    private root: BKTreeNode | null = null;
+
+    // 해시 추가
+    add(hash: string): void {
+        if (!this.root) {
+            this.root = new BKTreeNode(hash);
+            return;
+        }
+
+        let current = this.root;
+
+        while (true) {
+            const distance = hammingDistance(current.hash, hash);
+
+            if (distance === 0) {
+                // 중복, 추가하지 않음
+                return;
+            }
+
+            if (!current.children.has(distance)) {
+                current.children.set(distance, new BKTreeNode(hash));
+                return;
+            }
+
+            current = current.children.get(distance)!;
+        }
+    }
+
+    // 임계값 이내의 모든 해시 검색
+    search(targetHash: string, threshold: number): string[] {
+        if (!this.root) {
+            return [];
+        }
+
+        const results: string[] = [];
+        const queue: BKTreeNode[] = [this.root];
+
+        while (queue.length > 0) {
+            const node = queue.shift()!;
+            const distance = hammingDistance(node.hash, targetHash);
+
+            if (distance <= threshold) {
+                results.push(node.hash);
+            }
+
+            // 삼각 부등식을 사용한 가지치기
+            const minDist = Math.max(0, distance - threshold);
+            const maxDist = distance + threshold;
+
+            for (let d = minDist; d <= maxDist; d++) {
+                if (node.children.has(d)) {
+                    queue.push(node.children.get(d)!);
+                }
+            }
+        }
+
+        return results;
+    }
+}
+
+// 사용 예제
+const tree = new BKTree();
+
+// 지문 데이터베이스 구축
+const hashes = [
+    'a1b2c3d4e5f6a7b8',
+    'a1b2c3d4e5f6a7b9',
+    'f1e2d3c4b5a69788',
+    // ... 수백만 개의 해시
+];
+
+for (const hash of hashes) {
+    tree.add(hash);
+}
+
+// 유사한 해시 검색
+const queryHash = 'a1b2c3d4e5f6a7ba';
+const matches = tree.search(queryHash, 3);  // 해밍 거리 3 이내
+
+console.log('일치하는 해시:', matches);
+</pre></div>
+
+        <h2>신경망 기반 지문</h2>
+        <p>딥러닝 모델은 전통적인 알고리즘보다 더 강인하고 의미론적으로 의미 있는 지문을 학습할 수 있습니다.</p>
+
+        <h3>이미지 임베딩</h3>
+        <p>사전 훈련된 CNN(ResNet, EfficientNet 등)의 중간 계층을 특징 추출기로 사용합니다.</p>
+
+        <div class="code-block"><pre>
+// TensorFlow.js를 사용한 신경망 지문
+import * as tf from '@tensorflow/tfjs-node';
+import * as mobilenet from '@tensorflow-models/mobilenet';
+import sharp from 'sharp';
+
+class NeuralFingerprint {
+    private model: mobilenet.MobileNet;
+
+    async initialize() {
+        // MobileNet 모델 로드 (사전 훈련된 ImageNet)
+        this.model = await mobilenet.load({
+            version: 2,
+            alpha: 1.0
+        });
+        console.log('✅ 모델 로드 완료');
+    }
+
+    async computeEmbedding(imagePath: string): Promise<number[]> {
+        // 1. 이미지 로드 및 전처리
+        const imageBuffer = await sharp(imagePath)
+            .resize(224, 224)
+            .raw()
+            .toBuffer();
+
+        // 2. 텐서로 변환
+        const tensor = tf.tensor3d(
+            new Uint8Array(imageBuffer),
+            [224, 224, 3]
+        ).expandDims(0).toFloat().div(255);
+
+        // 3. 내부 활성화 추출 (분류 계층 이전)
+        const activation = this.model.infer(tensor, 'conv_preds');
+
+        // 4. 평균 풀링으로 고정 크기 벡터 생성
+        const embedding = tf.mean(activation, [1, 2]).squeeze();
+
+        // 5. 배열로 변환
+        const embeddingArray = await embedding.array() as number[];
+
+        // 메모리 정리
+        tensor.dispose();
+        activation.dispose();
+        embedding.dispose();
+
+        return embeddingArray;
+    }
+
+    // 코사인 유사도 계산
+    cosineSimilarity(vec1: number[], vec2: number[]): number {
+        let dotProduct = 0;
+        let norm1 = 0;
+        let norm2 = 0;
+
+        for (let i = 0; i < vec1.length; i++) {
+            dotProduct += vec1[i] * vec2[i];
+            norm1 += vec1[i] * vec1[i];
+            norm2 += vec2[i] * vec2[i];
+        }
+
+        return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+    }
+}
+
+// 사용 예제
+const fingerprinter = new NeuralFingerprint();
+await fingerprinter.initialize();
+
+const emb1 = await fingerprinter.computeEmbedding('photo1.jpg');
+const emb2 = await fingerprinter.computeEmbedding('photo2.jpg');
+
+const similarity = fingerprinter.cosineSimilarity(emb1, emb2);
+console.log('신경망 유사도:', (similarity * 100).toFixed(2) + '%');
+</pre></div>
+
+        <h2>WIA-AI-017 지문 표준</h2>
+        <p>WIA-AI-017은 상호 운용성을 위해 표준화된 지문 형식을 정의합니다.</p>
+
+        <div class="code-block"><pre>
+// WIA-AI-017 지문 매니페스트
+interface FingerprintManifest {
+    fingerprintId: string;        // 고유 ID
+    version: string;              // 표준 버전
+
+    // 콘텐츠 참조
+    contentType: string;          // image, video, audio, text
+    contentHash: string;          // SHA-256 해시
+
+    // 지문 데이터
+    fingerprints: {
+        algorithm: string;        // phash, dhash, simhash 등
+        hash: string;             // 실제 지문
+        confidence: number;       // 0.0-1.0
+    }[];
+
+    // 메타데이터
+    computedAt: string;           // ISO 8601 타임스탬프
+    computedBy: string;           // 생성 시스템/조직
+}
+
+// 예제 사용
+const manifest: FingerprintManifest = {
+    fingerprintId: 'fp-' + crypto.randomUUID(),
+    version: '1.0',
+    contentType: 'image',
+    contentHash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+    fingerprints: [
+        {
+            algorithm: 'pHash-DCT',
+            hash: await perceptualHash('image.jpg'),
+            confidence: 0.95
+        },
+        {
+            algorithm: 'dHash',
+            hash: await differenceHash('image.jpg'),
+            confidence: 0.90
+        }
+    ],
+    computedAt: new Date().toISOString(),
+    computedBy: 'WIA 콘텐츠 연구소'
+};
+</pre></div>
+
+        <div class="success-box">
+            <strong>✅ 다중 지문 전략</strong><br>
+            여러 지문 알고리즘을 결합하면 강인성이 향상됩니다. 한 알고리즘이 특정 변환(예: 회전)에 실패하더라도 다른 알고리즘이 여전히 일치를 감지할 수 있습니다.
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 요약</h3>
+            <ul>
+                <li>지각적 해시는 유사한 콘텐츠에 대해 유사한 지문을 생성합니다</li>
+                <li>이미지 지문: aHash(빠름), dHash(균형), pHash(강인함)</li>
+                <li>해밍 거리는 이진 해시 간의 유사성을 측정합니다</li>
+                <li>비디오 지문은 프레임 샘플링과 시간적 분석을 결합합니다</li>
+                <li>오디오 지문은 스펙트로그램의 피크 패턴을 캡처합니다</li>
+                <li>텍스트 유사성: MinHash는 자카드 유사도를 효율적으로 추정합니다</li>
+                <li>신경망 임베딩은 의미론적으로 풍부한 지문을 제공합니다</li>
+                <li>BK-트리는 대규모 지문 데이터베이스의 효율적인 검색을 가능하게 합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 복습 문제</h3>
+            <ol>
+                <li>지각적 해시와 암호화 해시의 주요 차이점은 무엇입니까?</li>
+                <li>aHash, dHash, pHash의 장단점을 비교하십시오.</li>
+                <li>해밍 거리를 계산하는 방법과 유사성 임계값을 결정하는 방법을 설명하십시오.</li>
+                <li>비디오 지문에서 모든 프레임을 해싱하지 않는 이유는 무엇입니까?</li>
+                <li>오디오 지문이 스펙트로그램을 사용하는 이유를 설명하십시오.</li>
+                <li>MinHash가 텍스트 유사성을 측정하는 방식을 설명하십시오.</li>
+                <li>신경망 기반 지문의 장점은 무엇입니까?</li>
+                <li>BK-트리가 대규모 해시 검색을 어떻게 가속화합니까?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · 널리 인간을 이롭게 하라</p>
+
+        </div>
+</body>
+</html>

@@ -476,5 +476,60 @@ Webhook payload:
 
 ---
 
+## Reference Standards Alignment
+
+The Phase 2 API surface composes well-established healthcare and IT primitives:
+
+| Concern | Reference |
+|---------|-----------|
+| Health-data interoperability | HL7 FHIR R5 |
+| Clinical terminology | SNOMED CT, ICD-10 / ICD-11 (WHO), LOINC |
+| Health-data exchange (US) | 45 CFR Part 162 (HIPAA Transactions and Code Sets) |
+| Patient-data privacy (US) | 45 CFR Part 164 (HIPAA Privacy Rule), 45 CFR Part 160 (Security Rule) |
+| Patient-data privacy (EU) | Regulation (EU) 2016/679 (GDPR) Article 9 (special-category data) |
+| Patient-data privacy (KR) | 개인정보 보호법 §23 (sensitive personal information) |
+| API transport | RFC 9110 (HTTP), RFC 9112 (HTTP/1.1), RFC 9113 (HTTP/2), RFC 8446 (TLS 1.3) |
+| Authentication | RFC 7519 (JWT), RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), RFC 8705 (mTLS) |
+| Errors | RFC 9457 (Problem Details for HTTP APIs) |
+| OpenAPI | OpenAPI Specification 3.1 |
+| Time encoding | ISO 8601:2019 |
+| Information security | ISO/IEC 27001:2022 |
+| Cloud privacy | ISO/IEC 27018:2019 |
+| Privacy management | ISO/IEC 27701:2019 |
+| Health-information security management | ISO 27799:2016 |
+| Quality management for medical devices | ISO 13485:2016 (when applicable to integrated devices) |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 2 implementation is conformant when:
+
+1. The OpenAPI 3.1 description publishes every endpoint with request and response schemas.
+2. Authentication accepts at least the `bearerAuth` (JWT) scheme.
+3. Errors use RFC 9457 problem-detail responses.
+4. PHI handling complies with HIPAA, GDPR Article 9, or the deploying jurisdiction's analogous rule.
+5. Information-security controls map to a published statement of applicability.
+
+## Implementation Appendix
+
+### A. Idempotency
+
+Endpoints that create resources accept an `Idempotency-Key` request header containing a UUID. The server stores the response for at least 24 hours and returns the cached response on retry. This prevents duplicate claim submission when the network is unreliable.
+
+### B. Trace Context
+
+Every request carries a W3C Trace Context `traceparent` header so distributed traces span the EHR, payer adjudication engine, and the patient-facing portal. Trace identifiers are emitted in error responses to aid debugging.
+
+### C. Bulk Operations
+
+Bulk claim submission supports up to 100 claims per request. Bulk responses include per-item success status so that the client can retry only the failed records.
+
+### D. Cross-Reference
+
+The HL7 FHIR R5 ExplanationOfBenefit, Coverage, Claim, and ClaimResponse resources are the canonical interchange formats; the WIA-SOC-019 API surface is a thin RESTful wrapper around those resources with WIA-specific extensions for cross-jurisdictional reporting.
+
+---
+
 © 2025 SmileStory Inc. / WIA
 弘益人間 (홍익인간) · Benefit All Humanity

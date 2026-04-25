@@ -308,10 +308,6 @@ This project follows the principle of 홍익인간 (弘益人間). We are commit
 
 This standard builds upon pioneering research in federated learning:
 
-- 선행 연구: Federated Averaging
-- 선행 연구: Secure Aggregation
-- 선행 연구: Advances and Open Problems in FL
-- 선행 연구: Federated Optimization
 
 ## Contact & Support
 

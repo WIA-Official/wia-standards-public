@@ -400,6 +400,80 @@ wia-cli certify --implementation-id your-impl-id
 
 ---
 
+
+
+## Reference Standards Alignment
+
+The Phase 4 integration draws on a coherent stack of well-established IT, AI-governance, and operational standards.
+
+| Concern | Reference |
+|---------|-----------|
+| Observability | OpenTelemetry Specification (CNCF) |
+| Trace context | W3C Trace Context Recommendation |
+| Container runtime | OCI Runtime Specification, OCI Image Specification |
+| Orchestration | Kubernetes published API references |
+| Information security | ISO/IEC 27001:2022 |
+| Cloud security | ISO/IEC 27017:2015, ISO/IEC 27018:2019 |
+| Privacy management | ISO/IEC 27701:2019 |
+| Privacy framework | ISO/IEC 29100:2011 |
+| AI risk management | NIST AI Risk Management Framework, ISO/IEC 23894:2023 |
+| Algorithmic bias | IEEE 7003-2024 |
+| Ethical AI | IEEE 7000-2021 |
+| Functional safety | IEC 61508 series, ISO 13849-1:2023 |
+| Cybersecurity (industrial) | IEC 62443 series |
+| Functional safety (auto) | ISO 26262 series |
+| Medical device safety | IEC 60601-1:2005+AMD2:2020, IEC 62304:2006+AMD1:2015 |
+| Sensor metadata | W3C SOSA/SSN |
+| Quality management | ISO 9001:2015 |
+| Energy management | ISO 50001:2018 |
+| GHG inventory | ISO 14064-1:2018 |
+| Accessibility | W3C WCAG 2.2 |
+| Locale | BCP 47 (RFC 5646), Unicode CLDR |
+| Time encoding | ISO 8601:2019 |
+
+All references conform to the WIA Citation & Veracity Policy v1.0 §2.1 ALLOW.
+
+## Conformance
+
+A Phase 4 integration is conformant when:
+
+1. The deployment topology, runtime, and orchestration choices are documented and reproducible.
+2. Observability uses OpenTelemetry semantic conventions.
+3. Information-security and privacy controls map to a published statement of applicability.
+4. AI risk management aligns with the NIST AI RMF or ISO/IEC 23894:2023.
+5. Functional-safety considerations apply where the deployment context requires it (industrial, automotive, medical).
+
+## Operational Appendix
+
+### A. Hardware Targets
+
+Edge AI runtimes target a wide range of hardware:
+
+- **Microcontroller-class** — ARM Cortex-M, RISC-V profiles RV32IMAC and above.
+- **Application-class** — ARM Cortex-A series, Intel Atom and Core families, RISC-V RV64GC.
+- **Accelerated** — NVIDIA Jetson family, Google Coral, Intel Movidius, Qualcomm AI Engine, Hailo accelerators.
+- **High-end edge gateways** — server-class CPUs with discrete GPUs or domain-specific accelerators.
+
+The runtime profile (EDGE-MIN, EDGE-STD, EDGE-MAX) is matched to the target class.
+
+### B. Update and Lifecycle
+
+Edge fleet updates follow a staged roll-out with documented metrics, alerts, and roll-back criteria. The reference roll-out uses canary cohorts of 1%, 5%, 25%, and 100% with a minimum bake time at each stage. Roll-back is automatic on documented degradation.
+
+### C. Security Operations
+
+Security operations include code-signing of model artefacts (Ed25519 RFC 8032 by default), secure-boot of edge runtimes (TCG TPM 2.0 where hardware permits), and centralised certificate management following RFC 5280 conventions.
+
+### D. Disaster Recovery
+
+Recovery objectives align with ISO/IEC 27031:2011. The reference RTOs are 5 minutes for telemetry ingestion, 15 minutes for control APIs, and 1 hour for read-only audit access. Quarterly drills are mandatory and reviewed by the operating organisation's quality officer.
+
+### E. Sustainability
+
+Operating organisations may publish sustainability reports following ISO 14064-1:2018 (greenhouse-gas inventory) and ISO 50001:2018 (energy management). Energy efficiency is a first-class metric for edge AI: inferences per joule are reported alongside latency and accuracy.
+
+---
+
 **Copyright © 2025 World Certification Industry Association (WIA)**
 **License:** CC BY 4.0
 **弘益人間** - Benefit All Humanity

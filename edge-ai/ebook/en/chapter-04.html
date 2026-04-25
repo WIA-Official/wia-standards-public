@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: TinyML and Embedded AI | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        .review-questions { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 4</div>
+            <h1>TinyML and Embedded AI</h1>
+        </header>
+
+        <article>
+            <h2>What is TinyML?</h2>
+            <p>TinyML (Tiny Machine Learning) represents the extreme edge of AI deployment—running neural networks on microcontrollers with as little as 1KB RAM, 1MHz processors, and microwatt power consumption. These ultra-resource-constrained devices enable always-on AI in battery-powered sensors, wearables, and IoT endpoints that operate for months or years on coin cell batteries.</p>
+
+            <p>TinyML sits at the intersection of embedded systems and machine learning, bringing intelligence to the billions of microcontrollers deployed globally—devices previously considered too limited for AI workloads.</p>
+
+            <h2>Hardware Constraints</h2>
+
+            <h3>Microcontroller Specifications</h3>
+            <p>Typical TinyML hardware specifications:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Typical Range</th>
+                        <th>Example (ARM Cortex-M4)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Flash Memory</td>
+                        <td>64KB - 2MB</td>
+                        <td>512KB</td>
+                    </tr>
+                    <tr>
+                        <td>SRAM</td>
+                        <td>8KB - 256KB</td>
+                        <td>96KB</td>
+                    </tr>
+                    <tr>
+                        <td>Clock Speed</td>
+                        <td>48MHz - 200MHz</td>
+                        <td>80MHz</td>
+                    </tr>
+                    <tr>
+                        <td>Power</td>
+                        <td>1mW - 100mW</td>
+                        <td>~5mW active</td>
+                    </tr>
+                    <tr>
+                        <td>Cost</td>
+                        <td>$1 - $10</td>
+                        <td>$3</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Compare this to smartphones with 6-12GB RAM, 3GHz processors, and watt-scale power budgets. TinyML operates with 1000x less memory, 100x slower processors, and 1000x less power.</p>
+
+            <h3>Memory Architecture</h3>
+            <p>Microcontrollers have two memory types:</p>
+            <ul>
+                <li><strong>Flash (Non-volatile):</strong> Stores program code and model weights. Larger capacity but read-only at runtime.</li>
+                <li><strong>SRAM (Volatile):</strong> Working memory for activations and temporary buffers. Much smaller, very limited.</li>
+            </ul>
+
+            <p>A 100KB model fits in Flash, but intermediate activations must fit in SRAM—often just 32-64KB. This is the primary bottleneck.</p>
+
+            <h2>TensorFlow Lite Micro</h2>
+
+            <h3>Architecture</h3>
+            <p>TensorFlow Lite Micro (TFLM) is Google's framework for running ML on microcontrollers. It's a stripped-down version of TensorFlow Lite designed for extreme resource constraints:</p>
+
+            <ul>
+                <li>No dynamic memory allocation (no malloc/free)</li>
+                <li>Statically allocated tensor arena</li>
+                <li>Minimal dependencies (no standard library requirements)</li>
+                <li>Optimized kernels for ARM Cortex-M processors</li>
+                <li>~20KB code footprint</li>
+            </ul>
+
+            <h3>Example: Keyword Spotting</h3>
+            <pre><code>// TensorFlow Lite Micro inference (C++)
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "model.h"  // Converted TFLite model
+
+constexpr int kTensorArenaSize = 10 * 1024;  // 10KB for activations
+uint8_t tensor_arena[kTensorArenaSize];
+
+// Setup
+static tflite::MicroMutableOpResolver<6> micro_op_resolver;
+micro_op_resolver.AddConv2D();
+micro_op_resolver.AddDepthwiseConv2D();
+micro_op_resolver.AddFullyConnected();
+micro_op_resolver.AddSoftmax();
+micro_op_resolver.AddReshape();
+micro_op_resolver.AddQuantize();
+
+static tflite::MicroInterpreter interpreter(
+    model, micro_op_resolver, tensor_arena, kTensorArenaSize);
+
+interpreter.AllocateTensors();
+
+// Inference
+TfLiteTensor* input = interpreter.input(0);
+// Fill input with audio features
+for (int i = 0; i < input->bytes; i++) {
+    input->data.uint8[i] = audio_features[i];
+}
+
+interpreter.Invoke();
+
+TfLiteTensor* output = interpreter.output(0);
+uint8_t prediction = output->data.uint8[0];</code></pre>
+
+            <h2>Model Design for TinyML</h2>
+
+            <h3>Ultra-Compact Architectures</h3>
+            <p>Standard architectures (ResNet, BERT) are far too large. TinyML requires purpose-built models:</p>
+
+            <ul>
+                <li><strong>MicroNet:</strong> Sub-1MB models for ImageNet classification</li>
+                <li><strong>DS-CNN:</strong> Depthwise-separable CNNs for keyword spotting (14KB)</li>
+                <li><strong>MCUNet:</strong> Joint NAS of architecture and inference schedule</li>
+                <li><strong>Fully Connected Tiny:</strong> 2-3 layer networks for simple classification</li>
+            </ul>
+
+            <h3>Depthwise Separable Convolutions</h3>
+            <p>Standard convolutions are computationally expensive. Depthwise separable convolutions factorize into:</p>
+
+            <pre><code>// Standard Conv2D: C_in × C_out × K × K multiplies
+Standard: 64 × 128 × 3 × 3 = 73,728 multiply-adds
+
+// Depthwise Separable: (C_in × K × K) + (C_in × C_out × 1 × 1)
+Depthwise: (64 × 3 × 3) + (64 × 128 × 1 × 1) = 576 + 8,192 = 8,768
+
+Reduction: 73,728 / 8,768 = 8.4x fewer operations!</code></pre>
+
+            <h3>Binary and Ternary Networks</h3>
+            <p>Extreme quantization where weights are constrained to:</p>
+            <ul>
+                <li><strong>Binary:</strong> {-1, +1} (1 bit per weight)</li>
+                <li><strong>Ternary:</strong> {-1, 0, +1} (1.5 bits per weight)</li>
+            </ul>
+
+            <p>This enables 32x compression beyond INT8 quantization, crucial for sub-10KB models.</p>
+
+            <h2>TinyML Use Cases</h2>
+
+            <h3>Always-On Keyword Detection</h3>
+            <p>Listen continuously for wake words ("Hey Siri", "OK Google") with <1mW power draw. Model detects keyword locally, then wakes main processor for full speech recognition.</p>
+
+            <pre><code>Model: 14KB DS-CNN
+Input: 40 MFCC features × 10 frames
+Output: 4 classes (yes, no, unknown, silence)
+Latency: 5ms per inference
+Power: 0.8mW continuous
+Accuracy: 92% on speech commands dataset</code></pre>
+
+            <h3>Predictive Maintenance Sensors</h3>
+            <p>Industrial vibration sensors analyze motor/bearing health. Detect anomalies locally, transmit only alerts—not raw vibration data.</p>
+
+            <ul>
+                <li>Model: Autoencoder (32KB)</li>
+                <li>Battery: 10 years on AA batteries</li>
+                <li>Alerts: 99.7% reduction in data transmission</li>
+            </ul>
+
+            <h3>Environmental Monitoring</h3>
+            <p>Wildlife cameras with on-device animal classification. Capture images only when target species detected, preserving battery and storage.</p>
+
+            <h3>Gesture Recognition</h3>
+            <p>Wearable devices detecting hand gestures from accelerometer/gyroscope. No image data, extreme privacy preservation.</p>
+
+            <h3>Health Monitoring</h3>
+            <p>Wearable ECG monitors detecting arrhythmias, fall detection in elderly care devices, seizure prediction from EEG.</p>
+
+            <h2>Training TinyML Models</h2>
+
+            <h3>Training Pipeline</h3>
+            <ol>
+                <li><strong>Design Architecture:</strong> Ensure model fits memory constraints (check Flash and SRAM requirements)</li>
+                <li><strong>Train with Quantization Awareness:</strong> Simulate INT8 arithmetic during training</li>
+                <li><strong>Optimize:</strong> Prune aggressively (80-95% sparsity common)</li>
+                <li><strong>Convert:</strong> Export to TensorFlow Lite Micro format</li>
+                <li><strong>Benchmark:</strong> Measure on actual microcontroller hardware</li>
+            </ol>
+
+            <pre><code>// Training for TinyML with size constraints
+model = Sequential([
+    DepthwiseConv2D(kernel_size=3, depth_multiplier=1),
+    BatchNormalization(),
+    ReLU(),
+    DepthwiseConv2D(kernel_size=3, depth_multiplier=1),
+    GlobalAveragePooling2D(),
+    Dense(4, activation='softmax')
+])
+
+# Quantization-aware training
+quant_model = quantize_model(model)
+quant_model.compile(optimizer='adam', loss='categorical_crossentropy')
+quant_model.fit(train_data, epochs=50)
+
+# Convert to TFLite Micro
+converter = tf.lite.TFLiteConverter.from_keras_model(quant_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+tflite_model = converter.convert()
+
+# Check size constraints
+print(f"Model size: {len(tflite_model)} bytes")
+assert len(tflite_model) < 100_000, "Model too large for 512KB Flash!"</code></pre>
+
+            <h3>Data Collection Challenges</h3>
+            <p>TinyML often targets niche applications with limited labeled data. Strategies:</p>
+            <ul>
+                <li><strong>Data Augmentation:</strong> Synthetic variations of limited real data</li>
+                <li><strong>Transfer Learning:</strong> Fine-tune pre-trained models on small datasets</li>
+                <li><strong>Few-Shot Learning:</strong> Learn from very few examples per class</li>
+                <li><strong>Simulation:</strong> Generate synthetic training data from physics models</li>
+            </ul>
+
+            <h2>Power Optimization</h2>
+
+            <h3>Energy Breakdown</h3>
+            <p>Where does power go in TinyML inference?</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Power (mW)</th>
+                        <th>Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Core Computation</td>
+                        <td>1.2</td>
+                        <td>40%</td>
+                    </tr>
+                    <tr>
+                        <td>Memory Access</td>
+                        <td>1.5</td>
+                        <td>50%</td>
+                    </tr>
+                    <tr>
+                        <td>I/O (Sensors)</td>
+                        <td>0.3</td>
+                        <td>10%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Memory access dominates! Reducing data movement is critical.</p>
+
+            <h3>Power-Saving Techniques</h3>
+            <ul>
+                <li><strong>Duty Cycling:</strong> Wake up, infer, sleep. E.g., 10ms inference every 100ms = 10% duty cycle</li>
+                <li><strong>Cascaded Models:</strong> Cheap classifier runs continuously, expensive model only on positive detections</li>
+                <li><strong>Voltage Scaling:</strong> Lower voltage for lower power (with slower computation)</li>
+                <li><strong>Clock Gating:</strong> Disable unused peripherals and cores</li>
+            </ul>
+
+            <pre><code>// Cascaded inference for power saving
+void loop() {
+    // Tier 1: Ultra-cheap binary classifier (0.5mW, 2ms)
+    if (cheap_detector.has_activity()) {
+        // Tier 2: Full model only when needed (5mW, 10ms)
+        result = full_model.infer();
+        if (result.confidence > 0.8) {
+            transmit_alert(result);
+        }
+    }
+    sleep_until_next_window();  // Deep sleep between inferences
+}</code></pre>
+
+            <h2>Development Tools and Frameworks</h2>
+
+            <h3>TensorFlow Lite Micro</h3>
+            <p>Google's official framework. Supports most common layers, optimized for ARM Cortex-M.</p>
+
+            <h3>Edge Impulse</h3>
+            <p>End-to-end platform for building TinyML applications. Handles data collection, training, optimization, and deployment.</p>
+
+            <h3>Arduino IDE + TinyML</h3>
+            <p>Accessible development environment for prototyping. Libraries for common models (keyword spotting, gesture recognition).</p>
+
+            <h3>STM32Cube.AI</h3>
+            <p>STMicroelectronics' toolkit for deploying AI on STM32 microcontrollers. Automated optimization and code generation.</p>
+
+            <h3>Arm Ethos-U</h3>
+            <p>Microcontroller-class neural processing unit. 256 MAC/cycle, INT8/INT16 support, 0.5 TOPS/W efficiency.</p>
+
+            <h2>Real-World Deployment</h2>
+
+            <h3>Arduino Nano 33 BLE Sense Example</h3>
+            <p>Popular TinyML prototyping platform with integrated sensors:</p>
+
+            <ul>
+                <li>ARM Cortex-M4 @ 64MHz</li>
+                <li>256KB RAM, 1MB Flash</li>
+                <li>IMU (9-axis motion)</li>
+                <li>Microphone, temperature, humidity, pressure, light, gesture, proximity sensors</li>
+            </ul>
+
+            <pre><code>// Complete gesture recognition on Arduino
+#include <TensorFlowLite.h>
+#include <Arduino_LSM9DS1.h>
+#include "model.h"
+
+void setup() {
+    IMU.begin();
+    interpreter = new tflite::MicroInterpreter(...);
+    interpreter->AllocateTensors();
+}
+
+void loop() {
+    float ax, ay, az;
+    if (IMU.accelerationAvailable()) {
+        IMU.readAcceleration(ax, ay, az);
+
+        // Fill input tensor
+        input_tensor->data.f[buffer_index++] = ax;
+        input_tensor->data.f[buffer_index++] = ay;
+        input_tensor->data.f[buffer_index++] = az;
+
+        if (buffer_index >= 384) {  // 128 samples × 3 axes
+            interpreter->Invoke();
+            int gesture = argmax(output_tensor);
+            Serial.println(gesture_names[gesture]);
+            buffer_index = 0;
+        }
+    }
+}</code></pre>
+
+            <h3>Battery Life Calculations</h3>
+            <pre><code>// Calculate battery life for TinyML deployment
+Battery: 1000mAh (CR2032 coin cell)
+Inference: 5mW for 10ms
+Sleep: 5µW
+Duty Cycle: Infer once per second
+
+Active Power: 5mW × 10ms = 50µJ per inference
+Sleep Power: 5µW × 990ms = 4.95µJ per cycle
+Total per inference: ~55µJ
+
+Power per second: 55µJ × 1 = 55µJ
+Average power: 55µW
+
+Battery life: 1000mAh × 3V = 3000mWh = 10,800,000mWs
+Lifetime: 10,800,000mWs / 0.055mW = 196,363,636 seconds
+         = 3,272,727 minutes = 6.2 years!
+
+Result: Multi-year deployment on coin cell battery</code></pre>
+
+            <div class="info-box">
+                <p><strong>弘益人間 TinyML Principle:</strong></p>
+                <p>TinyML democratizes AI by bringing intelligence to the most resource-constrained devices, enabling IoT applications that benefit humanity—from wildlife conservation to elderly care—without requiring expensive hardware or constant internet connectivity.</p>
+            </div>
+
+            <h2>Challenges and Future Directions</h2>
+
+            <h3>Current Limitations</h3>
+            <ul>
+                <li><strong>Model Complexity:</strong> Only simple models fit on microcontrollers</li>
+                <li><strong>Accuracy Trade-offs:</strong> Aggressive compression reduces accuracy significantly</li>
+                <li><strong>Development Complexity:</strong> Requires embedded systems expertise</li>
+                <li><strong>Limited Frameworks:</strong> Fewer tools than mobile/cloud ML</li>
+            </ul>
+
+            <h3>Emerging Technologies</h3>
+            <ul>
+                <li><strong>Neuromorphic Computing:</strong> Event-driven processing mimicking biological neurons</li>
+                <li><strong>In-Memory Computing:</strong> Compute within memory arrays, eliminating data movement</li>
+                <li><strong>Analog AI Accelerators:</strong> Ultra-low-power analog circuits for neural networks</li>
+                <li><strong>Federated TinyML:</strong> Collaborative learning across microcontroller fleets</li>
+            </ul>
+
+            <div class="summary">
+                <h2>Summary</h2>
+                <p>TinyML enables AI on microcontrollers with extreme resource constraints—kilobytes of RAM, megahertz processors, milliwatt power budgets. Key enablers include:</p>
+                <ul>
+                    <li><strong>TensorFlow Lite Micro:</strong> Optimized framework for microcontrollers</li>
+                    <li><strong>Ultra-compact models:</strong> Depthwise separable convolutions, binary/ternary networks, aggressive pruning</li>
+                    <li><strong>Quantization:</strong> INT8 and even binary quantization for maximum compression</li>
+                    <li><strong>Power optimization:</strong> Duty cycling, cascaded inference, voltage scaling</li>
+                </ul>
+                <p>TinyML unlocks always-on AI applications—keyword spotting, predictive maintenance, environmental monitoring—running for years on battery power. This brings intelligence to billions of edge devices, enabling privacy-preserving, offline-capable AI at massive scale.</p>
+            </div>
+
+            <div class="review-questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>What are typical hardware specifications for TinyML microcontrollers?</li>
+                    <li>How does TensorFlow Lite Micro differ from standard TensorFlow Lite?</li>
+                    <li>Explain why depthwise separable convolutions are important for TinyML.</li>
+                    <li>What are binary and ternary neural networks, and why are they used in TinyML?</li>
+                    <li>Describe three real-world TinyML use cases and their requirements.</li>
+                    <li>Why does memory access consume more power than computation in TinyML?</li>
+                    <li>What is cascaded inference, and how does it save power?</li>
+                    <li>Calculate battery life for a device doing 1ms inference at 10mW every 10 seconds, sleeping at 10µW, with a 500mAh battery.</li>
+                    <li>What are the main challenges in developing TinyML applications?</li>
+                    <li>Name three emerging technologies that could advance TinyML capabilities.</li>
+                </ol>
+            </div>
+        </article>
+
+        </div>
+</body>
+</html>

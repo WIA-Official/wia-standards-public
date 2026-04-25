@@ -337,6 +337,61 @@ Depth is measured along the Z-axis (perpendicular distance from sensor plane), N
   - Multi-spectral depth data
   - Event-based depth streams
 
+## 7. Reference Standards Alignment
+
+### 7.1 Geographic Metadata
+
+When 3D sensor frames are tagged with positional metadata (mobile robotics, surveying, autonomous vehicles), the metadata block follows ISO 19115-1:2014 *Geographic information — Metadata — Part 1: Fundamentals*.
+
+```json
+{
+  "geographic_metadata": {
+    "iso19115_compliant": true,
+    "reference_system": "EPSG:4326",
+    "elevation_model": "EGM96",
+    "acquisition_time_iso8601": "2026-04-26T08:14:32Z",
+    "uncertainty_3d_m": [0.05, 0.05, 0.12]
+  }
+}
+```
+
+For raster depth maps with geographic alignment, the OGC GeoTIFF 1.1 standard is used as the on-disk container (key `GeoKeyDirectoryTag`).
+
+### 7.2 Color and Image Encoding
+
+RGB companion frames follow ISO/IEC 14496-12 (ISO Base Media File Format) for streaming and ISO/IEC 10918-1 (JPEG) or ISO/IEC 23008-12 (HEIF) for stills. Color spaces are reported via ICC v4 profiles per ISO 15076-1:2010, with the default working space sRGB IEC 61966-2-1:1999.
+
+### 7.3 Time Synchronization
+
+Frame timestamps are encoded per ISO 8601:2019 with nanosecond precision when sensor capability allows. Networked synchronization uses IEEE 1588-2019 PTPv2 (Precision Time Protocol) for hardware-synchronized arrays and RFC 5905 NTPv4 for software-synchronized clusters. Sub-microsecond synchronization between sensors in a single rack requires PTPv2 with hardware timestamping.
+
+### 7.4 Numeric Encoding
+
+Floating-point numbers conform to IEEE 754-2019 (binary32 and binary64). Integer types follow ISO/IEC 9899:2018 (C18) `<stdint.h>` fixed-width semantics: `uint16_t` for raw depth millimeters, `uint8_t` for confidence, `int32_t` for indexed point cloud fields.
+
+### 7.5 Compression Profiles
+
+| Use case | Codec | Reference |
+|----------|-------|-----------|
+| Lossless depth (archival) | LZ4 / Zstandard | RFC 8478 (Zstandard) |
+| Lossy depth streaming | Custom delta + range coder | ISO/IEC 23090-5 (V-PCC) for compatibility |
+| Point cloud archival | Draco or PLY | OGC v1.0 PLY conformance |
+| Mesh archival | glTF 2.0 with KHR_draco_mesh_compression | Khronos glTF 2.0 specification |
+
+Implementations declare their codec choice in the file header `compression.profile` field. Decoders MUST reject unknown profile identifiers and SHOULD report the unrecognized profile in their error response (RFC 9457 *Problem Details for HTTP APIs*).
+
+### 7.6 Conformance
+
+A producer is conformant with this Phase 1 specification when:
+
+1. All mandatory header fields are present and validate against the v1.0 JSON Schema.
+2. Numeric encodings match the declarations in §7.4.
+3. Compression profile is one of the listed identifiers in §7.5.
+4. Geographic metadata, when present, validates against ISO 19115-1:2014.
+5. Time fields conform to ISO 8601:2019.
+
+A consumer is conformant when it correctly decodes any v1.0 producer output and gracefully reports unrecognized optional fields per §7.5 last paragraph.
+
 ---
 
 **© 2025 SmileStory Inc. / WIA - World Certification Industry Association**  

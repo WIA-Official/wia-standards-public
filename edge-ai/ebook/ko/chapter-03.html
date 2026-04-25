@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 모델 최적화 | WIA-AI-019</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .chapter-number { color: #10B981; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #10B981; font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { color: #10B981; font-size: 1.8rem; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #34d399; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; padding-left: 2rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        .summary { background: #1e293b; padding: 2rem; border-radius: 12px; margin: 3rem 0; border: 1px solid #334155; }
+        nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        td { background: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">3장</div>
+            <h1>모델 최적화</h1>
+        </header>
+        <article>
+            <h2>최적화의 필요성</h2>
+            <p>최첨단 신경망 모델은 종종 수억 또는 수십억 개의 파라미터를 포함하며 기가바이트의 메모리와 막대한 컴퓨팅 리소스를 필요로 합니다. 반면 엣지 디바이스는 엄격한 제약을 가지고 있습니다: 제한된 RAM(1-8GB), 적당한 컴퓨팅 성능(10-100 TOPS), 그리고 타이트한 전력 예산(0.1-5W). 클라우드 규모의 모델을 엣지 디바이스에 직접 배포하는 것은 불가능합니다.</p>
+
+            <p>모델 최적화는 이 격차를 메우며, 크고 정확한 모델을 가능한 한 많은 정확도를 보존하면서 엣지 배포에 적합한 컴팩트하고 효율적인 버전으로 변환합니다. 목표: 최소한의 정확도 손실(<1-3%)로 10-100배 크기 감소와 3-10배 속도 향상을 달성하는 것입니다.</p>
+
+            <h2>양자화 (Quantization)</h2>
+
+            <h3>수치 정밀도 이해</h3>
+            <p>신경망은 전통적으로 가중치와 활성화에 32비트 부동소수점(FP32) 숫자를 사용합니다. 각 파라미터는 4바이트의 저장 공간을 필요로 합니다. 양자화는 수치 정밀도를 더 작은 데이터 타입으로 줄입니다:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>데이터 타입</th>
+                        <th>비트</th>
+                        <th>범위</th>
+                        <th>크기 감소</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>FP32</td>
+                        <td>32</td>
+                        <td>±3.4×10³⁸</td>
+                        <td>기준 (1x)</td>
+                    </tr>
+                    <tr>
+                        <td>FP16</td>
+                        <td>16</td>
+                        <td>±6.5×10⁴</td>
+                        <td>2배 작음</td>
+                    </tr>
+                    <tr>
+                        <td>INT8</td>
+                        <td>8</td>
+                        <td>-128 ~ 127</td>
+                        <td>4배 작음</td>
+                    </tr>
+                    <tr>
+                        <td>INT4</td>
+                        <td>4</td>
+                        <td>-8 ~ 7</td>
+                        <td>8배 작음</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>훈련 후 양자화 (PTQ)</h3>
+            <p>PTQ는 재훈련 없이 훈련된 FP32 모델을 낮은 정밀도로 변환합니다. 프로세스:</p>
+
+            <ol>
+                <li>보정: 대표 데이터를 모델에 통과시켜 활성화 통계 수집</li>
+                <li>범위 결정: 각 레이어의 최소/최대 값 계산</li>
+                <li>매핑: FP32 값을 INT8 범위로 변환</li>
+                <li>검증: 정확도 저하 측정</li>
+            </ol>
+
+            <pre><code>// TensorFlow Lite 훈련 후 INT8 양자화
+import tensorflow as tf
+
+converter = tf.lite.TFLiteConverter.from_saved_model('model/')
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+def representative_dataset():
+    for data in calibration_samples:
+        yield [data.astype(np.float32)]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.int8
+converter.inference_output_type = tf.int8
+
+quantized_model = converter.convert()
+with open('model_int8.tflite', 'wb') as f:
+    f.write(quantized_model)</code></pre>
+
+            <p><strong>결과:</strong> PTQ는 일반적으로 1-2% 정확도 손실로 4배 크기 감소(FP32 → INT8)를 달성합니다. 재훈련이 필요 없고 빠른 변환(몇 분)이 가능합니다.</p>
+
+            <h3>양자화 인식 훈련 (QAT)</h3>
+            <p>QAT는 훈련 중 양자화를 시뮬레이션하여 모델이 감소된 정밀도에 적응할 수 있게 합니다. 이는 PTQ에 비해 정확도 손실을 최소화합니다.</p>
+
+            <pre><code>// PyTorch 양자화 인식 훈련
+import torch.quantization as quant
+
+model = YourModel()
+model.qconfig = quant.get_default_qat_qconfig('fbgemm')
+model_prepared = quant.prepare_qat(model)
+
+# 시뮬레이션된 양자화로 정상적으로 훈련
+for epoch in range(num_epochs):
+    train(model_prepared, train_loader)
+
+# 양자화된 모델로 변환
+model_quantized = quant.convert(model_prepared)</code></pre>
+
+            <p><strong>결과:</strong> QAT는 0.5% 미만의 정확도 손실로 4배 크기 감소를 달성합니다. 재훈련이 필요하지만(몇 시간에서 며칠) PTQ보다 더 나은 정확도 보존이 가능합니다.</p>
+
+            <h3>혼합 정밀도 양자화</h3>
+            <p>모든 레이어가 양자화를 동일하게 허용하는 것은 아닙니다. 민감한 레이어(첫 번째, 마지막, 어텐션)는 FP16을 사용하고 중간 레이어는 INT8을 사용할 수 있습니다. 이는 크기 감소와 정확도 사이의 균형을 맞춥니다.</p>
+
+            <h2>프루닝 (Pruning)</h2>
+
+            <h3>비구조적 프루닝</h3>
+            <p>작은 크기의 개별 가중치를 제거합니다. 0에 가까운 가중치는 모델 출력에 최소한으로 기여하며 정확히 0으로 설정할 수 있습니다.</p>
+
+            <pre><code>// 간단한 크기 기반 프루닝
+import torch.nn.utils.prune as prune
+
+# Conv 레이어에서 50%의 가중치 프루닝
+prune.l1_unstructured(model.conv1, name='weight', amount=0.5)
+
+# 프루닝을 영구적으로 만들기
+prune.remove(model.conv1, 'weight')</code></pre>
+
+            <p>대형 네트워크의 경우 50-90%의 가중치를 프루닝하는 것이 일반적입니다. 프루닝된 모델은 실제로 크기를 줄이기 위해 희소 행렬 형식(CSR, CSC)이 필요합니다.</p>
+
+            <p><strong>과제:</strong> 희소 행렬은 많은 엣지 가속기에서 잘 지원되지 않습니다. 비구조적 프루닝은 전문 하드웨어 없이는 추론 속도를 향상시키지 못할 수 있습니다.</p>
+
+            <h3>구조적 프루닝</h3>
+            <p>개별 가중치가 아닌 전체 채널, 필터 또는 뉴런을 제거합니다. 이는 표준 하드웨어에서 효율적으로 실행되는 모델을 만듭니다.</p>
+
+            <pre><code>// 채널 프루닝 예제
+# L1 노름을 기반으로 30%의 채널 제거
+for layer in model.conv_layers:
+    channel_importance = compute_channel_norms(layer)
+    keep_channels = select_top_k(channel_importance, k=0.7)
+    layer.weight = layer.weight[keep_channels, :, :, :]
+    layer.bias = layer.bias[keep_channels]</code></pre>
+
+            <p><strong>결과:</strong> 2-5% 정확도 손실로 30-50% 파라미터 감소. 모델 구조가 밀집 상태로 유지되므로 엣지 하드웨어에서 실제 속도 향상이 있습니다.</p>
+
+            <h3>반복적 프루닝 및 미세 조정</h3>
+            <p>최선의 방법: 반복 사이에 미세 조정을 통해 점진적으로 프루닝합니다.</p>
+
+            <ol>
+                <li>10-20%의 파라미터 프루닝</li>
+                <li>5-10 에폭 동안 미세 조정하여 정확도 회복</li>
+                <li>목표 압축에 도달할 때까지 반복</li>
+            </ol>
+
+            <h2>지식 증류 (Knowledge Distillation)</h2>
+
+            <h3>교사-학생 프레임워크</h3>
+            <p>작은 "학생" 모델을 큰 "교사" 모델을 모방하도록 훈련합니다. 학생은 실제 레이블과 교사의 소프트 예측 모두에서 학습합니다.</p>
+
+            <pre><code>// 지식 증류 손실
+def distillation_loss(student_logits, teacher_logits, labels, temp=3.0, alpha=0.7):
+    # 교사의 소프트 타겟 (평활화된 확률)
+    soft_targets = F.softmax(teacher_logits / temp, dim=1)
+    soft_student = F.log_softmax(student_logits / temp, dim=1)
+    distillation = F.kl_div(soft_student, soft_targets, reduction='batchmean')
+
+    # 실제 레이블의 하드 타겟
+    hard_loss = F.cross_entropy(student_logits, labels)
+
+    # 결합 손실
+    return alpha * (temp ** 2) * distillation + (1 - alpha) * hard_loss
+
+# 훈련 루프
+for images, labels in dataloader:
+    with torch.no_grad():
+        teacher_logits = teacher_model(images)
+
+    student_logits = student_model(images)
+    loss = distillation_loss(student_logits, teacher_logits, labels)
+    loss.backward()
+    optimizer.step()</code></pre>
+
+            <p>교사의 소프트 예측은 하드 레이블보다 풍부한 정보를 제공합니다. "개"로 95% 확신으로 분류된 이미지의 경우, 교사는 3% "늑대", 1% "고양이"라는 것도 보여줍니다—학생이 배울 수 있는 구조적 지식입니다.</p>
+
+            <h3>학생 아키텍처 선택</h3>
+            <p>일반적인 접근 방식:</p>
+            <ul>
+                <li><strong>축소된 버전:</strong> 교사와 동일한 아키텍처이지만 더 적은 레이어/채널 (예: ResNet-152 → ResNet-18)</li>
+                <li><strong>효율적인 아키텍처:</strong> 엣지에 최적화된 다른 아키텍처 (예: ResNet-50 → MobileNetV3)</li>
+                <li><strong>작업별:</strong> 대상 하드웨어용 전문 아키텍처</li>
+            </ul>
+
+            <p><strong>결과:</strong> 교사 정확도의 95-99%를 유지하면서 5-20배 모델 크기 감소. 학생은 종종 작은 아키텍처를 직접 훈련하는 것보다 더 나은 성능을 보입니다.</p>
+
+            <h2>신경 아키텍처 검색 (NAS)</h2>
+
+            <h3>하드웨어 인식 NAS</h3>
+            <p>대상 엣지 하드웨어에 최적화된 신경망 아키텍처를 자동으로 발견합니다. 검색 목표는 다음 사항의 균형을 맞춥니다:</p>
+            <ul>
+                <li>검증 세트의 정확도</li>
+                <li>대상 디바이스의 지연시간</li>
+                <li>모델 크기 (파라미터, 저장소)</li>
+                <li>에너지 소비</li>
+            </ul>
+
+            <p>인기 있는 NAS 방법:</p>
+            <ul>
+                <li><strong>EfficientNet:</strong> 복합 스케일링을 사용하여 깊이, 너비, 해상도 균형</li>
+                <li><strong>MobileNetV3:</strong> 모바일 디바이스용 플랫폼 인식 NAS를 통해 발견</li>
+                <li><strong>FBNet:</strong> Facebook의 모바일 배포용 NAS</li>
+                <li><strong>Once-for-All (OFA):</strong> 한 번 훈련하고 여러 하드웨어 대상에 배포</li>
+            </ul>
+
+            <h3>엣지를 위한 AutoML</h3>
+            <p>TensorFlow Model Optimization Toolkit 및 Neural Network Intelligence (NNI)와 같은 도구는 양자화, 프루닝, NAS를 체계적으로 적용하여 최적화 프로세스를 자동화합니다.</p>
+
+            <h2>연산자 융합 및 그래프 최적화</h2>
+
+            <h3>레이어 융합</h3>
+            <p>순차적 연산을 단일 커널로 결합하여 메모리 트래픽과 오버헤드를 줄입니다.</p>
+
+            <p>일반적인 융합:</p>
+            <ul>
+                <li><strong>Conv + BatchNorm + ReLU:</strong> 3개 연산 → 1개 융합 커널</li>
+                <li><strong>MatMul + Bias + Activation:</strong> 활성화를 가진 Dense 레이어</li>
+                <li><strong>Add + ReLU:</strong> 활성화를 가진 Residual 연결</li>
+            </ul>
+
+            <pre><code>// 융합 전 (3개 연산, 3번 메모리 통과)
+x = conv2d(input, weights)
+x = batch_norm(x, bn_params)
+output = relu(x)
+
+// 융합 후 (1개 연산, 1번 메모리 통과)
+output = fused_conv_bn_relu(input, weights, bn_params)</code></pre>
+
+            <p>융합은 메모리 읽기/쓰기를 최소화하여 지연시간을 20-40% 줄입니다.</p>
+
+            <h3>상수 폴딩</h3>
+            <p>컴파일 시간에 상수 입력을 가진 연산을 미리 계산합니다.</p>
+
+            <pre><code>// 전: 런타임에 계산
+scale = 0.5
+output = input * scale * 2.0
+
+// 상수 폴딩 후: 0.5 * 2.0 = 1.0 사전 계산
+output = input  // 곱셈이 완전히 제거됨!</code></pre>
+
+            <h3>데드 코드 제거</h3>
+            <p>사용되지 않는 출력, 도달할 수 없는 연산, 중복 계산을 그래프에서 제거합니다.</p>
+
+            <h2>저랭크 인수분해</h2>
+
+            <h3>텐서 분해</h3>
+            <p>저랭크 분해를 사용하여 가중치 행렬을 근사화합니다. 가중치 행렬 W ∈ R^(m×n)에 대해, W ≈ U × V로 분해합니다. 여기서 U ∈ R^(m×k), V ∈ R^(k×n)이고 k ≪ min(m,n)입니다.</p>
+
+            <pre><code>// 압축을 위한 특이값 분해 (SVD)
+U, S, V = torch.svd(weight_matrix)
+
+# 상위 k개의 특이값만 유지
+k = 64
+U_reduced = U[:, :k]
+S_reduced = S[:k]
+V_reduced = V[:, :k]
+
+# 원래 가중치 근사
+weight_approx = U_reduced @ torch.diag(S_reduced) @ V_reduced.t()
+
+# 하나의 큰 레이어를 두 개의 작은 레이어로 교체
+layer1.weight = U_reduced @ torch.diag(torch.sqrt(S_reduced))
+layer2.weight = torch.diag(torch.sqrt(S_reduced)) @ V_reduced.t()</code></pre>
+
+            <p><strong>결과:</strong> 최소한의 정확도 손실로 완전 연결 레이어에 대해 2-5배 압축.</p>
+
+            <h2>압축 파이프라인</h2>
+
+            <h3>기술 결합</h3>
+            <p>최대 압축은 여러 기술을 결합하여 얻습니다:</p>
+
+            <ol>
+                <li><strong>프루닝:</strong> 50%의 파라미터 제거 (2배 감소)</li>
+                <li><strong>양자화:</strong> FP32 → INT8 (4배 감소)</li>
+                <li><strong>지식 증류:</strong> 효율적인 학생 훈련 (3배 감소)</li>
+                <li><strong>총계:</strong> 2 × 4 × 3 = 24배 전체 압축</li>
+            </ol>
+
+            <pre><code>// 완전한 최적화 파이프라인
+// 1. 사전 훈련된 모델로 시작
+model = load_pretrained_model()
+
+// 2. 60%의 가중치 프루닝
+model = iterative_prune(model, target_sparsity=0.6, epochs=10)
+
+// 3. 효율적인 아키텍처로 지식 증류
+student = MobileNetV3()
+student = distill(teacher=model, student=student, epochs=50)
+
+// 4. 양자화 인식 훈련
+student = quantization_aware_train(student, epochs=20)
+
+// 5. INT8로 변환
+model_int8 = convert_to_int8(student)
+
+// 6. 엣지 배포를 위해 내보내기
+export_to_tflite(model_int8, 'optimized_model.tflite')</code></pre>
+
+            <h2>정확도-효율성 트레이드오프</h2>
+
+            <h3>파레토 프론티어</h3>
+            <p>정확도 대 지연시간/크기에 모델 변형을 플로팅합니다. 파레토 프론티어는 지배되지 않는 모델을 보여줍니다—한 지표를 다른 지표를 해치지 않고 개선할 수 없는 모델입니다.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>모델 변형</th>
+                        <th>정확도</th>
+                        <th>지연시간</th>
+                        <th>크기</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>원본 FP32</td>
+                        <td>92.5%</td>
+                        <td>120ms</td>
+                        <td>98 MB</td>
+                    </tr>
+                    <tr>
+                        <td>+ 프루닝 50%</td>
+                        <td>91.8%</td>
+                        <td>100ms</td>
+                        <td>50 MB</td>
+                    </tr>
+                    <tr>
+                        <td>+ INT8 양자화</td>
+                        <td>91.2%</td>
+                        <td>35ms</td>
+                        <td>12 MB</td>
+                    </tr>
+                    <tr>
+                        <td>+ 증류</td>
+                        <td>89.5%</td>
+                        <td>18ms</td>
+                        <td>4 MB</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>작업별 요구 사항</h3>
+            <p>애플리케이션 요구 사항에 따라 최적화 수준을 선택합니다:</p>
+            <ul>
+                <li><strong>의료 진단:</strong> 정확도 우선 (91%+), 더 높은 지연시간/크기 허용</li>
+                <li><strong>실시간 AR:</strong> 지연시간 우선 (<16ms for 60fps), 일부 정확도 손실 허용</li>
+                <li><strong>IoT 센서:</strong> 크기/전력 우선 (100KB 미만 모델), 상당한 정확도 감소 허용</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>弘益人間 최적화 원칙:</strong></p>
+                <p>가장 광범위한 디바이스에서 실행되도록 모델을 최적화하여 하드웨어에 관계없이 모든 사람이 AI에 접근할 수 있도록 합니다. 10배 크기 감소는 전 세계적으로 10배 더 많은 디바이스에 AI를 제공합니다.</p>
+            </div>
+
+            <h2>도구 및 프레임워크</h2>
+
+            <h3>TensorFlow Model Optimization Toolkit</h3>
+            <p>양자화, 프루닝, 클러스터링을 위한 포괄적인 툴킷입니다. 훈련 후 및 훈련 시간 최적화를 지원합니다.</p>
+
+            <h3>PyTorch Quantization</h3>
+            <p>PTQ 및 QAT에 대한 내장 지원. 배포를 위한 TorchScript와의 통합.</p>
+
+            <h3>ONNX Runtime</h3>
+            <p>ONNX 모델을 위한 그래프 최적화 및 양자화. 크로스 프레임워크 호환성.</p>
+
+            <h3>Neural Network Compression Framework (NNCF)</h3>
+            <p>최소한의 정확도 손실로 압축하기 위한 Intel의 툴킷. PyTorch 및 TensorFlow 지원.</p>
+
+            <h2>최적화 영향 측정</h2>
+
+            <h3>전후 비교</h3>
+            <pre><code>// 원본 대 최적화된 모델 벤치마크
+원본 모델:
+- 크기: 245 MB
+- 지연시간: 178ms (CPU), 45ms (GPU)
+- 정확도: 94.2%
+- 전력: 2.8W
+
+최적화된 모델 (INT8 + 프루닝 + 증류):
+- 크기: 12 MB (20.4배 작음)
+- 지연시간: 18ms (CPU), 8ms (NPU)
+- 정확도: 92.1% (-2.1%)
+- 전력: 0.4W (7배 더 효율적)
+
+결과: 20배 압축, 10배 빠름, 7배 더 전력 효율적
+트레이드오프: 2.1% 정확도 감소 (대부분의 사용 사례에 허용 가능)</code></pre>
+
+            <div class="summary">
+                <h2>요약</h2>
+                <p>모델 최적화는 엣지 AI 배포에 필수적입니다. 주요 기술:</p>
+                <ul>
+                    <li><strong>양자화:</strong> 수치 정밀도 감소 (FP32 → INT8)로 최소한의 정확도 손실로 4배 크기 감소</li>
+                    <li><strong>프루닝:</strong> 불필요한 가중치/채널 제거로 2-10배 파라미터 감소</li>
+                    <li><strong>지식 증류:</strong> 작은 모델을 큰 모델을 모방하도록 훈련하여 5-20배 압축 달성</li>
+                    <li><strong>NAS:</strong> 하드웨어 최적화 아키텍처 자동 발견</li>
+                    <li><strong>그래프 최적화:</strong> 연산 융합, 데드 코드 제거, 상수 폴딩</li>
+                </ul>
+                <p>기술을 결합하면 10-100배 총 압축을 얻습니다. 최적화 파이프라인: 프루닝 → 증류 → 양자화 → 그래프 최적화. 정확도, 지연시간, 크기, 전력 간의 트레이드오프는 애플리케이션별로 다릅니다.</p>
+                <p>최신 프레임워크(TensorFlow Lite, PyTorch, ONNX Runtime)는 자동화된 최적화를 위한 강력한 도구를 제공합니다. 실제 성능 향상을 검증하기 위해 대상 하드웨어에서 결과를 측정하십시오.</p>
+            </div>
+
+            <div class="summary">
+                <h2>복습 문제</h2>
+                <ol>
+                    <li>훈련 후 양자화(PTQ)와 양자화 인식 훈련(QAT)의 차이점은 무엇입니까?</li>
+                    <li>INT8 양자화는 FP32에 비해 얼마나 크기 감소를 달성합니까?</li>
+                    <li>구조적 프루닝과 비구조적 프루닝의 차이점을 설명하세요. 엣지 배포에 어느 것이 더 좋습니까?</li>
+                    <li>지식 증류는 어떻게 작동하며, 왜 학생이 작은 모델을 직접 훈련하는 것보다 더 나은 성능을 보입니까?</li>
+                    <li>신경 아키텍처 검색(NAS)이란 무엇이며, 하드웨어 인식 NAS는 전통적인 NAS와 어떻게 다릅니까?</li>
+                    <li>3가지 일반적인 연산자 융합을 나열하고 성능을 어떻게 향상시키는지 설명하세요.</li>
+                    <li>50% 프루닝과 INT8 양자화를 적용하면 이론적 총 압축 비율은 얼마입니까?</li>
+                    <li>모델 최적화 맥락에서 파레토 프론티어란 무엇입니까?</li>
+                    <li>여러 기술을 결합한 완전한 최적화 파이프라인을 설명하세요.</li>
+                    <li>특정 애플리케이션에 적합한 최적화 수준을 어떻게 선택합니까?</li>
+                </ol>
+            </div>
+        </article>
+        </div>
+</body>
+</html>

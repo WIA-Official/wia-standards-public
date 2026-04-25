@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Watermarking Technologies - WIA-AI-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px; border-radius: 15px; margin-bottom: 40px; border: 2px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2em; font-weight: 600; margin-bottom: 10px; }
+        h1 { font-size: 2.5em; color: #e2e8f0; margin-bottom: 20px; }
+        h2 { font-size: 2em; color: #10B981; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { font-size: 1.5em; color: #34d399; margin: 30px 0 15px 0; }
+        p { margin: 15px 0; line-height: 1.8; }
+        .code-block { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #10B981; margin: 20px 0; overflow-x: auto; }
+        .code-block pre { color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.95em; }
+        .info-box { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 10px 0; }
+        .key-takeaways { background: #1e293b; padding: 30px; border-radius: 15px; border: 2px solid #10B981; margin: 40px 0; }
+        .key-takeaways h3 { color: #10B981; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 15px; margin: 40px 0; }
+        .review-questions h3 { color: #10B981; margin-top: 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 40px 0; }
+        .nav-button { background: #10B981; color: #0f172a; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; font-weight: 600; margin: 40px 0; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">CHAPTER 04</div>
+            <h1>Watermarking Technologies</h1>
+            <p style="color: #94a3b8; font-size: 1.1em;">Master invisible watermark embedding and extraction for content protection</p>
+        </header>
+
+        <h2>Introduction to Digital Watermarking</h2>
+        <p>Digital watermarking embeds information directly into content in a way that survives common transformations. Unlike metadata that can be stripped, watermarks are an integral part of the content itself. The WIA-AI-017 standard specifies watermarking requirements for AI content authentication.</p>
+
+        <h3>Watermarking Requirements</h3>
+        <ul>
+            <li><strong>Imperceptibility:</strong> Invisible to human perception</li>
+            <li><strong>Robustness:</strong> Survives compression, resizing, format conversion</li>
+            <li><strong>Capacity:</strong> Embeds sufficient data (typically 64-256 bits)</li>
+            <li><strong>Security:</strong> Resistant to unauthorized removal or alteration</li>
+            <li><strong>Blind Detection:</strong> Extraction without original content</li>
+        </ul>
+
+        <h2>DCT-Based Watermarking</h2>
+        <p>Discrete Cosine Transform watermarking modifies frequency coefficients for robustness to JPEG compression.</p>
+
+        <div class="code-block">
+            <pre>
+// Example: DCT Watermarking Implementation
+import Jimp from 'jimp';
+
+class DCTWatermarker {
+    constructor(strength = 10) {
+        this.strength = strength;
+        this.blockSize = 8;
+    }
+
+    async embed(imagePath, watermarkBits) {
+        const image = await Jimp.read(imagePath);
+        const { width, height } = image.bitmap;
+
+        // Process 8x8 blocks
+        for (let y = 0; y < height - this.blockSize; y += this.blockSize) {
+            for (let x = 0; x < width - this.blockSize; x += this.blockSize) {
+                const block = this.extractBlock(image, x, y);
+                const dct = this.computeDCT(block);
+
+                // Embed watermark bit in mid-frequency coefficient
+                const bitIndex = ((y / this.blockSize) * (width / this.blockSize) +
+                                 (x / this.blockSize)) % watermarkBits.length;
+                const bit = watermarkBits[bitIndex];
+
+                // Modify DCT coefficient
+                dct[3][3] = bit === 1 ?
+                    Math.abs(dct[3][3]) + this.strength :
+                    -Math.abs(dct[3][3]) - this.strength;
+
+                // Inverse DCT and write back
+                const modifiedBlock = this.inverseDCT(dct);
+                this.writeBlock(image, x, y, modifiedBlock);
+            }
+        }
+
+        return image;
+    }
+
+    async extract(imagePath, watermarkLength) {
+        const image = await Jimp.read(imagePath);
+        const { width, height } = image.bitmap;
+        const extractedBits = [];
+
+        for (let y = 0; y < height - this.blockSize; y += this.blockSize) {
+            for (let x = 0; x < width - this.blockSize; x += this.blockSize) {
+                const block = this.extractBlock(image, x, y);
+                const dct = this.computeDCT(block);
+
+                // Extract bit from mid-frequency coefficient
+                const bit = dct[3][3] > 0 ? 1 : 0;
+                extractedBits.push(bit);
+
+                if (extractedBits.length >= watermarkLength) {
+                    return extractedBits;
+                }
+            }
+        }
+
+        return extractedBits;
+    }
+
+    extractBlock(image, startX, startY) {
+        const block = [];
+        for (let y = 0; y < this.blockSize; y++) {
+            const row = [];
+            for (let x = 0; x < this.blockSize; x++) {
+                const pixel = Jimp.intToRGBA(image.getPixelColor(startX + x, startY + y));
+                row.push(pixel.r); // Use red channel
+            }
+            block.push(row);
+        }
+        return block;
+    }
+
+    writeBlock(image, startX, startY, block) {
+        for (let y = 0; y < this.blockSize; y++) {
+            for (let x = 0; x < this.blockSize; x++) {
+                const value = Math.max(0, Math.min(255, Math.round(block[y][x])));
+                const color = Jimp.rgbaToInt(value, value, value, 255);
+                image.setPixelColor(color, startX + x, startY + y);
+            }
+        }
+    }
+
+    computeDCT(block) {
+        const N = this.blockSize;
+        const dct = Array(N).fill(0).map(() => Array(N).fill(0));
+
+        for (let u = 0; u < N; u++) {
+            for (let v = 0; v < N; v++) {
+                let sum = 0;
+                for (let x = 0; x < N; x++) {
+                    for (let y = 0; y < N; y++) {
+                        sum += block[y][x] *
+                               Math.cos(Math.PI * u * (2 * x + 1) / (2 * N)) *
+                               Math.cos(Math.PI * v * (2 * y + 1) / (2 * N));
+                    }
+                }
+                const cu = u === 0 ? 1 / Math.sqrt(2) : 1;
+                const cv = v === 0 ? 1 / Math.sqrt(2) : 1;
+                dct[u][v] = 0.25 * cu * cv * sum;
+            }
+        }
+        return dct;
+    }
+
+    inverseDCT(dct) {
+        const N = this.blockSize;
+        const block = Array(N).fill(0).map(() => Array(N).fill(0));
+
+        for (let x = 0; x < N; x++) {
+            for (let y = 0; y < N; y++) {
+                let sum = 0;
+                for (let u = 0; u < N; u++) {
+                    for (let v = 0; v < N; v++) {
+                        const cu = u === 0 ? 1 / Math.sqrt(2) : 1;
+                        const cv = v === 0 ? 1 / Math.sqrt(2) : 1;
+                        sum += cu * cv * dct[u][v] *
+                               Math.cos(Math.PI * u * (2 * x + 1) / (2 * N)) *
+                               Math.cos(Math.PI * v * (2 * y + 1) / (2 * N));
+                    }
+                }
+                block[y][x] = 0.25 * sum;
+            }
+        }
+        return block;
+    }
+}
+
+// Usage
+const watermarker = new DCTWatermarker(15);
+const watermarkData = "WIA-AI-017 Authenticated Content";
+const watermarkBits = stringToBits(watermarkData);
+
+const watermarked = await watermarker.embed('original.jpg', watermarkBits);
+await watermarked.writeAsync('watermarked.jpg');
+
+const extracted = await watermarker.extract('watermarked.jpg', watermarkBits.length);
+const extractedText = bitsToString(extracted);
+console.log('Extracted watermark:', extractedText);
+            </pre>
+        </div>
+
+        <h2>DWT-Based Watermarking</h2>
+        <p>Discrete Wavelet Transform provides better imperceptibility by modifying multi-scale representations.</p>
+
+        <div class="code-block">
+            <pre>
+// Example: DWT Watermarking
+class DWTWatermarker {
+    constructor(level = 3) {
+        this.level = level;
+    }
+
+    async embed(imagePath, watermarkBits) {
+        const image = await Jimp.read(imagePath);
+
+        // Convert to YCbCr color space
+        const y = this.extractLuminance(image);
+
+        // Perform DWT
+        const coeffs = this.dwt2D(y, this.level);
+
+        // Embed in LL subband (low-frequency approximation)
+        const ll = coeffs.LL;
+        for (let i = 0; i < watermarkBits.length && i < ll.length; i++) {
+            for (let j = 0; j < ll[i].length && (i * ll[i].length + j) < watermarkBits.length; j++) {
+                const bitIndex = i * ll[i].length + j;
+                if (bitIndex < watermarkBits.length) {
+                    // Quantization-based embedding
+                    const bit = watermarkBits[bitIndex];
+                    const delta = 20; // Quantization step
+                    const quantized = Math.round(ll[i][j] / delta) * delta;
+                    ll[i][j] = quantized + (bit === 1 ? delta / 2 : 0);
+                }
+            }
+        }
+
+        // Inverse DWT
+        const reconstructed = this.idwt2D(coeffs, this.level);
+
+        // Write back to image
+        this.writeLuminance(image, reconstructed);
+
+        return image;
+    }
+
+    dwt2D(matrix, level) {
+        // Haar wavelet transform
+        let current = matrix;
+        const coefficients = { LL: null, LH: [], HL: [], HH: [] };
+
+        for (let l = 0; l < level; l++) {
+            const result = this.haarTransform(current);
+            coefficients.LH.push(result.LH);
+            coefficients.HL.push(result.HL);
+            coefficients.HH.push(result.HH);
+            current = result.LL;
+        }
+
+        coefficients.LL = current;
+        return coefficients;
+    }
+
+    haarTransform(matrix) {
+        const rows = matrix.length;
+        const cols = matrix[0].length;
+        const halfRows = Math.floor(rows / 2);
+        const halfCols = Math.floor(cols / 2);
+
+        const LL = Array(halfRows).fill(0).map(() => Array(halfCols).fill(0));
+        const LH = Array(halfRows).fill(0).map(() => Array(halfCols).fill(0));
+        const HL = Array(halfRows).fill(0).map(() => Array(halfCols).fill(0));
+        const HH = Array(halfRows).fill(0).map(() => Array(halfCols).fill(0));
+
+        for (let i = 0; i < halfRows; i++) {
+            for (let j = 0; j < halfCols; j++) {
+                const a = matrix[2*i][2*j];
+                const b = matrix[2*i][2*j+1] || a;
+                const c = matrix[2*i+1] ? matrix[2*i+1][2*j] : a;
+                const d = matrix[2*i+1] ? matrix[2*i+1][2*j+1] || c : a;
+
+                LL[i][j] = (a + b + c + d) / 4;
+                LH[i][j] = (a + b - c - d) / 4;
+                HL[i][j] = (a - b + c - d) / 4;
+                HH[i][j] = (a - b - c + d) / 4;
+            }
+        }
+
+        return { LL, LH, HL, HH };
+    }
+
+    // Additional helper methods for extraction, IDWT, etc.
+}
+            </pre>
+        </div>
+
+        <h2>Spread Spectrum Watermarking</h2>
+        <p>Spread spectrum techniques distribute watermark across many frequency components for security and robustness.</p>
+
+        <div class="info-box">
+            <strong>ℹ️ Spread Spectrum Advantage</strong><br>
+            By spreading the watermark across many coefficients, the technique is robust to localized attacks and difficult to remove without degrading image quality significantly.
+        </div>
+
+        <h2>LSB Steganography</h2>
+        <p>Least Significant Bit embedding offers high capacity but limited robustness:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: LSB Watermarking (High Capacity, Low Robustness)
+class LSBWatermarker {
+    async embed(imagePath, watermarkData) {
+        const image = await Jimp.read(imagePath);
+        const bits = stringToBits(watermarkData);
+
+        let bitIndex = 0;
+
+        image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, idx) => {
+            if (bitIndex < bits.length) {
+                // Modify LSB of red channel
+                const currentByte = image.bitmap.data[idx];
+                image.bitmap.data[idx] = (currentByte & 0xFE) | bits[bitIndex];
+                bitIndex++;
+            }
+        });
+
+        return image;
+    }
+
+    async extract(imagePath, dataLength) {
+        const image = await Jimp.read(imagePath);
+        const bits = [];
+
+        image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, idx) => {
+            if (bits.length < dataLength * 8) {
+                bits.push(image.bitmap.data[idx] & 1);
+            }
+        });
+
+        return bitsToString(bits);
+    }
+}
+
+function stringToBits(str) {
+    const bits = [];
+    for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        for (let j = 7; j >= 0; j--) {
+            bits.push((code >> j) & 1);
+        }
+    }
+    return bits;
+}
+
+function bitsToString(bits) {
+    let str = '';
+    for (let i = 0; i < bits.length; i += 8) {
+        let byte = 0;
+        for (let j = 0; j < 8 && i + j < bits.length; j++) {
+            byte = (byte << 1) | bits[i + j];
+        }
+        str += String.fromCharCode(byte);
+    }
+    return str;
+}
+            </pre>
+        </div>
+
+        <h2>Video Watermarking</h2>
+        <p>Video watermarking extends image techniques to temporal sequences:</p>
+
+        <ul>
+            <li><strong>Intra-frame:</strong> Apply image watermarking to each frame</li>
+            <li><strong>Inter-frame:</strong> Embed in temporal differences</li>
+            <li><strong>Motion vector:</strong> Modify motion compensation data</li>
+            <li><strong>3D DWT:</strong> Wavelet transform across spatial and temporal dimensions</li>
+        </ul>
+
+        <h2>Audio Watermarking</h2>
+        <p>Audio watermarking techniques leverage psychoacoustic models:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Echo Hiding for Audio Watermarking
+class AudioWatermarker {
+    constructor(delay1 = 0.001, delay2 = 0.002, decay = 0.5) {
+        this.delay1 = delay1; // Delay for bit 0
+        this.delay2 = delay2; // Delay for bit 1
+        this.decay = decay;
+    }
+
+    embedBit(audioSegment, bit) {
+        const delay = bit === 1 ? this.delay2 : this.delay1;
+        const delaySamples = Math.floor(delay * audioSegment.sampleRate);
+
+        const watermarked = [...audioSegment.samples];
+
+        for (let i = delaySamples; i < watermarked.length; i++) {
+            watermarked[i] += this.decay * watermarked[i - delaySamples];
+        }
+
+        return watermarked;
+    }
+
+    extractBit(audioSegment) {
+        // Compute autocorrelation at both delays
+        const corr1 = this.autocorrelation(audioSegment, this.delay1);
+        const corr2 = this.autocorrelation(audioSegment, this.delay2);
+
+        return corr2 > corr1 ? 1 : 0;
+    }
+
+    autocorrelation(segment, delay) {
+        const delaySamples = Math.floor(delay * segment.sampleRate);
+        let sum = 0;
+
+        for (let i = delaySamples; i < segment.samples.length; i++) {
+            sum += segment.samples[i] * segment.samples[i - delaySamples];
+        }
+
+        return sum / (segment.samples.length - delaySamples);
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Watermark Attacks and Robustness</h2>
+        <p>Watermarks must survive both unintentional and malicious modifications:</p>
+
+        <h3>Common Attacks</h3>
+        <ul>
+            <li><strong>Compression:</strong> JPEG, H.264, MP3 lossy encoding</li>
+            <li><strong>Geometric:</strong> Rotation, scaling, cropping, aspect ratio changes</li>
+            <li><strong>Signal processing:</strong> Filtering, noise addition, contrast adjustment</li>
+            <li><strong>Removal attacks:</strong> Averaging multiple copies, denoising</li>
+            <li><strong>Protocol attacks:</strong> Copy-paste regions, collusion</li>
+        </ul>
+
+        <h2>Blind vs. Non-Blind Detection</h2>
+        <p>Blind watermark detection doesn't require the original content:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Blind Watermark Detection
+class BlindWatermarkDetector {
+    async detect(watermarkedImage, expectedWatermark) {
+        // Extract watermark without original image
+        const extracted = await this.extractWatermark(watermarkedImage);
+
+        // Compute correlation with expected watermark
+        const correlation = this.correlate(extracted, expectedWatermark);
+
+        // Threshold-based detection
+        const threshold = 0.7;
+        const detected = correlation > threshold;
+
+        return {
+            detected: detected,
+            correlation: correlation.toFixed(3),
+            confidence: (correlation * 100).toFixed(1) + '%'
+        };
+    }
+
+    correlate(signal1, signal2) {
+        if (signal1.length !== signal2.length) {
+            throw new Error('Signals must have same length');
+        }
+
+        let numerator = 0;
+        let sum1sq = 0;
+        let sum2sq = 0;
+
+        for (let i = 0; i < signal1.length; i++) {
+            numerator += signal1[i] * signal2[i];
+            sum1sq += signal1[i] * signal1[i];
+            sum2sq += signal2[i] * signal2[i];
+        }
+
+        return numerator / Math.sqrt(sum1sq * sum2sq);
+    }
+
+    async extractWatermark(image) {
+        // Implementation depends on embedding method
+        // This is a placeholder for DCT-based extraction
+        const dct = this.computeImageDCT(image);
+        return this.extractFromDCT(dct);
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Benchmarking Watermark Robustness</h2>
+        <p>Systematic testing ensures watermarks meet WIA-AI-017 requirements:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Watermark Robustness Benchmark
+class WatermarkBenchmark {
+    async runTests(watermarker, testImage, watermarkData) {
+        const results = [];
+
+        // Embed watermark
+        const watermarked = await watermarker.embed(testImage, watermarkData);
+
+        // Test 1: JPEG Compression
+        for (let quality = 10; quality <= 100; quality += 10) {
+            const compressed = await this.compressJPEG(watermarked, quality);
+            const extracted = await watermarker.extract(compressed);
+            const ber = this.bitErrorRate(watermarkData, extracted);
+
+            results.push({
+                test: `JPEG Q${quality}`,
+                ber: ber,
+                passed: ber < 0.1 // <10% bit error rate
+            });
+        }
+
+        // Test 2: Scaling
+        for (let scale of [0.5, 0.75, 1.25, 1.5, 2.0]) {
+            const scaled = await this.scaleImage(watermarked, scale);
+            const extracted = await watermarker.extract(scaled);
+            const ber = this.bitErrorRate(watermarkData, extracted);
+
+            results.push({
+                test: `Scale ${scale}x`,
+                ber: ber,
+                passed: ber < 0.1
+            });
+        }
+
+        // Test 3: Rotation
+        for (let angle of [-15, -10, -5, 5, 10, 15]) {
+            const rotated = await this.rotateImage(watermarked, angle);
+            const extracted = await watermarker.extract(rotated);
+            const ber = this.bitErrorRate(watermarkData, extracted);
+
+            results.push({
+                test: `Rotate ${angle}°`,
+                ber: ber,
+                passed: ber < 0.15 // Slightly higher tolerance
+            });
+        }
+
+        // Generate report
+        const totalTests = results.length;
+        const passed = results.filter(r => r.passed).length;
+
+        return {
+            totalTests,
+            passed,
+            failed: totalTests - passed,
+            passRate: ((passed / totalTests) * 100).toFixed(1) + '%',
+            results
+        };
+    }
+
+    bitErrorRate(original, extracted) {
+        let errors = 0;
+        const length = Math.min(original.length, extracted.length);
+
+        for (let i = 0; i < length; i++) {
+            if (original[i] !== extracted[i]) errors++;
+        }
+
+        return errors / length;
+    }
+}
+            </pre>
+        </div>
+
+        <h2>Integration with C2PA</h2>
+        <p>WIA-AI-017 watermarks complement C2PA metadata for comprehensive authentication:</p>
+
+        <div class="code-block">
+            <pre>
+// Example: Combined Watermark + C2PA
+class AuthenticatedContent {
+    async createAuthenticatedContent(content, metadata) {
+        // Step 1: Embed watermark
+        const watermarkData = {
+            content_id: generateUUID(),
+            creator: metadata.creator,
+            timestamp: new Date().toISOString(),
+            ai_model: metadata.ai_model
+        };
+
+        const watermarked = await this.embedWatermark(content, watermarkData);
+
+        // Step 2: Create C2PA manifest
+        const c2paManifest = this.createC2PAManifest(metadata, watermarkData);
+
+        // Step 3: Sign content
+        const signature = await this.signContent(watermarked, c2paManifest);
+
+        // Step 4: Combine everything
+        return {
+            content: watermarked,
+            manifest: c2paManifest,
+            signature: signature,
+            watermark_embedded: true
+        };
+    }
+
+    async verifyAuthenticatedContent(content) {
+        // Step 1: Verify signature
+        const signatureValid = await this.verifySignature(content);
+
+        // Step 2: Extract and verify watermark
+        const watermark = await this.extractWatermark(content);
+        const watermarkValid = this.verifyWatermark(watermark);
+
+        // Step 3: Validate C2PA manifest
+        const manifestValid = await this.validateC2PAManifest(content);
+
+        return {
+            authenticated: signatureValid && watermarkValid && manifestValid,
+            signature_valid: signatureValid,
+            watermark_valid: watermarkValid,
+            manifest_valid: manifestValid,
+            watermark_data: watermark
+        };
+    }
+}
+            </pre>
+        </div>
+
+        <div class="key-takeaways">
+            <h3>📌 Key Takeaways</h3>
+            <ul>
+                <li>Digital watermarks survive common transformations unlike metadata</li>
+                <li>DCT-based watermarking is robust to JPEG compression</li>
+                <li>DWT provides better imperceptibility through multi-scale embedding</li>
+                <li>Blind detection enables verification without original content</li>
+                <li>Video and audio require specialized temporal watermarking techniques</li>
+                <li>Systematic benchmarking validates robustness against attacks</li>
+                <li>Watermarking complements C2PA metadata for defense-in-depth</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>📝 Review Questions</h3>
+            <ol>
+                <li>What are the five key requirements for robust watermarking?</li>
+                <li>Why is DCT-based watermarking particularly robust to JPEG compression?</li>
+                <li>Explain the trade-off between LSB steganography and DCT watermarking.</li>
+                <li>How does spread spectrum watermarking improve security?</li>
+                <li>What is the difference between blind and non-blind watermark detection?</li>
+                <li>Describe three types of attacks watermarks must survive.</li>
+                <li>Why is video watermarking more complex than image watermarking?</li>
+                <li>How do watermarks complement C2PA metadata in content authentication?</li>
+            </ol>
+        </div>
+
+        <p class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</p>
+
+        </div>
+</body>
+</html>
