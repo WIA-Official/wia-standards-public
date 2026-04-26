@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Identity Revocation Mechanisms | WIA-LEG-010</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; font-size: 1.1rem; }
+        .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+        .breadcrumb { color: #64748b; margin-bottom: 2rem; font-size: 0.9rem; }
+        .breadcrumb a { color: #8B5CF6; text-decoration: none; }
+        h1 { font-size: 2.5rem; color: #8B5CF6; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 2px solid #8B5CF6; }
+        h2 { font-size: 2rem; color: #A78BFA; margin: 3rem 0 1.5rem; padding-top: 2rem; border-top: 1px solid rgba(139, 92, 246, 0.2); }
+        h3 { font-size: 1.5rem; color: #C4B5FD; margin: 2rem 0 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        ul, ol { margin: 1.5rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.75rem; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 2px solid rgba(139, 92, 246, 0.2); }
+        .nav-button { padding: 1rem 2rem; background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        code { background: rgba(139, 92, 246, 0.1); padding: 0.2rem 0.5rem; border-radius: 4px; color: #C4B5FD; font-family: 'Monaco', monospace; font-size: 0.95rem; }
+        pre { background: #0a0f1e; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #8B5CF6; }
+        pre code { background: none; padding: 0; color: #10b981; font-size: 0.9rem; }
+        .warning { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .warning h4 { color: #ef4444; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb"><a href="index.html">📖 Table of Contents</a> / Chapter 3</div>
+
+        <h1>Chapter 3: Identity Revocation Mechanisms</h1>
+
+        <p>
+            Once a death has been verified through the protocols described in Chapter 2, the next critical phase is systematic
+            revocation of the deceased person's digital credentials. This process must be comprehensive (covering all credentials),
+            rapid (minimizing windows for fraud), secure (preventing unauthorized access during transition), and graceful
+            (allowing for legitimate posthumous access as covered in Chapter 4).
+        </p>
+
+        <p>
+            This chapter explores the technical architecture for cascading credential revocation, the challenges of reaching
+            across heterogeneous identity systems, and the algorithms that make large-scale revocation feasible while maintaining security and auditability.
+        </p>
+
+        <h2>3.1 The Identity Credential Landscape</h2>
+
+        <p>
+            Modern digital identity is not a single monolithic credential but a complex web of interrelated authentication mechanisms,
+            each with different properties, lifetimes, and revocation requirements.
+        </p>
+
+        <h3>3.1.1 Credential Types and Characteristics</h3>
+
+        <ul>
+            <li>
+                <strong>Password-based credentials:</strong> Traditional username/password combinations. Simple to revoke but
+                often cached or stored in browser password managers, requiring additional cleanup.
+            </li>
+            <li>
+                <strong>Session tokens:</strong> Temporary credentials issued after authentication. May persist in cookies,
+                local storage, or HTTP headers. Revocation requires invalidating both server-side sessions and client-side storage.
+            </li>
+            <li>
+                <strong>OAuth/OpenID tokens:</strong> Delegated authorization credentials used for single sign-on. Revoking the
+                primary identity must cascade to all connected services—potentially dozens of third-party applications.
+            </li>
+            <li>
+                <strong>API keys and access tokens:</strong> Long-lived credentials for programmatic access. Often embedded in
+                scripts, applications, or IoT devices. May require coordination with device manufacturers for revocation.
+            </li>
+            <li>
+                <strong>Biometric credentials:</strong> Fingerprints, facial recognition templates, iris scans, voice prints.
+                Present unique challenges as they're tied to a physical body and may continue to function for a period after death.
+            </li>
+            <li>
+                <strong>Hardware tokens:</strong> Physical security keys (YubiKey, smart cards). Revocation must occur even if
+                the physical device is never recovered.
+            </li>
+            <li>
+                <strong>Blockchain credentials:</strong> Decentralized identifiers (DIDs), verifiable credentials, private keys.
+                No central authority to contact; revocation must occur through cryptographic means.
+            </li>
+            <li>
+                <strong>Derived credentials:</strong> Credentials created from or dependent on other credentials. Revoking a
+                parent must cascade to all children.
+            </li>
+        </ul>
+
+        <h3>3.1.2 Credential Dependency Graph</h3>
+
+        <p>
+            Credentials exist in a dependency graph where some credentials enable the creation or use of others. Consider this example:
+        </p>
+
+        <pre><code>Email Account (root)
+  ├── Password Reset Tokens
+  ├── Two-Factor Authentication Setup
+  │   ├── SMS 2FA
+  │   ├── Authenticator App
+  │   └── Backup Codes
+  ├── OAuth Applications (SSO)
+  │   ├── Social Media Login (Facebook, Google)
+  │   ├── Enterprise SaaS (Slack, GitHub)
+  │   └── Financial Services (PayPal, Stripe)
+  ├── API Keys
+  │   ├── Cloud Provider Keys (AWS, Azure)
+  │   ├── Payment Processor Keys
+  │   └── IoT Device Keys
+  └── Session Tokens
+      ├── Browser Sessions
+      ├── Mobile App Sessions
+      └── Desktop Application Sessions</code></pre>
+
+        <p>
+            Revoking the root email account should cascade through this entire tree, but in practice, many of these dependencies
+            are not tracked or enforced by systems, requiring explicit enumeration and revocation at each level.
+        </p>
+
+        <h2>3.2 Cascading Revocation Algorithm</h2>
+
+        <p>
+            The WIA-LEG-010 standard specifies a breadth-first search (BFS) algorithm for systematic credential revocation that
+            ensures all credentials are discovered and revoked while respecting dependency relationships.
+        </p>
+
+        <h3>3.2.1 Core Algorithm</h3>
+
+        <pre><code>async function cascadeRevocation(identityId, deathProof) {
+  // Initialize tracking structures
+  const queue = [identityId];
+  const discovered = new Set();
+  const revoked = new Set();
+  const failed = new Set();
+  const auditLog = [];
+
+  // BFS traversal of credential graph
+  while (queue.length > 0) {
+    const currentCred = queue.shift();
+
+    // Skip if already processed
+    if (discovered.has(currentCred)) {
+      continue;
+    }
+
+    discovered.add(currentCred);
+
+    try {
+      // Discover dependent credentials
+      const dependents = await discoverDependentCredentials(
+        currentCred,
+        deathProof
+      );
+
+      // Add to queue for processing
+      queue.push(...dependents.filter(d => !discovered.has(d)));
+
+      // Attempt revocation
+      const revocationResult = await revokeCredential(
+        currentCred,
+        deathProof,
+        {
+          reason: 'death_verified',
+          cascading: true,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      if (revocationResult.success) {
+        revoked.add(currentCred);
+        auditLog.push({
+          credential: currentCred,
+          status: 'revoked',
+          timestamp: revocationResult.timestamp,
+          method: revocationResult.method
+        });
+      } else {
+        failed.add(currentCred);
+        auditLog.push({
+          credential: currentCred,
+          status: 'failed',
+          reason: revocationResult.error,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      failed.add(currentCred);
+      auditLog.push({
+        credential: currentCred,
+        status: 'error',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  // Generate comprehensive revocation report
+  return {
+    identityId: identityId,
+    totalDiscovered: discovered.size,
+    successfulRevocations: revoked.size,
+    failedRevocations: failed.size,
+    successRate: (revoked.size / discovered.size) * 100,
+    revokedCredentials: Array.from(revoked),
+    failedCredentials: Array.from(failed),
+    auditLog: auditLog,
+    timestamp: new Date().toISOString()
+  };
+}</code></pre>
+
+        <h3>3.2.2 Credential Discovery</h3>
+
+        <p>
+            Discovering all credentials associated with an identity is challenging because there's no universal registry.
+            The standard defines multiple discovery mechanisms:
+        </p>
+
+        <pre><code>async function discoverDependentCredentials(credentialId, deathProof) {
+  const discovered = [];
+
+  // 1. Query credential registries
+  const registryResults = await queryCredentialRegistries(
+    credentialId,
+    deathProof
+  );
+  discovered.push(...registryResults);
+
+  // 2. Parse OAuth authorization server metadata
+  if (credentialId.type === 'oauth') {
+    const oauthClients = await discoverOAuthClients(credentialId);
+    discovered.push(...oauthClients);
+  }
+
+  // 3. Scan blockchain for DID credentials
+  if (credentialId.type === 'did') {
+    const blockchainCreds = await scanBlockchainForCredentials(
+      credentialId.did
+    );
+    discovered.push(...blockchainCreds);
+  }
+
+  // 4. Query platform-specific APIs
+  const platformCreds = await queryPlatformAPIs(credentialId);
+  discovered.push(...platformCreds);
+
+  // 5. Check for hardware tokens in device registry
+  const hardwareTokens = await queryDeviceRegistry(credentialId);
+  discovered.push(...hardwareTokens);
+
+  // Deduplicate and return
+  return Array.from(new Set(discovered));
+}</code></pre>
+
+        <h2>3.3 OAuth and SSO Revocation</h2>
+
+        <p>
+            OAuth and single sign-on (SSO) credentials present particular challenges because they enable access to dozens or
+            hundreds of third-party services. Revoking the primary identity must notify all relying parties.
+        </p>
+
+        <h3>3.3.1 OAuth Token Revocation Protocol</h3>
+
+        <pre><code>async function revokeOAuthCredentials(oauthIdentity, deathProof) {
+  // Get all authorized applications
+  const authorizedApps = await getAuthorizedApplications(oauthIdentity.id);
+
+  const revocationResults = await Promise.allSettled(
+    authorizedApps.map(async app => {
+      try {
+        // Revoke access token
+        await revokeOAuthToken({
+          token: app.accessToken,
+          tokenTypeHint: 'access_token',
+          clientId: app.clientId
+        });
+
+        // Revoke refresh token if exists
+        if (app.refreshToken) {
+          await revokeOAuthToken({
+            token: app.refreshToken,
+            tokenTypeHint: 'refresh_token',
+            clientId: app.clientId
+          });
+        }
+
+        // Notify relying party of death event
+        if (app.deathNotificationWebhook) {
+          await notifyRelyingParty(app.deathNotificationWebhook, {
+            eventType: 'user.deceased',
+            userId: oauthIdentity.id,
+            proof: deathProof,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        return { app: app.name, status: 'revoked' };
+      } catch (error) {
+        return { app: app.name, status: 'failed', error: error.message };
+      }
+    })
+  );
+
+  return revocationResults;
+}</code></pre>
+
+        <h3>3.3.2 Relying Party Notification</h3>
+
+        <p>
+            Third-party services that rely on SSO from the deceased's identity should be notified of the death event so they
+            can take appropriate action (e.g., memorializing accounts, transferring data to executors, deleting accounts based
+            on user preferences).
+        </p>
+
+        <pre><code>POST /webhooks/identity-events
+Content-Type: application/json
+X-WIA-Death-Proof-Signature: ...
+
+{
+  "eventType": "user.deceased",
+  "userId": "oauth-id-123",
+  "deathVerification": {
+    "verified": true,
+    "verificationTimestamp": "2025-12-25T00:00:00Z",
+    "blockchainProof": "0x...",
+    "consensusScore": 3.0
+  },
+  "revokedTokens": [
+    "access_token_abc",
+    "refresh_token_def"
+  ],
+  "nextSteps": {
+    "accountAction": "memorialize",  // or "delete", "transfer"
+    "executorContact": "encrypted-contact-info",
+    "dataRetentionPeriod": "90-days"
+  }
+}</code></pre>
+
+        <h2>3.4 Biometric Credential Purging</h2>
+
+        <p>
+            Biometric credentials present unique challenges because they're derived from physical characteristics of a body.
+            After death, these biometrics may still technically function for a period (fingerprints remain usable for hours to days,
+            facial recognition may work on a deceased person's face, etc.).
+        </p>
+
+        <div class="warning">
+            <h4>Security Critical</h4>
+            <p>
+                Biometric templates must be purged from all systems immediately upon death verification to prevent postmortem
+                authentication fraud. This includes templates stored in devices (phones, laptops), servers, and biometric databases.
+            </p>
+        </div>
+
+        <h3>3.4.1 Biometric Template Purging Protocol</h3>
+
+        <pre><code>async function purgeBiometricTemplates(identityId, deathProof) {
+  const biometricSystems = [
+    'fingerprint_databases',
+    'facial_recognition_systems',
+    'iris_scan_databases',
+    'voice_print_systems',
+    'behavioral_biometrics'
+  ];
+
+  const purgeResults = await Promise.allSettled(
+    biometricSystems.map(async system => {
+      // Query system for templates
+      const templates = await queryBiometricSystem(system, identityId);
+
+      // Purge each template
+      const purged = await Promise.all(
+        templates.map(async template => {
+          // Overwrite with random data before deletion (DOD 5220.22-M)
+          await secureOverwrite(template.id);
+
+          // Delete template
+          await deleteBiometricTemplate(template.id);
+
+          // Log purge action
+          await logAuditEvent({
+            action: 'biometric_purge',
+            system: system,
+            templateId: template.id,
+            templateType: template.type,
+            timestamp: new Date().toISOString(),
+            proof: deathProof
+          });
+
+          return template.id;
+        })
+      );
+
+      return {
+        system: system,
+        templatesPurged: purged.length,
+        status: 'completed'
+      };
+    })
+  );
+
+  return purgeResults;
+}</code></pre>
+
+        <h2>3.5 Blockchain and DID Revocation</h2>
+
+        <p>
+            Decentralized identifiers (DIDs) and blockchain-based credentials cannot be "revoked" in the traditional sense because
+            there's no central authority to contact. Instead, revocation is achieved through cryptographic means and on-chain status updates.
+        </p>
+
+        <h3>3.5.1 DID Deactivation</h3>
+
+        <pre><code>async function deactivateDID(did, deathProof, privateKey) {
+  // Create DID deactivation document
+  const deactivationDoc = {
+    '@context': 'https://www.w3.org/ns/did/v1',
+    id: did,
+    deactivated: true,
+    deathProof: {
+      certificateHash: deathProof.certificateHash,
+      blockchainAnchor: deathProof.blockchainAnchor,
+      timestamp: deathProof.timestamp
+    }
+  };
+
+  // Sign deactivation document
+  const signature = await signDocument(deactivationDoc, privateKey);
+
+  // Publish to DID registry
+  const txHash = await publishToBlockchain({
+    method: 'deactivateDID',
+    did: did,
+    document: deactivationDoc,
+    signature: signature
+  });
+
+  // Update verifiable credential status list
+  await revokeVerifiableCredentials(did, deathProof);
+
+  return {
+    did: did,
+    deactivated: true,
+    transactionHash: txHash,
+    timestamp: new Date().toISOString()
+  };
+}</code></pre>
+
+        <h2>3.6 Notification and Communication</h2>
+
+        <p>
+            Systematic revocation must be accompanied by appropriate notifications to various stakeholders:
+        </p>
+
+        <ul>
+            <li><strong>Executors/Family:</strong> Regular status updates on revocation progress</li>
+            <li><strong>Service Providers:</strong> Notification of credential revocation and next steps</li>
+            <li><strong>Security Teams:</strong> Alerts about any failed revocations or anomalies</li>
+            <li><strong>Regulators:</strong> Compliance reports for jurisdictions requiring notification</li>
+        </ul>
+
+        <h2>3.7 Edge Cases and Failure Handling</h2>
+
+        <p>
+            Not all revocations will succeed on the first attempt. The standard defines handling for common failure scenarios:
+        </p>
+
+        <ul>
+            <li><strong>Service Unavailable:</strong> Queue for retry with exponential backoff (max 7 days)</li>
+            <li><strong>Authentication Required:</strong> Escalate to executor for manual intervention</li>
+            <li><strong>Credential Not Found:</strong> Log as successful (already revoked or never existed)</li>
+            <li><strong>Partial Revocation:</strong> Mark as partially successful, continue with other credentials</li>
+            <li><strong>Revocation Rejected:</strong> Legal escalation, may require court order</li>
+        </ul>
+
+        <h2>3.8 Performance and Scalability Considerations</h2>
+
+        <p>
+            Revoking potentially hundreds of credentials across dozens of services requires careful performance optimization:
+        </p>
+
+        <ul>
+            <li>Parallel revocation where dependencies allow (up to 50 concurrent operations)</li>
+            <li>Batching of revocation requests to the same service</li>
+            <li>Caching of service metadata to reduce discovery overhead</li>
+            <li>Priority queuing: high-risk credentials (financial, healthcare) revoked first</li>
+            <li>Asynchronous processing with status callbacks</li>
+        </ul>
+
+        <h2>3.9 Compliance and Audit Requirements</h2>
+
+        <p>
+            Every revocation action must be logged with sufficient detail for audit and compliance purposes:
+        </p>
+
+        <pre><code>{
+  "auditId": "audit-123",
+  "action": "credential_revoked",
+  "timestamp": "2025-12-25T01:00:00Z",
+  "identityId": "id-456",
+  "credentialId": "cred-789",
+  "credentialType": "oauth_token",
+  "revocationMethod": "api",
+  "initiatedBy": "system",
+  "deathProof": "0x...",
+  "result": "success",
+  "serviceName": "Example Service",
+  "responseTime": 245,
+  "metadata": {
+    "cascadingRevocation": true,
+    "parentCredential": "cred-123"
+  }
+}</code></pre>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← Chapter 2</a>
+            <a href="chapter-04.html" class="nav-button">Chapter 4: Posthumous Authentication →</a>
+        </div>
+    </div>
+</body>
+</html>

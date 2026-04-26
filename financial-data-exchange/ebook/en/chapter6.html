@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Integration Patterns | WIA-FIN-021</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; }
+        .nav a { color: #22C55E; text-decoration: none; font-weight: 600; }
+        .chapter-header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 3rem 2rem; border-radius: 12px; margin-bottom: 3rem; border-left: 4px solid #22C55E; }
+        .chapter-number { color: #22C55E; font-size: 1.2rem; }
+        h1 { color: #22C55E; font-size: 2.5rem; margin: 0.5rem 0 1rem; }
+        .content { background: #1e293b; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; }
+        h2 { color: #22C55E; font-size: 1.8rem; margin: 2rem 0 1rem; }
+        h3 { color: #22C55E; font-size: 1.4rem; margin: 1.5rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1.5rem; }
+        ul { margin-left: 2rem; margin-bottom: 1.5rem; }
+        li { color: #cbd5e1; margin-bottom: 0.5rem; }
+        .code-block { background: #0f172a; padding: 1.5rem; border-radius: 8px; border: 1px solid #334155; margin: 1.5rem 0; font-family: 'Courier New', monospace; overflow-x: auto; }
+        .pagination { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .pagination a { background: #22C55E; color: #0f172a; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">CHAPTER 6</div>
+            <h1>Integration Patterns</h1>
+            <p style="color: #cbd5e1; font-size: 1.1rem;">
+                Common integration patterns for financial systems including open banking, payment processing,
+                market data distribution, and regulatory reporting automation.
+            </p>
+        </div>
+
+        <div class="content">
+            <h2>Open Banking Integration (PSD2)</h2>
+
+            <p>
+                Open Banking requires banks to provide third parties with access to customer account data
+                and payment initiation capabilities through standardized APIs.
+            </p>
+
+            <h3>Account Information Service (AIS)</h3>
+
+            <p>
+                AIS providers access customer account data with explicit consent:
+            </p>
+
+            <div class="code-block">
+// Step 1: Request consent
+POST /oauth/authorize
+{
+  "client_id": "aisp_client_123",
+  "redirect_uri": "https://fintech.example.com/callback",
+  "scope": "accounts transactions",
+  "permissions": [
+    "ReadAccountsBasic",
+    "ReadAccountsDetail",
+    "ReadTransactionsBasic",
+    "ReadTransactionsDetail"
+  ],
+  "expiration_date": "2026-12-25T23:59:59Z"
+}
+
+// Step 2: Retrieve accounts
+GET /open-banking/v3.1/aisp/accounts
+Authorization: Bearer {access_token}
+
+Response:
+{
+  "Data": {
+    "Account": [
+      {
+        "AccountId": "ACC-12345",
+        "Currency": "GBP",
+        "AccountType": "Personal",
+        "AccountSubType": "CurrentAccount",
+        "Nickname": "Main Account"
+      }
+    ]
+  }
+}
+
+// Step 3: Get transactions
+GET /open-banking/v3.1/aisp/accounts/ACC-12345/transactions
+Authorization: Bearer {access_token}
+
+Response:
+{
+  "Data": {
+    "Transaction": [
+      {
+        "TransactionId": "TXN-001",
+        "Amount": {
+          "Amount": "150.00",
+          "Currency": "GBP"
+        },
+        "CreditDebitIndicator": "Debit",
+        "Status": "Booked",
+        "BookingDateTime": "2025-12-24T14:30:00Z",
+        "MerchantDetails": {
+          "MerchantName": "Coffee Shop Ltd"
+        }
+      }
+    ]
+  }
+}
+            </div>
+
+            <h3>Payment Initiation Service (PIS)</h3>
+
+            <p>
+                PIS providers can initiate payments on behalf of customers:
+            </p>
+
+            <div class="code-block">
+// Initiate single domestic payment
+POST /open-banking/v3.1/pisp/domestic-payments
+Authorization: Bearer {access_token}
+x-idempotency-key: {unique-key}
+
+{
+  "Data": {
+    "Initiation": {
+      "InstructionIdentification": "PMT-2025-001",
+      "EndToEndIdentification": "E2E-12345",
+      "InstructedAmount": {
+        "Amount": "500.00",
+        "Currency": "GBP"
+      },
+      "DebtorAccount": {
+        "SchemeName": "UK.OBIE.SortCodeAccountNumber",
+        "Identification": "40400411290112",
+        "Name": "John Smith"
+      },
+      "CreditorAccount": {
+        "SchemeName": "UK.OBIE.SortCodeAccountNumber",
+        "Identification": "08080021325698",
+        "Name": "ACME Corp"
+      },
+      "RemittanceInformation": {
+        "Unstructured": "Invoice 12345"
+      }
+    }
+  }
+}
+            </div>
+
+            <h2>Payment Gateway Integration</h2>
+
+            <p>
+                Payment gateways process card payments, digital wallets, and alternative payment methods.
+            </p>
+
+            <h3>Card Payment Flow</h3>
+
+            <div class="code-block">
+// Create payment intent
+POST /v1/payment-intents
+{
+  "amount": 2500,
+  "currency": "usd",
+  "payment_method_types": ["card"],
+  "metadata": {
+    "order_id": "ORDER-12345"
+  }
+}
+
+Response:
+{
+  "id": "pi_abc123",
+  "client_secret": "pi_abc123_secret_xyz",
+  "status": "requires_payment_method",
+  "amount": 2500,
+  "currency": "usd"
+}
+
+// Client confirms payment (with 3D Secure)
+POST /v1/payment-intents/pi_abc123/confirm
+{
+  "payment_method": "pm_card_visa",
+  "return_url": "https://shop.example.com/complete"
+}
+
+// Webhook notification
+POST https://shop.example.com/webhook
+{
+  "type": "payment_intent.succeeded",
+  "data": {
+    "object": {
+      "id": "pi_abc123",
+      "status": "succeeded",
+      "amount_received": 2500,
+      "charges": {
+        "data": [
+          {
+            "id": "ch_abc123",
+            "payment_method_details": {
+              "card": {
+                "brand": "visa",
+                "last4": "4242"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+            </div>
+
+            <h2>Market Data Distribution</h2>
+
+            <p>
+                Financial market data must be distributed with extremely low latency to traders and
+                algorithmic trading systems.
+            </p>
+
+            <h3>WebSocket Market Data Feed</h3>
+
+            <div class="code-block">
+// Subscribe to market data
+{
+  "action": "subscribe",
+  "symbols": ["AAPL", "GOOGL", "MSFT"],
+  "channels": ["trades", "quotes", "orderbook"]
+}
+
+// Receive trade updates
+{
+  "type": "trade",
+  "symbol": "AAPL",
+  "trade_id": "TR-123456",
+  "price": 150.25,
+  "size": 100,
+  "timestamp": 1735138200123,
+  "conditions": []
+}
+
+// Receive quote updates (Level 1)
+{
+  "type": "quote",
+  "symbol": "AAPL",
+  "bid": 150.24,
+  "bid_size": 500,
+  "ask": 150.26,
+  "ask_size": 300,
+  "timestamp": 1735138200456
+}
+
+// Receive order book update (Level 2)
+{
+  "type": "orderbook",
+  "symbol": "AAPL",
+  "bids": [
+    [150.24, 500],
+    [150.23, 1200],
+    [150.22, 800]
+  ],
+  "asks": [
+    [150.26, 300],
+    [150.27, 900],
+    [150.28, 600]
+  ],
+  "timestamp": 1735138200789
+}
+            </div>
+
+            <h3>FIX Protocol for Order Management</h3>
+
+            <div class="code-block">
+// New Order Single (Type D)
+8=FIX.4.4|9=200|35=D|49=BROKER|56=EXCHANGE|34=1|52=20251225-14:30:00|
+11=ORD-2025-001|21=1|55=AAPL|54=1|60=20251225-14:30:00|38=100|40=2|
+44=150.25|59=0|10=123|
+
+Fields explained:
+11 = Client Order ID
+21 = 1 (Automated execution)
+55 = Symbol (AAPL)
+54 = 1 (Buy side)
+38 = Order quantity (100 shares)
+40 = 2 (Limit order)
+44 = Price (150.25)
+59 = 0 (Day order)
+
+// Execution Report (Type 8)
+8=FIX.4.4|9=250|35=8|49=EXCHANGE|56=BROKER|34=2|52=20251225-14:30:01|
+37=EXCH-ORD-123|11=ORD-2025-001|17=FILL-001|150=2|39=2|55=AAPL|54=1|
+38=100|44=150.25|32=100|31=150.25|151=0|14=100|6=150.25|10=234|
+
+Fields explained:
+150 = 2 (Fill)
+39 = 2 (Filled)
+32 = Last filled quantity (100)
+31 = Last filled price (150.25)
+151 = Remaining quantity (0)
+14 = Cumulative quantity (100)
+6 = Average price (150.25)
+            </div>
+
+            <h2>Core Banking System Integration</h2>
+
+            <p>
+                Integrating with legacy core banking systems requires careful handling of mainframe
+                protocols and batch processing.
+            </p>
+
+            <h3>Real-time Integration Pattern</h3>
+
+            <ul>
+                <li><strong>API Wrapper:</strong> RESTful API layer over core banking</li>
+                <li><strong>Message Queue:</strong> Decouple request/response timing</li>
+                <li><strong>Data Cache:</strong> Cache frequently accessed data</li>
+                <li><strong>Circuit Breaker:</strong> Handle core system unavailability</li>
+            </ul>
+
+            <h3>Batch Processing Pattern</h3>
+
+            <div class="code-block">
+// End-of-day batch processing
+1. Extract transactions from core system (6:00 PM)
+   - Query DB2 database
+   - Generate flat file export
+   - Transfer via SFTP
+
+2. Transform data (6:30 PM)
+   - Parse fixed-width format
+   - Validate data integrity
+   - Enrich with reference data
+
+3. Load to data warehouse (7:00 PM)
+   - Bulk insert into PostgreSQL
+   - Update aggregated tables
+   - Refresh materialized views
+
+4. Generate reports (8:00 PM)
+   - Daily transaction summary
+   - Balance reconciliation
+   - Exception reports
+   - Regulatory filings
+
+5. Distribute reports (9:00 PM)
+   - Email to stakeholders
+   - Upload to secure portal
+   - Archive in document management
+            </div>
+
+            <h2>Regulatory Reporting Automation</h2>
+
+            <p>
+                Automated regulatory reporting reduces manual effort and improves accuracy.
+            </p>
+
+            <h3>EMIR Trade Reporting</h3>
+
+            <div class="code-block">
+// Collect trade data
+const trades = await db.query(`
+  SELECT * FROM derivatives_trades
+  WHERE trade_date = CURRENT_DATE
+  AND reportable = true
+`);
+
+// Transform to EMIR format (ISO 20022)
+const emirReport = trades.map(trade => ({
+  reportingCounterparty: {
+    id: trade.counterparty_lei,
+    country: 'GB'
+  },
+  otherCounterparty: {
+    id: trade.client_lei,
+    country: trade.client_country
+  },
+  commonData: {
+    contractType: trade.product_type,
+    notionalAmount: trade.notional,
+    notionalCurrency: trade.currency,
+    deliveryType: trade.settlement_type
+  },
+  underlyingData: {
+    underlyingId: trade.underlying_isin,
+    underlyingName: trade.underlying_name
+  }
+}));
+
+// Submit to trade repository
+await tradeRepository.submit({
+  format: 'ISO20022',
+  data: emirReport,
+  reportingEntity: 'LEI-1234567890ABCDEFGH',
+  submissionDate: new Date().toISOString()
+});
+            </div>
+
+            <h3>MiFID II Transaction Reporting</h3>
+
+            <ul>
+                <li>Report all transactions in financial instruments within 1 working day</li>
+                <li>Include 65 data fields per transaction</li>
+                <li>Submit to national competent authority (e.g., FCA, AMF)</li>
+                <li>Maintain audit trail for 5 years</li>
+            </ul>
+
+            <h2>Event-Driven Integration</h2>
+
+            <p>
+                Event-driven architectures enable real-time processing and loose coupling between systems.
+            </p>
+
+            <h3>Event Sourcing Pattern</h3>
+
+            <div class="code-block">
+// Define domain events
+interface AccountEvent {
+  eventId: string;
+  accountId: string;
+  timestamp: string;
+  type: string;
+  data: unknown;
+}
+
+// Events examples
+{
+  "eventId": "EVT-001",
+  "accountId": "ACC-12345",
+  "timestamp": "2025-12-25T14:30:00Z",
+  "type": "ACCOUNT_CREDITED",
+  "data": {
+    "amount": 500.00,
+    "currency": "USD",
+    "source": "SALARY_PAYMENT"
+  }
+}
+
+{
+  "eventId": "EVT-002",
+  "accountId": "ACC-12345",
+  "timestamp": "2025-12-25T15:45:00Z",
+  "type": "ACCOUNT_DEBITED",
+  "data": {
+    "amount": 150.00,
+    "currency": "USD",
+    "recipient": "MERCHANT_ABC"
+  }
+}
+
+// Rebuild account state from events
+function rebuildAccountState(events: AccountEvent[]): Account {
+  return events.reduce((account, event) => {
+    switch (event.type) {
+      case 'ACCOUNT_CREATED':
+        return { ...event.data, balance: 0 };
+      case 'ACCOUNT_CREDITED':
+        return { ...account, balance: account.balance + event.data.amount };
+      case 'ACCOUNT_DEBITED':
+        return { ...account, balance: account.balance - event.data.amount };
+      default:
+        return account;
+    }
+  }, {} as Account);
+}
+            </div>
+
+            <p>
+                These integration patterns form the foundation of modern financial systems. Choosing
+                the right pattern for each use case is essential for building scalable, maintainable
+                solutions.
+            </p>
+        </div>
+
+        <div class="pagination">
+            <a href="chapter5.html">← Previous: Implementation</a>
+            <a href="chapter7.html">Next: Case Studies →</a>
+        </div>
+    </div>
+</body>
+</html>

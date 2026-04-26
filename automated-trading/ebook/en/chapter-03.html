@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Technical Architecture - WIA Automated Trading Standard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+            --gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { color: var(--primary); font-weight: bold; font-size: 1.2rem; text-decoration: none; }
+        .lang-switch { display: flex; gap: 0.5rem; }
+        .lang-switch a {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .lang-switch a.active { background: var(--primary); color: white; border-color: var(--primary); }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2.5rem 0 1rem 0;
+            border-left: 4px solid var(--primary);
+            padding-left: 1rem;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg);
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: linear-gradient(135deg, var(--primary), #059669);
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background: rgba(16, 185, 129, 0.05); }
+        .summary {
+            background: var(--bg);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 4px;
+        }
+        .code-block {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+        .code-block pre {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text);
+        }
+        .code-header {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px 4px 0 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: -1.5rem -1.5rem 1rem -1.5rem;
+        }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .nav-button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .nav-button:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .highlight-box {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+        footer {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="index.html" class="logo">📊 Automated Trading Standard</a>
+            <div class="lang-switch">
+                <a href="chapter-03.html" class="active">EN</a>
+                <a href="../ko/chapter-03.html">KO</a>
+            </div>
+        </header>
+
+        <h1>Chapter 3: Technical Architecture</h1>
+
+        <div class="summary">
+            <p><strong>Chapter Overview:</strong> This chapter explores the technical infrastructure required for automated trading systems, from order management and execution to low-latency networking and co-location strategies. We examine architectural patterns, system components, and performance optimization techniques for building robust trading platforms.</p>
+        </div>
+
+        <h2>1. System Architecture Overview</h2>
+
+        <p>Modern automated trading systems are complex distributed systems that must handle high-frequency data streams, execute trades with microsecond latency, maintain risk controls, and ensure regulatory compliance. The architecture typically consists of multiple layers working in concert.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Function</th>
+                    <th>Latency Target</th>
+                    <th>Critical Features</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Market Data Gateway</td>
+                    <td>Real-time market data ingestion</td>
+                    <td>&lt; 1 microsecond</td>
+                    <td>Multicast, normalization, failover</td>
+                </tr>
+                <tr>
+                    <td>Strategy Engine</td>
+                    <td>Signal generation and decision making</td>
+                    <td>&lt; 10 microseconds</td>
+                    <td>Event-driven, parallel processing</td>
+                </tr>
+                <tr>
+                    <td>Risk Manager</td>
+                    <td>Pre-trade and post-trade risk checks</td>
+                    <td>&lt; 5 microseconds</td>
+                    <td>Real-time limits, circuit breakers</td>
+                </tr>
+                <tr>
+                    <td>Order Management System</td>
+                    <td>Order lifecycle management</td>
+                    <td>&lt; 20 microseconds</td>
+                    <td>State machine, audit trail</td>
+                </tr>
+                <tr>
+                    <td>Execution Gateway</td>
+                    <td>Exchange connectivity and order routing</td>
+                    <td>&lt; 50 microseconds</td>
+                    <td>FIX protocol, smart routing</td>
+                </tr>
+                <tr>
+                    <td>Position Manager</td>
+                    <td>Real-time position tracking and P&L</td>
+                    <td>&lt; 100 microseconds</td>
+                    <td>Multi-asset, multi-currency</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2. Order Management System (OMS)</h2>
+
+        <p>The Order Management System is the central hub for managing the complete lifecycle of trading orders, from creation through execution to settlement. A robust OMS must handle thousands of orders per second while maintaining perfect accuracy and auditability.</p>
+
+        <div class="code-block">
+            <div class="code-header">TypeScript: Order Management System Core</div>
+            <pre>
+enum OrderType {
+  MARKET = 'MARKET',
+  LIMIT = 'LIMIT',
+  STOP = 'STOP',
+  STOP_LIMIT = 'STOP_LIMIT',
+  ICEBERG = 'ICEBERG',
+  TWAP = 'TWAP',
+  VWAP = 'VWAP'
+}
+
+enum OrderStatus {
+  PENDING = 'PENDING',
+  SUBMITTED = 'SUBMITTED',
+  PARTIALLY_FILLED = 'PARTIALLY_FILLED',
+  FILLED = 'FILLED',
+  CANCELLED = 'CANCELLED',
+  REJECTED = 'REJECTED',
+  EXPIRED = 'EXPIRED'
+}
+
+interface Order {
+  orderId: string;
+  clientOrderId: string;
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  type: OrderType;
+  quantity: number;
+  price?: number;
+  stopPrice?: number;
+  timeInForce: 'GTC' | 'IOC' | 'FOK' | 'DAY';
+  status: OrderStatus;
+  filledQuantity: number;
+  averagePrice: number;
+  timestamp: number;
+  lastUpdateTime: number;
+  strategyId?: string;
+  accountId: string;
+}
+
+class OrderManagementSystem {
+  private orders: Map<string, Order> = new Map();
+  private orderIdCounter: number = 1;
+  private eventListeners: OrderEventListener[] = [];
+
+  async submitOrder(request: OrderRequest): Promise<Order> {
+    // Generate unique order ID
+    const orderId = this.generateOrderId();
+
+    // Create order object
+    const order: Order = {
+      orderId,
+      clientOrderId: request.clientOrderId,
+      symbol: request.symbol,
+      side: request.side,
+      type: request.type,
+      quantity: request.quantity,
+      price: request.price,
+      stopPrice: request.stopPrice,
+      timeInForce: request.timeInForce || 'GTC',
+      status: OrderStatus.PENDING,
+      filledQuantity: 0,
+      averagePrice: 0,
+      timestamp: Date.now(),
+      lastUpdateTime: Date.now(),
+      strategyId: request.strategyId,
+      accountId: request.accountId
+    };
+
+    // Pre-trade risk checks
+    const riskCheckResult = await this.performRiskChecks(order);
+    if (!riskCheckResult.passed) {
+      order.status = OrderStatus.REJECTED;
+      this.emitEvent('ORDER_REJECTED', order, riskCheckResult.reason);
+      throw new Error(`Order rejected: ${riskCheckResult.reason}`);
+    }
+
+    // Store order
+    this.orders.set(orderId, order);
+
+    // Submit to execution gateway
+    try {
+      await this.sendToExecutionGateway(order);
+      order.status = OrderStatus.SUBMITTED;
+      order.lastUpdateTime = Date.now();
+      this.emitEvent('ORDER_SUBMITTED', order);
+    } catch (error) {
+      order.status = OrderStatus.REJECTED;
+      this.emitEvent('ORDER_REJECTED', order, error.message);
+      throw error;
+    }
+
+    return order;
+  }
+
+  async cancelOrder(orderId: string): Promise<void> {
+    const order = this.orders.get(orderId);
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+
+    if (order.status === OrderStatus.FILLED ||
+        order.status === OrderStatus.CANCELLED) {
+      throw new Error(`Cannot cancel order in status ${order.status}`);
+    }
+
+    // Send cancel request to exchange
+    await this.sendCancelRequest(orderId);
+
+    order.status = OrderStatus.CANCELLED;
+    order.lastUpdateTime = Date.now();
+    this.emitEvent('ORDER_CANCELLED', order);
+  }
+
+  async modifyOrder(
+    orderId: string,
+    modifications: Partial<OrderRequest>
+  ): Promise<Order> {
+    const order = this.orders.get(orderId);
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+
+    // Create new order with modifications
+    const modifiedOrder = {
+      ...order,
+      ...modifications,
+      lastUpdateTime: Date.now()
+    };
+
+    // Risk checks on modified order
+    const riskCheckResult = await this.performRiskChecks(modifiedOrder);
+    if (!riskCheckResult.passed) {
+      throw new Error(`Modification rejected: ${riskCheckResult.reason}`);
+    }
+
+    // Send modification to exchange
+    await this.sendModificationRequest(orderId, modifications);
+
+    // Update stored order
+    Object.assign(order, modifications);
+    order.lastUpdateTime = Date.now();
+    this.emitEvent('ORDER_MODIFIED', order);
+
+    return order;
+  }
+
+  onExecutionReport(report: ExecutionReport): void {
+    const order = this.orders.get(report.orderId);
+    if (!order) {
+      console.error(`Unknown order ID in execution report: ${report.orderId}`);
+      return;
+    }
+
+    // Update order based on execution report
+    switch (report.executionType) {
+      case 'FILL':
+      case 'PARTIAL_FILL':
+        const fillQuantity = report.lastQuantity;
+        const fillPrice = report.lastPrice;
+
+        order.filledQuantity += fillQuantity;
+        order.averagePrice = (
+          (order.averagePrice * (order.filledQuantity - fillQuantity)) +
+          (fillPrice * fillQuantity)
+        ) / order.filledQuantity;
+
+        order.status = order.filledQuantity >= order.quantity
+          ? OrderStatus.FILLED
+          : OrderStatus.PARTIALLY_FILLED;
+
+        this.emitEvent('ORDER_FILLED', order, report);
+        break;
+
+      case 'CANCELLED':
+        order.status = OrderStatus.CANCELLED;
+        this.emitEvent('ORDER_CANCELLED', order);
+        break;
+
+      case 'REJECTED':
+        order.status = OrderStatus.REJECTED;
+        this.emitEvent('ORDER_REJECTED', order, report.rejectReason);
+        break;
+
+      case 'EXPIRED':
+        order.status = OrderStatus.EXPIRED;
+        this.emitEvent('ORDER_EXPIRED', order);
+        break;
+    }
+
+    order.lastUpdateTime = Date.now();
+  }
+
+  getOrder(orderId: string): Order | undefined {
+    return this.orders.get(orderId);
+  }
+
+  getOrdersByStrategy(strategyId: string): Order[] {
+    return Array.from(this.orders.values())
+      .filter(order => order.strategyId === strategyId);
+  }
+
+  getActiveOrders(): Order[] {
+    return Array.from(this.orders.values())
+      .filter(order =>
+        order.status === OrderStatus.SUBMITTED ||
+        order.status === OrderStatus.PARTIALLY_FILLED
+      );
+  }
+
+  private generateOrderId(): string {
+    const timestamp = Date.now();
+    const counter = this.orderIdCounter++;
+    return `ORD-${timestamp}-${counter}`;
+  }
+
+  private async performRiskChecks(order: Order): Promise<RiskCheckResult> {
+    // Implementation would check position limits, buying power, etc.
+    return { passed: true };
+  }
+
+  private async sendToExecutionGateway(order: Order): Promise<void> {
+    // Implementation would send order to exchange via FIX or REST API
+  }
+
+  private async sendCancelRequest(orderId: string): Promise<void> {
+    // Implementation would send cancel request to exchange
+  }
+
+  private async sendModificationRequest(
+    orderId: string,
+    modifications: Partial<OrderRequest>
+  ): Promise<void> {
+    // Implementation would send modification request to exchange
+  }
+
+  private emitEvent(
+    eventType: string,
+    order: Order,
+    additionalData?: any
+  ): void {
+    for (const listener of this.eventListeners) {
+      listener.onOrderEvent({
+        type: eventType,
+        order,
+        timestamp: Date.now(),
+        data: additionalData
+      });
+    }
+  }
+
+  addEventListener(listener: OrderEventListener): void {
+    this.eventListeners.push(listener);
+  }
+}
+
+interface OrderRequest {
+  clientOrderId: string;
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  type: OrderType;
+  quantity: number;
+  price?: number;
+  stopPrice?: number;
+  timeInForce?: 'GTC' | 'IOC' | 'FOK' | 'DAY';
+  strategyId?: string;
+  accountId: string;
+}
+
+interface ExecutionReport {
+  orderId: string;
+  executionType: 'FILL' | 'PARTIAL_FILL' | 'CANCELLED' | 'REJECTED' | 'EXPIRED';
+  lastQuantity: number;
+  lastPrice: number;
+  rejectReason?: string;
+}
+
+interface RiskCheckResult {
+  passed: boolean;
+  reason?: string;
+}
+
+interface OrderEventListener {
+  onOrderEvent(event: OrderEvent): void;
+}
+
+interface OrderEvent {
+  type: string;
+  order: Order;
+  timestamp: number;
+  data?: any;
+}
+</pre>
+        </div>
+
+        <h2>3. Execution Management System (EMS)</h2>
+
+        <p>The Execution Management System optimizes order execution by intelligently routing orders to venues and employing sophisticated algorithms to minimize market impact and transaction costs. EMS strategies include TWAP (Time-Weighted Average Price), VWAP (Volume-Weighted Average Price), and implementation shortfall algorithms.</p>
+
+        <h3>VWAP Algorithm Implementation</h3>
+
+        <div class="code-block">
+            <div class="code-header">TypeScript: VWAP Execution Algorithm</div>
+            <pre>
+interface VWAPConfig {
+  symbol: string;
+  totalQuantity: number;
+  side: 'BUY' | 'SELL';
+  startTime: Date;
+  endTime: Date;
+  participationRate: number;  // 0.0 to 1.0
+  maxSliceSize: number;
+}
+
+class VWAPExecutionAlgorithm {
+  private config: VWAPConfig;
+  private executedQuantity: number = 0;
+  private volumeProfile: number[] = [];
+  private scheduledSlices: OrderSlice[] = [];
+
+  constructor(config: VWAPConfig) {
+    this.config = config;
+    this.calculateVolumeProfile();
+    this.scheduleOrderSlices();
+  }
+
+  private async calculateVolumeProfile(): Promise<void> {
+    // Fetch historical intraday volume data
+    const historicalVolume = await this.fetchHistoricalVolume(
+      this.config.symbol,
+      this.config.startTime,
+      this.config.endTime
+    );
+
+    // Calculate typical intraday volume distribution
+    const totalVolume = historicalVolume.reduce((a, b) => a + b, 0);
+    this.volumeProfile = historicalVolume.map(v => v / totalVolume);
+  }
+
+  private scheduleOrderSlices(): void {
+    const duration = this.config.endTime.getTime() -
+                    this.config.startTime.getTime();
+    const intervals = this.volumeProfile.length;
+    const intervalDuration = duration / intervals;
+
+    let remainingQuantity = this.config.totalQuantity;
+
+    for (let i = 0; i < intervals; i++) {
+      const targetQuantity = Math.round(
+        this.config.totalQuantity * this.volumeProfile[i]
+      );
+
+      const sliceQuantity = Math.min(
+        targetQuantity,
+        this.config.maxSliceSize,
+        remainingQuantity
+      );
+
+      const executeTime = new Date(
+        this.config.startTime.getTime() + (i * intervalDuration)
+      );
+
+      this.scheduledSlices.push({
+        quantity: sliceQuantity,
+        executeTime,
+        executed: false
+      });
+
+      remainingQuantity -= sliceQuantity;
+    }
+  }
+
+  async execute(
+    oms: OrderManagementSystem,
+    marketData: MarketDataService
+  ): Promise<ExecutionSummary> {
+    const fills: Fill[] = [];
+
+    for (const slice of this.scheduledSlices) {
+      // Wait until scheduled time
+      await this.waitUntil(slice.executeTime);
+
+      // Get current market conditions
+      const quote = await marketData.getQuote(this.config.symbol);
+
+      // Adjust quantity based on current volume
+      const currentVolume = await marketData.getCurrentVolume(
+        this.config.symbol
+      );
+      const adjustedQuantity = Math.min(
+        slice.quantity,
+        currentVolume * this.config.participationRate
+      );
+
+      if (adjustedQuantity > 0) {
+        try {
+          // Submit order slice
+          const order = await oms.submitOrder({
+            clientOrderId: `VWAP-${Date.now()}`,
+            symbol: this.config.symbol,
+            side: this.config.side,
+            type: OrderType.LIMIT,
+            quantity: adjustedQuantity,
+            price: this.config.side === 'BUY' ? quote.ask : quote.bid,
+            timeInForce: 'IOC',  // Immediate or Cancel
+            accountId: 'ALGO_TRADING'
+          });
+
+          // Wait for fill
+          const fill = await this.waitForFill(oms, order.orderId, 5000);
+
+          if (fill) {
+            fills.push(fill);
+            this.executedQuantity += fill.quantity;
+            slice.executed = true;
+          }
+        } catch (error) {
+          console.error(`VWAP slice execution error:`, error);
+        }
+      }
+
+      // Check if target quantity reached
+      if (this.executedQuantity >= this.config.totalQuantity) {
+        break;
+      }
+    }
+
+    return this.calculateExecutionSummary(fills);
+  }
+
+  private async waitUntil(targetTime: Date): Promise<void> {
+    const delay = targetTime.getTime() - Date.now();
+    if (delay > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  private async waitForFill(
+    oms: OrderManagementSystem,
+    orderId: string,
+    timeoutMs: number
+  ): Promise<Fill | null> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      const order = oms.getOrder(orderId);
+
+      if (order && (order.status === OrderStatus.FILLED ||
+                    order.status === OrderStatus.PARTIALLY_FILLED)) {
+        return {
+          quantity: order.filledQuantity,
+          price: order.averagePrice,
+          timestamp: order.lastUpdateTime
+        };
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return null;
+  }
+
+  private async fetchHistoricalVolume(
+    symbol: string,
+    startTime: Date,
+    endTime: Date
+  ): Promise<number[]> {
+    // Implementation would fetch from market data service
+    // Return typical intraday volume distribution
+    return [
+      0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.12
+    ];  // Example: 8 intervals
+  }
+
+  private calculateExecutionSummary(fills: Fill[]): ExecutionSummary {
+    const totalQuantity = fills.reduce((sum, f) => sum + f.quantity, 0);
+    const averagePrice = fills.reduce(
+      (sum, f) => sum + (f.price * f.quantity),
+      0
+    ) / totalQuantity;
+
+    return {
+      executedQuantity: totalQuantity,
+      targetQuantity: this.config.totalQuantity,
+      averagePrice,
+      fills,
+      fillRate: totalQuantity / this.config.totalQuantity,
+      startTime: this.config.startTime,
+      endTime: new Date()
+    };
+  }
+}
+
+interface OrderSlice {
+  quantity: number;
+  executeTime: Date;
+  executed: boolean;
+}
+
+interface Fill {
+  quantity: number;
+  price: number;
+  timestamp: number;
+}
+
+interface ExecutionSummary {
+  executedQuantity: number;
+  targetQuantity: number;
+  averagePrice: number;
+  fills: Fill[];
+  fillRate: number;
+  startTime: Date;
+  endTime: Date;
+}
+
+interface MarketDataService {
+  getQuote(symbol: string): Promise<Quote>;
+  getCurrentVolume(symbol: string): Promise<number>;
+}
+
+interface Quote {
+  bid: number;
+  ask: number;
+  bidSize: number;
+  askSize: number;
+}
+</pre>
+        </div>
+
+        <h2>4. Low-Latency Optimization</h2>
+
+        <p>For high-frequency trading strategies, every microsecond matters. Latency optimization involves multiple layers from hardware selection to network topology to software design patterns.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Optimization Area</th>
+                    <th>Technique</th>
+                    <th>Latency Improvement</th>
+                    <th>Implementation Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Hardware</td>
+                    <td>FPGA-based trading systems</td>
+                    <td>90-99% reduction</td>
+                    <td>Very High</td>
+                </tr>
+                <tr>
+                    <td>Network</td>
+                    <td>Kernel bypass (DPDK, Solarflare)</td>
+                    <td>50-80% reduction</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td>Co-location</td>
+                    <td>Exchange proximity hosting</td>
+                    <td>95% reduction</td>
+                    <td>Medium-High</td>
+                </tr>
+                <tr>
+                    <td>Software</td>
+                    <td>Lock-free data structures</td>
+                    <td>30-50% reduction</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td>Software</td>
+                    <td>Memory-mapped I/O</td>
+                    <td>20-40% reduction</td>
+                    <td>Low-Medium</td>
+                </tr>
+                <tr>
+                    <td>Protocol</td>
+                    <td>Binary protocols vs FIX</td>
+                    <td>40-60% reduction</td>
+                    <td>Medium</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5. Infrastructure Design Patterns</h2>
+
+        <div class="highlight-box">
+            <h3 style="color: var(--primary);">High-Performance Architecture Principles</h3>
+            <ul>
+                <li><strong>Event-Driven Design:</strong> Asynchronous processing with message queues for maximum throughput</li>
+                <li><strong>Memory Locality:</strong> Keep hot data in CPU cache, minimize pointer chasing</li>
+                <li><strong>Lock-Free Algorithms:</strong> Use atomic operations and compare-and-swap instead of locks</li>
+                <li><strong>Zero-Copy Techniques:</strong> Avoid unnecessary data copying between network and application buffers</li>
+                <li><strong>Mechanical Sympathy:</strong> Understand hardware behavior (cache lines, branch prediction, etc.)</li>
+                <li><strong>Batching:</strong> Process multiple events together when possible to amortize overhead</li>
+                <li><strong>Hot/Cold Path Separation:</strong> Optimize critical path, defer non-critical operations</li>
+            </ul>
+        </div>
+
+        <h2>6. Monitoring and Observability</h2>
+
+        <p>Production trading systems require comprehensive monitoring to detect issues before they cause financial losses. Key metrics include order-to-execution latency, fill rates, slippage, rejection rates, and system resource utilization.</p>
+
+        <h2>Summary</h2>
+
+        <div class="summary">
+            <h3 style="color: var(--primary); margin-bottom: 1rem;">Key Takeaways</h3>
+            <ul>
+                <li><strong>Layered Architecture:</strong> Separate concerns into distinct components (data, strategy, risk, execution) for maintainability and scalability</li>
+                <li><strong>Latency Hierarchy:</strong> Different strategies require different latency budgets; design architecture accordingly</li>
+                <li><strong>Fault Tolerance:</strong> Trading systems must handle failures gracefully with automatic failover and recovery</li>
+                <li><strong>Audit Trail:</strong> Maintain complete records of all orders and executions for regulatory compliance</li>
+                <li><strong>Testing Environment:</strong> Robust testing infrastructure including simulators and replay capabilities is essential</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li><strong>Explain the role of an Order Management System.</strong> What are the key functions it must provide, and why is order state management critical?</li>
+            <li><strong>How does VWAP execution work?</strong> Describe the algorithm and explain when VWAP strategies are most appropriate.</li>
+            <li><strong>What are the main sources of latency in trading systems?</strong> Compare software optimizations versus infrastructure improvements.</li>
+            <li><strong>Explain the concept of co-location.</strong> What advantages does it provide, and what are the cost considerations?</li>
+            <li><strong>Why is event-driven architecture preferred for trading systems?</strong> Compare it to request-response architectures.</li>
+            <li><strong>Describe kernel bypass techniques.</strong> How do technologies like DPDK reduce latency, and what are the trade-offs?</li>
+        </ol>
+
+        <div class="navigation">
+            <a href="chapter-02.html" class="nav-button">← Previous: Strategies</a>
+            <a href="chapter-04.html" class="nav-button">Next: Risk Management →</a>
+        </div>
+
+        </div>
+
+<section style="margin-top:2rem;padding:1.5rem;background:rgba(139,92,246,0.05);border-left:4px solid #8B5CF6;">
+<h2 style="color:#A78BFA;">Reference Standards and Implementation Notes</h2>
+<p style="line-height:1.8;">
+This standard is designed to interoperate with established international
+frameworks. Implementations SHOULD treat the following as the single
+source of truth and use this PHASE document as the interoperability
+layer that maps existing data into a machine-readable, signed, and
+auditable shape.
+</p>
+<ul style="line-height:1.8;">
+  <li>OpenAPI Specification 3.1 — REST API definition</li>
+  <li>JSON Schema 2020-12 — schema validation</li>
+  <li>ISO/IEC 27001:2022 — information security management</li>
+  <li>ISO/IEC 27018:2019 — PII protection in public clouds</li>
+  <li>ISO/IEC 17065:2012 — product certification bodies</li>
+  <li>CycloneDX 1.5 / SPDX 2.3 — software bill of materials</li>
+  <li>Sigstore (DSSE envelope, Rekor transparency log) — signature anchoring</li>
+  <li>in-toto Attestation Framework 1.0 — build provenance</li>
+  <li>IETF RFC 9700 — OAuth 2.1</li>
+  <li>IETF RFC 9457 — Problem Details for HTTP APIs</li>
+  <li>IETF RFC 8615 — well-known URIs</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">Practical Implementation Checklist</h3>
+<ul style="line-height:1.8;">
+  <li>Manifest integrity — every published manifest is signed via
+      Sigstore DSSE. Tampering is detectable without trusting an
+      intermediary. Updates are issued as new manifests; the prior
+      manifest is preserved with a supersede marker.</li>
+  <li>Retention — keep signed evidence for at least seven years to
+      satisfy ISO/IEC 17065:2012 audit expectations. Some regulators
+      require longer retention; in that case the deployment policy
+      MUST extend the window rather than relying on the defaults.</li>
+  <li>Versioning — follow Semantic Versioning 2.0.0. Major version
+      bumps require at least a 90-day overlap with the prior major
+      version on every WIA-published reference implementation.</li>
+  <li>Negative-result reporting — a skipped indicator without
+      recorded justification is treated as a failed indicator at
+      audit time.</li>
+  <li>Key rotation — manifest signing keys are rotated per the
+      deployment policy. The previous key is preserved in a
+      published key history so that auditors can verify historical
+      manifests offline.</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">Reference Topologies</h3>
+<p style="line-height:1.8;">
+Implementations declare their operational topology in the manifest:
+single-tenant edge (one runtime per organization), multi-tenant
+gateway (shared runtime with header-based isolation), federated mesh
+(multiple runtimes peer to one another and publish manifests to a
+directory service), or air-gapped batch (signed evidence package
+transported out-of-band). Each topology ships with reference test
+vectors so that implementations can validate their deployment
+matches the canonical pattern.
+</p>
+
+<h3 style="color:#8B5CF6;">Open Governance</h3>
+<p style="line-height:1.8;">
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the appropriate
+label. The WIA Standards working group reviews open issues at the
+start of every minor release cycle and publishes the resulting
+decision log alongside the release notes. Errata are issued as
+patch releases; new normative requirements trigger minor bumps;
+backwards-incompatible changes trigger major bumps.
+</p>
+
+<p style="text-align:center;margin-top:2rem;color:#94a3b8;">
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+</p>
+</section>
+</body>
+</html>

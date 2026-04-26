@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Backtesting and Simulation - WIA Automated Trading Standard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+            --gold: #ffd700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { color: var(--primary); font-weight: bold; font-size: 1.2rem; text-decoration: none; }
+        .lang-switch { display: flex; gap: 0.5rem; }
+        .lang-switch a {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .lang-switch a.active { background: var(--primary); color: white; border-color: var(--primary); }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin: 2.5rem 0 1rem 0;
+            border-left: 4px solid var(--primary);
+            padding-left: 1rem;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg);
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: linear-gradient(135deg, var(--primary), #059669);
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background: rgba(16, 185, 129, 0.05); }
+        .summary {
+            background: var(--bg);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 4px;
+        }
+        .code-block {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+        .code-block pre {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text);
+        }
+        .code-header {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px 4px 0 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: -1.5rem -1.5rem 1rem -1.5rem;
+        }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .nav-button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .nav-button:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .highlight-box {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+        footer {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="index.html" class="logo">📊 Automated Trading Standard</a>
+            <div class="lang-switch">
+                <a href="chapter-06.html" class="active">EN</a>
+                <a href="../ko/chapter-06.html">KO</a>
+            </div>
+        </header>
+
+        <h1>Chapter 6: Backtesting and Simulation</h1>
+
+        <div class="summary">
+            <p><strong>Chapter Overview:</strong> Backtesting validates trading strategies using historical data before risking real capital. This chapter covers backtesting methodology, performance metrics, common pitfalls, walk-forward analysis, and Monte Carlo simulation. Proper backtesting is essential for understanding strategy behavior and avoiding costly mistakes.</p>
+        </div>
+
+        <h2>1. Backtesting Fundamentals</h2>
+
+        <p>Backtesting simulates strategy performance using historical market data. The goal is to estimate how a strategy would have performed in the past, providing insights into expected returns, risk characteristics, and potential failure modes. However, backtesting has significant limitations that must be understood and mitigated.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Backtesting Pitfall</th>
+                    <th>Description</th>
+                    <th>Mitigation Strategy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Survivorship Bias</td>
+                    <td>Using only currently active symbols</td>
+                    <td>Include delisted/bankrupt companies in data</td>
+                </tr>
+                <tr>
+                    <td>Look-Ahead Bias</td>
+                    <td>Using future information in signals</td>
+                    <td>Careful timestamp validation, point-in-time data</td>
+                </tr>
+                <tr>
+                    <td>Overfitting</td>
+                    <td>Strategy too optimized to historical data</td>
+                    <td>Out-of-sample testing, walk-forward analysis</td>
+                </tr>
+                <tr>
+                    <td>Transaction Cost Ignorance</td>
+                    <td>Not accounting for commissions and slippage</td>
+                    <td>Model realistic costs, use bid-ask spread</td>
+                </tr>
+                <tr>
+                    <td>Market Impact</td>
+                    <td>Assuming unlimited liquidity</td>
+                    <td>Volume constraints, progressive slippage model</td>
+                </tr>
+                <tr>
+                    <td>Data Mining</td>
+                    <td>Testing too many strategies on same data</td>
+                    <td>Bonferroni correction, hold-out validation set</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2. Backtesting Engine Implementation</h2>
+
+        <div class="code-block">
+            <div class="code-header">TypeScript: Professional Backtesting Framework</div>
+            <pre>
+interface BacktestConfig {
+  startDate: Date;
+  endDate: Date;
+  initialCapital: number;
+  commission: number;          // Per trade commission
+  slippageBps: number;        // Slippage in basis points
+  maxPositionSize?: number;
+  enableMarginTrading?: boolean;
+}
+
+interface HistoricalBar {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+interface BacktestTrade {
+  entryTime: number;
+  exitTime: number;
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  side: 'LONG' | 'SHORT';
+  pnl: number;
+  pnlPercent: number;
+  commission: number;
+  slippage: number;
+}
+
+interface BacktestMetrics {
+  totalReturn: number;
+  annualizedReturn: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  maxDrawdownDuration: number;
+  winRate: number;
+  profitFactor: number;
+  averageWin: number;
+  averageLoss: number;
+  totalTrades: number;
+  totalCommission: number;
+  totalSlippage: number;
+  calmarRatio: number;
+}
+
+class BacktestEngine {
+  private config: BacktestConfig;
+  private trades: BacktestTrade[] = [];
+  private equity: number[];
+  private dailyReturns: number[];
+  private currentPosition: number = 0;
+  private cash: number;
+  private entryPrice: number = 0;
+  private entryTime: number = 0;
+
+  constructor(config: BacktestConfig) {
+    this.config = config;
+    this.cash = config.initialCapital;
+    this.equity = [config.initialCapital];
+    this.dailyReturns = [];
+  }
+
+  async run(
+    data: HistoricalBar[],
+    strategy: TradingStrategy
+  ): Promise<BacktestResult> {
+    // Filter data to backtest period
+    const filteredData = data.filter(bar =>
+      bar.timestamp >= this.config.startDate.getTime() &&
+      bar.timestamp <= this.config.endDate.getTime()
+    );
+
+    // Iterate through historical data
+    for (let i = 0; i < filteredData.length; i++) {
+      const bar = filteredData[i];
+      const historicalData = filteredData.slice(0, i + 1);
+
+      // Generate signal from strategy
+      const signal = strategy.generateSignal(historicalData);
+
+      // Execute trading logic
+      if (signal.action === 'BUY' && this.currentPosition === 0) {
+        this.enterLong(bar, signal.quantity || this.calculatePositionSize(bar));
+      } else if (signal.action === 'SELL' && this.currentPosition > 0) {
+        this.closeLong(bar);
+      } else if (signal.action === 'SHORT' && this.currentPosition === 0) {
+        this.enterShort(bar, signal.quantity || this.calculatePositionSize(bar));
+      } else if (signal.action === 'COVER' && this.currentPosition < 0) {
+        this.closeShort(bar);
+      }
+
+      // Update equity curve
+      const portfolioValue = this.calculatePortfolioValue(bar.close);
+      this.equity.push(portfolioValue);
+
+      // Calculate daily return
+      if (this.equity.length > 1) {
+        const dailyReturn = (portfolioValue - this.equity[this.equity.length - 2]) /
+                           this.equity[this.equity.length - 2];
+        this.dailyReturns.push(dailyReturn);
+      }
+    }
+
+    // Close any open position at end of backtest
+    const lastBar = filteredData[filteredData.length - 1];
+    if (this.currentPosition !== 0) {
+      this.currentPosition > 0
+        ? this.closeLong(lastBar)
+        : this.closeShort(lastBar);
+    }
+
+    // Calculate metrics
+    const metrics = this.calculateMetrics();
+
+    return {
+      metrics,
+      trades: this.trades,
+      equity: this.equity,
+      dailyReturns: this.dailyReturns
+    };
+  }
+
+  private enterLong(bar: HistoricalBar, quantity: number): void {
+    const slippage = bar.close * (this.config.slippageBps / 10000);
+    const entryPrice = bar.close + slippage;
+    const commission = this.config.commission;
+    const cost = (quantity * entryPrice) + commission;
+
+    if (cost > this.cash) {
+      return; // Insufficient capital
+    }
+
+    this.currentPosition = quantity;
+    this.entryPrice = entryPrice;
+    this.entryTime = bar.timestamp;
+    this.cash -= cost;
+  }
+
+  private closeLong(bar: HistoricalBar): void {
+    const slippage = bar.close * (this.config.slippageBps / 10000);
+    const exitPrice = bar.close - slippage;
+    const commission = this.config.commission;
+    const proceeds = (this.currentPosition * exitPrice) - commission;
+
+    const pnl = proceeds - (this.currentPosition * this.entryPrice);
+    const pnlPercent = pnl / (this.currentPosition * this.entryPrice);
+
+    this.trades.push({
+      entryTime: this.entryTime,
+      exitTime: bar.timestamp,
+      entryPrice: this.entryPrice,
+      exitPrice,
+      quantity: this.currentPosition,
+      side: 'LONG',
+      pnl,
+      pnlPercent,
+      commission: this.config.commission * 2,
+      slippage: slippage * this.currentPosition * 2
+    });
+
+    this.cash += proceeds;
+    this.currentPosition = 0;
+  }
+
+  private enterShort(bar: HistoricalBar, quantity: number): void {
+    const slippage = bar.close * (this.config.slippageBps / 10000);
+    const entryPrice = bar.close - slippage;
+    const commission = this.config.commission;
+    const proceeds = (quantity * entryPrice) - commission;
+
+    this.currentPosition = -quantity;
+    this.entryPrice = entryPrice;
+    this.entryTime = bar.timestamp;
+    this.cash += proceeds;
+  }
+
+  private closeShort(bar: HistoricalBar): void {
+    const slippage = bar.close * (this.config.slippageBps / 10000);
+    const exitPrice = bar.close + slippage;
+    const commission = this.config.commission;
+    const cost = (Math.abs(this.currentPosition) * exitPrice) + commission;
+
+    const pnl = (Math.abs(this.currentPosition) * this.entryPrice) - cost;
+    const pnlPercent = pnl / (Math.abs(this.currentPosition) * this.entryPrice);
+
+    this.trades.push({
+      entryTime: this.entryTime,
+      exitTime: bar.timestamp,
+      entryPrice: this.entryPrice,
+      exitPrice,
+      quantity: Math.abs(this.currentPosition),
+      side: 'SHORT',
+      pnl,
+      pnlPercent,
+      commission: this.config.commission * 2,
+      slippage: slippage * Math.abs(this.currentPosition) * 2
+    });
+
+    this.cash -= cost;
+    this.currentPosition = 0;
+  }
+
+  private calculatePositionSize(bar: HistoricalBar): number {
+    const maxPositionValue = this.config.maxPositionSize ||
+                            (this.cash * 0.95);
+    return Math.floor(maxPositionValue / bar.close);
+  }
+
+  private calculatePortfolioValue(currentPrice: number): number {
+    const positionValue = this.currentPosition * currentPrice;
+    return this.cash + positionValue;
+  }
+
+  private calculateMetrics(): BacktestMetrics {
+    const finalValue = this.equity[this.equity.length - 1];
+    const totalReturn = (finalValue - this.config.initialCapital) /
+                       this.config.initialCapital;
+
+    // Calculate Sharpe Ratio
+    const avgReturn = this.dailyReturns.reduce((a, b) => a + b, 0) /
+                     this.dailyReturns.length;
+    const stdDev = Math.sqrt(
+      this.dailyReturns.reduce(
+        (sum, r) => sum + Math.pow(r - avgReturn, 2),
+        0
+      ) / this.dailyReturns.length
+    );
+    const sharpeRatio = (avgReturn / stdDev) * Math.sqrt(252);
+
+    // Calculate Sortino Ratio (downside deviation only)
+    const downsideReturns = this.dailyReturns.filter(r => r < 0);
+    const downsideDeviation = downsideReturns.length > 0
+      ? Math.sqrt(
+          downsideReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) /
+          downsideReturns.length
+        )
+      : 0;
+    const sortinoRatio = downsideDeviation > 0
+      ? (avgReturn / downsideDeviation) * Math.sqrt(252)
+      : 0;
+
+    // Calculate Maximum Drawdown
+    let maxDrawdown = 0;
+    let peak = this.equity[0];
+    let maxDrawdownDuration = 0;
+    let currentDrawdownDuration = 0;
+
+    for (const value of this.equity) {
+      if (value > peak) {
+        peak = value;
+        currentDrawdownDuration = 0;
+      } else {
+        const drawdown = (peak - value) / peak;
+        maxDrawdown = Math.max(maxDrawdown, drawdown);
+        currentDrawdownDuration++;
+        maxDrawdownDuration = Math.max(maxDrawdownDuration, currentDrawdownDuration);
+      }
+    }
+
+    // Win rate and profit factor
+    const winningTrades = this.trades.filter(t => t.pnl > 0);
+    const losingTrades = this.trades.filter(t => t.pnl < 0);
+    const winRate = this.trades.length > 0
+      ? winningTrades.length / this.trades.length
+      : 0;
+
+    const totalWin = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const totalLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
+    const profitFactor = totalLoss > 0 ? totalWin / totalLoss : 0;
+
+    const averageWin = winningTrades.length > 0
+      ? totalWin / winningTrades.length
+      : 0;
+    const averageLoss = losingTrades.length > 0
+      ? totalLoss / losingTrades.length
+      : 0;
+
+    // Calculate annualized return
+    const years = (this.config.endDate.getTime() - this.config.startDate.getTime()) /
+                 (365.25 * 24 * 60 * 60 * 1000);
+    const annualizedReturn = Math.pow(1 + totalReturn, 1 / years) - 1;
+
+    // Calmar Ratio (annualized return / max drawdown)
+    const calmarRatio = maxDrawdown > 0 ? annualizedReturn / maxDrawdown : 0;
+
+    // Total costs
+    const totalCommission = this.trades.reduce((sum, t) => sum + t.commission, 0);
+    const totalSlippage = this.trades.reduce((sum, t) => sum + t.slippage, 0);
+
+    return {
+      totalReturn,
+      annualizedReturn,
+      sharpeRatio,
+      sortinoRatio,
+      maxDrawdown,
+      maxDrawdownDuration,
+      winRate,
+      profitFactor,
+      averageWin,
+      averageLoss,
+      totalTrades: this.trades.length,
+      totalCommission,
+      totalSlippage,
+      calmarRatio
+    };
+  }
+}
+
+interface TradingStrategy {
+  generateSignal(data: HistoricalBar[]): {
+    action: 'BUY' | 'SELL' | 'SHORT' | 'COVER' | 'HOLD';
+    quantity?: number;
+  };
+}
+
+interface BacktestResult {
+  metrics: BacktestMetrics;
+  trades: BacktestTrade[];
+  equity: number[];
+  dailyReturns: number[];
+}
+</pre>
+        </div>
+
+        <h2>3. Performance Metrics</h2>
+
+        <p>Comprehensive performance analysis requires multiple metrics that capture different aspects of strategy behavior. No single metric tells the complete story.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Formula/Description</th>
+                    <th>Good Value</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Sharpe Ratio</td>
+                    <td>Excess return / Standard deviation</td>
+                    <td>&gt; 1.5</td>
+                    <td>Risk-adjusted return; higher is better</td>
+                </tr>
+                <tr>
+                    <td>Sortino Ratio</td>
+                    <td>Excess return / Downside deviation</td>
+                    <td>&gt; 2.0</td>
+                    <td>Like Sharpe but only penalizes downside</td>
+                </tr>
+                <tr>
+                    <td>Maximum Drawdown</td>
+                    <td>Peak-to-trough decline</td>
+                    <td>&lt; 20%</td>
+                    <td>Worst historical loss period</td>
+                </tr>
+                <tr>
+                    <td>Calmar Ratio</td>
+                    <td>Annual return / Max drawdown</td>
+                    <td>&gt; 1.0</td>
+                    <td>Return per unit of downside risk</td>
+                </tr>
+                <tr>
+                    <td>Win Rate</td>
+                    <td>Winning trades / Total trades</td>
+                    <td>40-60%</td>
+                    <td>Percentage of profitable trades</td>
+                </tr>
+                <tr>
+                    <td>Profit Factor</td>
+                    <td>Gross profit / Gross loss</td>
+                    <td>&gt; 1.5</td>
+                    <td>Total winnings vs total losses</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. Walk-Forward Analysis</h2>
+
+        <p>Walk-forward analysis is a more robust validation technique than simple train-test splits. The strategy is optimized on a training window, tested on an out-of-sample period, then the window rolls forward. This simulates continuous re-optimization as would occur in live trading.</p>
+
+        <div class="highlight-box">
+            <h3 style="color: var(--primary);">Walk-Forward Process</h3>
+            <ol>
+                <li><strong>Define Windows:</strong> Training period (e.g., 12 months) and test period (e.g., 3 months)</li>
+                <li><strong>Optimize:</strong> Find best parameters on training data</li>
+                <li><strong>Test:</strong> Evaluate performance on out-of-sample test period</li>
+                <li><strong>Roll Forward:</strong> Move windows forward by test period duration</li>
+                <li><strong>Repeat:</strong> Continue until all data is processed</li>
+                <li><strong>Aggregate:</strong> Combine all out-of-sample periods for final metrics</li>
+            </ol>
+        </div>
+
+        <h2>5. Monte Carlo Simulation</h2>
+
+        <p>Monte Carlo simulation generates thousands of possible future scenarios by randomly resampling historical returns. This provides a distribution of possible outcomes rather than a single point estimate, helping quantify uncertainty and tail risks.</p>
+
+        <h2>6. Common Pitfalls and Solutions</h2>
+
+        <div class="highlight-box">
+            <h3 style="color: var(--primary);">Avoiding Backtest Pitfalls</h3>
+            <ul>
+                <li><strong>Use Realistic Costs:</strong> Model commissions, slippage, and market impact accurately</li>
+                <li><strong>Point-in-Time Data:</strong> Ensure no look-ahead bias; use data as it was known historically</li>
+                <li><strong>Out-of-Sample Testing:</strong> Always reserve data that was never used in optimization</li>
+                <li><strong>Multiple Regimes:</strong> Test across bull markets, bear markets, and high volatility periods</li>
+                <li><strong>Diversify Strategies:</strong> Don't rely on a single strategy; combine multiple uncorrelated approaches</li>
+                <li><strong>Track Degradation:</strong> Monitor live performance vs backtest; investigate significant deviations</li>
+            </ul>
+        </div>
+
+        <h2>Summary</h2>
+
+        <div class="summary">
+            <h3 style="color: var(--primary); margin-bottom: 1rem;">Key Takeaways</h3>
+            <ul>
+                <li><strong>Backtest Carefully:</strong> Avoid look-ahead bias, survivorship bias, and overfitting through rigorous methodology</li>
+                <li><strong>Multiple Metrics:</strong> Evaluate strategies using diverse metrics; no single number tells the full story</li>
+                <li><strong>Walk-Forward Validation:</strong> More realistic than static train-test splits; simulates ongoing optimization</li>
+                <li><strong>Model Costs:</strong> Transaction costs dramatically impact high-frequency strategies; always include realistic estimates</li>
+                <li><strong>Expect Degradation:</strong> Live performance typically worse than backtest; plan for 20-30% degradation</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+
+        <ol>
+            <li><strong>What is survivorship bias?</strong> How does it affect backtesting results, and how can it be mitigated?</li>
+            <li><strong>Explain the difference between Sharpe Ratio and Sortino Ratio.</strong> When is Sortino Ratio preferred?</li>
+            <li><strong>What is walk-forward analysis?</strong> Why is it more robust than simple train-test splits?</li>
+            <li><strong>How does overfitting occur in strategy development?</strong> What techniques help prevent it?</li>
+            <li><strong>Why is maximum drawdown an important metric?</strong> How does it relate to psychological and capital management?</li>
+            <li><strong>Describe Monte Carlo simulation for trading strategies.</strong> What insights does it provide beyond single backtest?</li>
+        </ol>
+
+        <div class="navigation">
+            <a href="chapter-05.html" class="nav-button">← Previous: API Specs</a>
+            <a href="chapter-07.html" class="nav-button">Next: Compliance →</a>
+        </div>
+
+        </div>
+
+<section style="margin-top:2rem;padding:1.5rem;background:rgba(139,92,246,0.05);border-left:4px solid #8B5CF6;">
+<h2 style="color:#A78BFA;">Reference Standards and Implementation Notes</h2>
+<p style="line-height:1.8;">
+This standard is designed to interoperate with established international
+frameworks. Implementations SHOULD treat the following as the single
+source of truth and use this PHASE document as the interoperability
+layer that maps existing data into a machine-readable, signed, and
+auditable shape.
+</p>
+<ul style="line-height:1.8;">
+  <li>OpenAPI Specification 3.1 — REST API definition</li>
+  <li>JSON Schema 2020-12 — schema validation</li>
+  <li>ISO/IEC 27001:2022 — information security management</li>
+  <li>ISO/IEC 27018:2019 — PII protection in public clouds</li>
+  <li>ISO/IEC 17065:2012 — product certification bodies</li>
+  <li>CycloneDX 1.5 / SPDX 2.3 — software bill of materials</li>
+  <li>Sigstore (DSSE envelope, Rekor transparency log) — signature anchoring</li>
+  <li>in-toto Attestation Framework 1.0 — build provenance</li>
+  <li>IETF RFC 9700 — OAuth 2.1</li>
+  <li>IETF RFC 9457 — Problem Details for HTTP APIs</li>
+  <li>IETF RFC 8615 — well-known URIs</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">Practical Implementation Checklist</h3>
+<ul style="line-height:1.8;">
+  <li>Manifest integrity — every published manifest is signed via
+      Sigstore DSSE. Tampering is detectable without trusting an
+      intermediary. Updates are issued as new manifests; the prior
+      manifest is preserved with a supersede marker.</li>
+  <li>Retention — keep signed evidence for at least seven years to
+      satisfy ISO/IEC 17065:2012 audit expectations. Some regulators
+      require longer retention; in that case the deployment policy
+      MUST extend the window rather than relying on the defaults.</li>
+  <li>Versioning — follow Semantic Versioning 2.0.0. Major version
+      bumps require at least a 90-day overlap with the prior major
+      version on every WIA-published reference implementation.</li>
+  <li>Negative-result reporting — a skipped indicator without
+      recorded justification is treated as a failed indicator at
+      audit time.</li>
+  <li>Key rotation — manifest signing keys are rotated per the
+      deployment policy. The previous key is preserved in a
+      published key history so that auditors can verify historical
+      manifests offline.</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">Reference Topologies</h3>
+<p style="line-height:1.8;">
+Implementations declare their operational topology in the manifest:
+single-tenant edge (one runtime per organization), multi-tenant
+gateway (shared runtime with header-based isolation), federated mesh
+(multiple runtimes peer to one another and publish manifests to a
+directory service), or air-gapped batch (signed evidence package
+transported out-of-band). Each topology ships with reference test
+vectors so that implementations can validate their deployment
+matches the canonical pattern.
+</p>
+
+<h3 style="color:#8B5CF6;">Open Governance</h3>
+<p style="line-height:1.8;">
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the appropriate
+label. The WIA Standards working group reviews open issues at the
+start of every minor release cycle and publishes the resulting
+decision log alongside the release notes. Errata are issued as
+patch releases; new normative requirements trigger minor bumps;
+backwards-incompatible changes trigger major bumps.
+</p>
+
+<p style="text-align:center;margin-top:2rem;color:#94a3b8;">
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+</p>
+</section>
+</body>
+</html>

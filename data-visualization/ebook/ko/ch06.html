@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 빅데이터 시각화 기법 - WIA-DATA-011</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; padding: 3rem; line-height: 2; max-width: 900px; margin: 0 auto; }
+        h1 { color: #10B981; font-size: 2.8rem; margin-bottom: 0.5rem; text-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+        h2 { color: #10B981; font-size: 2rem; margin-top: 3rem; margin-bottom: 1.5rem; border-bottom: 2px solid #1e293b; padding-bottom: 0.5rem; }
+        h3 { color: #34d399; font-size: 1.5rem; margin-top: 2rem; margin-bottom: 1rem; }
+        h4 { color: #6ee7b7; font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; font-size: 1.1rem; }
+        .chapter-nav { background: #1e293b; border: 2px solid #10B981; border-radius: 12px; padding: 1.5rem; margin: 2rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .chapter-nav a { color: #10B981; text-decoration: none; font-weight: 600; padding: 0.75rem 1.5rem; background: #334155; border-radius: 8px; transition: all 0.3s; }
+        .chapter-nav a:hover { background: #10B981; color: #0f172a; }
+        .highlight-box { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-left: 4px solid #10B981; padding: 2rem; margin: 2rem 0; border-radius: 8px; }
+        .key-concept { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #0f172a; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .key-concept h3 { color: #0f172a; margin-top: 0; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.75rem; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #10B981; color: #0f172a; padding: 1rem; text-align: left; font-weight: 600; }
+        td { padding: 1rem; border-bottom: 1px solid #334155; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #334155; }
+        code { background: #1e293b; color: #10B981; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: 'Consolas', 'Monaco', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        pre code { background: none; padding: 0; }
+        .info-box { background: #1e293b; border: 2px solid #3b82f6; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; }
+        .warning-box { background: #1e293b; border: 2px solid #f59e0b; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; }
+        blockquote { border-left: 4px solid #10B981; padding-left: 2rem; margin: 2rem 0; font-style: italic; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <h1>제6장: 빅데이터 시각화 기법</h1>
+    <p><strong>대규모 데이터셋을 효과적으로 표현하는 전략과 기술</strong></p>
+
+    <div class="key-concept">
+        <h3>🎯 학습 목표</h3>
+        <p>
+            이 장에서는 수백만 개 이상의 데이터 포인트를 효과적으로 시각화하는 기법을 학습합니다.
+            데이터 샘플링, 집계, 점진적 렌더링, LOD(Level of Detail) 기법 등을 다루며, 성능과 인사이트의
+            균형을 맞추는 방법을 탐구합니다.
+        </p>
+    </div>
+
+    <h2>6.1 빅데이터 시각화의 도전 과제</h2>
+
+    <p>
+        빅데이터 시각화는 기술적, 인지적 과제를 모두 제시합니다. 수백만 개의 데이터 포인트를 렌더링하는 것은
+        브라우저의 성능 한계를 시험하며, 동시에 사용자가 의미 있는 패턴을 인식할 수 있도록 정보를 제시해야 합니다.
+    </p>
+
+    <h3>주요 과제</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>과제 유형</th>
+                <th>문제</th>
+                <th>영향</th>
+                <th>해결 전략</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>렌더링 성능</strong></td>
+                <td>수백만 DOM 요소 생성 시 느림</td>
+                <td>5-10초+ 초기 로딩</td>
+                <td>Canvas/WebGL, 가상화</td>
+            </tr>
+            <tr>
+                <td><strong>메모리 사용</strong></td>
+                <td>대량 데이터를 메모리에 로드</td>
+                <td>브라우저 크래시</td>
+                <td>스트리밍, 페이지네이션</td>
+            </tr>
+            <tr>
+                <td><strong>네트워크 전송</strong></td>
+                <td>큰 데이터 파일 다운로드</td>
+                <td>긴 대기 시간</td>
+                <td>서버 집계, 압축</td>
+            </tr>
+            <tr>
+                <td><strong>시각적 혼잡</strong></td>
+                <td>오버플로팅, 겹침</td>
+                <td>패턴 인식 불가</td>
+                <td>집계, 히트맵</td>
+            </tr>
+            <tr>
+                <td><strong>인터랙션 지연</strong></td>
+                <td>줌/필터 시 재계산</td>
+                <td>60fps 미달</td>
+                <td>인덱싱, 캐싱</td>
+            </tr>
+            <tr>
+                <td><strong>정보 과부하</strong></td>
+                <td>너무 많은 데이터</td>
+                <td>인지 과부하</td>
+                <td>계층적 탐색, 점진적 공개</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>성능 벤치마크</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>데이터 크기</th>
+                <th>SVG (D3.js)</th>
+                <th>Canvas</th>
+                <th>WebGL</th>
+                <th>권장 기술</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>< 1,000</strong></td>
+                <td>매우 빠름</td>
+                <td>빠름</td>
+                <td>오버헤드</td>
+                <td>SVG</td>
+            </tr>
+            <tr>
+                <td><strong>1K - 10K</strong></td>
+                <td>빠름</td>
+                <td>매우 빠름</td>
+                <td>빠름</td>
+                <td>SVG 또는 Canvas</td>
+            </tr>
+            <tr>
+                <td><strong>10K - 100K</strong></td>
+                <td>느림</td>
+                <td>빠름</td>
+                <td>매우 빠름</td>
+                <td>Canvas</td>
+            </tr>
+            <tr>
+                <td><strong>100K - 1M</strong></td>
+                <td>매우 느림</td>
+                <td>중간</td>
+                <td>빠름</td>
+                <td>WebGL</td>
+            </tr>
+            <tr>
+                <td><strong>> 1M</strong></td>
+                <td>불가능</td>
+                <td>느림</td>
+                <td>중간-빠름</td>
+                <td>WebGL + 집계</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6.2 데이터 축소 기법</h2>
+
+    <p>
+        빅데이터를 시각화하는 가장 효과적인 방법은 시각화하기 전에 데이터를 줄이는 것입니다.
+        중요한 패턴과 인사이트를 유지하면서 데이터 포인트 수를 줄이는 다양한 기법이 있습니다.
+    </p>
+
+    <h3>샘플링 기법</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>샘플링 방법</th>
+                <th>설명</th>
+                <th>장점</th>
+                <th>단점</th>
+                <th>사용 시기</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>무작위 샘플링</strong></td>
+                <td>랜덤하게 N개 선택</td>
+                <td>간단, 편향 없음</td>
+                <td>극단값 놓칠 수 있음</td>
+                <td>균일 분포 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>계층적 샘플링</strong></td>
+                <td>그룹별로 비례 샘플링</td>
+                <td>하위 그룹 보존</td>
+                <td>그룹 정의 필요</td>
+                <td>범주형 변수 있을 때</td>
+            </tr>
+            <tr>
+                <td><strong>시간 기반</strong></td>
+                <td>일정 간격으로 샘플링</td>
+                <td>트렌드 보존</td>
+                <td>주기성 놓칠 수 있음</td>
+                <td>시계열 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>중요도 샘플링</strong></td>
+                <td>중요한 포인트 우선</td>
+                <td>이상치 보존</td>
+                <td>복잡한 알고리즘</td>
+                <td>이상치 탐지</td>
+            </tr>
+            <tr>
+                <td><strong>공간 샘플링</strong></td>
+                <td>공간적으로 균등하게</td>
+                <td>시각적 균형</td>
+                <td>밀도 정보 손실</td>
+                <td>산점도</td>
+            </tr>
+            <tr>
+                <td><strong>LTTB</strong></td>
+                <td>Largest Triangle Three Buckets</td>
+                <td>형태 보존, 효율적</td>
+                <td>구현 복잡</td>
+                <td>시계열 다운샘플링</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>LTTB 샘플링 구현</h4>
+
+    <pre><code>// Largest Triangle Three Buckets 알고리즘
+function LTTB(data, threshold) {
+    if (data.length <= threshold) return data;
+
+    const sampled = [];
+    const bucketSize = (data.length - 2) / (threshold - 2);
+
+    // 첫 포인트는 항상 포함
+    sampled.push(data[0]);
+
+    let a = 0; // 이전 선택 포인트
+
+    for (let i = 0; i < threshold - 2; i++) {
+        // 현재 버킷 범위
+        let avgRangeStart = Math.floor((i + 1) * bucketSize) + 1;
+        let avgRangeEnd = Math.floor((i + 2) * bucketSize) + 1;
+        avgRangeEnd = Math.min(avgRangeEnd, data.length);
+
+        // 다음 버킷의 평균 포인트 계산
+        let avgX = 0, avgY = 0;
+        let avgRangeLength = avgRangeEnd - avgRangeStart;
+
+        for (; avgRangeStart < avgRangeEnd; avgRangeStart++) {
+            avgX += data[avgRangeStart].x;
+            avgY += data[avgRangeStart].y;
+        }
+        avgX /= avgRangeLength;
+        avgY /= avgRangeLength;
+
+        // 현재 버킷에서 최대 삼각형 면적을 만드는 포인트 선택
+        let rangeOffs = Math.floor((i + 0) * bucketSize) + 1;
+        let rangeTo = Math.floor((i + 1) * bucketSize) + 1;
+
+        let pointAX = data[a].x;
+        let pointAY = data[a].y;
+
+        let maxArea = -1;
+        let maxAreaPoint;
+
+        for (; rangeOffs < rangeTo; rangeOffs++) {
+            // 삼각형 면적 계산
+            const area = Math.abs(
+                (pointAX - avgX) * (data[rangeOffs].y - pointAY) -
+                (pointAX - data[rangeOffs].x) * (avgY - pointAY)
+            ) * 0.5;
+
+            if (area > maxArea) {
+                maxArea = area;
+                maxAreaPoint = data[rangeOffs];
+                a = rangeOffs;
+            }
+        }
+
+        sampled.push(maxAreaPoint);
+    }
+
+    // 마지막 포인트는 항상 포함
+    sampled.push(data[data.length - 1]);
+
+    return sampled;
+}
+
+// 사용 예시
+const originalData = generateLargeDataset(100000);
+const sampledData = LTTB(originalData, 1000);
+
+console.log(`${originalData.length} → ${sampledData.length} 포인트`);
+// "100000 → 1000 포인트"</code></pre>
+
+    <h3>집계 기법</h3>
+
+    <p>
+        집계는 데이터 포인트를 그룹화하여 요약 통계로 변환합니다. 원시 데이터보다 적은 데이터로
+        동일하거나 더 명확한 인사이트를 제공할 수 있습니다.
+    </p>
+
+    <h4>시간 기반 집계</h4>
+
+    <table>
+        <thead>
+            <tr>
+                <th>집계 수준</th>
+                <th>원본 데이터 예시</th>
+                <th>축소 비율</th>
+                <th>사용 사례</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>초 → 분</strong></td>
+                <td>60 포인트/분</td>
+                <td>60:1</td>
+                <td>실시간 모니터링 기록</td>
+            </tr>
+            <tr>
+                <td><strong>분 → 시간</strong></td>
+                <td>60 포인트/시간</td>
+                <td>60:1</td>
+                <td>일간 추세</td>
+            </tr>
+            <tr>
+                <td><strong>시간 → 일</strong></td>
+                <td>24 포인트/일</td>
+                <td>24:1</td>
+                <td>월간 보고서</td>
+            </tr>
+            <tr>
+                <td><strong>일 → 주</strong></td>
+                <td>7 포인트/주</td>
+                <td>7:1</td>
+                <td>분기별 트렌드</td>
+            </tr>
+            <tr>
+                <td><strong>주 → 월</strong></td>
+                <td>4-5 포인트/월</td>
+                <td>4:1</td>
+                <td>연간 분석</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>집계 구현</h4>
+
+    <pre><code>// 시간 기반 데이터 집계
+function aggregateTimeSeries(data, interval) {
+    const aggregated = [];
+    const buckets = new Map();
+
+    // 데이터를 시간 버킷으로 그룹화
+    data.forEach(point => {
+        const bucketKey = Math.floor(point.timestamp / interval) * interval;
+
+        if (!buckets.has(bucketKey)) {
+            buckets.set(bucketKey, []);
+        }
+        buckets.get(bucketKey).push(point.value);
+    });
+
+    // 각 버킷의 통계 계산
+    buckets.forEach((values, timestamp) => {
+        aggregated.push({
+            timestamp: timestamp,
+            count: values.length,
+            min: Math.min(...values),
+            max: Math.max(...values),
+            avg: values.reduce((a, b) => a + b, 0) / values.length,
+            median: getMedian(values),
+            sum: values.reduce((a, b) => a + b, 0)
+        });
+    });
+
+    return aggregated.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// 공간 기반 집계 (히트맵용)
+function aggregateToHexbin(points, radius) {
+    const hexbin = d3.hexbin().radius(radius);
+    const bins = hexbin(points);
+
+    return bins.map(bin => ({
+        x: bin.x,
+        y: bin.y,
+        count: bin.length,
+        avgValue: d3.mean(bin, d => d.value)
+    }));
+}</code></pre>
+
+    <h2>6.3 점진적 렌더링과 스트리밍</h2>
+
+    <p>
+        점진적 렌더링은 데이터를 청크 단위로 로드하고 렌더링하여 초기 응답 시간을 개선합니다.
+        사용자는 전체 데이터를 기다리지 않고 즉시 일부 결과를 볼 수 있습니다.
+    </p>
+
+    <h3>점진적 렌더링 전략</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>전략</th>
+                <th>작동 방식</th>
+                <th>장점</th>
+                <th>구현 복잡도</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>청크 로딩</strong></td>
+                <td>데이터를 작은 배치로 페이지네이션</td>
+                <td>빠른 초기 렌더링</td>
+                <td>낮음</td>
+            </tr>
+            <tr>
+                <td><strong>가상 스크롤</strong></td>
+                <td>뷰포트 내 요소만 렌더링</td>
+                <td>메모리 효율적</td>
+                <td>중간</td>
+            </tr>
+            <tr>
+                <td><strong>레이지 로딩</strong></td>
+                <td>스크롤 시 추가 데이터 로드</td>
+                <td>무한 스크롤</td>
+                <td>낮음</td>
+            </tr>
+            <tr>
+                <td><strong>웹 워커</strong></td>
+                <td>백그라운드 스레드에서 처리</td>
+                <td>UI 블로킹 방지</td>
+                <td>높음</td>
+            </tr>
+            <tr>
+                <td><strong>스트리밍</strong></td>
+                <td>실시간으로 데이터 수신</td>
+                <td>실시간 업데이트</td>
+                <td>높음</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>점진적 렌더링 구현</h4>
+
+    <pre><code>// requestAnimationFrame을 활용한 점진적 렌더링
+class ProgressiveRenderer {
+    constructor(canvas, data, chunkSize = 1000) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.data = data;
+        this.chunkSize = chunkSize;
+        this.currentIndex = 0;
+    }
+
+    renderChunk() {
+        const endIndex = Math.min(
+            this.currentIndex + this.chunkSize,
+            this.data.length
+        );
+
+        // 현재 청크 렌더링
+        for (let i = this.currentIndex; i < endIndex; i++) {
+            const point = this.data[i];
+            this.drawPoint(point);
+        }
+
+        this.currentIndex = endIndex;
+
+        // 진행률 표시
+        const progress = (this.currentIndex / this.data.length) * 100;
+        this.updateProgress(progress);
+
+        // 아직 렌더링할 데이터가 있으면 계속
+        if (this.currentIndex < this.data.length) {
+            requestAnimationFrame(() => this.renderChunk());
+        } else {
+            this.onComplete();
+        }
+    }
+
+    drawPoint(point) {
+        this.ctx.beginPath();
+        this.ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+        this.ctx.fillStyle = point.color;
+        this.ctx.fill();
+    }
+
+    updateProgress(percent) {
+        document.getElementById('progress').textContent =
+            `렌더링 중: ${percent.toFixed(1)}%`;
+    }
+
+    onComplete() {
+        console.log('렌더링 완료!');
+        document.getElementById('progress').textContent = '완료';
+    }
+
+    start() {
+        this.currentIndex = 0;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.renderChunk();
+    }
+}
+
+// 사용 예시
+const canvas = document.getElementById('chart');
+const largeDataset = generateLargeDataset(1000000);
+const renderer = new ProgressiveRenderer(canvas, largeDataset, 5000);
+renderer.start();</code></pre>
+
+    <h4>Web Worker를 활용한 백그라운드 처리</h4>
+
+    <pre><code>// worker.js - Web Worker 파일
+self.addEventListener('message', (e) => {
+    const { data, operation } = e.data;
+
+    switch (operation) {
+        case 'aggregate':
+            const result = aggregateData(data);
+            self.postMessage({ type: 'result', data: result });
+            break;
+
+        case 'sample':
+            const sampled = LTTB(data, 1000);
+            self.postMessage({ type: 'result', data: sampled });
+            break;
+    }
+});
+
+function aggregateData(data) {
+    // 무거운 집계 작업
+    // ...
+    return aggregated;
+}
+
+// main.js - 메인 스레드
+const worker = new Worker('worker.js');
+
+worker.addEventListener('message', (e) => {
+    if (e.data.type === 'result') {
+        renderChart(e.data.data);
+    }
+});
+
+// 대용량 데이터를 워커로 전송
+fetch('/api/large-dataset')
+    .then(res => res.json())
+    .then(data => {
+        worker.postMessage({
+            data: data,
+            operation: 'aggregate'
+        });
+    });</code></pre>
+
+    <h2>6.4 LOD (Level of Detail) 기법</h2>
+
+    <p>
+        LOD는 줌 레벨에 따라 다른 세부 수준의 데이터를 표시합니다. 확대하면 더 많은 세부사항을,
+        축소하면 집계된 요약을 보여줍니다.
+    </p>
+
+    <h3>LOD 구현 전략</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>줌 레벨</th>
+                <th>데이터 표현</th>
+                <th>세부 수준</th>
+                <th>예시</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>전체 뷰 (1x)</strong></td>
+                <td>일간/주간 집계</td>
+                <td>낮음</td>
+                <td>연간 트렌드</td>
+            </tr>
+            <tr>
+                <td><strong>중간 줌 (5x)</strong></td>
+                <td>시간별 집계</td>
+                <td>중간</td>
+                <td>월간 패턴</td>
+            </tr>
+            <tr>
+                <td><strong>높은 줌 (20x)</strong></td>
+                <td>분 단위 데이터</td>
+                <td>높음</td>
+                <td>일간 변동</td>
+            </tr>
+            <tr>
+                <td><strong>최대 줌 (100x)</strong></td>
+                <td>원시 데이터 포인트</td>
+                <td>전체</td>
+                <td>개별 이벤트</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>LOD 구현 예제</h4>
+
+    <pre><code>// 줌 레벨에 따른 LOD 구현
+class LODChart {
+    constructor(data) {
+        this.rawData = data;
+        this.zoomLevel = 1;
+
+        // 미리 여러 LOD 준비
+        this.lod = {
+            1: this.aggregateByDay(data),      // 일간
+            5: this.aggregateByHour(data),     // 시간
+            20: this.aggregateByMinute(data),  // 분
+            100: data                          // 원시 데이터
+        };
+    }
+
+    getLOD(zoomLevel) {
+        // 가장 가까운 LOD 선택
+        const levels = Object.keys(this.lod).map(Number).sort((a, b) => a - b);
+        const closestLevel = levels.reduce((prev, curr) =>
+            Math.abs(curr - zoomLevel) < Math.abs(prev - zoomLevel) ? curr : prev
+        );
+        return this.lod[closestLevel];
+    }
+
+    onZoom(newZoomLevel) {
+        this.zoomLevel = newZoomLevel;
+        const data = this.getLOD(newZoomLevel);
+
+        // 데이터 포인트 수에 따라 렌더링 방식 변경
+        if (data.length < 1000) {
+            this.renderWithSVG(data);
+        } else if (data.length < 10000) {
+            this.renderWithCanvas(data);
+        } else {
+            this.renderWithWebGL(data);
+        }
+    }
+
+    aggregateByDay(data) {
+        // 일 단위 집계 로직
+        return aggregateTimeSeries(data, 86400000); // 1일 = 86400000ms
+    }
+
+    aggregateByHour(data) {
+        return aggregateTimeSeries(data, 3600000); // 1시간 = 3600000ms
+    }
+
+    aggregateByMinute(data) {
+        return aggregateTimeSeries(data, 60000); // 1분 = 60000ms
+    }
+}</code></pre>
+
+    <h2>6.5 WebGL을 활용한 초대규모 데이터</h2>
+
+    <p>
+        WebGL은 GPU를 직접 활용하여 수백만 개의 데이터 포인트를 실시간으로 렌더링할 수 있습니다.
+        Deck.gl, regl 같은 라이브러리가 WebGL의 복잡성을 추상화합니다.
+    </p>
+
+    <h3>WebGL 시각화 라이브러리</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>라이브러리</th>
+                <th>특징</th>
+                <th>최적 사용 사례</th>
+                <th>성능</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>deck.gl</strong></td>
+                <td>레이어 기반, 지리 공간 최적화</td>
+                <td>지도 시각화, 10M+ 포인트</td>
+                <td>매우 높음</td>
+            </tr>
+            <tr>
+                <td><strong>regl</strong></td>
+                <td>함수형 WebGL 래퍼</td>
+                <td>커스텀 시각화</td>
+                <td>높음</td>
+            </tr>
+            <tr>
+                <td><strong>Three.js</strong></td>
+                <td>3D 엔진, 풍부한 생태계</td>
+                <td>3D 시각화, 게임</td>
+                <td>높음</td>
+            </tr>
+            <tr>
+                <td><strong>Plotly WebGL</strong></td>
+                <td>Plotly의 WebGL 백엔드</td>
+                <td>과학 차트, 산점도</td>
+                <td>높음</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>deck.gl 사용 예제</h4>
+
+    <pre><code>// deck.gl로 1백만 포인트 시각화
+import { Deck } from '@deck.gl/core';
+import { ScatterplotLayer } from '@deck.gl/layers';
+
+// 100만 개 포인트 생성
+const data = Array.from({ length: 1000000 }, (_, i) => ({
+    position: [
+        Math.random() * 360 - 180,  // longitude
+        Math.random() * 180 - 90    // latitude
+    ],
+    value: Math.random() * 100
+}));
+
+const deck = new Deck({
+    container: 'container',
+    initialViewState: {
+        longitude: 0,
+        latitude: 0,
+        zoom: 2
+    },
+    controller: true,
+    layers: [
+        new ScatterplotLayer({
+            id: 'scatter-layer',
+            data: data,
+            pickable: true,
+            opacity: 0.8,
+            radiusMinPixels: 2,
+            radiusMaxPixels: 10,
+            getPosition: d => d.position,
+            getRadius: d => Math.sqrt(d.value),
+            getFillColor: d => [255, 140, 0],
+            onHover: ({object}) => {
+                if (object) {
+                    console.log(`Value: ${object.value}`);
+                }
+            }
+        })
+    ]
+});
+
+// 60fps로 부드럽게 렌더링됨</code></pre>
+
+    <h2>6.6 서버 사이드 집계와 API 설계</h2>
+
+    <p>
+        대규모 데이터의 가장 효과적인 처리 방법은 서버에서 집계하여 클라이언트로 전송하는 것입니다.
+        적절한 API 설계로 네트워크 전송을 최소화하고 클라이언트 성능을 최적화할 수 있습니다.
+    </p>
+
+    <h3>API 설계 패턴</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>패턴</th>
+                <th>설명</th>
+                <th>장점</th>
+                <th>사용 시기</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>사전 집계</strong></td>
+                <td>서버에서 미리 계산된 집계 제공</td>
+                <td>빠른 응답, 작은 페이로드</td>
+                <td>고정된 집계 수준</td>
+            </tr>
+            <tr>
+                <td><strong>동적 집계</strong></td>
+                <td>쿼리 파라미터로 집계 수준 지정</td>
+                <td>유연성</td>
+                <td>다양한 줌 레벨</td>
+            </tr>
+            <tr>
+                <td><strong>타일 기반</strong></td>
+                <td>공간을 타일로 나눠 요청</td>
+                <td>캐싱, 부분 로딩</td>
+                <td>지도, 대용량 이미지</td>
+            </tr>
+            <tr>
+                <td><strong>스트리밍</strong></td>
+                <td>데이터를 스트림으로 전송</td>
+                <td>즉시 렌더링 시작</td>
+                <td>실시간 데이터</td>
+            </tr>
+            <tr>
+                <td><strong>GraphQL</strong></td>
+                <td>필요한 필드만 요청</td>
+                <td>오버페칭 방지</td>
+                <td>복잡한 데이터 관계</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>동적 집계 API 예제</h4>
+
+    <pre><code>// API 엔드포인트 설계
+// GET /api/timeseries?start=2025-01-01&end=2025-12-31&interval=1d&metrics=avg,min,max
+
+// 서버 구현 (Node.js + Express)
+app.get('/api/timeseries', async (req, res) => {
+    const { start, end, interval, metrics } = req.query;
+
+    // 간격에 따라 적절한 집계 쿼리 선택
+    const intervalMs = parseInterval(interval); // '1h' -> 3600000ms
+
+    const query = `
+        SELECT
+            toStartOfInterval(timestamp, INTERVAL ${interval}) as time,
+            ${metrics.includes('avg') ? 'AVG(value) as avg,' : ''}
+            ${metrics.includes('min') ? 'MIN(value) as min,' : ''}
+            ${metrics.includes('max') ? 'MAX(value) as max,' : ''}
+            COUNT(*) as count
+        FROM data
+        WHERE timestamp >= ? AND timestamp <= ?
+        GROUP BY time
+        ORDER BY time
+    `;
+
+    const result = await db.query(query, [start, end]);
+
+    // 압축하여 전송
+    res.set('Content-Encoding', 'gzip');
+    res.json(result);
+});
+
+// 클라이언트 구현
+async function fetchData(zoomLevel) {
+    // 줌 레벨에 따라 적절한 간격 선택
+    const interval = zoomLevel < 10 ? '1d' :
+                     zoomLevel < 50 ? '1h' :
+                     zoomLevel < 200 ? '5m' : '1m';
+
+    const response = await fetch(
+        `/api/timeseries?start=${start}&end=${end}&interval=${interval}&metrics=avg,min,max`
+    );
+
+    const data = await response.json();
+    return data;
+}</code></pre>
+
+    <h2>6.7 인덱싱과 공간 데이터 구조</h2>
+
+    <p>
+        대규모 데이터셋에서 빠른 쿼리를 위해 적절한 데이터 구조가 필요합니다.
+        공간 인덱스는 "이 영역 내 모든 포인트"같은 쿼리를 효율적으로 처리합니다.
+    </p>
+
+    <h3>공간 데이터 구조</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>구조</th>
+                <th>시간 복잡도</th>
+                <th>장점</th>
+                <th>사용 사례</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Quadtree</strong></td>
+                <td>O(log n)</td>
+                <td>간단, 2D 최적화</td>
+                <td>산점도, 지도</td>
+            </tr>
+            <tr>
+                <td><strong>R-tree</strong></td>
+                <td>O(log n)</td>
+                <td>범위 쿼리 효율적</td>
+                <td>GIS, 바운딩 박스</td>
+            </tr>
+            <tr>
+                <td><strong>KD-tree</strong></td>
+                <td>O(log n)</td>
+                <td>k차원 지원</td>
+                <td>최근접 이웃 검색</td>
+            </tr>
+            <tr>
+                <td><strong>Grid Index</strong></td>
+                <td>O(1) - O(n)</td>
+                <td>매우 빠름 (균일 분포)</td>
+                <td>히트맵, 히스토그램</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>Quadtree 구현</h4>
+
+    <pre><code>// Quadtree 구현 (간소화)
+class Quadtree {
+    constructor(boundary, capacity = 4) {
+        this.boundary = boundary; // {x, y, width, height}
+        this.capacity = capacity;
+        this.points = [];
+        this.divided = false;
+    }
+
+    subdivide() {
+        const x = this.boundary.x;
+        const y = this.boundary.y;
+        const w = this.boundary.width / 2;
+        const h = this.boundary.height / 2;
+
+        this.northeast = new Quadtree({x: x + w, y: y, width: w, height: h}, this.capacity);
+        this.northwest = new Quadtree({x: x, y: y, width: w, height: h}, this.capacity);
+        this.southeast = new Quadtree({x: x + w, y: y + h, width: w, height: h}, this.capacity);
+        this.southwest = new Quadtree({x: x, y: y + h, width: w, height: h}, this.capacity);
+
+        this.divided = true;
+    }
+
+    insert(point) {
+        if (!this.contains(point)) return false;
+
+        if (this.points.length < this.capacity) {
+            this.points.push(point);
+            return true;
+        }
+
+        if (!this.divided) {
+            this.subdivide();
+        }
+
+        return this.northeast.insert(point) ||
+               this.northwest.insert(point) ||
+               this.southeast.insert(point) ||
+               this.southwest.insert(point);
+    }
+
+    query(range, found = []) {
+        if (!this.intersects(range)) return found;
+
+        for (let p of this.points) {
+            if (this.inRange(p, range)) {
+                found.push(p);
+            }
+        }
+
+        if (this.divided) {
+            this.northeast.query(range, found);
+            this.northwest.query(range, found);
+            this.southeast.query(range, found);
+            this.southwest.query(range, found);
+        }
+
+        return found;
+    }
+
+    contains(point) {
+        return point.x >= this.boundary.x &&
+               point.x < this.boundary.x + this.boundary.width &&
+               point.y >= this.boundary.y &&
+               point.y < this.boundary.y + this.boundary.height;
+    }
+
+    intersects(range) {
+        return !(range.x > this.boundary.x + this.boundary.width ||
+                 range.x + range.width < this.boundary.x ||
+                 range.y > this.boundary.y + this.boundary.height ||
+                 range.y + range.height < this.boundary.y);
+    }
+
+    inRange(point, range) {
+        return point.x >= range.x &&
+               point.x <= range.x + range.width &&
+               point.y >= range.y &&
+               point.y <= range.y + range.height;
+    }
+}
+
+// 사용 예시
+const qt = new Quadtree({x: 0, y: 0, width: 1000, height: 1000});
+
+// 100만 포인트 삽입
+for (let i = 0; i < 1000000; i++) {
+    qt.insert({
+        x: Math.random() * 1000,
+        y: Math.random() * 1000,
+        data: i
+    });
+}
+
+// 특정 영역 쿼리 (매우 빠름)
+const visiblePoints = qt.query({
+    x: 100, y: 100,
+    width: 200, height: 200
+});
+
+console.log(`${visiblePoints.length} 포인트 발견`);</code></pre>
+
+    <h2>6.8 성능 모니터링과 최적화</h2>
+
+    <p>
+        빅데이터 시각화에서는 지속적인 성능 모니터링과 최적화가 필수입니다.
+    </p>
+
+    <h3>성능 지표</h3>
+
+    <div class="info-box">
+        <h4>📊 주요 성능 메트릭</h4>
+        <ul>
+            <li><strong>FPS (Frames Per Second):</strong> 60fps 목표, 30fps 이하 시 개선 필요</li>
+            <li><strong>TTI (Time to Interactive):</strong> 초기 로딩 후 인터랙션 가능까지 < 3초</li>
+            <li><strong>메모리 사용량:</strong> 증가 추세 감지 (메모리 누수)</li>
+            <li><strong>네트워크 페이로드:</strong> 초기 로드 < 1MB, 추가 쿼리 < 100KB</li>
+        </ul>
+    </div>
+
+    <h2>요약</h2>
+
+    <div class="key-concept">
+        <h3>🎯 핵심 요점</h3>
+        <ul>
+            <li>빅데이터 시각화는 렌더링, 메모리, 네트워크, 인지적 과제를 모두 고려해야 합니다</li>
+            <li>LTTB 같은 스마트 샘플링으로 형태를 보존하며 데이터 축소 가능</li>
+            <li>집계는 원시 데이터보다 명확한 인사이트를 제공할 수 있습니다</li>
+            <li>점진적 렌더링과 Web Worker로 UI 응답성 유지</li>
+            <li>LOD 기법으로 줌 레벨에 따라 적절한 세부 수준 제공</li>
+            <li>WebGL(deck.gl 등)로 수백만 포인트 실시간 렌더링</li>
+            <li>서버 사이드 집계로 네트워크 전송 최소화</li>
+            <li>Quadtree 같은 공간 인덱스로 빠른 범위 쿼리</li>
+        </ul>
+    </div>
+
+    <h2>복습 문제</h2>
+
+    <div class="info-box">
+        <h4>📝 이해도 확인</h4>
+        <ol>
+            <li>LTTB 샘플링 알고리즘의 작동 원리와 장점을 설명하세요.</li>
+            <li>SVG, Canvas, WebGL 중 10만 개 포인트에 적합한 기술과 이유는?</li>
+            <li>LOD(Level of Detail) 기법이 무엇이며, 언제 유용한가요?</li>
+            <li>점진적 렌더링과 가상 스크롤의 차이점을 설명하세요.</li>
+            <li>Quadtree의 시간 복잡도와 사용 사례를 설명하세요.</li>
+        </ol>
+    </div>
+</body>
+</html>

@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flexible Display Simulator - WIA-SEMI-011</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --primary: #8B5CF6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --card-bg: #1e293b;
+            --border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            border-bottom: 2px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .lang-selector {
+            margin: 1rem 0;
+        }
+
+        .lang-selector select {
+            padding: 0.5rem 1rem;
+            background: var(--card-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin: 2rem 0;
+            border-bottom: 2px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: var(--border);
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: var(--bg);
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 2rem;
+            background: var(--card-bg);
+            border-radius: 0 0 8px 8px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            margin: 1.5rem 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-dim);
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        input[type="range"] {
+            padding: 0;
+        }
+
+        button {
+            padding: 0.75rem 2rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .results {
+            margin-top: 2rem;
+            padding: 2rem;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            background: var(--card-bg);
+            border-radius: 6px;
+        }
+
+        .result-value {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 0.25rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-pass {
+            background: var(--success);
+            color: white;
+        }
+
+        .status-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .status-fail {
+            background: var(--danger);
+            color: white;
+        }
+
+        canvas {
+            width: 100%;
+            max-width: 600px;
+            height: 400px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .spec-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .spec-table th,
+        .spec-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .spec-table th {
+            background: var(--bg);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Flexible Display</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>📱 Flexible Display Simulator</h1>
+            <p class="subtitle" data-i18n="subtitle">Advanced Testing & Validation Suite for WIA-SEMI-011</p>
+
+            <div class="lang-selector">
+                <select id="languageSelect" onchange="changeLanguage()">
+                    <option value="en">English</option>
+                    <option value="ko">한국어 (Korean)</option>
+                    <option value="zh">中文 (Chinese)</option>
+                    <option value="ja">日本語 (Japanese)</option>
+                    <option value="es">Español (Spanish)</option>
+                    <option value="fr">Français (French)</option>
+                    <option value="de">Deutsch (German)</option>
+                    <option value="it">Italiano (Italian)</option>
+                    <option value="pt">Português (Portuguese)</option>
+                    <option value="ru">Русский (Russian)</option>
+                    <option value="ar">العربية (Arabic)</option>
+                    <option value="hi">हिन्दी (Hindi)</option>
+                    <option value="bn">বাংলা (Bengali)</option>
+                    <option value="vi">Tiếng Việt (Vietnamese)</option>
+                    <option value="th">ไทย (Thai)</option>
+                    <option value="tr">Türkçe (Turkish)</option>
+                    <option value="pl">Polski (Polish)</option>
+                    <option value="nl">Nederlands (Dutch)</option>
+                    <option value="sv">Svenska (Swedish)</option>
+                    <option value="no">Norsk (Norwegian)</option>
+                    <option value="da">Dansk (Danish)</option>
+                    <option value="fi">Suomi (Finnish)</option>
+                    <option value="cs">Čeština (Czech)</option>
+                    <option value="hu">Magyar (Hungarian)</option>
+                    <option value="ro">Română (Romanian)</option>
+                    <option value="el">Ελληνικά (Greek)</option>
+                    <option value="he">עברית (Hebrew)</option>
+                    <option value="id">Bahasa Indonesia</option>
+                    <option value="ms">Bahasa Melayu (Malay)</option>
+                    <option value="fil">Filipino</option>
+                    <option value="uk">Українська (Ukrainian)</option>
+                    <option value="bg">Български (Bulgarian)</option>
+                    <option value="hr">Hrvatski (Croatian)</option>
+                    <option value="sr">Српски (Serbian)</option>
+                    <option value="sk">Slovenčina (Slovak)</option>
+                    <option value="sl">Slovenščina (Slovenian)</option>
+                    <option value="lt">Lietuvių (Lithuanian)</option>
+                    <option value="lv">Latviešu (Latvian)</option>
+                    <option value="et">Eesti (Estonian)</option>
+                    <option value="fa">فارسی (Persian)</option>
+                    <option value="ur">اردو (Urdu)</option>
+                    <option value="sw">Kiswahili (Swahili)</option>
+                    <option value="am">አማርኛ (Amharic)</option>
+                    <option value="ne">नेपाली (Nepali)</option>
+                    <option value="si">සිංහල (Sinhala)</option>
+                    <option value="km">ខ្មែរ (Khmer)</option>
+                    <option value="lo">ລາວ (Lao)</option>
+                    <option value="my">မြန်မာ (Burmese)</option>
+                    <option value="ka">ქართული (Georgian)</option>
+                    <option value="hy">Հայերեն (Armenian)</option>
+                    <option value="az">Azərbaycan (Azerbaijani)</option>
+                    <option value="kk">Қазақ (Kazakh)</option>
+                    <option value="uz">O'zbek (Uzbek)</option>
+                    <option value="mn">Монгол (Mongolian)</option>
+                    <option value="ta">தமிழ் (Tamil)</option>
+                    <option value="te">తెలుగు (Telugu)</option>
+                    <option value="ml">മലയാളം (Malayalam)</option>
+                    <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                    <option value="mr">मराठी (Marathi)</option>
+                    <option value="gu">ગુજરાતી (Gujarati)</option>
+                    <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                    <option value="or">ଓଡ଼ିଆ (Odia)</option>
+                    <option value="as">অসমীয়া (Assamese)</option>
+                    <option value="is">Íslenska (Icelandic)</option>
+                    <option value="mt">Malti (Maltese)</option>
+                    <option value="ga">Gaeilge (Irish)</option>
+                    <option value="cy">Cymraeg (Welsh)</option>
+                    <option value="sq">Shqip (Albanian)</option>
+                    <option value="mk">Македонски (Macedonian)</option>
+                    <option value="bs">Bosanski (Bosnian)</option>
+                    <option value="af">Afrikaans</option>
+                    <option value="zu">isiZulu (Zulu)</option>
+                    <option value="xh">isiXhosa (Xhosa)</option>
+                    <option value="so">Soomaali (Somali)</option>
+                    <option value="ha">Hausa</option>
+                    <option value="yo">Yorùbá (Yoruba)</option>
+                    <option value="ig">Igbo</option>
+                    <option value="mg">Malagasy</option>
+                    <option value="ceb">Cebuano</option>
+                    <option value="hmn">Hmong</option>
+                    <option value="haw">ʻŌlelo Hawaiʻi (Hawaiian)</option>
+                    <option value="sm">Gagana Samoa (Samoan)</option>
+                    <option value="mi">Te Reo Māori (Maori)</option>
+                    <option value="la">Latina (Latin)</option>
+                    <option value="eo">Esperanto</option>
+                    <option value="jw">Basa Jawa (Javanese)</option>
+                    <option value="su">Basa Sunda (Sundanese)</option>
+                    <option value="ny">Chichewa</option>
+                    <option value="sn">chiShona (Shona)</option>
+                    <option value="st">Sesotho (Southern Sotho)</option>
+                    <option value="eu">Euskara (Basque)</option>
+                    <option value="gl">Galego (Galician)</option>
+                    <option value="ca">Català (Catalan)</option>
+                    <option value="lb">Lëtzebuergesch (Luxembourgish)</option>
+                    <option value="fy">Frysk (Frisian)</option>
+                    <option value="gd">Gàidhlig (Scots Gaelic)</option>
+                    <option value="yi">ייִדיש (Yiddish)</option>
+                    <option value="ku">Kurdî (Kurdish)</option>
+                    <option value="ps">پښتو (Pashto)</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(0)"><span data-i18n="tab1"> Flex Specifications</span></div>
+            <div class="tab" onclick="switchTab(1)"><span data-i18n="tab2">🔢 Durability Calc</span></div>
+            <div class="tab" onclick="switchTab(2)"><span data-i18n="tab3">📡 Hinge Protocols</span></div>
+            <div class="tab" onclick="switchTab(3)"><span data-i18n="tab4">🔗 Electronics Integration</span></div>
+            <div class="tab" onclick="switchTab(4)"><span data-i18n="tab5">🧪 Endurance Testing</span></div>
+        </div>
+
+        <!-- Tab 1: Flex Specifications -->
+        <div class="tab-content active">
+            <h2 data-i18n="tab1_title">Flexible Display Specifications</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-i18n="bend_radius_title">Bend Radius Calculator</h3>
+                    <div class="input-group">
+                        <label data-i18n="display_type">Display Type:</label>
+                        <select id="displayType">
+                            <option value="foldable">Foldable (In-fold)</option>
+                            <option value="outfold">Foldable (Out-fold)</option>
+                            <option value="rollable">Rollable</option>
+                            <option value="stretchable">Stretchable</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="substrate">Substrate Material:</label>
+                        <select id="substrate">
+                            <option value="utg">Ultra-Thin Glass (UTG)</option>
+                            <option value="pi">Polyimide (PI)</option>
+                            <option value="pet">PET</option>
+                            <option value="silicone">Silicone</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="thickness">Thickness (μm): <span id="thicknessVal">50</span></label>
+                        <input type="range" id="thickness" min="10" max="200" value="50" oninput="updateValue('thickness')">
+                    </div>
+                    <button onclick="calculateBendRadius()" data-i18n="calculate">Calculate</button>
+                </div>
+
+                <div class="card">
+                    <h3 data-i18n="results">Results</h3>
+                    <div id="bendResults" class="results">
+                        <p data-i18n="enter_params">Enter parameters and click Calculate</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3 data-i18n="industry_standards">Industry Standards Comparison</h3>
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="parameter">Parameter</th>
+                            <th data-i18n="wia_standard">WIA-SEMI-011</th>
+                            <th>Samsung</th>
+                            <th>LG Display</th>
+                            <th>BOE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Min Bend Radius</td>
+                            <td>< 3mm</td>
+                            <td>3.0mm</td>
+                            <td>2.5mm</td>
+                            <td>3.5mm</td>
+                        </tr>
+                        <tr>
+                            <td>Fold Cycles</td>
+                            <td>200,000+</td>
+                            <td>200,000</td>
+                            <td>100,000</td>
+                            <td>150,000</td>
+                        </tr>
+                        <tr>
+                            <td>Crease Depth</td>
+                            <td>< 0.5mm</td>
+                            <td>0.4mm</td>
+                            <td>0.3mm</td>
+                            <td>0.6mm</td>
+                        </tr>
+                        <tr>
+                            <td>Response Time</td>
+                            <td>< 1ms</td>
+                            <td>0.8ms</td>
+                            <td>1.2ms</td>
+                            <td>1.0ms</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 2: Durability Calculations -->
+        <div class="tab-content">
+            <h2 data-i18n="tab2_title">Durability & Lifecycle Calculator</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-i18n="fold_cycle_title">Fold Cycle Estimation</h3>
+                    <div class="input-group">
+                        <label data-i18n="daily_folds">Daily Folds:</label>
+                        <input type="number" id="dailyFolds" value="50">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="material_factor">Material Degradation Factor:</label>
+                        <select id="degradation">
+                            <option value="0.95">UTG (Excellent - 0.95)</option>
+                            <option value="0.90">PI (Good - 0.90)</option>
+                            <option value="0.85">PET (Fair - 0.85)</option>
+                            <option value="0.80">Standard Polymer (0.80)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="temp_range">Operating Temperature (°C): <span id="tempVal">25</span></label>
+                        <input type="range" id="temperature" min="-20" max="60" value="25" oninput="updateValue('temperature')">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="humidity">Humidity (%): <span id="humidityVal">50</span></label>
+                        <input type="range" id="humidity" min="0" max="100" value="50" oninput="updateValue('humidity')">
+                    </div>
+                    <button onclick="calculateDurability()" data-i18n="calculate">Calculate Lifecycle</button>
+                </div>
+
+                <div class="card">
+                    <h3 data-i18n="lifecycle_results">Lifecycle Results</h3>
+                    <div id="durabilityResults" class="results">
+                        <p data-i18n="enter_params">Enter parameters and click Calculate</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <canvas id="durabilityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Tab 3: Hinge Protocols -->
+        <div class="tab-content">
+            <h2 data-i18n="tab3_title">Hinge Mechanism Protocols</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-i18n="hinge_config">Hinge Configuration</h3>
+                    <div class="input-group">
+                        <label data-i18n="hinge_type">Hinge Type:</label>
+                        <select id="hingeType">
+                            <option value="multi-cam">Multi-Cam (Samsung)</option>
+                            <option value="waterdrop">Waterdrop (Huawei)</option>
+                            <option value="teardrop">Teardrop (Motorola)</option>
+                            <option value="360">360° Dual-Axis</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="fold_angle">Fold Angle (°): <span id="angleVal">180</span></label>
+                        <input type="range" id="foldAngle" min="0" max="360" value="180" oninput="updateValue('foldAngle')">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="torque">Torque (N·mm): <span id="torqueVal">100</span></label>
+                        <input type="range" id="torque" min="50" max="300" value="100" oninput="updateValue('torque')">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="gap_tolerance">Gap Tolerance (mm): <span id="gapVal">0.1</span></label>
+                        <input type="range" id="gap" min="0" max="1" step="0.05" value="0.1" oninput="updateValue('gap')">
+                    </div>
+                    <button onclick="analyzeHinge()" data-i18n="analyze">Analyze Hinge</button>
+                </div>
+
+                <div class="card">
+                    <h3 data-i18n="hinge_results">Analysis Results</h3>
+                    <div id="hingeResults" class="results">
+                        <p data-i18n="enter_params">Configure hinge and click Analyze</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Electronics Integration -->
+        <div class="tab-content">
+            <h2 data-i18n="tab4_title">Flexible Electronics Integration</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-i18n="circuit_design">Circuit Design Parameters</h3>
+                    <div class="input-group">
+                        <label data-i18n="interconnect">Interconnect Type:</label>
+                        <select id="interconnect">
+                            <option value="serpentine">Serpentine</option>
+                            <option value="island-bridge">Island-Bridge</option>
+                            <option value="mesh">Stretchable Mesh</option>
+                            <option value="rigid-flex">Rigid-Flex Hybrid</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="conductor">Conductor Material:</label>
+                        <select id="conductor">
+                            <option value="copper">Copper (Cu)</option>
+                            <option value="silver">Silver (Ag)</option>
+                            <option value="graphene">Graphene</option>
+                            <option value="cnt">Carbon Nanotubes</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="stretch_percent">Max Stretch (%): <span id="stretchVal">20</span></label>
+                        <input type="range" id="stretch" min="0" max="50" value="20" oninput="updateValue('stretch')">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="layers">Circuit Layers:</label>
+                        <input type="number" id="layers" value="2" min="1" max="8">
+                    </div>
+                    <button onclick="evaluateIntegration()" data-i18n="evaluate">Evaluate Integration</button>
+                </div>
+
+                <div class="card">
+                    <h3 data-i18n="integration_results">Integration Assessment</h3>
+                    <div id="integrationResults" class="results">
+                        <p data-i18n="enter_params">Configure parameters and click Evaluate</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3 data-i18n="power_delivery">Power Delivery Analysis</h3>
+                <div class="grid-2">
+                    <div class="card">
+                        <h4 data-i18n="voltage_drop">Voltage Drop Calculation</h4>
+                        <div class="input-group">
+                            <label>Current (mA):</label>
+                            <input type="number" id="current" value="500">
+                        </div>
+                        <div class="input-group">
+                            <label>Trace Length (mm):</label>
+                            <input type="number" id="traceLength" value="100">
+                        </div>
+                        <button onclick="calculateVoltageDrop()">Calculate</button>
+                        <div id="voltageResults" style="margin-top: 1rem;"></div>
+                    </div>
+
+                    <div class="card">
+                        <h4 data-i18n="signal_integrity">Signal Integrity</h4>
+                        <div class="input-group">
+                            <label>Frequency (MHz):</label>
+                            <input type="number" id="frequency" value="100">
+                        </div>
+                        <div class="input-group">
+                            <label>Impedance (Ω):</label>
+                            <input type="number" id="impedance" value="50">
+                        </div>
+                        <button onclick="analyzeSignal()">Analyze</button>
+                        <div id="signalResults" style="margin-top: 1rem;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Endurance Testing -->
+        <div class="tab-content">
+            <h2 data-i18n="tab5_title">Folding Endurance Testing Protocol</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 data-i18n="test_config">Test Configuration</h3>
+                    <div class="input-group">
+                        <label data-i18n="test_standard">Test Standard:</label>
+                        <select id="testStandard">
+                            <option value="wia">WIA-SEMI-011</option>
+                            <option value="iec">IEC 62715-6-2</option>
+                            <option value="mil">MIL-STD-810H</option>
+                            <option value="jesd">JESD22-A104</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="test_cycles">Test Cycles:</label>
+                        <input type="number" id="testCycles" value="200000" step="1000">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="cycle_speed">Cycle Speed (cycles/min): <span id="speedVal">5</span></label>
+                        <input type="range" id="cycleSpeed" min="1" max="20" value="5" oninput="updateValue('cycleSpeed')">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="test_temp">Test Temperature (°C):</label>
+                        <select id="testTemp">
+                            <option value="-20">-20°C (Cold)</option>
+                            <option value="25" selected>25°C (Room)</option>
+                            <option value="60">60°C (Hot)</option>
+                            <option value="85">85°C (Extreme)</option>
+                        </select>
+                    </div>
+                    <button onclick="runEnduranceTest()" data-i18n="run_test">Run Test Simulation</button>
+                </div>
+
+                <div class="card">
+                    <h3 data-i18n="test_results">Test Results</h3>
+                    <div id="testResults" class="results">
+                        <p data-i18n="configure_test">Configure test parameters and click Run</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3 data-i18n="failure_modes">Failure Mode Analysis</h3>
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="failure_mode">Failure Mode</th>
+                            <th data-i18n="probability">Probability</th>
+                            <th data-i18n="cycle_range">Typical Cycle Range</th>
+                            <th data-i18n="mitigation">Mitigation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Crease Propagation</td>
+                            <td><span class="status-indicator status-warning">Medium</span></td>
+                            <td>50,000 - 100,000</td>
+                            <td>UTG substrate, improved adhesive</td>
+                        </tr>
+                        <tr>
+                            <td>Delamination</td>
+                            <td><span class="status-indicator status-warning">Medium</span></td>
+                            <td>80,000 - 150,000</td>
+                            <td>Enhanced bonding layer</td>
+                        </tr>
+                        <tr>
+                            <td>Touch Sensitivity Loss</td>
+                            <td><span class="status-indicator status-pass">Low</span></td>
+                            <td>150,000+</td>
+                            <td>Conductive coating refresh</td>
+                        </tr>
+                        <tr>
+                            <td>Hinge Wear</td>
+                            <td><span class="status-indicator status-pass">Low</span></td>
+                            <td>200,000+</td>
+                            <td>Precision bearing design</td>
+                        </tr>
+                        <tr>
+                            <td>Pixel Dead Spots</td>
+                            <td><span class="status-indicator status-fail">High</span></td>
+                            <td>30,000 - 80,000</td>
+                            <td>Stress relief patterns</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            en: {
+                subtitle: "Advanced Testing & Validation Suite for WIA-SEMI-011",
+                tab1: " Flex Specifications",
+                tab2: "🔢 Durability Calc",
+                tab3: "📡 Hinge Protocols",
+                tab4: "🔗 Electronics Integration",
+                tab5: "🧪 Endurance Testing",
+                calculate: "Calculate",
+                analyze: "Analyze",
+                evaluate: "Evaluate",
+                run_test: "Run Test Simulation",
+                results: "Results",
+                enter_params: "Enter parameters and click Calculate"
+            },
+            ko: {
+                subtitle: "WIA-SEMI-011 고급 테스팅 및 검증 도구",
+                tab1: " 플렉스 사양",
+                tab2: "🔢 내구성 계산",
+                tab3: "📡 힌지 프로토콜",
+                tab4: "🔗 전자 통합",
+                tab5: "🧪 내구성 테스트",
+                calculate: "계산하기",
+                analyze: "분석하기",
+                evaluate: "평가하기",
+                run_test: "테스트 실행",
+                results: "결과",
+                enter_params: "매개변수를 입력하고 계산을 클릭하세요"
+            },
+            zh: {
+                subtitle: "WIA-SEMI-011 高级测试与验证套件",
+                tab1: " 柔性规格",
+                tab2: "🔢 耐久性计算",
+                tab3: "📡 铰链协议",
+                tab4: "🔗 电子集成",
+                tab5: "🧪 耐久性测试"
+            },
+            ja: {
+                subtitle: "WIA-SEMI-011 高度なテストと検証スイート",
+                tab1: " フレックス仕様",
+                tab2: "🔢 耐久性計算",
+                tab3: "📡 ヒンジプロトコル",
+                tab4: "🔗 電子統合",
+                tab5: "🧪 耐久性テスト"
+            }
+        };
+
+        function changeLanguage() {
+            const lang = document.getElementById('languageSelect').value;
+            const trans = translations[lang] || translations['en'];
+
+            document.querySelectorAll('[data-i18n]').forEach(elem => {
+                const key = elem.getAttribute('data-i18n');
+                if (trans[key]) {
+                    elem.textContent = trans[key];
+                }
+            });
+        }
+
+        function switchTab(index) {
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach((tab, i) => {
+                if (i === index) {
+                    tab.classList.add('active');
+                    contents[i].classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                    contents[i].classList.remove('active');
+                }
+            });
+        }
+
+        function updateValue(id) {
+            const elem = document.getElementById(id);
+            const display = document.getElementById(id + 'Val');
+            if (display) {
+                display.textContent = elem.value;
+            }
+        }
+
+        function calculateBendRadius() {
+            const type = document.getElementById('displayType').value;
+            const substrate = document.getElementById('substrate').value;
+            const thickness = parseFloat(document.getElementById('thickness').value);
+
+            const modulusMap = {
+                'utg': 70, 'pi': 3.5, 'pet': 4.0, 'silicone': 0.01
+            };
+
+            const modulus = modulusMap[substrate] || 3.5;
+            const minRadius = (thickness / 1000) * modulus * 1.5;
+            const maxStrain = (thickness / (2 * minRadius)) * 100;
+
+            const passWIA = minRadius < 3.0 ? 'PASS' : 'FAIL';
+            const statusClass = passWIA === 'PASS' ? 'status-pass' : 'status-fail';
+
+            document.getElementById('bendResults').innerHTML = `
+                <div class="result-item">
+                    <span>Minimum Bend Radius:</span>
+                    <span class="result-value">${minRadius.toFixed(2)} mm</span>
+                </div>
+                <div class="result-item">
+                    <span>Maximum Strain:</span>
+                    <span class="result-value">${maxStrain.toFixed(2)}%</span>
+                </div>
+                <div class="result-item">
+                    <span>WIA-SEMI-011 Compliance:</span>
+                    <span class="status-indicator ${statusClass}">${passWIA}</span>
+                </div>
+                <div class="result-item">
+                    <span>Recommended Usage:</span>
+                    <span>${type === 'foldable' ? 'Smartphone/Tablet' : type === 'rollable' ? 'Portable Display' : 'Wearable Device'}</span>
+                </div>
+            `;
+        }
+
+        function calculateDurability() {
+            const dailyFolds = parseFloat(document.getElementById('dailyFolds').value);
+            const degradation = parseFloat(document.getElementById('degradation').value);
+            const temp = parseFloat(document.getElementById('temperature').value);
+            const humidity = parseFloat(document.getElementById('humidity').value);
+
+            const tempFactor = 1 - Math.abs(temp - 25) / 500;
+            const humidityFactor = 1 - Math.abs(humidity - 50) / 200;
+
+            const baseCycles = 200000;
+            const effectiveCycles = baseCycles * degradation * tempFactor * humidityFactor;
+            const lifespanDays = effectiveCycles / dailyFolds;
+            const lifespanYears = (lifespanDays / 365).toFixed(1);
+
+            const status = lifespanYears >= 3 ? 'Excellent' : lifespanYears >= 2 ? 'Good' : 'Fair';
+            const statusClass = lifespanYears >= 3 ? 'status-pass' : lifespanYears >= 2 ? 'status-warning' : 'status-fail';
+
+            document.getElementById('durabilityResults').innerHTML = `
+                <div class="result-item">
+                    <span>Expected Fold Cycles:</span>
+                    <span class="result-value">${Math.round(effectiveCycles).toLocaleString()}</span>
+                </div>
+                <div class="result-item">
+                    <span>Estimated Lifespan:</span>
+                    <span class="result-value">${lifespanYears} years</span>
+                </div>
+                <div class="result-item">
+                    <span>Durability Rating:</span>
+                    <span class="status-indicator ${statusClass}">${status}</span>
+                </div>
+                <div class="result-item">
+                    <span>Temperature Impact:</span>
+                    <span>${(tempFactor * 100).toFixed(1)}%</span>
+                </div>
+                <div class="result-item">
+                    <span>Humidity Impact:</span>
+                    <span>${(humidityFactor * 100).toFixed(1)}%</span>
+                </div>
+            `;
+        }
+
+        function analyzeHinge() {
+            const type = document.getElementById('hingeType').value;
+            const angle = parseFloat(document.getElementById('foldAngle').value);
+            const torque = parseFloat(document.getElementById('torque').value);
+            const gap = parseFloat(document.getElementById('gap').value);
+
+            const creaseFactor = gap * 5;
+            const stressLevel = torque / 100;
+
+            const compliance = (angle >= 180 && torque <= 200 && gap <= 0.2) ? 'PASS' : 'WARNING';
+            const statusClass = compliance === 'PASS' ? 'status-pass' : 'status-warning';
+
+            document.getElementById('hingeResults').innerHTML = `
+                <div class="result-item">
+                    <span>Hinge Configuration:</span>
+                    <span class="result-value">${type}</span>
+                </div>
+                <div class="result-item">
+                    <span>Fold Angle:</span>
+                    <span class="result-value">${angle}°</span>
+                </div>
+                <div class="result-item">
+                    <span>Applied Torque:</span>
+                    <span class="result-value">${torque} N·mm</span>
+                </div>
+                <div class="result-item">
+                    <span>Estimated Crease:</span>
+                    <span class="result-value">${creaseFactor.toFixed(2)} mm</span>
+                </div>
+                <div class="result-item">
+                    <span>Stress Level:</span>
+                    <span class="result-value">${stressLevel.toFixed(1)}x</span>
+                </div>
+                <div class="result-item">
+                    <span>Compliance Status:</span>
+                    <span class="status-indicator ${statusClass}">${compliance}</span>
+                </div>
+            `;
+        }
+
+        function evaluateIntegration() {
+            const interconnect = document.getElementById('interconnect').value;
+            const conductor = document.getElementById('conductor').value;
+            const stretch = parseFloat(document.getElementById('stretch').value);
+            const layers = parseInt(document.getElementById('layers').value);
+
+            const resistivityMap = {
+                'copper': 1.68, 'silver': 1.59, 'graphene': 10, 'cnt': 5
+            };
+
+            const resistivity = resistivityMap[conductor] || 1.68;
+            const stretchLimit = interconnect === 'serpentine' ? 30 : interconnect === 'mesh' ? 40 : 15;
+
+            const reliability = ((stretchLimit - stretch) / stretchLimit * 100).toFixed(0);
+            const statusClass = reliability >= 70 ? 'status-pass' : reliability >= 50 ? 'status-warning' : 'status-fail';
+
+            document.getElementById('integrationResults').innerHTML = `
+                <div class="result-item">
+                    <span>Interconnect Type:</span>
+                    <span class="result-value">${interconnect}</span>
+                </div>
+                <div class="result-item">
+                    <span>Conductor Material:</span>
+                    <span class="result-value">${conductor}</span>
+                </div>
+                <div class="result-item">
+                    <span>Stretch Capability:</span>
+                    <span class="result-value">${stretch}% / ${stretchLimit}%</span>
+                </div>
+                <div class="result-item">
+                    <span>Circuit Layers:</span>
+                    <span class="result-value">${layers}</span>
+                </div>
+                <div class="result-item">
+                    <span>Reliability Score:</span>
+                    <span class="status-indicator ${statusClass}">${reliability}%</span>
+                </div>
+                <div class="result-item">
+                    <span>Resistivity:</span>
+                    <span>${resistivity} μΩ·cm</span>
+                </div>
+            `;
+        }
+
+        function calculateVoltageDrop() {
+            const current = parseFloat(document.getElementById('current').value) / 1000;
+            const length = parseFloat(document.getElementById('traceLength').value) / 1000;
+            const conductor = document.getElementById('conductor').value;
+
+            const resistivityMap = {
+                'copper': 1.68e-8, 'silver': 1.59e-8, 'graphene': 1e-7, 'cnt': 5e-8
+            };
+
+            const resistivity = resistivityMap[conductor] || 1.68e-8;
+            const area = 0.035 * 0.5; // mm² typical
+            const resistance = (resistivity * length) / (area * 1e-6);
+            const voltageDrop = current * resistance;
+
+            document.getElementById('voltageResults').innerHTML = `
+                <div class="result-item">
+                    <span>Voltage Drop:</span>
+                    <span class="result-value">${(voltageDrop * 1000).toFixed(2)} mV</span>
+                </div>
+                <div class="result-item">
+                    <span>Resistance:</span>
+                    <span>${resistance.toFixed(3)} Ω</span>
+                </div>
+            `;
+        }
+
+        function analyzeSignal() {
+            const freq = parseFloat(document.getElementById('frequency').value);
+            const impedance = parseFloat(document.getElementById('impedance').value);
+
+            const wavelength = 300 / freq; // m
+            const riseTime = 0.35 / freq; // ns
+
+            const status = impedance >= 45 && impedance <= 55 ? 'Optimal' : 'Needs Tuning';
+            const statusClass = status === 'Optimal' ? 'status-pass' : 'status-warning';
+
+            document.getElementById('signalResults').innerHTML = `
+                <div class="result-item">
+                    <span>Wavelength:</span>
+                    <span class="result-value">${wavelength.toFixed(2)} m</span>
+                </div>
+                <div class="result-item">
+                    <span>Rise Time:</span>
+                    <span class="result-value">${riseTime.toFixed(2)} ns</span>
+                </div>
+                <div class="result-item">
+                    <span>Status:</span>
+                    <span class="status-indicator ${statusClass}">${status}</span>
+                </div>
+            `;
+        }
+
+        function runEnduranceTest() {
+            const standard = document.getElementById('testStandard').value;
+            const cycles = parseInt(document.getElementById('testCycles').value);
+            const speed = parseFloat(document.getElementById('cycleSpeed').value);
+            const temp = parseFloat(document.getElementById('testTemp').value);
+
+            const duration = cycles / (speed * 60); // hours
+            const tempFactor = 1 - Math.abs(temp - 25) / 200;
+            const expectedSuccess = tempFactor * 95;
+
+            const passRate = expectedSuccess >= 90 ? 'PASS' : expectedSuccess >= 80 ? 'MARGINAL' : 'FAIL';
+            const statusClass = passRate === 'PASS' ? 'status-pass' : passRate === 'MARGINAL' ? 'status-warning' : 'status-fail';
+
+            document.getElementById('testResults').innerHTML = `
+                <div class="result-item">
+                    <span>Test Standard:</span>
+                    <span class="result-value">${standard.toUpperCase()}</span>
+                </div>
+                <div class="result-item">
+                    <span>Total Cycles:</span>
+                    <span class="result-value">${cycles.toLocaleString()}</span>
+                </div>
+                <div class="result-item">
+                    <span>Test Duration:</span>
+                    <span class="result-value">${duration.toFixed(1)} hours</span>
+                </div>
+                <div class="result-item">
+                    <span>Temperature:</span>
+                    <span class="result-value">${temp}°C</span>
+                </div>
+                <div class="result-item">
+                    <span>Expected Success Rate:</span>
+                    <span class="result-value">${expectedSuccess.toFixed(1)}%</span>
+                </div>
+                <div class="result-item">
+                    <span>Test Result:</span>
+                    <span class="status-indicator ${statusClass}">${passRate}</span>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

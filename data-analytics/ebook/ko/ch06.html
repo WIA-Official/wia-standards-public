@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제6장: 실시간 분석 아키텍처 - WIA-DATA-012</title>
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; line-height: 1.9; max-width: 900px; margin: 0 auto; padding: 2rem; background: #0f172a; color: #e2e8f0; }
+        h1, h2, h3 { color: #10B981; }
+        h1 { font-size: 2.5rem; border-bottom: 3px solid #10B981; padding-bottom: 1rem; }
+        h2 { font-size: 1.8rem; margin-top: 2.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #10B981; overflow-x: auto; }
+        code { font-family: 'Courier New', monospace; color: #10B981; }
+        .highlight { background: #1e293b; padding: 1.5rem; border-left: 4px solid #10B981; margin: 1.5rem 0; }
+        ul { margin-left: 2rem; }
+        li { margin-bottom: 0.8rem; }
+        .architecture { background: #1e293b; padding: 2rem; margin: 2rem 0; border-radius: 8px; border: 2px solid #10B981; }
+        .comparison { background: #0f172a; padding: 1rem; margin: 1rem 0; border-left: 3px solid #3b82f6; }
+    </style>
+</head>
+<body>
+    <h1>제6장: 실시간 분석 아키텍처</h1>
+
+    <h2>6.1 실시간 분석 소개</h2>
+    <p>실시간 분석은 데이터가 도착하는 즉시 처리하여 즉각적인 인사이트를 제공하고 즉시 의사결정을 가능하게 합니다. 과거 데이터를 분석하는 배치 처리와 달리 실시간 분석은 밀리초에서 초 단위의 대기 시간으로 스트리밍 데이터에서 작동합니다.</p>
+
+    <p>실시간 분석은 현대 비즈니스의 핵심 요구사항이 되었습니다. 고객은 즉각적인 응답을 기대하고, 시스템은 밀리초 단위로 위협을 탐지해야 하며, 비즈니스 의사결정은 최신 데이터를 기반으로 이루어져야 합니다. 이는 사기 탐지, IoT 모니터링, 주식 거래, 개인화된 추천, 실시간 대시보드 등 다양한 사용 사례에서 중요합니다.</p>
+
+    <h3>6.1.1 실시간 분석의 비즈니스 가치</h3>
+    <table>
+        <tr><th>비즈니스 영역</th><th>실시간 분석 적용</th><th>ROI 영향</th></tr>
+        <tr><td><strong>고객 경험</strong></td><td>실시간 개인화, 추천</td><td>전환율 15-30% 증가</td></tr>
+        <tr><td><strong>사기 탐지</strong></td><td>거래 즉시 검증</td><td>손실 60-80% 감소</td></tr>
+        <tr><td><strong>운영 효율성</strong></td><td>실시간 모니터링, 알림</td><td>다운타임 40-50% 감소</td></tr>
+        <tr><td><strong>공급망</strong></td><td>재고 최적화, 동적 배송</td><td>비용 20-35% 절감</td></tr>
+        <tr><td><strong>마케팅</strong></td><td>캠페인 실시간 최적화</td><td>ROAS 25-45% 향상</td></tr>
+        <tr><td><strong>리스크 관리</strong></td><td>시장 변화 즉시 대응</td><td>리스크 노출 50-70% 감소</td></tr>
+    </table>
+
+    <h2>6.2 배치 vs. 스트림 처리</h2>
+    <table>
+        <tr><th>측면</th><th>배치 처리</th><th>스트림 처리</th></tr>
+        <tr><td><strong>데이터 범위</strong></td><td>과거 데이터, 제한된 데이터셋</td><td>연속적, 무제한 스트림</td></tr>
+        <tr><td><strong>대기 시간</strong></td><td>분에서 시간</td><td>밀리초에서 초</td></tr>
+        <tr><td><strong>처리</strong></td><td>한 번에 모든 데이터</td><td>이벤트별 또는 마이크로 배치</td></tr>
+        <tr><td><strong>사용 사례</strong></td><td>보고서, 데이터 웨어하우징, ML 학습</td><td>사기 탐지, 모니터링, 실시간 대시보드</td></tr>
+        <tr><td><strong>복잡성</strong></td><td>더 간단한 아키텍처</td><td>더 복잡, 분산 시스템 필요</td></tr>
+        <tr><td><strong>리소스 패턴</strong></td><td>피크 시간 높은 사용</td><td>지속적인 리소스 사용</td></tr>
+        <tr><td><strong>비용 모델</strong></td><td>처리 시간 기반</td><td>처리량 기반</td></tr>
+        <tr><td><strong>예시</strong></td><td>Apache Hadoop, Spark 배치</td><td>Apache Kafka, Flink, Spark Streaming</td></tr>
+    </table>
+
+    <h2>6.3 스트림 처리 아키텍처</h2>
+
+    <h3>6.3.1 람다 아키텍처</h3>
+    <p>람다 아키텍처는 속도와 정확성의 균형을 맞추기 위해 배치 및 스트림 처리를 결합합니다. 이는 Nathan Marz가 제안한 패턴으로, 빅데이터 시스템의 복잡성을 관리하면서도 강력한 쿼리 기능을 제공합니다.</p>
+
+    <div class="architecture">
+        <strong>람다 아키텍처 구성 요소:</strong>
+        <ul>
+            <li><strong>배치 레이어 (Batch Layer):</strong> 정확성을 위해 전체 데이터셋 처리. 마스터 데이터셋을 관리하고 사전 계산된 배치 뷰를 생성합니다.</li>
+            <li><strong>속도 레이어 (Speed Layer):</strong> 낮은 대기 시간을 위해 실시간 데이터 처리. 최신 데이터만 처리하여 실시간 뷰를 제공합니다.</li>
+            <li><strong>서빙 레이어 (Serving Layer):</strong> 두 레이어의 결과 병합. 쿼리를 처리하고 배치 뷰와 실시간 뷰를 결합합니다.</li>
+        </ul>
+        <strong>장점:</strong>
+        <ul>
+            <li>배치의 정확성과 스트림의 낮은 대기 시간 모두 제공</li>
+            <li>내결함성 - 배치 레이어로 재계산 가능</li>
+            <li>확장 가능 - 각 레이어를 독립적으로 확장</li>
+        </ul>
+        <strong>단점:</strong>
+        <ul>
+            <li>유지보수 복잡 - 두 개의 처리 시스템 관리</li>
+            <li>코드 중복 - 동일한 로직을 두 번 구현</li>
+            <li>높은 운영 비용</li>
+        </ul>
+    </div>
+
+    <h3>6.3.2 카파 아키텍처</h3>
+    <p>카파 아키텍처는 스트림 처리만 사용하여 람다를 단순화합니다. Jay Kreps가 제안한 이 패턴은 모든 데이터를 스트림으로 취급하여 아키텍처를 단순화합니다.</p>
+
+    <div class="architecture">
+        <strong>카파 아키텍처 핵심 원칙:</strong>
+        <ul>
+            <li><strong>단일 처리 경로:</strong> 모든 것을 스트림으로 처리</li>
+            <li><strong>재생 가능성:</strong> 필요에 따라 과거 데이터 재처리</li>
+            <li><strong>단순성:</strong> 하나의 코드베이스로 관리</li>
+        </ul>
+        <strong>장점:</strong>
+        <ul>
+            <li>더 간단한 아키텍처 - 하나의 처리 시스템</li>
+            <li>단일 코드베이스 - 유지보수 용이</li>
+            <li>낮은 운영 복잡도</li>
+        </ul>
+        <strong>단점:</strong>
+        <ul>
+            <li>재생 가능한 메시지 큐 필요 (예: Kafka)</li>
+            <li>매우 큰 과거 데이터 재처리 시 비효율적일 수 있음</li>
+            <li>복잡한 배치 작업에는 적합하지 않을 수 있음</li>
+        </ul>
+    </div>
+
+    <h3>6.3.3 아키텍처 선택 가이드</h3>
+    <table>
+        <tr><th>시나리오</th><th>권장 아키텍처</th><th>이유</th></tr>
+        <tr><td><strong>실시간 우선</strong></td><td>카파</td><td>단순성과 낮은 대기 시간</td></tr>
+        <tr><td><strong>복잡한 배치 작업</strong></td><td>람다</td><td>배치 처리 최적화</td></tr>
+        <tr><td><strong>높은 정확성 요구</strong></td><td>람다</td><td>배치 레이어로 검증</td></tr>
+        <tr><td><strong>작은 팀</strong></td><td>카파</td><td>운영 복잡도 낮음</td></tr>
+        <tr><td><strong>레거시 배치 시스템</strong></td><td>람다</td><td>기존 시스템 활용</td></tr>
+    </table>
+
+    <h2>6.4 스트림 처리 프레임워크</h2>
+    <table>
+        <tr><th>프레임워크</th><th>강점</th><th>사용 사례</th><th>대기 시간</th><th>처리량</th></tr>
+        <tr><td><strong>Apache Kafka Streams</strong></td><td>경량, Kafka와 통합</td><td>이벤트 기반 마이크로서비스</td><td>< 100ms</td><td>높음</td></tr>
+        <tr><td><strong>Apache Flink</strong></td><td>진정한 스트리밍, 정확히 한 번 의미론</td><td>복잡한 이벤트 처리, 상태 기반 계산</td><td>< 50ms</td><td>매우 높음</td></tr>
+        <tr><td><strong>Apache Spark Streaming</strong></td><td>마이크로 배치, 통합 배치/스트림 API</td><td>기존 Spark 사용자, 람다 아키텍처</td><td>1-2초</td><td>높음</td></tr>
+        <tr><td><strong>Apache Storm</strong></td><td>낮은 대기 시간, 튜플별 처리</td><td>실시간 ETL, 연속 계산</td><td>< 10ms</td><td>중간</td></tr>
+        <tr><td><strong>AWS Kinesis</strong></td><td>관리형 서비스, AWS 통합</td><td>AWS 기반 애플리케이션</td><td>< 200ms</td><td>높음</td></tr>
+        <tr><td><strong>Google Dataflow</strong></td><td>통합 모델, 완전 관리형</td><td>GCP 기반 애플리케이션</td><td>< 1초</td><td>매우 높음</td></tr>
+    </table>
+
+    <h2>6.5 Apache Kafka 기초</h2>
+    <p>Apache Kafka는 실시간 데이터 파이프라인 구축에 사용되는 분산 이벤트 스트리밍 플랫폼입니다. LinkedIn에서 개발되어 Apache 재단에 기부된 Kafka는 현재 가장 인기 있는 스트리밍 플랫폼입니다.</p>
+
+    <h3>6.5.1 Kafka 구성 요소</h3>
+    <table>
+        <tr><th>구성 요소</th><th>설명</th><th>주요 기능</th></tr>
+        <tr><td><strong>프로듀서</strong></td><td>토픽에 메시지 게시</td><td>비동기 전송, 압축, 파티셔닝</td></tr>
+        <tr><td><strong>컨슈머</strong></td><td>토픽을 구독하고 메시지 처리</td><td>컨슈머 그룹, 오프셋 관리</td></tr>
+        <tr><td><strong>토픽</strong></td><td>레코드가 게시되는 범주 또는 피드 이름</td><td>파티션된 로그</td></tr>
+        <tr><td><strong>파티션</strong></td><td>병렬 처리를 위해 토픽을 파티션으로 분할</td><td>순서 보장, 확장성</td></tr>
+        <tr><td><strong>브로커</strong></td><td>데이터를 저장하는 Kafka 서버</td><td>복제, 내결함성</td></tr>
+        <tr><td><strong>컨슈머 그룹</strong></td><td>함께 작동하는 컨슈머 그룹</td><td>로드 밸런싱, 장애 조치</td></tr>
+        <tr><td><strong>오프셋</strong></td><td>파티션 내 레코드의 고유 식별자</td><td>위치 추적, 재생</td></tr>
+        <tr><td><strong>ZooKeeper</strong></td><td>클러스터 메타데이터 관리</td><td>리더 선출, 구성 관리</td></tr>
+    </table>
+
+    <h3>6.5.2 Kafka 프로듀서 예제</h3>
+    <pre><code># Kafka 프로듀서 예제 (Python)
+from kafka import KafkaProducer
+import json
+import time
+from datetime import datetime
+
+# 프로듀서 초기화
+producer = KafkaProducer(
+    bootstrap_servers=['localhost:9092'],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+    compression_type='gzip',  # 압축 활성화
+    acks='all',  # 모든 복제본 확인
+    retries=3,  # 재시도 횟수
+    max_in_flight_requests_per_connection=1  # 순서 보장
+)
+
+# 사용자 이벤트 전송
+for i in range(100):
+    data = {
+        'user_id': i,
+        'action': 'click',
+        'timestamp': datetime.now().isoformat(),
+        'session_id': f'session_{i % 10}',
+        'page': f'/product/{i % 20}',
+        'metadata': {
+            'device': 'mobile' if i % 2 == 0 else 'desktop',
+            'browser': 'chrome'
+        }
+    }
+
+    # 파티션 키로 user_id 사용 (동일 사용자는 동일 파티션)
+    producer.send(
+        'user-events',
+        key=str(i).encode('utf-8'),
+        value=data
+    ).add_callback(on_send_success).add_errback(on_send_error)
+
+    time.sleep(0.1)
+
+# 콜백 함수
+def on_send_success(record_metadata):
+    print(f"메시지 전송 성공: topic={record_metadata.topic}, "
+          f"partition={record_metadata.partition}, "
+          f"offset={record_metadata.offset}")
+
+def on_send_error(excp):
+    print(f"메시지 전송 실패: {excp}")
+
+producer.flush()
+producer.close()
+</code></pre>
+
+    <h3>6.5.3 Kafka 컨슈머 예제</h3>
+    <pre><code># Kafka 컨슈머 예제
+from kafka import KafkaConsumer
+import json
+
+consumer = KafkaConsumer(
+    'user-events',
+    bootstrap_servers=['localhost:9092'],
+    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+    auto_offset_reset='earliest',  # 처음부터 읽기
+    enable_auto_commit=True,  # 자동 오프셋 커밋
+    group_id='analytics-group',  # 컨슈머 그룹
+    max_poll_records=500  # 한 번에 가져올 레코드 수
+)
+
+# 이벤트 처리
+for message in consumer:
+    event = message.value
+
+    # 이벤트 처리 로직
+    print(f"사용자 {event['user_id']}가 {event['action']}을 수행했습니다")
+
+    # 분석 처리
+    if event['action'] == 'click':
+        process_click_event(event)
+    elif event['action'] == 'purchase':
+        process_purchase_event(event)
+
+    # 오프셋 수동 커밋 (필요 시)
+    # consumer.commit()
+
+consumer.close()
+</code></pre>
+
+    <h2>6.6 복잡한 이벤트 처리 (CEP)</h2>
+    <p>복잡한 이벤트 처리(Complex Event Processing)는 여러 이벤트 스트림에서 의미 있는 패턴을 실시간으로 탐지하는 기법입니다.</p>
+
+    <h3>6.6.1 CEP 패턴</h3>
+    <table>
+        <tr><th>패턴 유형</th><th>설명</th><th>예시</th></tr>
+        <tr><td><strong>시퀀스</strong></td><td>특정 순서로 발생하는 이벤트</td><td>로그인 → 검색 → 구매</td></tr>
+        <tr><td><strong>논리적 패턴</strong></td><td>AND, OR, NOT 조건</td><td>클릭 AND (장바구니 OR 위시리스트)</td></tr>
+        <tr><td><strong>시간 패턴</strong></td><td>시간 제약 내 발생</td><td>5분 이내 3번 실패한 로그인</td></tr>
+        <tr><td><strong>부재 패턴</strong></td><td>이벤트가 발생하지 않음</td><td>24시간 동안 하트비트 없음</td></tr>
+        <tr><td><strong>집계 패턴</strong></td><td>임계값 기반 트리거</td><td>1분 동안 거래 100건 이상</td></tr>
+    </table>
+
+    <h3>6.6.2 Apache Flink CEP 예제</h3>
+    <pre><code># Apache Flink CEP 예제 (Python API)
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment
+
+env = StreamExecutionEnvironment.get_execution_environment()
+table_env = StreamTableEnvironment.create(env)
+
+# 사기 패턴 탐지 - 짧은 시간 내 여러 실패한 거래
+pattern_query = """
+    SELECT *
+    FROM transactions
+    MATCH_RECOGNIZE (
+        PARTITION BY user_id
+        ORDER BY transaction_time
+        MEASURES
+            A.user_id AS user_id,
+            COUNT(A.*) AS failed_count,
+            FIRST(A.transaction_time) AS start_time,
+            LAST(A.transaction_time) AS end_time
+        ONE ROW PER MATCH
+        AFTER MATCH SKIP TO LAST A
+        PATTERN (A{3,})
+        WITHIN INTERVAL '5' MINUTES
+        DEFINE
+            A AS A.status = 'FAILED'
+    )
+"""
+
+# 패턴 매칭 결과 스트림
+fraud_alerts = table_env.sql_query(pattern_query)
+
+# 알림 전송
+fraud_alerts.execute_insert("fraud_alert_sink")
+</code></pre>
+
+    <h2>6.7 스트림 처리에서의 윈도잉</h2>
+    <p>윈도우는 시간 또는 개수에 따라 이벤트를 그룹화하여 집계합니다. 윈도잉은 무한 스트림을 유한한 청크로 나누어 계산 가능하게 만듭니다.</p>
+
+    <table>
+        <tr><th>윈도우 유형</th><th>설명</th><th>사용 사례</th><th>메모리 사용</th></tr>
+        <tr><td><strong>텀블링 윈도우</strong></td><td>고정 크기, 겹치지 않음</td><td>시간별 집계, 일일 요약</td><td>낮음</td></tr>
+        <tr><td><strong>슬라이딩 윈도우</strong></td><td>고정 크기, 겹침</td><td>이동 평균, 트렌드 분석</td><td>높음</td></tr>
+        <tr><td><strong>세션 윈도우</strong></td><td>간격 기반, 가변 크기</td><td>사용자 세션, 활동 분석</td><td>중간</td></tr>
+        <tr><td><strong>글로벌 윈도우</strong></td><td>하나의 윈도우에 모든 이벤트</td><td>배치와 유사한 처리</td><td>매우 높음</td></tr>
+        <tr><td><strong>카운팅 윈도우</strong></td><td>이벤트 개수 기반</td><td>100개 이벤트마다 집계</td><td>중간</td></tr>
+    </table>
+
+    <h3>6.7.1 윈도우 연산 예제</h3>
+    <pre><code># Apache Flink 윈도우 연산 예제
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.window import TumblingEventTimeWindows, SlidingEventTimeWindows
+from pyflink.common import Time
+
+env = StreamExecutionEnvironment.get_execution_environment()
+
+# 데이터 스트림
+events = env.add_source(...)
+
+# 텀블링 윈도우 - 5분마다 집계
+tumbling_result = events \
+    .key_by(lambda x: x['user_id']) \
+    .window(TumblingEventTimeWindows.of(Time.minutes(5))) \
+    .reduce(lambda a, b: {
+        'user_id': a['user_id'],
+        'count': a['count'] + b['count'],
+        'total_amount': a['total_amount'] + b['total_amount']
+    })
+
+# 슬라이딩 윈도우 - 10분 윈도우, 1분마다 이동
+sliding_result = events \
+    .key_by(lambda x: x['product_id']) \
+    .window(SlidingEventTimeWindows.of(Time.minutes(10), Time.minutes(1))) \
+    .aggregate(...)
+
+# 세션 윈도우 - 30분 비활성 후 세션 종료
+session_result = events \
+    .key_by(lambda x: x['session_id']) \
+    .window(EventTimeSessionWindows.with_gap(Time.minutes(30))) \
+    .process(...)
+</code></pre>
+
+    <h2>6.8 상태 관리</h2>
+    <p>분산 스트림 처리에서 상태를 유지하는 것은 복잡한 분석에 중요합니다. 상태는 과거 이벤트 정보를 기억하여 컨텍스트를 제공합니다.</p>
+
+    <h3>6.8.1 상태 유형</h3>
+    <div class="highlight">
+        <strong>상태 기반 작업:</strong>
+        <ul>
+            <li><strong>집계 (Aggregations):</strong> 실행 중인 합계, 개수, 평균 유지</li>
+            <li><strong>조인 (Joins):</strong> 키를 기반으로 여러 스트림 결합</li>
+            <li><strong>패턴 탐지:</strong> 복잡한 이벤트 시퀀스 추적</li>
+            <li><strong>중복 제거:</strong> 확인된 이벤트 ID 저장</li>
+            <li><strong>세션화:</strong> 사용자 세션 상태 유지</li>
+            <li><strong>머신러닝 모델:</strong> 모델 파라미터 및 특징 저장</li>
+        </ul>
+    </div>
+
+    <h3>6.8.2 상태 백엔드 비교</h3>
+    <table>
+        <tr><th>백엔드</th><th>저장 위치</th><th>성능</th><th>용량</th><th>사용 사례</th></tr>
+        <tr><td><strong>MemoryStateBackend</strong></td><td>JVM 힙</td><td>매우 빠름</td><td>제한적</td><td>개발, 테스트</td></tr>
+        <tr><td><strong>FsStateBackend</strong></td><td>메모리 + 파일시스템</td><td>빠름</td><td>큼</td><td>프로덕션</td></tr>
+        <tr><td><strong>RocksDBStateBackend</strong></td><td>로컬 디스크</td><td>중간</td><td>매우 큼</td><td>대규모 상태</td></tr>
+    </table>
+
+    <h3>6.8.3 상태 관리 예제</h3>
+    <pre><code># Flink 상태 관리 예제
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.state import ValueStateDescriptor
+
+class StatefulProcessor(KeyedProcessFunction):
+    def __init__(self):
+        self.count_state = None
+        self.sum_state = None
+
+    def open(self, runtime_context):
+        # 상태 초기화
+        self.count_state = runtime_context.get_state(
+            ValueStateDescriptor("count", Types.INT())
+        )
+        self.sum_state = runtime_context.get_state(
+            ValueStateDescriptor("sum", Types.DOUBLE())
+        )
+
+    def process_element(self, value, ctx):
+        # 현재 상태 읽기
+        current_count = self.count_state.value() or 0
+        current_sum = self.sum_state.value() or 0.0
+
+        # 상태 업데이트
+        self.count_state.update(current_count + 1)
+        self.sum_state.update(current_sum + value['amount'])
+
+        # 평균 계산
+        avg = (current_sum + value['amount']) / (current_count + 1)
+
+        return {'user_id': value['user_id'], 'avg_amount': avg}
+</code></pre>
+
+    <h2>6.9 정확히 한 번 의미론</h2>
+    <p>실패 시에도 각 메시지가 정확히 한 번 처리되도록 보장합니다. 이는 금융 거래, 재고 관리 등 중요한 시스템에서 필수적입니다.</p>
+
+    <table>
+        <tr><th>의미론</th><th>보장</th><th>트레이드오프</th><th>구현 복잡도</th></tr>
+        <tr><td><strong>최대 한 번</strong></td><td>메시지 손실 가능</td><td>가장 높은 성능, 가장 낮은 신뢰성</td><td>낮음</td></tr>
+        <tr><td><strong>최소 한 번</strong></td><td>메시지 중복 가능</td><td>좋은 성능, 멱등적 처리 필요</td><td>중간</td></tr>
+        <tr><td><strong>정확히 한 번</strong></td><td>손실 없음, 중복 없음</td><td>낮은 성능, 가장 높은 신뢰성</td><td>높음</td></tr>
+    </table>
+
+    <h3>6.9.1 정확히 한 번 처리 구현</h3>
+    <pre><code># Kafka Streams 정확히 한 번 처리
+Properties props = new Properties();
+props.put(StreamsConfig.APPLICATION_ID_CONFIG, "exactly-once-app");
+props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+// 정확히 한 번 의미론 활성화
+props.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+          StreamsConfig.EXACTLY_ONCE_V2);
+
+StreamsBuilder builder = new StreamsBuilder();
+KStream<String, String> input = builder.stream("input-topic");
+
+input
+    .mapValues(value -> processValue(value))
+    .to("output-topic");
+
+KafkaStreams streams = new KafkaStreams(builder.build(), props);
+streams.start();
+</code></pre>
+
+    <h2>6.10 실시간 대시보드 구현</h2>
+    <p>실시간 대시보드는 스트리밍 데이터를 시각화하여 비즈니스 의사결정을 지원합니다.</p>
+
+    <h3>6.10.1 실시간 대시보드 아키텍처</h3>
+    <pre><code># Python Flask + WebSocket 실시간 대시보드
+from flask import Flask, render_template
+from flask_socketio import SocketIO, emit
+from kafka import KafkaConsumer
+import json
+import threading
+
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Kafka 컨슈머 스레드
+def kafka_consumer_thread():
+    consumer = KafkaConsumer(
+        'metrics-topic',
+        bootstrap_servers=['localhost:9092'],
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
+
+    for message in consumer:
+        metric = message.value
+        # WebSocket으로 클라이언트에 푸시
+        socketio.emit('metric_update', metric)
+
+@app.route('/')
+def index():
+    return render_template('dashboard.html')
+
+@socketio.on('connect')
+def handle_connect():
+    print('클라이언트 연결됨')
+
+if __name__ == '__main__':
+    # Kafka 컨슈머 스레드 시작
+    consumer_thread = threading.Thread(target=kafka_consumer_thread)
+    consumer_thread.daemon = True
+    consumer_thread.start()
+
+    # WebSocket 서버 시작
+    socketio.run(app, debug=True, port=5000)
+</code></pre>
+
+    <h2>6.11 성능 최적화</h2>
+    <div class="highlight">
+        <strong>스트림 처리 최적화 모범 사례:</strong>
+        <ul>
+            <li><strong>파티셔닝 전략:</strong> 파티션 전반에 로드 균등 분산. 핫 파티션 방지를 위해 적절한 파티션 키 선택</li>
+            <li><strong>병렬 처리:</strong> 여러 파티션을 동시에 처리. 병렬도를 파티션 수에 맞춤</li>
+            <li><strong>압축 활성화:</strong> 네트워크 및 스토리지 오버헤드 감소. gzip, snappy, lz4 등 사용</li>
+            <li><strong>배칭:</strong> 효율성을 위해 작은 메시지 그룹화. 처리량 향상, 대기 시간 트레이드오프</li>
+            <li><strong>캐싱:</strong> 자주 액세스하는 데이터를 메모리에 저장. 외부 조회 최소화</li>
+            <li><strong>백프레셔 처리:</strong> 과부하를 우아하게 처리. 동적 배치 크기 조정</li>
+            <li><strong>리소스 튜닝:</strong> 메모리, CPU, 네트워크 설정 최적화</li>
+            <li><strong>체크포인트 간격:</strong> 내결함성과 성능 균형 맞추기</li>
+        </ul>
+    </div>
+
+    <h3>6.11.1 성능 벤치마크</h3>
+    <table>
+        <tr><th>프레임워크</th><th>처리량 (msg/sec)</th><th>대기 시간 (ms)</th><th>리소스 사용</th></tr>
+        <tr><td><strong>Kafka Streams</strong></td><td>1M+</td><td>50-100</td><td>중간</td></tr>
+        <tr><td><strong>Apache Flink</strong></td><td>5M+</td><td>10-50</td><td>높음</td></tr>
+        <tr><td><strong>Spark Streaming</strong></td><td>500K+</td><td>500-2000</td><td>높음</td></tr>
+        <tr><td><strong>Apache Storm</strong></td><td>1M+</td><td>5-10</td><td>중간</td></tr>
+    </table>
+
+    <h2>6.12 모니터링 및 관찰성</h2>
+    <p>실시간 시스템의 건강 상태를 모니터링하는 것은 안정적인 운영에 필수적입니다.</p>
+
+    <table>
+        <tr><th>메트릭</th><th>모니터링할 사항</th><th>정상 범위</th><th>알림 임계값</th></tr>
+        <tr><td><strong>처리량</strong></td><td>초당 처리된 이벤트</td><td>예상 로드의 80%</td><td>예상 로드의 95%</td></tr>
+        <tr><td><strong>대기 시간</strong></td><td>이벤트에서 결과까지의 시간</td><td>< 100ms</td><td>> 500ms</td></tr>
+        <tr><td><strong>지연 (Lag)</strong></td><td>컨슈머 오프셋 지연</td><td>< 1000 메시지</td><td>> 10000 메시지</td></tr>
+        <tr><td><strong>오류율</strong></td><td>처리 실패</td><td>< 0.1%</td><td>> 1%</td></tr>
+        <tr><td><strong>CPU 사용률</strong></td><td>프로세서 사용량</td><td>< 70%</td><td>> 85%</td></tr>
+        <tr><td><strong>메모리 사용률</strong></td><td>힙 메모리</td><td>< 75%</td><td>> 90%</td></tr>
+        <tr><td><strong>네트워크 I/O</strong></td><td>대역폭 사용</td><td>< 60%</td><td>> 80%</td></tr>
+        <tr><td><strong>데이터 품질</strong></td><td>누락/잘못된 형식의 이벤트</td><td>< 0.01%</td><td>> 0.1%</td></tr>
+    </table>
+
+    <h3>6.12.1 모니터링 스택 구성</h3>
+    <pre><code># Prometheus + Grafana 모니터링
+# Kafka JMX 메트릭 노출
+from prometheus_client import start_http_server, Gauge
+import time
+
+# 메트릭 정의
+kafka_lag = Gauge('kafka_consumer_lag', 'Consumer lag', ['topic', 'partition'])
+processing_latency = Gauge('processing_latency_ms', 'Processing latency')
+error_rate = Gauge('error_rate', 'Error rate')
+
+# 메트릭 업데이트
+def update_metrics():
+    while True:
+        # Kafka 메트릭 수집
+        lag = get_consumer_lag()
+        kafka_lag.labels(topic='events', partition='0').set(lag)
+
+        # 처리 지연 수집
+        latency = measure_processing_latency()
+        processing_latency.set(latency)
+
+        time.sleep(10)
+
+# Prometheus HTTP 서버 시작
+start_http_server(8000)
+update_metrics()
+</code></pre>
+
+    <h2>요약</h2>
+    <div class="highlight">
+        <p><strong>핵심 개념:</strong></p>
+        <ul>
+            <li>실시간 분석은 밀리초 단위로 인사이트를 제공하여 즉각적인 의사결정을 가능하게 합니다</li>
+            <li>람다 아키텍처는 배치와 스트림을 결합하고, 카파 아키텍처는 스트림만 사용하여 단순화합니다</li>
+            <li>Apache Kafka는 이벤트 스트리밍의 사실상 표준이며, Flink는 복잡한 처리에 뛰어납니다</li>
+            <li>윈도잉, 상태 관리, 정확히 한 번 의미론은 신뢰할 수 있는 스트림 처리의 핵심입니다</li>
+            <li>성능 최적화와 모니터링은 프로덕션 시스템의 안정성에 필수적입니다</li>
+        </ul>
+        <p>다음 장에서는 이러한 기법을 구현하는 것을 더 접근 가능하게 만드는 분석 도구 및 플랫폼을 탐색합니다.</p>
+    </div>
+
+    <h2>복습 문제</h2>
+    <div class="highlight">
+        <ol>
+            <li><strong>람다 아키텍처와 카파 아키텍처의 주요 차이점을 설명하고, 각각 어떤 상황에서 선택해야 하는지 논의하세요.</strong></li>
+
+            <li><strong>Apache Kafka의 핵심 구성 요소(프로듀서, 컨슈머, 토픽, 파티션)를 설명하고, 파티션이 확장성과 순서 보장에 어떻게 기여하는지 설명하세요.</strong></li>
+
+            <li><strong>스트림 처리에서 "정확히 한 번" 의미론이 중요한 이유를 설명하고, 이를 구현할 때의 성능 트레이드오프에 대해 논의하세요.</strong></li>
+
+            <li><strong>텀블링 윈도우, 슬라이딩 윈도우, 세션 윈도우의 차이점을 설명하고, 각각의 실제 사용 사례를 제시하세요.</strong></li>
+
+            <li><strong>실시간 스트림 처리 시스템을 프로덕션 환경에 배포할 때 모니터링해야 할 주요 메트릭과 각 메트릭이 중요한 이유를 설명하세요.</strong></li>
+        </ol>
+    </div>
+</body>
+</html>

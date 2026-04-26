@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: API-Based Data Integration - WIA-DATA-010</title>
+</head>
+<body>
+
+<p><a href="index.html">🔄 WIA-DATA-010 Data Integration Standard Ebook</a> | Chapter 4 of 8</p>
+
+<hr>
+
+<h1>Chapter 4: API-Based Data Integration</h1>
+
+<blockquote>
+<p><strong>Hongik Ingan (弘益人間)</strong></p>
+<p>"Benefit All Humanity"</p>
+<p>APIs democratize data access, enabling organizations to connect systems, share information, and build innovative solutions. Well-designed API integration empowers teams to move fast while maintaining security and reliability.</p>
+</blockquote>
+
+<hr>
+
+<h2>4.1 API Integration Fundamentals</h2>
+
+<p><strong>API-based integration</strong> connects systems through Application Programming Interfaces, enabling real-time, synchronous data exchange.</p>
+
+<h3>4.1.1 Why API Integration?</h3>
+
+<p>APIs provide advantages over traditional file-based or database integration:</p>
+
+<ul>
+    <li><strong>Real-Time:</strong> Immediate data access, no waiting for batch processing</li>
+    <li><strong>Standardized:</strong> Well-defined contracts (OpenAPI, GraphQL schemas)</li>
+    <li><strong>Secure:</strong> Authentication, authorization, rate limiting built-in</li>
+    <li><strong>Scalable:</strong> Load balancers, caching, horizontal scaling</li>
+    <li><strong>Language-Agnostic:</strong> Any language can call HTTP APIs</li>
+    <li><strong>Versioned:</strong> API versions allow backward compatibility</li>
+    <li><strong>Self-Service:</strong> Developers can integrate without database access</li>
+</ul>
+
+<h2>4.2 REST APIs</h2>
+
+<p><strong>REST (Representational State Transfer)</strong> is the dominant API style for web services.</p>
+
+<h3>4.2.1 REST Principles</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Principle</th>
+            <th>Description</th>
+            <th>Implementation</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Client-Server</strong></td>
+            <td>Separation of concerns</td>
+            <td>Frontend and backend evolve independently</td>
+        </tr>
+        <tr>
+            <td><strong>Stateless</strong></td>
+            <td>No session state on server</td>
+            <td>Each request contains all needed context (auth token)</td>
+        </tr>
+        <tr>
+            <td><strong>Cacheable</strong></td>
+            <td>Responses can be cached</td>
+            <td>Cache-Control headers, ETags for conditional requests</td>
+        </tr>
+        <tr>
+            <td><strong>Uniform Interface</strong></td>
+            <td>Standardized interactions</td>
+            <td>HTTP methods (GET, POST, PUT, DELETE), resource URIs</td>
+        </tr>
+        <tr>
+            <td><strong>Layered System</strong></td>
+            <td>Intermediary layers allowed</td>
+            <td>Load balancers, caches, proxies transparent to client</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.2.2 HTTP Methods for CRUD</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>HTTP Method</th>
+            <th>CRUD Operation</th>
+            <th>Idempotent</th>
+            <th>Example</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>GET</strong></td>
+            <td>Read</td>
+            <td>Yes</td>
+            <td>GET /customers/123 - Retrieve customer</td>
+        </tr>
+        <tr>
+            <td><strong>POST</strong></td>
+            <td>Create</td>
+            <td>No</td>
+            <td>POST /customers - Create new customer</td>
+        </tr>
+        <tr>
+            <td><strong>PUT</strong></td>
+            <td>Update (full replace)</td>
+            <td>Yes</td>
+            <td>PUT /customers/123 - Replace customer</td>
+        </tr>
+        <tr>
+            <td><strong>PATCH</strong></td>
+            <td>Update (partial)</td>
+            <td>No</td>
+            <td>PATCH /customers/123 - Update fields</td>
+        </tr>
+        <tr>
+            <td><strong>DELETE</strong></td>
+            <td>Delete</td>
+            <td>Yes</td>
+            <td>DELETE /customers/123 - Remove customer</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.2.3 REST API Best Practices</h3>
+
+<ul>
+    <li><strong>Versioning:</strong> /v1/customers, /v2/customers for breaking changes</li>
+    <li><strong>Pagination:</strong> limit/offset or cursor-based for large datasets</li>
+    <li><strong>Filtering:</strong> /customers?status=active&created_after=2025-01-01</li>
+    <li><strong>Sorting:</strong> /customers?sort=-created_at (desc by created_at)</li>
+    <li><strong>Field Selection:</strong> /customers?fields=id,name,email (sparse fieldsets)</li>
+    <li><strong>HATEOAS:</strong> Include links to related resources in responses</li>
+    <li><strong>Error Handling:</strong> Consistent error format with HTTP status codes</li>
+    <li><strong>Rate Limiting:</strong> Protect API with rate limits (X-RateLimit headers)</li>
+</ul>
+
+<h3>4.2.4 REST API Integration Example</h3>
+
+<pre><code>import requests
+import time
+
+class SalesforceIntegration:
+    def __init__(self, instance_url, access_token):
+        self.base_url = f"{instance_url}/services/data/v55.0"
+        self.headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+
+    def get_accounts(self, limit=200):
+        """Fetch accounts with pagination"""
+        accounts = []
+        url = f"{self.base_url}/query"
+        query = f"SELECT Id, Name, Industry FROM Account LIMIT {limit}"
+
+        params = {'q': query}
+
+        while url:
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+            accounts.extend(data['records'])
+
+            # Handle pagination
+            url = data.get('nextRecordsUrl')
+            if url:
+                url = self.base_url.replace('/services/data/v55.0', '') + url
+                params = None  # params already in nextRecordsUrl
+
+        return accounts
+
+    def create_account(self, account_data):
+        """Create new account"""
+        url = f"{self.base_url}/sobjects/Account"
+        response = requests.post(url, headers=self.headers, json=account_data)
+        response.raise_for_status()
+        return response.json()
+
+    def sync_accounts_to_warehouse(self, db_connection):
+        """Sync Salesforce accounts to data warehouse"""
+        accounts = self.get_accounts()
+
+        # Transform and load to warehouse
+        for account in accounts:
+            db_connection.upsert('accounts', {
+                'salesforce_id': account['Id'],
+                'name': account['Name'],
+                'industry': account.get('Industry'),
+                'synced_at': time.time()
+            })
+
+        print(f"Synced {len(accounts)} accounts")
+</code></pre>
+
+<h2>4.3 GraphQL APIs</h2>
+
+<p><strong>GraphQL</strong> is a query language for APIs enabling clients to request exactly the data they need.</p>
+
+<h3>4.3.1 GraphQL vs REST</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Aspect</th>
+            <th>REST</th>
+            <th>GraphQL</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Data Fetching</strong></td>
+            <td>Multiple endpoints, fixed responses</td>
+            <td>Single endpoint, client specifies fields</td>
+        </tr>
+        <tr>
+            <td><strong>Over-fetching</strong></td>
+            <td>Common (get more data than needed)</td>
+            <td>None (request exactly what you need)</td>
+        </tr>
+        <tr>
+            <td><strong>Under-fetching</strong></td>
+            <td>Common (need multiple requests)</td>
+            <td>Rare (get related data in one query)</td>
+        </tr>
+        <tr>
+            <td><strong>Versioning</strong></td>
+            <td>URL versioning (/v1, /v2)</td>
+            <td>Field deprecation, no versions</td>
+        </tr>
+        <tr>
+            <td><strong>Caching</strong></td>
+            <td>HTTP caching works well</td>
+            <td>Requires custom caching</td>
+        </tr>
+        <tr>
+            <td><strong>Learning Curve</strong></td>
+            <td>Low (familiar HTTP)</td>
+            <td>Medium (new concepts)</td>
+        </tr>
+        <tr>
+            <td><strong>Tooling</strong></td>
+            <td>Mature, widespread</td>
+            <td>Growing, GraphiQL explorer</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.3.2 GraphQL Query Example</h3>
+
+<pre><code># GraphQL Query - Get customer with orders in one request
+query {
+  customer(id: "123") {
+    id
+    name
+    email
+    orders(limit: 10) {
+      id
+      total
+      created_at
+      items {
+        product_name
+        quantity
+        price
+      }
+    }
+  }
+}
+
+# Response
+{
+  "data": {
+    "customer": {
+      "id": "123",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "orders": [
+        {
+          "id": "order_789",
+          "total": 99.99,
+          "created_at": "2025-01-15T10:30:00Z",
+          "items": [
+            {
+              "product_name": "Widget",
+              "quantity": 2,
+              "price": 49.99
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+</code></pre>
+
+<h3>4.3.3 GraphQL Integration with Python</h3>
+
+<pre><code>from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
+
+class GraphQLIntegration:
+    def __init__(self, url, api_key):
+        transport = RequestsHTTPTransport(
+            url=url,
+            headers={'Authorization': f'Bearer {api_key}'}
+        )
+        self.client = Client(transport=transport)
+
+    def fetch_customers_with_orders(self):
+        query = gql('''
+            query {
+                customers(first: 100) {
+                    edges {
+                        node {
+                            id
+                            name
+                            email
+                            orders(first: 50) {
+                                edges {
+                                    node {
+                                        id
+                                        total
+                                        createdAt
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ''')
+
+        result = self.client.execute(query)
+        return result['customers']['edges']
+</code></pre>
+
+<h2>4.4 Webhooks</h2>
+
+<p><strong>Webhooks</strong> enable real-time event notifications via HTTP callbacks.</p>
+
+<h3>4.4.1 Webhook Workflow</h3>
+
+<ol>
+    <li>Consumer registers webhook URL with provider</li>
+    <li>Event occurs in provider system (e.g., payment received)</li>
+    <li>Provider sends HTTP POST to webhook URL with event data</li>
+    <li>Consumer processes event and returns 200 OK</li>
+    <li>Provider retries if non-200 response</li>
+</ol>
+
+<h3>4.4.2 Webhook Best Practices</h3>
+
+<ul>
+    <li><strong>Idempotency:</strong> Handle duplicate webhook deliveries</li>
+    <li><strong>Signature Verification:</strong> Verify webhook authenticity (HMAC signatures)</li>
+    <li><strong>Quick Response:</strong> Return 200 OK quickly, process async</li>
+    <li><strong>Retry Logic:</strong> Implement exponential backoff for retries</li>
+    <li><strong>Dead Letter Queue:</strong> Store failed webhooks for investigation</li>
+    <li><strong>Monitoring:</strong> Track webhook delivery success rates</li>
+</ul>
+
+<h3>4.4.3 Webhook Handler Example</h3>
+
+<pre><code>from flask import Flask, request, jsonify
+import hmac
+import hashlib
+import json
+
+app = Flask(__name__)
+
+@app.route('/webhooks/stripe', methods=['POST'])
+def stripe_webhook():
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature')
+
+    # Verify webhook signature
+    if not verify_stripe_signature(payload, sig_header):
+        return jsonify({'error': 'Invalid signature'}), 401
+
+    event = json.loads(payload)
+
+    # Process different event types
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        handle_successful_payment(payment_intent)
+
+    elif event['type'] == 'customer.subscription.created':
+        subscription = event['data']['object']
+        handle_new_subscription(subscription)
+
+    # Return 200 quickly
+    return jsonify({'status': 'received'}), 200
+
+def verify_stripe_signature(payload, sig_header):
+    webhook_secret = 'whsec_...'  # From Stripe
+    expected_sig = hmac.new(
+        webhook_secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    received_sig = sig_header.split(',')[1].split('=')[1]
+    return hmac.compare_digest(expected_sig, received_sig)
+
+def handle_successful_payment(payment_intent):
+    # Insert to data warehouse
+    db.insert('payments', {
+        'stripe_id': payment_intent['id'],
+        'amount': payment_intent['amount'],
+        'currency': payment_intent['currency'],
+        'status': 'succeeded',
+        'created_at': payment_intent['created']
+    })
+</code></pre>
+
+<h2>4.5 gRPC APIs</h2>
+
+<p><strong>gRPC</strong> is a high-performance RPC framework using HTTP/2 and Protocol Buffers.</p>
+
+<h3>4.5.1 gRPC Benefits</h3>
+
+<ul>
+    <li><strong>Performance:</strong> Binary protocol (Protobuf) vs. JSON, HTTP/2 multiplexing</li>
+    <li><strong>Streaming:</strong> Bi-directional streaming support</li>
+    <li><strong>Type Safety:</strong> Strongly-typed Protobuf schemas</li>
+    <li><strong>Code Generation:</strong> Auto-generate client/server code</li>
+    <li><strong>Multi-Language:</strong> SDKs for 10+ languages</li>
+</ul>
+
+<h3>4.5.2 When to Use gRPC</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Scenario</th>
+            <th>REST</th>
+            <th>gRPC</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Internal microservices</td>
+            <td>✓</td>
+            <td>✓✓ (better performance)</td>
+        </tr>
+        <tr>
+            <td>Public-facing API</td>
+            <td>✓✓ (better for browsers)</td>
+            <td>✗ (limited browser support)</td>
+        </tr>
+        <tr>
+            <td>Real-time streaming</td>
+            <td>✗ (WebSockets needed)</td>
+            <td>✓✓ (native support)</td>
+        </tr>
+        <tr>
+            <td>Mobile apps</td>
+            <td>✓</td>
+            <td>✓✓ (lower latency/bandwidth)</td>
+        </tr>
+        <tr>
+            <td>IoT devices</td>
+            <td>✓</td>
+            <td>✓✓ (efficient binary)</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>4.6 API Integration Patterns</h2>
+
+<h3>4.6.1 Polling vs. Webhooks</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Aspect</th>
+            <th>Polling</th>
+            <th>Webhooks</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>How it Works</strong></td>
+            <td>Periodically check for updates</td>
+            <td>Provider pushes updates to you</td>
+        </tr>
+        <tr>
+            <td><strong>Latency</strong></td>
+            <td>Delay up to poll interval</td>
+            <td>Near real-time</td>
+        </tr>
+        <tr>
+            <td><strong>Efficiency</strong></td>
+            <td>Wasteful (many empty checks)</td>
+            <td>Efficient (only when events occur)</td>
+        </tr>
+        <tr>
+            <td><strong>Implementation</strong></td>
+            <td>Simple (just schedule API calls)</td>
+            <td>Complex (endpoint setup, security)</td>
+        </tr>
+        <tr>
+            <td><strong>Best For</strong></td>
+            <td>Batch updates, simple integrations</td>
+            <td>Real-time events, notifications</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.6.2 API Gateway Pattern</h3>
+
+<p>An <strong>API Gateway</strong> sits between clients and microservices, providing:</p>
+
+<ul>
+    <li>Single entry point for all client requests</li>
+    <li>Request routing to appropriate microservices</li>
+    <li>Authentication and authorization</li>
+    <li>Rate limiting and throttling</li>
+    <li>Response caching</li>
+    <li>Request/response transformation</li>
+    <li>Monitoring and logging</li>
+</ul>
+
+<p>Popular API Gateways: Kong, AWS API Gateway, Azure API Management, Apigee</p>
+
+<h2>4.7 API Security</h2>
+
+<h3>4.7.1 Authentication Methods</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Method</th>
+            <th>How It Works</th>
+            <th>Use Cases</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>API Keys</strong></td>
+            <td>Static secret in header/query</td>
+            <td>Simple service-to-service auth</td>
+        </tr>
+        <tr>
+            <td><strong>OAuth 2.0</strong></td>
+            <td>Token-based authorization</td>
+            <td>User-delegated access (Google, Facebook)</td>
+        </tr>
+        <tr>
+            <td><strong>JWT</strong></td>
+            <td>Self-contained signed tokens</td>
+            <td>Stateless authentication</td>
+        </tr>
+        <tr>
+            <td><strong>mTLS</strong></td>
+            <td>Mutual TLS certificates</td>
+            <td>High-security service-to-service</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.7.2 API Security Best Practices</h3>
+
+<ul>
+    <li><strong>HTTPS Only:</strong> Encrypt all API traffic with TLS</li>
+    <li><strong>Rate Limiting:</strong> Prevent abuse with per-client limits</li>
+    <li><strong>Input Validation:</strong> Validate all inputs, prevent injection attacks</li>
+    <li><strong>Least Privilege:</strong> Grant minimal necessary permissions</li>
+    <li><strong>Logging & Monitoring:</strong> Track API usage, detect anomalies</li>
+    <li><strong>API Versioning:</strong> Deprecate old versions gracefully</li>
+    <li><strong>Secrets Management:</strong> Never hardcode API keys, use vaults</li>
+</ul>
+
+<h2>4.8 API Monitoring & Reliability</h2>
+
+<p>Critical metrics for API integration:</p>
+
+<ul>
+    <li><strong>Uptime:</strong> API availability (target: 99.9%+)</li>
+    <li><strong>Latency:</strong> Response times (p50, p95, p99)</li>
+    <li><strong>Error Rate:</strong> 4xx and 5xx errors percentage</li>
+    <li><strong>Throughput:</strong> Requests per second handled</li>
+    <li><strong>Rate Limit Usage:</strong> How close to limits</li>
+</ul>
+
+<h2>Summary</h2>
+
+<p>API-based integration provides real-time, secure, and scalable data exchange:</p>
+
+<ul>
+    <li><strong>REST:</strong> Dominant standard for web APIs, HTTP + JSON</li>
+    <li><strong>GraphQL:</strong> Flexible querying, request exactly what you need</li>
+    <li><strong>Webhooks:</strong> Real-time event notifications</li>
+    <li><strong>gRPC:</strong> High-performance for microservices</li>
+</ul>
+
+<p>Choose the right API style based on your needs: REST for public APIs, GraphQL for flexible clients, gRPC for internal services, webhooks for events. Implement robust security, monitoring, and error handling for production reliability.</p>
+
+<hr>
+
+<p><a href="ch03.html">← Previous: Chapter 3 - Architecture Patterns</a> | <a href="ch05.html">Next: Chapter 5 - Real-time Data Integration →</a></p>
+</body>
+</html>

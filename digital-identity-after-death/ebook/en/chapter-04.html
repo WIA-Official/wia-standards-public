@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Posthumous Authentication and Access Control | WIA-LEG-010</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; font-size: 1.1rem; }
+        .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+        .breadcrumb { color: #64748b; margin-bottom: 2rem; font-size: 0.9rem; }
+        .breadcrumb a { color: #8B5CF6; text-decoration: none; }
+        h1 { font-size: 2.5rem; color: #8B5CF6; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 2px solid #8B5CF6; }
+        h2 { font-size: 2rem; color: #A78BFA; margin: 3rem 0 1.5rem; padding-top: 2rem; border-top: 1px solid rgba(139, 92, 246, 0.2); }
+        h3 { font-size: 1.5rem; color: #C4B5FD; margin: 2rem 0 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        ul, ol { margin: 1.5rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.75rem; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 2px solid rgba(139, 92, 246, 0.2); }
+        .nav-button { padding: 1rem 2rem; background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        code { background: rgba(139, 92, 246, 0.1); padding: 0.2rem 0.5rem; border-radius: 4px; color: #C4B5FD; font-family: 'Monaco', monospace; font-size: 0.95rem; }
+        pre { background: #0a0f1e; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #8B5CF6; }
+        pre code { background: none; padding: 0; color: #10b981; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb"><a href="index.html">📖 Table of Contents</a> / Chapter 4</div>
+
+        <h1>Chapter 4: Posthumous Authentication and Access Control</h1>
+
+        <p>
+            While Chapter 3 focused on revoking the deceased's credentials, Chapter 4 addresses a equally critical challenge:
+            granting controlled, auditable access to authorized parties who need to manage the deceased's digital estate.
+            Executors, beneficiaries, and family members require legitimate access to accounts, data, and digital assets,
+            but this access must be carefully managed to prevent fraud, protect privacy, and honor the deceased's wishes.
+        </p>
+
+        <h2>4.1 Executor Authorization Framework</h2>
+
+        <p>
+            The WIA-LEG-010 standard defines a comprehensive framework for authorizing executors and other authorized parties
+            to access deceased individuals' digital resources. This framework balances security, legal validity, and practical usability.
+        </p>
+
+        <h3>4.1.1 Authorization Hierarchy</h3>
+
+        <p>The standard recognizes four levels of authorized access:</p>
+
+        <ul>
+            <li><strong>Primary Executor:</strong> Court-appointed or will-designated executor with full authority over the digital estate</li>
+            <li><strong>Co-Executors:</strong> Additional executors with shared authority, requiring multi-party approval for major actions</li>
+            <li><strong>Specific Beneficiaries:</strong> Individuals granted access to specific accounts or data types</li>
+            <li><strong>Professional Advisors:</strong> Lawyers, accountants, or digital estate specialists with limited, time-bound access</li>
+        </ul>
+
+        <h3>4.1.2 Executor Credential Issuance</h3>
+
+        <pre><code>async function issueExecutorCredentials(request) {
+  // Validate legal authority
+  const legalValidation = await validateLegalAuthority({
+    executorId: request.executorId,
+    deceasedId: request.deceasedId,
+    legalDocuments: request.documents, // probate, will, court order
+    jurisdiction: request.jurisdiction
+  });
+
+  if (!legalValidation.valid) {
+    throw new Error(`Legal validation failed: ${legalValidation.reason}`);
+  }
+
+  // Generate time-locked credential
+  const credential = {
+    credentialId: generateUUID(),
+    credentialType: 'executor_access',
+    executorId: request.executorId,
+    deceasedId: request.deceasedId,
+    issuedAt: new Date().toISOString(),
+    expiresAt: calculateExpiration(request.expiryPeriod || '1y'),
+    permissions: request.permissions || ['read', 'export'],
+    requiresMultiSig: request.coExecutors?.length > 0,
+    multiSigConfig: {
+      requiredSignatures: Math.ceil((request.coExecutors?.length || 0) / 2) + 1,
+      signers: [request.executorId, ...(request.coExecutors || [])]
+    },
+    legalBasis: {
+      documentType: legalValidation.documentType,
+      documentId: legalValidation.documentId,
+      issuingCourt: legalValidation.court,
+      verificationHash: legalValidation.verificationHash
+    }
+  };
+
+  // Sign credential with system key
+  const signedCredential = await signCredential(credential);
+
+  // Store in executor registry
+  await storeExecutorCredential(signedCredential);
+
+  // Generate access tokens
+  const accessToken = await generateAccessToken(signedCredential);
+  const refreshToken = await generateRefreshToken(signedCredential);
+
+  return {
+    credential: signedCredential,
+    accessToken: accessToken,
+    refreshToken: refreshToken,
+    expiresIn: 3600, // 1 hour
+    tokenType: 'Bearer'
+  };
+}</code></pre>
+
+        <h2>4.2 Multi-Party Authorization</h2>
+
+        <p>
+            For high-value assets or sensitive operations, WIA-LEG-010 supports multi-party authorization requiring
+            signatures from multiple executors or witnesses before granting access.
+        </p>
+
+        <h3>4.2.1 Multi-Signature Protocol</h3>
+
+        <pre><code>async function initiateMultiSigAccess(accessRequest) {
+  const { resourceId, executorId, coExecutors, operation } = accessRequest;
+
+  // Create multi-sig proposal
+  const proposal = {
+    proposalId: generateUUID(),
+    resourceId: resourceId,
+    operation: operation,
+    initiatedBy: executorId,
+    requiredSignatures: Math.ceil(coExecutors.length / 2) + 1,
+    signatures: [
+      {
+        signerId: executorId,
+        timestamp: new Date().toISOString(),
+        signature: await signProposal(accessRequest, executorId)
+      }
+    ],
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+  };
+
+  // Store proposal
+  await storeMultiSigProposal(proposal);
+
+  // Notify co-executors
+  await notifyCoExecutors(coExecutors, {
+    proposalId: proposal.proposalId,
+    operation: operation,
+    initiatedBy: executorId,
+    requiresAction: true
+  });
+
+  return proposal;
+}
+
+async function addSignature(proposalId, executorId, signature) {
+  const proposal = await getMultiSigProposal(proposalId);
+
+  // Validate executor is authorized signer
+  if (!proposal.coExecutors.includes(executorId)) {
+    throw new Error('Executor not authorized to sign this proposal');
+  }
+
+  // Verify signature
+  const validSignature = await verifySignature(
+    proposal,
+    executorId,
+    signature
+  );
+
+  if (!validSignature) {
+    throw new Error('Invalid signature');
+  }
+
+  // Add signature
+  proposal.signatures.push({
+    signerId: executorId,
+    timestamp: new Date().toISOString(),
+    signature: signature
+  });
+
+  // Check if threshold met
+  if (proposal.signatures.length >= proposal.requiredSignatures) {
+    proposal.status = 'approved';
+
+    // Execute the operation
+    await executeAuthorizedOperation(proposal);
+  }
+
+  await updateMultiSigProposal(proposal);
+
+  return proposal;
+}</code></pre>
+
+        <h2>4.3 Time-Locked Access Controls</h2>
+
+        <p>
+            Some access should be delayed or limited by time constraints. For example, certain data might only become
+            accessible 30 days after death, or executor access might automatically expire after one year.
+        </p>
+
+        <h3>4.3.1 Time-Lock Implementation</h3>
+
+        <pre><code>class TimeLockController {
+  async createTimeLock(config) {
+    const timeLock = {
+      lockId: generateUUID(),
+      resourceId: config.resourceId,
+      authorizedParty: config.authorizedParty,
+      unlockConditions: {
+        type: config.lockType, // 'absolute_time', 'relative_time', 'event_based'
+        unlockTime: config.unlockTime,
+        baseEvent: config.baseEvent, // e.g., 'death_verification'
+        offset: config.offset // e.g., '+30 days'
+      },
+      status: 'locked',
+      createdAt: new Date().toISOString()
+    };
+
+    await this.storeTimeLock(timeLock);
+    await this.scheduleUnlockCheck(timeLock);
+
+    return timeLock;
+  }
+
+  async checkUnlockConditions(lockId) {
+    const lock = await this.getTimeLock(lockId);
+    const now = new Date();
+
+    switch (lock.unlockConditions.type) {
+      case 'absolute_time':
+        return now >= new Date(lock.unlockConditions.unlockTime);
+
+      case 'relative_time':
+        const baseEventTime = await this.getEventTime(
+          lock.unlockConditions.baseEvent
+        );
+        const unlockTime = this.addTimeOffset(
+          baseEventTime,
+          lock.unlockConditions.offset
+        );
+        return now >= unlockTime;
+
+      case 'event_based':
+        return await this.checkEventOccurred(
+          lock.unlockConditions.requiredEvent
+        );
+    }
+  }
+
+  async attemptUnlock(lockId, requestingParty) {
+    const lock = await this.getTimeLock(lockId);
+
+    // Verify requesting party is authorized
+    if (lock.authorizedParty !== requestingParty) {
+      throw new Error('Unauthorized access attempt');
+    }
+
+    // Check unlock conditions
+    const conditionsMet = await this.checkUnlockConditions(lockId);
+
+    if (!conditionsMet) {
+      const estimatedUnlock = await this.estimateUnlockTime(lock);
+      throw new Error(
+        `Time lock not yet released. Estimated unlock: ${estimatedUnlock}`
+      );
+    }
+
+    // Unlock and grant access
+    lock.status = 'unlocked';
+    lock.unlockedAt = new Date().toISOString();
+    lock.unlockedBy = requestingParty;
+
+    await this.updateTimeLock(lock);
+
+    // Generate access token
+    return await this.generateTimeLockAccessToken(lock);
+  }
+}</code></pre>
+
+        <h2>4.4 Comprehensive Audit Logging</h2>
+
+        <p>
+            Every access to a deceased person's digital resources must be logged with immutable, comprehensive audit trails.
+            This serves legal, compliance, and security purposes.
+        </p>
+
+        <h3>4.4.1 Audit Log Structure</h3>
+
+        <pre><code>{
+  "auditId": "audit-abc123",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "eventType": "posthumous_access",
+  "deceasedId": "did:wia:deceased:xyz789",
+  "accessorId": "did:wia:executor:abc123",
+  "accessorRole": "primary_executor",
+  "operation": "read_emails",
+  "resourceId": "email-account-456",
+  "resourceType": "email_account",
+  "authorizationMethod": "executor_credential",
+  "multiSigRequired": true,
+  "multiSigSignatures": [
+    {
+      "signerId": "executor-1",
+      "timestamp": "2025-12-25T10:25:00Z"
+    },
+    {
+      "signerId": "executor-2",
+      "timestamp": "2025-12-25T10:28:00Z"
+    }
+  ],
+  "legalBasis": {
+    "documentType": "probate_order",
+    "jurisdiction": "US-CA",
+    "courtId": "CA-SF-PROB-2025-123"
+  },
+  "accessDetails": {
+    "duration": 1800, // seconds
+    "dataAccessed": "250 emails",
+    "dataExported": false,
+    "ipAddress": "203.0.113.42",
+    "userAgent": "Mozilla/5.0...",
+    "geolocation": {
+      "country": "US",
+      "region": "CA",
+      "city": "San Francisco"
+    }
+  },
+  "blockchainAnchor": {
+    "chain": "ethereum",
+    "txHash": "0x...",
+    "blockNumber": 18293950
+  },
+  "signature": "0x..." // Digital signature of entire log entry
+}</code></pre>
+
+        <h3>4.4.2 Immutable Audit Chain</h3>
+
+        <p>
+            Audit logs are linked in a blockchain-style chain where each log entry references the hash of the previous entry,
+            making tampering detectable:
+        </p>
+
+        <pre><code>class ImmutableAuditLog {
+  async logAccess(accessEvent) {
+    // Get previous log entry
+    const previousLog = await this.getLastLogEntry(accessEvent.deceasedId);
+
+    // Create new log entry
+    const logEntry = {
+      ...accessEvent,
+      previousHash: previousLog ? previousLog.hash : '0x0',
+      sequenceNumber: previousLog ? previousLog.sequenceNumber + 1 : 1
+    };
+
+    // Calculate hash of this entry
+    logEntry.hash = await this.calculateHash(logEntry);
+
+    // Sign entry
+    logEntry.signature = await this.signLogEntry(logEntry);
+
+    // Store entry
+    await this.storeLogEntry(logEntry);
+
+    // Periodically anchor to blockchain
+    if (logEntry.sequenceNumber % 100 === 0) {
+      await this.anchorToBlockchain(logEntry.hash);
+    }
+
+    return logEntry;
+  }
+
+  async verifyAuditChain(deceasedId) {
+    const allLogs = await this.getAllLogEntries(deceasedId);
+
+    for (let i = 1; i < allLogs.length; i++) {
+      const current = allLogs[i];
+      const previous = allLogs[i - 1];
+
+      // Verify chain linkage
+      if (current.previousHash !== previous.hash) {
+        return {
+          valid: false,
+          error: `Chain break at entry ${i}`,
+          tampered: true
+        };
+      }
+
+      // Verify hash
+      const calculatedHash = await this.calculateHash(current);
+      if (calculatedHash !== current.hash) {
+        return {
+          valid: false,
+          error: `Hash mismatch at entry ${i}`,
+          tampered: true
+        };
+      }
+
+      // Verify signature
+      const validSignature = await this.verifySignature(current);
+      if (!validSignature) {
+        return {
+          valid: false,
+          error: `Invalid signature at entry ${i}`,
+          tampered: true
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      totalEntries: allLogs.length,
+      firstEntry: allLogs[0].timestamp,
+      lastEntry: allLogs[allLogs.length - 1].timestamp
+    };
+  }
+}</code></pre>
+
+        <h2>4.5 Privacy-Preserving Access</h2>
+
+        <p>
+            Executors may need to access certain information without viewing all content. Zero-knowledge proofs and
+            selective disclosure enable this:
+        </p>
+
+        <ul>
+            <li><strong>Selective Disclosure:</strong> Executors can prove account balance without seeing transaction history</li>
+            <li><strong>Redacted Access:</strong> Sensitive content (medical records, private messages) can be redacted while preserving metadata</li>
+            <li><strong>Purpose Limitation:</strong> Access is granted only for specific stated purposes</li>
+            <li><strong>Minimization:</strong> Only minimum necessary data is revealed</li>
+        </ul>
+
+        <h2>4.6 Revocation of Posthumous Access</h2>
+
+        <p>
+            Executor credentials can be revoked if legal authority changes, fraud is detected, or the estate is closed:
+        </p>
+
+        <pre><code>async function revokeExecutorAccess(revocationRequest) {
+  const { credentialId, reason, revokedBy, legalBasis } = revocationRequest;
+
+  // Retrieve credential
+  const credential = await getExecutorCredential(credentialId);
+
+  // Validate revocation authority
+  await validateRevocationAuthority(revokedBy, credential, legalBasis);
+
+  // Revoke all active sessions
+  await revokeActiveSessions(credentialId);
+
+  // Invalidate tokens
+  await invalidateTokens(credentialId);
+
+  // Update credential status
+  credential.status = 'revoked';
+  credential.revokedAt = new Date().toISOString();
+  credential.revokedBy = revokedBy;
+  credential.revocationReason = reason;
+
+  await updateExecutorCredential(credential);
+
+  // Publish revocation to registry
+  await publishRevocation({
+    credentialId: credentialId,
+    revokedAt: credential.revokedAt,
+    reason: reason
+  });
+
+  // Audit log
+  await logAuditEvent({
+    eventType: 'executor_access_revoked',
+    credentialId: credentialId,
+    revokedBy: revokedBy,
+    reason: reason
+  });
+
+  return credential;
+}</code></pre>
+
+        <h2>4.7 Best Practices for Implementation</h2>
+
+        <ul>
+            <li>Always verify legal authority before issuing executor credentials</li>
+            <li>Implement multi-party authorization for high-value or sensitive resources</li>
+            <li>Use time-locks appropriately to prevent premature access</li>
+            <li>Maintain comprehensive, immutable audit logs</li>
+            <li>Design for privacy: minimize data exposure even to authorized parties</li>
+            <li>Implement automatic expiration of executor credentials</li>
+            <li>Provide clear interfaces for family members to understand what was accessed</li>
+        </ul>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-button">← Chapter 3</a>
+            <a href="chapter-05.html" class="nav-button">Chapter 5: Digital Legacy →</a>
+        </div>
+    </div>
+</body>
+</html>

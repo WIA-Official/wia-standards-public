@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Real-time Analytics Architecture - WIA-DATA-012</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 2rem; background: #0f172a; color: #e2e8f0; }
+        h1, h2, h3 { color: #10B981; }
+        h1 { font-size: 2.5rem; border-bottom: 3px solid #10B981; padding-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: #1e293b; }
+        th, td { padding: 1rem; border: 1px solid #334155; }
+        th { background: #334155; color: #10B981; }
+        pre { background: #1e293b; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #10B981; overflow-x: auto; }
+        .highlight { background: #1e293b; padding: 1.5rem; border-left: 4px solid #10B981; margin: 1.5rem 0; }
+        ul { margin-left: 2rem; }
+        li { margin-bottom: 0.8rem; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Real-time Analytics Architecture</h1>
+
+    <h2>6.1 Introduction to Real-time Analytics</h2>
+    <p>Real-time analytics processes data as it arrives, providing immediate insights and enabling instant decision-making. Unlike batch processing that analyzes historical data, real-time analytics operates on streaming data with milliseconds to seconds latency. This capability is crucial for use cases like fraud detection, IoT monitoring, stock trading, and personalized recommendations.</p>
+
+    <h2>6.2 Batch vs. Stream Processing</h2>
+    <table>
+        <tr><th>Aspect</th><th>Batch Processing</th><th>Stream Processing</th></tr>
+        <tr><td><strong>Data Scope</strong></td><td>Historical, bounded datasets</td><td>Continuous, unbounded streams</td></tr>
+        <tr><td><strong>Latency</strong></td><td>Minutes to hours</td><td>Milliseconds to seconds</td></tr>
+        <tr><td><strong>Processing</strong></td><td>All data at once</td><td>Event-by-event or micro-batches</td></tr>
+        <tr><td><strong>Use Cases</strong></td><td>Reports, data warehousing, ML training</td><td>Fraud detection, monitoring, real-time dashboards</td></tr>
+        <tr><td><strong>Complexity</strong></td><td>Simpler architecture</td><td>More complex, requires distributed systems</td></tr>
+        <tr><td><strong>Examples</strong></td><td>Apache Hadoop, Spark batch</td><td>Apache Kafka, Flink, Spark Streaming</td></tr>
+    </table>
+
+    <h2>6.3 Stream Processing Architectures</h2>
+
+    <h3>6.3.1 Lambda Architecture</h3>
+    <p>Combines batch and stream processing to balance accuracy with speed.</p>
+    <div class="highlight">
+        <strong>Components:</strong>
+        <ul>
+            <li><strong>Batch Layer:</strong> Processes complete datasets for accuracy</li>
+            <li><strong>Speed Layer:</strong> Processes real-time data for low latency</li>
+            <li><strong>Serving Layer:</strong> Merges results from both layers</li>
+        </ul>
+        <strong>Pros:</strong> Combines benefits of batch and stream<br>
+        <strong>Cons:</strong> Complex to maintain, code duplication
+    </div>
+
+    <h3>6.3.2 Kappa Architecture</h3>
+    <p>Simplifies Lambda by using only stream processing.</p>
+    <div class="highlight">
+        <strong>Key Idea:</strong> Treat everything as a stream, reprocess historical data as needed<br>
+        <strong>Pros:</strong> Simpler, single codebase<br>
+        <strong>Cons:</strong> Requires replayable message queue
+    </div>
+
+    <h2>6.4 Stream Processing Frameworks</h2>
+    <table>
+        <tr><th>Framework</th><th>Strengths</th><th>Use Cases</th></tr>
+        <tr><td><strong>Apache Kafka Streams</strong></td><td>Lightweight, integrates with Kafka</td><td>Event-driven microservices</td></tr>
+        <tr><td><strong>Apache Flink</strong></td><td>True streaming, exactly-once semantics</td><td>Complex event processing, stateful computations</td></tr>
+        <tr><td><strong>Apache Spark Streaming</strong></td><td>Micro-batch, unified batch/stream API</td><td>Existing Spark users, lambda architecture</td></tr>
+        <tr><td><strong>Apache Storm</strong></td><td>Low latency, tuple-at-a-time</td><td>Real-time ETL, continuous computation</td></tr>
+        <tr><td><strong>AWS Kinesis</strong></td><td>Managed service, AWS integration</td><td>AWS-based applications</td></tr>
+        <tr><td><strong>Google Dataflow</strong></td><td>Unified model, fully managed</td><td>GCP-based applications</td></tr>
+    </table>
+
+    <h2>6.5 Apache Kafka Fundamentals</h2>
+    <p>Kafka is a distributed event streaming platform used for building real-time data pipelines.</p>
+
+    <h3>6.5.1 Kafka Components</h3>
+    <table>
+        <tr><th>Component</th><th>Description</th></tr>
+        <tr><td><strong>Producer</strong></td><td>Publishes messages to topics</td></tr>
+        <tr><td><strong>Consumer</strong></td><td>Subscribes to topics and processes messages</td></tr>
+        <tr><td><strong>Topic</strong></td><td>Category or feed name to which records are published</td></tr>
+        <tr><td><strong>Partition</strong></td><td>Topics are split into partitions for parallelism</td></tr>
+        <tr><td><strong>Broker</strong></td><td>Kafka server that stores data</td></tr>
+        <tr><td><strong>Consumer Group</strong></td><td>Group of consumers working together</td></tr>
+        <tr><td><strong>Offset</strong></td><td>Unique identifier of a record within a partition</td></tr>
+    </table>
+
+    <pre><code># Kafka Producer Example (Python)
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers=['localhost:9092'],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+# Send messages
+for i in range(100):
+    data = {
+        'user_id': i,
+        'action': 'click',
+        'timestamp': time.time()
+    }
+    producer.send('user-events', value=data)
+
+producer.flush()
+producer.close()
+</code></pre>
+
+    <pre><code># Kafka Consumer Example
+from kafka import KafkaConsumer
+import json
+
+consumer = KafkaConsumer(
+    'user-events',
+    bootstrap_servers=['localhost:9092'],
+    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+    auto_offset_reset='earliest',
+    group_id='analytics-group'
+)
+
+for message in consumer:
+    event = message.value
+    # Process event
+    print(f"User {event['user_id']} performed {event['action']}")
+</code></pre>
+
+    <h2>6.6 Windowing in Stream Processing</h2>
+    <p>Windows group events for aggregation over time or count.</p>
+
+    <table>
+        <tr><th>Window Type</th><th>Description</th><th>Use Case</th></tr>
+        <tr><td><strong>Tumbling Window</strong></td><td>Fixed-size, non-overlapping</td><td>Hourly aggregations</td></tr>
+        <tr><td><strong>Sliding Window</strong></td><td>Fixed-size, overlapping</td><td>Moving averages</td></tr>
+        <tr><td><strong>Session Window</strong></td><td>Gap-based, variable size</td><td>User sessions</td></tr>
+        <tr><td><strong>Global Window</strong></td><td>All events in one window</td><td>Batch-like processing</td></tr>
+    </table>
+
+    <h2>6.7 State Management</h2>
+    <p>Maintaining state in distributed stream processing is crucial for complex analytics.</p>
+
+    <div class="highlight">
+        <strong>Stateful Operations:</strong>
+        <ul>
+            <li><strong>Aggregations:</strong> Running sums, counts, averages</li>
+            <li><strong>Joins:</strong> Combining streams based on keys</li>
+            <li><strong>Pattern Detection:</strong> Complex event processing</li>
+            <li><strong>Deduplication:</strong> Tracking seen events</li>
+        </ul>
+    </div>
+
+    <h2>6.8 Exactly-Once Semantics</h2>
+    <p>Guaranteeing each message is processed exactly once, even in case of failures.</p>
+
+    <table>
+        <tr><th>Semantics</th><th>Guarantee</th><th>Trade-offs</th></tr>
+        <tr><td><strong>At-Most-Once</strong></td><td>May lose messages</td><td>Highest performance, lowest reliability</td></tr>
+        <tr><td><strong>At-Least-Once</strong></td><td>May duplicate messages</td><td>Good performance, needs idempotent processing</td></tr>
+        <tr><td><strong>Exactly-Once</strong></td><td>No loss, no duplication</td><td>Lower performance, highest reliability</td></tr>
+    </table>
+
+    <h2>6.9 Real-time Analytics Use Cases</h2>
+
+    <h3>6.9.1 Fraud Detection</h3>
+    <ul>
+        <li>Monitor transactions in real-time</li>
+        <li>Apply ML models to detect anomalies</li>
+        <li>Alert security teams immediately</li>
+        <li>Block suspicious transactions automatically</li>
+    </ul>
+
+    <h3>6.9.2 IoT Monitoring</h3>
+    <ul>
+        <li>Process sensor data from devices</li>
+        <li>Detect equipment failures before they occur</li>
+        <li>Optimize energy consumption</li>
+        <li>Track asset locations and conditions</li>
+    </ul>
+
+    <h3>6.9.3 Real-time Recommendations</h3>
+    <ul>
+        <li>Update user profiles continuously</li>
+        <li>Personalize content based on recent behavior</li>
+        <li>A/B test recommendations in real-time</li>
+        <li>Adapt to trending topics and events</li>
+    </ul>
+
+    <h3>6.9.4 Operational Monitoring</h3>
+    <ul>
+        <li>Track application metrics and logs</li>
+        <li>Detect performance degradation</li>
+        <li>Alert on SLA violations</li>
+        <li>Analyze user behavior patterns</li>
+    </ul>
+
+    <h2>6.10 Implementing Real-time Analytics with WIA-DATA-012</h2>
+
+    <pre><code># WIA-DATA-012 Real-time Analytics
+from wia_analytics import RealtimeAnalytics
+
+# Initialize
+realtime = RealtimeAnalytics(api_key="your_api_key")
+
+# Create stream processor
+stream = realtime.create_stream(
+    name="sales-events",
+    source={
+        "type": "kafka",
+        "brokers": ["localhost:9092"],
+        "topic": "transactions"
+    },
+    window={
+        "type": "tumbling",
+        "duration": "5m"
+    },
+    aggregations=[
+        {"metric": "count", "field": "*"},
+        {"metric": "sum", "field": "amount"},
+        {"metric": "avg", "field": "amount"}
+    ]
+)
+
+# Define anomaly detection
+stream.add_anomaly_detector(
+    algorithm="isolation_forest",
+    sensitivity=0.95,
+    features=["amount", "frequency"]
+)
+
+# Set up alerts
+stream.add_alert(
+    condition="sum(amount) > 100000",
+    action="notify",
+    channels=["email", "slack"]
+)
+
+# Start processing
+stream.start()
+
+# Monitor metrics
+metrics = stream.get_metrics()
+print(f"Events/sec: {metrics['throughput']}")
+print(f"Avg latency: {metrics['latency_ms']}ms")
+print(f"Anomalies: {metrics['anomalies_detected']}")
+</code></pre>
+
+    <h2>6.11 Performance Optimization</h2>
+    <div class="highlight">
+        <strong>Best Practices:</strong>
+        <ul>
+            <li><strong>Partitioning:</strong> Distribute load across partitions</li>
+            <li><strong>Parallelism:</strong> Process multiple partitions concurrently</li>
+            <li><strong>Compression:</strong> Reduce network and storage overhead</li>
+            <li><strong>Batching:</strong> Group small messages for efficiency</li>
+            <li><strong>Caching:</strong> Store frequently accessed data in memory</li>
+            <li><strong>Backpressure:</strong> Handle overload gracefully</li>
+        </ul>
+    </div>
+
+    <h2>6.12 Monitoring and Observability</h2>
+    <table>
+        <tr><th>Metric</th><th>What to Monitor</th></tr>
+        <tr><td><strong>Throughput</strong></td><td>Events processed per second</td></tr>
+        <tr><td><strong>Latency</strong></td><td>Time from event to result</td></tr>
+        <tr><td><strong>Lag</strong></td><td>Consumer offset delay</td></tr>
+        <tr><td><strong>Error Rate</strong></td><td>Processing failures</td></tr>
+        <tr><td><strong>Resource Usage</strong></td><td>CPU, memory, network</td></tr>
+        <tr><td><strong>Data Quality</strong></td><td>Missing/malformed events</td></tr>
+    </table>
+
+    <h2>Summary</h2>
+    <div class="highlight">
+        <p>This chapter explored real-time analytics architectures, covering stream processing fundamentals, Lambda and Kappa architectures, and popular frameworks like Apache Kafka and Flink. We examined windowing, state management, exactly-once semantics, and practical use cases. Real-time analytics enables organizations to act on insights immediately, opening up new possibilities for fraud detection, IoT monitoring, and personalized experiences.</p>
+        <p>In the next chapter, we'll explore analytics tools and platforms that make implementing these techniques accessible.</p>
+    </div>
+</body>
+</html>

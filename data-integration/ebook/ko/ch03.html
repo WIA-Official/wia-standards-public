@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>03장: 데이터 통합 아키텍처 패턴 - WIA-DATA-010</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+        h1 {
+            color: #10B981;
+            border-bottom: 3px solid #10B981;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #10B981;
+            margin-top: 40px;
+            border-left: 4px solid #10B981;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #34d399;
+            margin-top: 25px;
+        }
+        a {
+            color: #10B981;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #34d399;
+            text-decoration: underline;
+        }
+        blockquote {
+            background: #1e293b;
+            border-left: 5px solid #10B981;
+            margin: 20px 0;
+            padding: 15px 20px;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: #1e293b;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th {
+            background: #10B981;
+            color: #0f172a;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        code {
+            background: #1e293b;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #10B981;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border-left: 4px solid #10B981;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        hr {
+            border: none;
+            border-top: 2px solid #334155;
+            margin: 30px 0;
+        }
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #334155;
+            text-align: center;
+            color: #94a3b8;
+        }
+        .review-section {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border: 2px solid #10B981;
+        }
+    </style>
+</head>
+<body>
+
+<p><a href="index.html">🔄 WIA-DATA-010 데이터 통합 표준 전자책</a> | 03장 / 8장</p>
+
+<hr>
+
+<h1>03장: 데이터 통합 아키텍처 패턴</h1>
+
+<blockquote>
+<p><strong>홍익인간 (弘益人間)</strong></p>
+<p>"널리 인간을 이롭게 하라"</p>
+<p>올바른 아키텍처 패턴을 선택하고 구현하여 조직의 데이터 통합을 효율적이고 확장 가능하며 유지보수가 용이하게 만들어 모든 이해관계자에게 가치를 제공합니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>개요</h2>
+
+<p>이 장에서는 현대적인 데이터 통합 아키텍처 패턴에 대해 심도 있게 다룹니다. Lambda, Kappa, Data Mesh, Medallion 아키텍처 등 검증된 패턴들을 이해하고 조직의 요구사항에 맞는 적절한 패턴을 선택하는 방법을 배웁니다.</p>
+
+<p>데이터 통합 아키텍처는 단순히 데이터를 A 지점에서 B 지점으로 옮기는 것이 아닙니다. 확장성, 신뢰성, 성능, 그리고 장기적인 유지보수성을 고려한 전략적 결정입니다.</p>
+
+<h2>Lambda 아키텍처 패턴</h2>
+
+<p><strong>Lambda 아키텍처</strong>는 Nathan Marz가 제안한 빅데이터 처리 아키텍처로, 배치 처리와 실시간 처리를 결합하여 포괄적이고 정확한 데이터 뷰를 제공합니다.</p>
+
+<h3>Lambda 아키텍처의 세 가지 계층</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>계층</th>
+            <th>역할</th>
+            <th>기술 스택</th>
+            <th>특징</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>배치 계층<br>(Batch Layer)</strong></td>
+            <td>완전한 히스토리 데이터를 저장하고 배치 뷰 생성</td>
+            <td>Hadoop, Spark, Hive, Presto</td>
+            <td>정확성 우선, 높은 지연 시간 허용</td>
+        </tr>
+        <tr>
+            <td><strong>속도 계층<br>(Speed Layer)</strong></td>
+            <td>실시간 데이터 스트림 처리하여 즉각적 뷰 생성</td>
+            <td>Storm, Flink, Kafka Streams</td>
+            <td>낮은 지연 시간, 근사 결과 허용</td>
+        </tr>
+        <tr>
+            <td><strong>서빙 계층<br>(Serving Layer)</strong></td>
+            <td>배치 뷰와 실시간 뷰를 병합하여 쿼리 제공</td>
+            <td>Druid, Cassandra, HBase</td>
+            <td>빠른 쿼리 응답, 통합된 뷰 제공</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Lambda 아키텍처 구현 예시</h3>
+
+<pre><code># Python: Lambda 아키텍처 - 배치 계층
+from pyspark.sql import SparkSession
+
+def batch_processing(spark, input_path, output_path):
+    """
+    배치 계층: 전체 히스토리 데이터를 처리하여 정확한 뷰 생성
+    """
+    # 전체 데이터 로드
+    df = spark.read.parquet(input_path)
+
+    # 복잡한 집계 수행 (정확도 우선)
+    batch_view = df.groupBy("user_id", "date") \
+        .agg({
+            "revenue": "sum",
+            "clicks": "sum",
+            "impressions": "sum"
+        })
+
+    # 배치 뷰 저장
+    batch_view.write.mode("overwrite") \
+        .partitionBy("date") \
+        .parquet(output_path)
+
+    return batch_view
+
+# Lambda 아키텍처 - 속도 계층
+from kafka import KafkaConsumer
+import redis
+
+def speed_processing(kafka_topic, redis_client):
+    """
+    속도 계층: 실시간 스트림 처리하여 즉각적 뷰 생성
+    """
+    consumer = KafkaConsumer(
+        kafka_topic,
+        bootstrap_servers=['localhost:9092']
+    )
+
+    for message in consumer:
+        event = parse_event(message.value)
+
+        # 실시간 집계 (낮은 지연 시간 우선)
+        key = f"realtime:{event['user_id']}:{event['date']}"
+        redis_client.hincrby(key, "revenue", event["amount"])
+        redis_client.hincrby(key, "clicks", 1)
+        redis_client.expire(key, 86400)  # 24시간 TTL
+
+# Lambda 아키텍처 - 서빙 계층
+def query_unified_view(user_id, date, batch_store, speed_store):
+    """
+    서빙 계층: 배치 뷰와 실시간 뷰를 병합
+    """
+    # 배치 뷰에서 데이터 가져오기
+    batch_data = batch_store.get(user_id, date)
+
+    # 실시간 뷰에서 최신 데이터 가져오기
+    realtime_key = f"realtime:{user_id}:{date}"
+    realtime_data = speed_store.hgetall(realtime_key)
+
+    # 두 뷰 병합
+    return {
+        "revenue": batch_data["revenue"] + realtime_data.get("revenue", 0),
+        "clicks": batch_data["clicks"] + realtime_data.get("clicks", 0),
+        "impressions": batch_data["impressions"]
+    }
+</code></pre>
+
+<h3>Lambda 아키텍처의 장단점</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>장점</th>
+            <th>단점</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                ✅ 배치 계층에서 완전한 정확성 보장<br>
+                ✅ 속도 계층에서 낮은 지연 시간 제공<br>
+                ✅ 내결함성: 속도 계층 실패 시 배치로 복구<br>
+                ✅ 검증된 패턴으로 많은 사례 존재
+            </td>
+            <td>
+                ❌ 두 개의 처리 경로로 복잡도 증가<br>
+                ❌ 동일한 로직을 두 번 구현 필요<br>
+                ❌ 높은 유지보수 비용<br>
+                ❌ 디버깅과 테스팅이 어려움
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Kappa 아키텍처 패턴</h2>
+
+<p><strong>Kappa 아키텍처</strong>는 Jay Kreps가 제안한 Lambda의 단순화 버전으로, 스트림 처리만 사용하여 모든 데이터를 처리합니다.</p>
+
+<h3>Kappa vs Lambda 비교</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>측면</th>
+            <th>Lambda 아키텍처</th>
+            <th>Kappa 아키텍처</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>처리 경로</strong></td>
+            <td>배치 + 스트림 (2개)</td>
+            <td>스트림만 (1개)</td>
+        </tr>
+        <tr>
+            <td><strong>코드베이스</strong></td>
+            <td>배치/스트림 로직 별도 구현</td>
+            <td>단일 스트림 처리 로직</td>
+        </tr>
+        <tr>
+            <td><strong>복잡도</strong></td>
+            <td>높음 (두 시스템 관리)</td>
+            <td>낮음 (하나의 시스템)</td>
+        </tr>
+        <tr>
+            <td><strong>히스토리 재처리</strong></td>
+            <td>배치 계층에서 처리</td>
+            <td>로그 리플레이로 처리</td>
+        </tr>
+        <tr>
+            <td><strong>적합한 경우</strong></td>
+            <td>복잡한 배치 처리 필요</td>
+            <td>대부분의 실시간 처리</td>
+        </tr>
+        <tr>
+            <td><strong>기술 스택</strong></td>
+            <td>Hadoop + Storm/Flink</td>
+            <td>Kafka + Flink/Kafka Streams</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Kappa 아키텍처 구현 예시</h3>
+
+<pre><code># Python: Kappa 아키텍처 - Kafka Streams 사용
+from kafka import KafkaConsumer, KafkaProducer
+import json
+from datetime import datetime
+
+class KappaProcessor:
+    """
+    Kappa 아키텍처: 모든 데이터를 스트림으로 처리
+    """
+    def __init__(self, input_topic, output_topic):
+        self.consumer = KafkaConsumer(
+            input_topic,
+            bootstrap_servers=['localhost:9092'],
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            auto_offset_reset='earliest'  # 히스토리 재처리 가능
+        )
+
+        self.producer = KafkaProducer(
+            bootstrap_servers=['localhost:9092'],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+
+        self.output_topic = output_topic
+        self.state = {}  # 상태 저장
+
+    def process_stream(self):
+        """
+        실시간 및 히스토리 데이터를 동일한 스트림 로직으로 처리
+        """
+        for message in self.consumer:
+            event = message.value
+
+            # 단일 처리 로직 (실시간/배치 구분 없음)
+            aggregated = self.aggregate_event(event)
+
+            # 결과 발행
+            self.producer.send(self.output_topic, aggregated)
+
+    def aggregate_event(self, event):
+        """
+        이벤트 집계 - 실시간/히스토리 모두 동일한 로직 사용
+        """
+        key = f"{event['user_id']}:{event['date']}"
+
+        if key not in self.state:
+            self.state[key] = {
+                "user_id": event["user_id"],
+                "date": event["date"],
+                "revenue": 0,
+                "clicks": 0
+            }
+
+        self.state[key]["revenue"] += event.get("amount", 0)
+        self.state[key]["clicks"] += 1
+
+        return self.state[key]
+
+# 히스토리 재처리: 로그 리플레이
+def reprocess_history(start_offset=0):
+    """
+    Kappa 아키텍처에서 히스토리 데이터 재처리
+    오프셋을 초기화하고 전체 로그를 다시 처리
+    """
+    processor = KappaProcessor('events', 'aggregated_events')
+    processor.consumer.seek_to_beginning()  # 처음부터 다시 처리
+    processor.process_stream()
+</code></pre>
+
+<h2>Data Mesh 아키텍처</h2>
+
+<p><strong>Data Mesh</strong>는 Zhamak Dehghani가 제안한 분산형 데이터 아키텍처로, 데이터를 제품으로 취급하고 도메인별 소유권을 갖습니다.</p>
+
+<h3>Data Mesh의 4가지 핵심 원칙</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>원칙</th>
+            <th>설명</th>
+            <th>구현 방법</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>1. 도메인 지향<br>분산 소유권</strong></td>
+            <td>각 비즈니스 도메인이 자신의 데이터를 소유하고 관리</td>
+            <td>영업팀이 영업 데이터, 마케팅팀이 마케팅 데이터 소유</td>
+        </tr>
+        <tr>
+            <td><strong>2. 제품으로서의<br>데이터</strong></td>
+            <td>데이터를 제품처럼 품질, SLA, 문서화 보장</td>
+            <td>데이터 제품 오너, API, 품질 메트릭, 사용자 지원</td>
+        </tr>
+        <tr>
+            <td><strong>3. 셀프서비스<br>데이터 플랫폼</strong></td>
+            <td>도메인 팀이 독립적으로 데이터 제품 생성 가능한 인프라</td>
+            <td>IaC, CI/CD, 모니터링 도구, 데이터 카탈로그</td>
+        </tr>
+        <tr>
+            <td><strong>4. 연합<br>컴퓨테이셔널 거버넌스</strong></td>
+            <td>자동화된 정책으로 표준과 규정 준수 강제</td>
+            <td>자동 스키마 검증, 데이터 품질 체크, 접근 제어</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Data Mesh 구현 예시</h3>
+
+<pre><code># YAML: Data Mesh - 데이터 제품 정의
+apiVersion: datamesh.io/v1
+kind: DataProduct
+metadata:
+  name: customer-analytics
+  domain: marketing
+  owner: marketing-data-team@company.com
+spec:
+  description: "고객 행동 분석 데이터 제품"
+
+  # SLA 정의
+  sla:
+    availability: 99.9%
+    freshness: 15min
+    completeness: 99.5%
+
+  # 데이터 스키마
+  schema:
+    format: avro
+    version: "1.2.0"
+    fields:
+      - name: customer_id
+        type: string
+        description: "고유 고객 식별자"
+      - name: event_timestamp
+        type: timestamp
+        description: "이벤트 발생 시간"
+      - name: event_type
+        type: enum
+        values: [page_view, click, purchase]
+
+  # 접근 인터페이스
+  interfaces:
+    - type: sql
+      endpoint: "snowflake://analytics.marketing.customer_analytics"
+    - type: api
+      endpoint: "https://api.company.com/data/customer-analytics"
+      format: json
+
+  # 품질 보증
+  quality:
+    - rule: "customer_id IS NOT NULL"
+    - rule: "event_timestamp > NOW() - INTERVAL 90 DAY"
+    - rule: "event_type IN ('page_view', 'click', 'purchase')"
+
+  # 데이터 계보
+  lineage:
+    upstream:
+      - web-clickstream
+      - mobile-app-events
+    downstream:
+      - customer-360-view
+      - marketing-dashboard
+
+---
+# Python: Data Mesh - 데이터 제품 생성
+class DataProduct:
+    """
+    Data Mesh에서 도메인 팀이 데이터 제품 생성
+    """
+    def __init__(self, name, domain, owner):
+        self.name = name
+        self.domain = domain
+        self.owner = owner
+        self.sla = {}
+        self.quality_rules = []
+
+    def define_sla(self, availability, freshness, completeness):
+        """데이터 제품 SLA 정의"""
+        self.sla = {
+            "availability": availability,
+            "freshness": freshness,
+            "completeness": completeness
+        }
+
+    def add_quality_rule(self, rule):
+        """데이터 품질 규칙 추가"""
+        self.quality_rules.append(rule)
+
+    def validate_quality(self, data):
+        """데이터 품질 검증"""
+        for rule in self.quality_rules:
+            if not rule.validate(data):
+                raise DataQualityException(f"Quality rule failed: {rule}")
+
+    def publish(self, data):
+        """데이터 제품 발행"""
+        self.validate_quality(data)
+
+        # 여러 인터페이스로 발행
+        self.publish_to_sql_endpoint(data)
+        self.publish_to_api_endpoint(data)
+        self.update_data_catalog()
+</code></pre>
+
+<h2>Medallion 아키텍처 (Bronze-Silver-Gold)</h2>
+
+<p><strong>Medallion 아키텍처</strong>는 Databricks가 제안한 계층화된 데이터 아키텍처로, 데이터를 품질 수준에 따라 Bronze, Silver, Gold 계층으로 구성합니다.</p>
+
+<h3>Medallion 아키텍처의 세 가지 계층</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>계층</th>
+            <th>역할</th>
+            <th>데이터 특성</th>
+            <th>사용자</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>🥉 Bronze<br>(원시 계층)</strong></td>
+            <td>소스에서 받은 원시 데이터 그대로 저장</td>
+            <td>원본 형식, 중복 가능, 변환 없음</td>
+            <td>데이터 엔지니어</td>
+        </tr>
+        <tr>
+            <td><strong>🥈 Silver<br>(정제 계층)</strong></td>
+            <td>검증되고 표준화된 데이터</td>
+            <td>중복 제거, 타입 변환, 기본 검증 완료</td>
+            <td>데이터 분석가, 엔지니어</td>
+        </tr>
+        <tr>
+            <td><strong>🥇 Gold<br>(비즈니스 계층)</strong></td>
+            <td>비즈니스 로직이 적용된 집계 데이터</td>
+            <td>집계, 조인, 비즈니스 규칙 적용 완료</td>
+            <td>비즈니스 사용자, BI 도구</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Medallion 아키텍처 구현 예시</h3>
+
+<pre><code># SQL: Medallion 아키텍처 - Bronze Layer
+-- Bronze 테이블: 원시 데이터 그대로 저장
+CREATE TABLE bronze.web_events (
+    raw_data STRING,
+    ingestion_timestamp TIMESTAMP,
+    source_file STRING
+)
+USING DELTA
+PARTITIONED BY (DATE(ingestion_timestamp));
+
+-- 원시 데이터 삽입 (변환 없음)
+INSERT INTO bronze.web_events
+SELECT
+    *,
+    current_timestamp() as ingestion_timestamp,
+    input_file_name() as source_file
+FROM read_json('s3://raw-data/web-events/*.json');
+
+---
+# SQL: Medallion 아키텍처 - Silver Layer
+-- Silver 테이블: 검증되고 정제된 데이터
+CREATE TABLE silver.web_events (
+    event_id STRING,
+    user_id STRING,
+    event_type STRING,
+    event_timestamp TIMESTAMP,
+    url STRING,
+    referrer STRING,
+    user_agent STRING,
+    ip_address STRING,
+    processed_timestamp TIMESTAMP
+)
+USING DELTA
+PARTITIONED BY (DATE(event_timestamp));
+
+-- Bronze → Silver 변환: 검증, 정제, 중복 제거
+INSERT INTO silver.web_events
+SELECT DISTINCT
+    get_json_object(raw_data, '$.event_id') as event_id,
+    get_json_object(raw_data, '$.user_id') as user_id,
+    get_json_object(raw_data, '$.event_type') as event_type,
+    CAST(get_json_object(raw_data, '$.timestamp') AS TIMESTAMP) as event_timestamp,
+    get_json_object(raw_data, '$.url') as url,
+    get_json_object(raw_data, '$.referrer') as referrer,
+    get_json_object(raw_data, '$.user_agent') as user_agent,
+    get_json_object(raw_data, '$.ip') as ip_address,
+    current_timestamp() as processed_timestamp
+FROM bronze.web_events
+WHERE
+    -- 데이터 품질 검증
+    get_json_object(raw_data, '$.event_id') IS NOT NULL
+    AND get_json_object(raw_data, '$.user_id') IS NOT NULL
+    AND get_json_object(raw_data, '$.timestamp') IS NOT NULL;
+
+---
+# SQL: Medallion 아키텍처 - Gold Layer
+-- Gold 테이블: 비즈니스 집계 데이터
+CREATE TABLE gold.daily_user_metrics (
+    user_id STRING,
+    date DATE,
+    page_views INT,
+    unique_sessions INT,
+    total_time_seconds INT,
+    conversion_events INT,
+    revenue DECIMAL(10,2),
+    created_timestamp TIMESTAMP
+)
+USING DELTA
+PARTITIONED BY (date);
+
+-- Silver → Gold 변환: 비즈니스 로직 적용
+INSERT INTO gold.daily_user_metrics
+SELECT
+    user_id,
+    DATE(event_timestamp) as date,
+    COUNT(*) as page_views,
+    COUNT(DISTINCT session_id) as unique_sessions,
+    SUM(time_on_page) as total_time_seconds,
+    SUM(CASE WHEN event_type = 'purchase' THEN 1 ELSE 0 END) as conversion_events,
+    SUM(CASE WHEN event_type = 'purchase' THEN amount ELSE 0 END) as revenue,
+    current_timestamp() as created_timestamp
+FROM silver.web_events
+WHERE DATE(event_timestamp) = CURRENT_DATE - 1
+GROUP BY user_id, DATE(event_timestamp);
+</code></pre>
+
+<h2>아키텍처 패턴 선택 가이드</h2>
+
+<p>조직의 요구사항에 따라 적절한 아키텍처 패턴을 선택하는 것이 중요합니다.</p>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>요구사항</th>
+            <th>추천 아키텍처</th>
+            <th>이유</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>실시간 + 배치 모두 중요, 정확성 최우선</td>
+            <td><strong>Lambda</strong></td>
+            <td>배치 계층에서 정확성 보장, 속도 계층에서 낮은 지연</td>
+        </tr>
+        <tr>
+            <td>대부분 실시간 처리, 단순성 우선</td>
+            <td><strong>Kappa</strong></td>
+            <td>단일 코드베이스, 낮은 복잡도, 로그 리플레이</td>
+        </tr>
+        <tr>
+            <td>도메인별 분산 소유, 데이터 민주화</td>
+            <td><strong>Data Mesh</strong></td>
+            <td>도메인 자율성, 확장 가능한 조직 구조</td>
+        </tr>
+        <tr>
+            <td>데이터 품질 계층화, 점진적 정제</td>
+            <td><strong>Medallion</strong></td>
+            <td>명확한 데이터 품질 수준, 재처리 용이</td>
+        </tr>
+        <tr>
+            <td>클라우드 데이터 레이크하우스 사용</td>
+            <td><strong>Medallion</strong></td>
+            <td>Delta Lake, Iceberg 등과 자연스러운 통합</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>하이브리드 아키텍처</h2>
+
+<p>실제 많은 조직은 여러 패턴을 결합한 하이브리드 아키텍처를 사용합니다.</p>
+
+<h3>Medallion + Data Mesh 결합</h3>
+
+<pre><code># 예시: 도메인별 Medallion 아키텍처
+/data-lake/
+  /marketing/                 # 마케팅 도메인
+    /bronze/                  # 원시 데이터
+      /web_events/
+      /email_campaigns/
+    /silver/                  # 정제 데이터
+      /cleaned_web_events/
+      /validated_campaigns/
+    /gold/                    # 비즈니스 데이터
+      /customer_journey/
+      /campaign_performance/
+
+  /sales/                     # 영업 도메인
+    /bronze/
+      /crm_data/
+      /transactions/
+    /silver/
+      /cleaned_opportunities/
+      /validated_transactions/
+    /gold/
+      /sales_pipeline/
+      /revenue_metrics/
+</code></pre>
+
+<h2>아키텍처 마이그레이션 전략</h2>
+
+<p>레거시 시스템에서 현대적인 아키텍처로 안전하게 마이그레이션하는 전략:</p>
+
+<ol>
+    <li><strong>평가 단계:</strong> 현재 아키텍처 분석, 문제점 식별, 목표 아키텍처 정의</li>
+    <li><strong>파일럿 단계:</strong> 하나의 도메인/데이터 제품으로 시작, 학습 및 검증</li>
+    <li><strong>병렬 실행:</strong> 레거시와 신규 시스템을 일정 기간 병렬 운영</li>
+    <li><strong>점진적 전환:</strong> 도메인별/기능별로 단계적 마이그레이션</li>
+    <li><strong>검증 및 최적화:</strong> 성능, 품질, 비용 검증 후 최적화</li>
+    <li><strong>레거시 폐기:</strong> 안전하게 확인된 후 구 시스템 종료</li>
+</ol>
+
+<h2>성능 최적화 전략</h2>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>아키텍처</th>
+            <th>최적화 기법</th>
+            <th>기대 효과</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Lambda</strong></td>
+            <td>배치 계층 파티셔닝, 속도 계층 상태 저장 최적화</td>
+            <td>처리 시간 40-60% 감소</td>
+        </tr>
+        <tr>
+            <td><strong>Kappa</strong></td>
+            <td>Kafka 파티션 조정, 상태 저장소 튜닝</td>
+            <td>처리량 2-3배 증가</td>
+        </tr>
+        <tr>
+            <td><strong>Data Mesh</strong></td>
+            <td>데이터 제품 캐싱, API 응답 최적화</td>
+            <td>쿼리 응답 시간 50% 개선</td>
+        </tr>
+        <tr>
+            <td><strong>Medallion</strong></td>
+            <td>Delta Lake 최적화, Z-ordering, 파티션 프루닝</td>
+            <td>쿼리 속도 5-10배 개선</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>비용 관리</h2>
+
+<p>각 아키텍처 패턴별 비용 관리 전략:</p>
+
+<ul>
+    <li><strong>Lambda:</strong> 배치 계층은 스팟 인스턴스 활용, 속도 계층은 자동 스케일링</li>
+    <li><strong>Kappa:</strong> Kafka 스토리지 계층화, 오래된 로그는 저비용 스토리지로 이동</li>
+    <li><strong>Data Mesh:</strong> 도메인별 비용 추적, 사용량 기반 차지백</li>
+    <li><strong>Medallion:</strong> Bronze는 압축 우선, Silver/Gold는 컴퓨트 최적화</li>
+</ul>
+
+<h2>모니터링 및 관찰성</h2>
+
+<p>아키텍처별 핵심 모니터링 메트릭:</p>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>메트릭 유형</th>
+            <th>측정 항목</th>
+            <th>임계값 예시</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>처리 지연</strong></td>
+            <td>데이터 도착부터 처리 완료까지 시간</td>
+            <td>실시간: &lt;1분, 배치: &lt;1시간</td>
+        </tr>
+        <tr>
+            <td><strong>데이터 품질</strong></td>
+            <td>검증 실패율, NULL 비율, 중복 비율</td>
+            <td>실패율 &lt;0.1%, NULL &lt;1%</td>
+        </tr>
+        <tr>
+            <td><strong>시스템 건강성</strong></td>
+            <td>CPU, 메모리, 디스크 사용률</td>
+            <td>CPU &lt;80%, 메모리 &lt;85%</td>
+        </tr>
+        <tr>
+            <td><strong>비용</strong></td>
+            <td>일일/월간 인프라 비용</td>
+            <td>예산 대비 ±10% 이내</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>요약</h2>
+
+<p>이 장에서 다룬 주요 아키텍처 패턴:</p>
+
+<ul>
+    <li><strong>Lambda 아키텍처:</strong> 배치 + 스트림 처리로 정확성과 낮은 지연 모두 달성</li>
+    <li><strong>Kappa 아키텍처:</strong> 스트림 처리만으로 단순성 확보, 로그 리플레이로 재처리</li>
+    <li><strong>Data Mesh:</strong> 도메인 분산 소유, 데이터를 제품으로 관리</li>
+    <li><strong>Medallion:</strong> Bronze-Silver-Gold 계층으로 데이터 품질 점진적 향상</li>
+</ul>
+
+<p>올바른 아키텍처 선택은 조직의 규모, 기술 역량, 데이터 볼륨, 실시간 요구사항에 따라 결정됩니다. 많은 조직이 하이브리드 접근 방식으로 여러 패턴을 결합하여 사용합니다.</p>
+
+<div class="review-section">
+    <h3>복습 질문</h3>
+    <ol>
+        <li>Lambda 아키텍처의 세 가지 계층과 각각의 역할을 설명하세요.</li>
+        <li>Kappa 아키텍처가 Lambda보다 단순한 이유는 무엇인가요?</li>
+        <li>Data Mesh의 4가지 핵심 원칙을 나열하고 각각을 설명하세요.</li>
+        <li>Medallion 아키텍처에서 Bronze, Silver, Gold 계층의 차이점은?</li>
+        <li>실시간 처리가 중요하고 단순성을 원한다면 어떤 아키텍처를 선택해야 하나요?</li>
+        <li>하이브리드 아키텍처의 장점은 무엇인가요?</li>
+    </ol>
+</div>
+
+<hr>
+
+<p><a href="ch02.html">← 이전 장</a> | <a href="ch04.html">다음 장 →</a></p>
+</body>
+</html>

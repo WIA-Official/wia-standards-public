@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Implementation Guide | WIA-FIN-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(34, 197, 94, 0.2); padding: 1.5rem 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.25rem; font-weight: 800; color: #22c55e; text-decoration: none; }
+        .nav-links { display: flex; gap: 1rem; }
+        .nav-links a { color: #94a3b8; text-decoration: none; padding: 0.5rem 1rem; border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; transition: all 0.3s ease; }
+        .nav-links a:hover { border-color: #22c55e; color: #22c55e; }
+        .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #22c55e 0%, #10b981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        h2 { font-size: 2rem; font-weight: 700; color: #22c55e; margin: 3rem 0 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(34, 197, 94, 0.2); }
+        h3 { font-size: 1.5rem; font-weight: 600; color: #22c55e; margin: 2rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1.5rem; font-size: 1.125rem; }
+        .highlight { background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.75rem; }
+        .code-block { background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        .code-block code { color: #22c55e; font-family: 'Monaco', 'Courier New', monospace; font-size: 0.9rem; white-space: pre; }
+        .chapter-nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(34, 197, 94, 0.2); }
+        .chapter-nav a { color: #22c55e; text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid #22c55e; border-radius: 8px; transition: all 0.3s ease; }
+        .chapter-nav a:hover { background: rgba(34, 197, 94, 0.1); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="index.html" class="logo">🌍 WIA-FIN-014</a>
+            <div class="nav-links">
+                <a href="index.html">← Contents</a>
+                <a href="../../index.html">Home</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>Chapter 4: Implementation Guide</h1>
+
+        <div class="highlight">
+            <p><strong>In this chapter:</strong> Practical step-by-step guide to implementing cross-border payment systems using the WIA-FIN-014 SDK, including code examples, API integration patterns, and development workflows.</p>
+        </div>
+
+        <h2>4.1 Getting Started</h2>
+
+        <h3>Installation</h3>
+        <div class="code-block"><code>npm install @wia/cross-border-payment-sdk</code></div>
+
+        <h3>Configuration</h3>
+        <div class="code-block"><code>import { CrossBorderPaymentClient } from '@wia/cross-border-payment-sdk';
+
+const client = new CrossBorderPaymentClient({
+  apiKey: process.env.WIA_API_KEY,
+  environment: 'production', // or 'sandbox'
+  options: {
+    timeout: 30000,
+    retries: 3,
+    baseURL: 'https://api.wia.org/fin-014/v1'
+  }
+});</code></div>
+
+        <h2>4.2 Creating Your First Payment</h2>
+
+        <h3>Step 1: Get FX Quote</h3>
+        <div class="code-block"><code>const quote = await client.getQuote({
+  from: 'USD',
+  to: 'PHP',
+  amount: 1000,
+  method: 'SWIFT'
+});
+
+console.log('Exchange Rate:', quote.rate);
+console.log('Recipient Amount:', quote.destinationAmount);
+console.log('Fees:', quote.fees);
+console.log('Total Cost:', quote.totalCost);</code></div>
+
+        <h3>Step 2: Verify Beneficiary</h3>
+        <div class="code-block"><code>const beneficiary = await client.createBeneficiary({
+  name: 'Jane Smith',
+  country: 'PH',
+  currency: 'PHP',
+  accountNumber: '1234567890',
+  bankCode: 'BDO',
+  accountType: 'SAVINGS',
+  address: {
+    street: '123 Makati Ave',
+    city: 'Manila',
+    postalCode: '1200',
+    country: 'PH'
+  }
+});
+
+console.log('Beneficiary ID:', beneficiary.id);</code></div>
+
+        <h3>Step 3: Initiate Payment</h3>
+        <div class="code-block"><code>const payment = await client.createPayment({
+  beneficiaryId: beneficiary.id,
+  amount: 1000,
+  currency: 'USD',
+  purpose: 'Family support',
+  reference: 'INV-2025-001',
+  method: 'SWIFT',
+  metadata: {
+    invoiceId: 'INV-2025-001',
+    customerEmail: 'john.doe@example.com'
+  }
+});
+
+console.log('Payment ID:', payment.id);
+console.log('Status:', payment.status);
+console.log('Estimated Delivery:', payment.estimatedDelivery);</code></div>
+
+        <h2>4.3 Payment Status Tracking</h2>
+
+        <h3>Polling Method</h3>
+        <div class="code-block"><code>async function waitForCompletion(paymentId: string) {
+  let status = 'PENDING';
+
+  while (status !== 'COMPLETED' && status !== 'FAILED') {
+    const payment = await client.getPayment(paymentId);
+    status = payment.status;
+
+    console.log(`Status: ${status}`);
+
+    if (status === 'COMPLETED') {
+      console.log('Payment completed successfully!');
+      console.log('Transaction Reference:', payment.transactionReference);
+      return payment;
+    }
+
+    if (status === 'FAILED') {
+      console.error('Payment failed:', payment.failureReason);
+      throw new Error(payment.failureReason);
+    }
+
+    await sleep(5000); // Wait 5 seconds before next poll
+  }
+}</code></div>
+
+        <h3>Webhook Method (Recommended)</h3>
+        <div class="code-block"><code>// Express.js webhook endpoint
+app.post('/webhooks/payment', async (req, res) => {
+  const signature = req.headers['x-wia-signature'];
+
+  // Verify webhook signature
+  const isValid = client.verifyWebhookSignature(
+    req.body,
+    signature,
+    process.env.WEBHOOK_SECRET
+  );
+
+  if (!isValid) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  const event = req.body;
+
+  switch (event.type) {
+    case 'payment.created':
+      console.log('Payment created:', event.data.id);
+      break;
+
+    case 'payment.processing':
+      console.log('Payment processing:', event.data.id);
+      break;
+
+    case 'payment.completed':
+      console.log('Payment completed:', event.data.id);
+      await updateDatabase(event.data);
+      await sendConfirmationEmail(event.data);
+      break;
+
+    case 'payment.failed':
+      console.error('Payment failed:', event.data.failureReason);
+      await notifyCustomer(event.data);
+      break;
+  }
+
+  res.sendStatus(200);
+});</code></div>
+
+        <h2>4.4 Advanced Features</h2>
+
+        <h3>Batch Payments</h3>
+        <div class="code-block"><code>const batch = await client.createBatchPayment({
+  payments: [
+    {
+      beneficiaryId: 'BEN-001',
+      amount: 500,
+      currency: 'USD',
+      purpose: 'Salary payment'
+    },
+    {
+      beneficiaryId: 'BEN-002',
+      amount: 750,
+      currency: 'USD',
+      purpose: 'Supplier payment'
+    },
+    {
+      beneficiaryId: 'BEN-003',
+      amount: 1000,
+      currency: 'USD',
+      purpose: 'Contractor payment'
+    }
+  ],
+  method: 'SWIFT',
+  scheduledDate: '2025-12-30'
+});
+
+console.log('Batch ID:', batch.id);
+console.log('Total Amount:', batch.totalAmount);
+console.log('Payment Count:', batch.paymentCount);</code></div>
+
+        <h3>FX Rate Locking</h3>
+        <div class="code-block"><code>// Lock rate for 24 hours
+const rateLock = await client.lockFxRate({
+  from: 'USD',
+  to: 'EUR',
+  amount: 10000,
+  duration: 86400 // 24 hours in seconds
+});
+
+console.log('Locked Rate:', rateLock.rate);
+console.log('Expires At:', rateLock.expiresAt);
+
+// Use locked rate for payment
+const payment = await client.createPayment({
+  beneficiaryId: 'BEN-123',
+  amount: 10000,
+  currency: 'USD',
+  rateLockId: rateLock.id
+});</code></div>
+
+        <h3>Compliance Pre-Check</h3>
+        <div class="code-block"><code>const complianceCheck = await client.checkCompliance({
+  sender: {
+    name: 'John Doe',
+    country: 'US',
+    idType: 'PASSPORT',
+    idNumber: 'AB1234567'
+  },
+  recipient: {
+    name: 'Jane Smith',
+    country: 'PH'
+  },
+  amount: 10000,
+  currency: 'USD'
+});
+
+if (complianceCheck.approved) {
+  console.log('Compliance check passed');
+} else {
+  console.log('Additional verification required');
+  console.log('Reasons:', complianceCheck.reasons);
+}</code></div>
+
+        <h2>4.5 Error Handling</h2>
+
+        <div class="code-block"><code>try {
+  const payment = await client.createPayment(paymentData);
+} catch (error) {
+  if (error instanceof WiaApiError) {
+    switch (error.code) {
+      case 'INSUFFICIENT_BALANCE':
+        console.log('Insufficient balance in account');
+        break;
+
+      case 'INVALID_BENEFICIARY':
+        console.log('Beneficiary details invalid');
+        break;
+
+      case 'COMPLIANCE_FAILED':
+        console.log('Compliance check failed');
+        console.log('Reason:', error.message);
+        break;
+
+      case 'RATE_LIMIT_EXCEEDED':
+        console.log('Too many requests, retry later');
+        await sleep(error.retryAfter * 1000);
+        break;
+
+      default:
+        console.error('Payment error:', error.message);
+    }
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}</code></div>
+
+        <h2>4.6 Testing</h2>
+
+        <h3>Sandbox Environment</h3>
+        <div class="code-block"><code>// Use sandbox for testing
+const testClient = new CrossBorderPaymentClient({
+  apiKey: process.env.WIA_SANDBOX_KEY,
+  environment: 'sandbox'
+});
+
+// Sandbox test cards and accounts
+const testBeneficiary = await testClient.createBeneficiary({
+  name: 'Test Beneficiary',
+  country: 'PH',
+  accountNumber: 'TEST-1234567890', // Sandbox test account
+  bankCode: 'BDO'
+});</code></div>
+
+        <h3>Unit Tests Example</h3>
+        <div class="code-block"><code>import { describe, it, expect } from 'vitest';
+import { CrossBorderPaymentClient } from '@wia/cross-border-payment-sdk';
+
+describe('Cross-Border Payment', () => {
+  const client = new CrossBorderPaymentClient({
+    apiKey: 'test-key',
+    environment: 'sandbox'
+  });
+
+  it('should create payment successfully', async () => {
+    const payment = await client.createPayment({
+      beneficiaryId: 'TEST-BEN-001',
+      amount: 100,
+      currency: 'USD',
+      purpose: 'Test payment'
+    });
+
+    expect(payment.id).toBeDefined();
+    expect(payment.status).toBe('PENDING');
+  });
+
+  it('should handle invalid beneficiary', async () => {
+    await expect(
+      client.createPayment({
+        beneficiaryId: 'INVALID',
+        amount: 100,
+        currency: 'USD'
+      })
+    ).rejects.toThrow('Invalid beneficiary');
+  });
+});</code></div>
+
+        <div class="highlight">
+            <p><strong>💡 Best Practices:</strong></p>
+            <ul>
+                <li>Always use webhooks for production systems instead of polling</li>
+                <li>Implement idempotency keys to safely retry failed requests</li>
+                <li>Store webhook secrets securely in environment variables</li>
+                <li>Test thoroughly in sandbox before going to production</li>
+                <li>Implement proper error handling and logging</li>
+                <li>Use rate limiting to avoid API throttling</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

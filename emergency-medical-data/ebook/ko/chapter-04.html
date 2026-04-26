@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 실시간 위치 공유 - WIA MED-018</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #ef4444;">제4장: 실시간 위치 공유 - GPS 기반 응급 대응</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #fbbf24; margin: 20px 0;">
+<p style="color: #fbbf24; font-style: italic;">"응급 상황에서 '어디에 있는가'는 '언제 도착하는가'를 결정하고, 이는 곧 생존 여부를 좌우합니다."</p>
+<p style="color: #64748b; font-size: 0.9em; margin-top: 10px;">— 응급의료 위치 기반 서비스 연구</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.1 위치 기반 응급의료의 중요성</h2>
+
+<p><strong style="color: #ef4444;">실시간 위치 추적</strong>은 응급의료 서비스의 핵심 인프라입니다. 정확한 위치 정보는 신속한 출동과 효율적인 자원 배분을 가능하게 합니다.</p>
+
+<h3 style="color: #ef4444;">📍 위치 데이터가 해결하는 문제</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">부정확한 위치 신고</strong> — 신고자가 정확한 주소를 모르는 경우</li>
+    <li><strong style="color: #e2e8f0;">구급차 배치 최적화</strong> — 가장 가까운 가용 구급차 선택</li>
+    <li><strong style="color: #e2e8f0;">도착 시간 예측</strong> — 병원이 환자 도착 준비 가능</li>
+    <li><strong style="color: #e2e8f0;">경로 최적화</strong> — 실시간 교통 상황 반영</li>
+    <li><strong style="color: #e2e8f0;">안전 관리</strong> — 구급대원 위치 파악 및 지원</li>
+</ul>
+
+<h3 style="color: #ef4444;">⏱️ 위치 정확도와 대응 시간</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">위치 정확도</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">평균 도착 시간</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">골든 아워 달성률</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">주소 기반 (수동 입력)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">12-15분</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">68%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">GPS (±50m)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">8-10분</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">84%</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">고정밀 GPS (±5m)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">6-8분</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">93%</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">3D 위치 (층수 포함)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">5-7분</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">97%</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.2 WIA MED-018 위치 데이터 구조</h2>
+
+<h3 style="color: #ef4444;">🗺️ 위치 정보 표준 형식</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">{
+  "standard": "WIA-MED-018",
+  "messageType": "LOCATION_UPDATE",
+  "timestamp": "2025-12-26T14:23:45.123Z",
+
+  "entity": {
+    "type": "AMBULANCE" | "PATIENT" | "INCIDENT_SITE",
+    "id": "AMB-SN-001",
+    "callSign": "서울119-성북-01"
+  },
+
+  "location": {
+    "coordinates": {
+      "latitude": 37.588924,
+      "longitude": 127.016853,
+      "altitude": 125.5,  // 해발 고도 (m)
+      "accuracy": 4.2,  // 정확도 (m)
+      "verticalAccuracy": 8.5  // 수직 정확도 (m)
+    },
+    "address": {
+      "full": "서울특별시 성북구 정릉동 123-45",
+      "city": "서울특별시",
+      "district": "성북구",
+      "neighborhood": "정릉동",
+      "street": "정릉로",
+      "building": "정릉아파트 101동",
+      "floor": 8,
+      "unit": "804호",
+      "postalCode": "02768"
+    },
+    "landmark": {
+      "name": "국민대학교 정문",
+      "distance": 150,  // 미터
+      "direction": "북동쪽"
+    },
+    "what3words": "///준비.학교.친구"  // What3Words 주소
+  },
+
+  "movement": {
+    "speed": 45.5,  // km/h
+    "heading": 135,  // 도 (0-359, 0=북)
+    "isMoving": true,
+    "movementType": "VEHICLE"
+  },
+
+  "route": {
+    "origin": {
+      "latitude": 37.577123,
+      "longitude": 127.009456,
+      "name": "성북소방서"
+    },
+    "destination": {
+      "latitude": 37.588924,
+      "longitude": 127.016853,
+      "name": "사고 현장"
+    },
+    "waypoints": [
+      {"lat": 37.580123, "lon": 127.011234, "name": "정릉사거리"}
+    ],
+    "distanceRemaining": 1.2,  // km
+    "timeRemaining": 180,  // 초
+    "eta": "2025-12-26T14:26:45Z"
+  },
+
+  "quality": {
+    "source": "GPS" | "NETWORK" | "CELL_TOWER" | "WIFI",
+    "satellites": 12,
+    "hdop": 1.2,  // Horizontal Dilution of Precision
+    "signalStrength": -75  // dBm
+  },
+
+  "context": {
+    "environment": "URBAN" | "SUBURBAN" | "RURAL" | "HIGHWAY",
+    "trafficCondition": "HEAVY" | "MODERATE" | "LIGHT" | "NONE",
+    "weather": "CLEAR" | "RAIN" | "SNOW" | "FOG",
+    "roadCondition": "DRY" | "WET" | "ICY"
+  }
+}</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.3 다층 위치 추적 시스템</h2>
+
+<h3 style="color: #ef4444;">🏢 실내 위치 추적 (Indoor Positioning)</h3>
+
+<p>대형 건물이나 지하에서는 GPS만으로는 부족합니다. WIA MED-018은 다중 기술을 통합합니다.</p>
+
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">기술</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">정확도</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">장점</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">용도</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">WiFi 삼각측량</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">5-15m</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">기존 인프라 활용</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">사무실, 상업 건물</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">Bluetooth Beacon</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">1-3m</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">저전력, 저비용</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">병원, 대형 쇼핑몰</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">UWB (Ultra-Wideband)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">10-30cm</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">매우 정확</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">중요 시설</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">기압계 (고도)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">1-2층</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">층수 파악</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">고층 건물</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">지도 매칭</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">건물 구조 기반</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">문맥 인식</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모든 실내</td>
+    </tr>
+</table>
+
+<h3 style="color: #ef4444;">📱 모바일 기기 통합</h3>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #475569;">
+<code style="color: #34d399;">// 스마트폰 센서 데이터 융합
+{
+  "sensorFusion": {
+    "gps": { "lat": 37.5889, "lon": 127.0169, "accuracy": 5 },
+    "wifi": [
+      { "ssid": "Building_WiFi_1F", "signal": -45 },
+      { "ssid": "Building_WiFi_2F", "signal": -72 }
+    ],
+    "bluetooth": [
+      { "uuid": "beacon-lobby", "rssi": -55, "distance": 3.2 },
+      { "uuid": "beacon-elevator", "rssi": -68, "distance": 8.1 }
+    ],
+    "barometer": {
+      "pressure": 1005.2,  // hPa
+      "estimatedFloor": 8
+    },
+    "accelerometer": {
+      "activity": "WALKING",
+      "steps": 45
+    }
+  },
+  "finalEstimate": {
+    "latitude": 37.588924,
+    "longitude": 127.016853,
+    "floor": 8,
+    "confidence": 0.94
+  }
+}</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.4 구급차 실시간 추적</h2>
+
+<h3 style="color: #ef4444;">🚑 AVL (Automatic Vehicle Location) 시스템</h3>
+
+<p>모든 구급차는 실시간으로 위치를 보고하며, 119 상황실은 전체 차량을 모니터링합니다.</p>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">{
+  "ambulanceId": "AMB-SN-001",
+  "status": "EN_ROUTE_TO_SCENE" | "ON_SCENE" | "TRANSPORTING" | "AVAILABLE",
+  "crew": {
+    "paramedic": "김철수",
+    "emt": "이영희",
+    "driver": "박운전"
+  },
+
+  "currentLocation": {
+    "latitude": 37.5789,
+    "longitude": 127.0123,
+    "speed": 62,  // km/h
+    "heading": 45,
+    "updateInterval": 5  // 초
+  },
+
+  "assignment": {
+    "incidentId": "INC-20251226-001234",
+    "dispatchTime": "2025-12-26T14:20:45Z",
+    "sceneLocation": {
+      "latitude": 37.5889,
+      "longitude": 127.0169,
+      "address": "서울시 성북구 정릉동 123-45"
+    },
+    "distanceToScene": 1.8,  // km
+    "etaToScene": "2025-12-26T14:24:30Z",
+
+    "destinationHospital": {
+      "id": "HOSP-SNU-001",
+      "name": "서울대학교병원",
+      "location": {
+        "latitude": 37.5794,
+        "longitude": 126.9951
+      },
+      "etaToHospital": null  // 아직 출발 전
+    }
+  },
+
+  "vehicleInfo": {
+    "make": "Mercedes",
+    "model": "Sprinter",
+    "year": 2024,
+    "equipmentLevel": "ALS",  // Advanced Life Support
+    "fuelLevel": 78,  // %
+    "mileage": 45231,
+    "lastMaintenance": "2025-12-01"
+  },
+
+  "telemetry": {
+    "engineOn": true,
+    "lightsOn": true,
+    "sirenOn": true,
+    "doorsStatus": "CLOSED",
+    "climateControl": 22  // °C
+  }
+}</code>
+</pre>
+
+<h3 style="color: #ef4444;">🗺️ 경로 최적화 알고리즘</h3>
+
+<p>실시간 교통 상황, 도로 공사, 사고 정보를 반영하여 최적 경로를 계산합니다.</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">실시간 교통 데이터</strong> — 구글맵, 카카오맵 등과 연동</li>
+    <li><strong style="color: #e2e8f0;">신호 우선 제어</strong> — 구급차 접근 시 신호등 자동 제어</li>
+    <li><strong style="color: #e2e8f0;">긴급 차선 안내</strong> — 버스 전용 차선, 갓길 사용 가능 구간 표시</li>
+    <li><strong style="color: #e2e8f0;">동적 재경로</strong> — 예상치 못한 정체 시 즉시 대안 경로 제공</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.5 병원 선택 및 사전 알림</h2>
+
+<h3 style="color: #ef4444;">🏥 최적 병원 선택 알고리즘</h3>
+
+<p>단순히 가까운 병원이 아니라, 환자 상태에 가장 적합한 병원을 선택합니다.</p>
+
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">고려 요소</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">가중치</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">세부 항목</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">거리/시간</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">30%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">이송 거리, 예상 소요 시간</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">병원 능력</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">40%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">외상센터 레벨, 전문과 유무</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">수용 가능성</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">20%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">응급실 혼잡도, 병상 가용성</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">특수 자원</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">10%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Cath Lab, 수술실, ECMO 등</td>
+    </tr>
+</table>
+
+<h3 style="color: #ef4444;">📲 병원 사전 알림 시스템</h3>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #475569;">
+<code style="color: #34d399;">{
+  "preArrivalNotification": {
+    "hospitalId": "HOSP-SNU-001",
+    "notificationTime": "2025-12-26T14:30:00Z",
+    "eta": "2025-12-26T14:42:00Z",
+    "timeToArrival": 12,  // 분
+
+    "patientSummary": {
+      "acuity": "CRITICAL",
+      "chiefComplaint": "급성 심근경색 의심",
+      "age": 52,
+      "vitals": {
+        "bp": "155/90",
+        "hr": 108,
+        "spo2": 96
+      }
+    },
+
+    "requiredResources": [
+      "심혈관조영술실 (Cath Lab)",
+      "심장내과 당직의",
+      "심장중환자실 병상"
+    ],
+
+    "ambulanceLocation": {
+      "currentPosition": {
+        "lat": 37.5856,
+        "lon": 127.0089
+      },
+      "trackingUrl": "https://track.ems.kr/AMB-SN-001",
+      "liveETA": "실시간 업데이트 중"
+    }
+  }
+}</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.6 대시민 위치 공유</h2>
+
+<h3 style="color: #ef4444;">📞 119 신고 시 자동 위치 전송</h3>
+
+<p>스마트폰으로 119에 전화하면 자동으로 GPS 위치가 전송됩니다.</p>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">// 자동 위치 전송 (AML - Advanced Mobile Location)
+{
+  "callType": "119_EMERGENCY",
+  "callerId": "+82-10-1234-5678",
+  "timestamp": "2025-12-26T14:20:15Z",
+
+  "automaticLocation": {
+    "method": "AML",
+    "location": {
+      "latitude": 37.588924,
+      "longitude": 127.016853,
+      "accuracy": 8,
+      "source": "GPS"
+    },
+    "device": {
+      "os": "Android 14",
+      "model": "Samsung Galaxy S24",
+      "battery": 45  // %
+    }
+  },
+
+  "callCenterDisplay": {
+    "mapView": "구글맵에 표시됨",
+    "address": "서울시 성북구 정릉동 123-45",
+    "nearestLandmark": "국민대학교 정문에서 150m",
+    "what3words": "///준비.학교.친구"
+  }
+}</code>
+</pre>
+
+<h3 style="color: #ef4444;">🚨 비상 위치 공유 앱</h3>
+
+<p>의식을 잃을 수 있는 환자를 위한 사전 설정 기능입니다.</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">낙상 감지</strong> — 스마트워치가 낙상 감지 시 자동 신고</li>
+    <li><strong style="color: #e2e8f0;">SOS 버튼</strong> — 긴급 버튼 누르면 위치와 의료 정보 전송</li>
+    <li><strong style="color: #e2e8f0;">주기적 체크인</strong> — 일정 시간 무응답 시 자동 알림</li>
+    <li><strong style="color: #e2e8f0;">보호자 알림</strong> — 등록된 가족에게 즉시 위치 공유</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.7 프라이버시 보호</h2>
+
+<h3 style="color: #ef4444;">🔒 위치 데이터 보안</h3>
+
+<p>민감한 위치 정보는 엄격하게 보호되어야 합니다.</p>
+
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">보안 조치</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">설명</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">종단 간 암호화</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">TLS 1.3, AES-256 암호화</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">접근 제어</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">역할 기반 권한 관리 (RBAC)</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">익명화</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">분석 시 개인 식별 정보 제거</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">자동 삭제</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">사건 종료 후 30일 자동 삭제</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">감사 로그</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모든 접근 기록 보관</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.8 실제 활용 사례</h2>
+
+<h3 style="color: #ef4444;">💼 사례: 산악 조난 구조</h3>
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+<p style="color: #e2e8f0;">
+<strong style="color: #fbbf24;">상황:</strong><br>
+등산객이 북한산에서 넘어져 다리 골절. 정확한 위치를 설명하지 못함.
+</p>
+<p style="color: #e2e8f0; margin-top: 15px;">
+<strong style="color: #10b981;">WIA MED-018 활용:</strong><br>
+1. 119 신고 시 자동으로 GPS 위치 전송<br>
+2. 3D 지형도에 정확한 위치 표시<br>
+3. 가장 가까운 등산로 입구부터 경로 안내<br>
+4. 구조헬기에 좌표 전송
+</p>
+<p style="color: #e2e8f0; margin-top: 15px;">
+<strong style="color: #10b981;">결과:</strong><br>
+• 기존 평균 구조 시간: <strong>90분</strong><br>
+• WIA MED-018 적용 후: <strong>32분</strong><br>
+• 시간 절감: <strong>64%</strong>
+</p>
+</div>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">4.9 미래 기술</h2>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">5G 네트워크</strong> — 밀리초 단위 위치 업데이트</li>
+    <li><strong style="color: #e2e8f0;">AR 네비게이션</strong> — 증강현실로 실내 경로 안내</li>
+    <li><strong style="color: #e2e8f0;">드론 연동</strong> — 드론이 먼저 현장 도착하여 정확한 위치 파악</li>
+    <li><strong style="color: #e2e8f0;">양자 암호화</strong> — 완벽한 위치 데이터 보안</li>
+    <li><strong style="color: #e2e8f0;">위성 직접 연결</strong> — 통신 두절 지역에서도 위치 전송</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 30px 0;">
+    <h3 style="color: #ef4444;">📚 다음 장 미리보기</h3>
+    <p style="color: #94a3b8;">제5장에서는 <strong style="color: #e2e8f0;">병원 수용 능력 데이터</strong>를 다룹니다. 실시간 병상 현황과 자원 정보를 통해 최적의 병원 선택을 지원하는 시스템을 학습합니다.</p>
+</div>
+</body>
+</html>

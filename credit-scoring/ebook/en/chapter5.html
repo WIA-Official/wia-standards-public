@@ -1,0 +1,109 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ch5: AI/ML Development|WIA-FIN-020</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.8}.header{background:rgba(30,41,59,0.8);border-bottom:1px solid rgba(34,197,94,0.2);padding:2rem}.container{max-width:900px;margin:0 auto;padding:3rem 2rem}.content{background:rgba(30,41,59,0.3);border-radius:12px;padding:3rem}h2{color:#22c55e;font-size:2rem;margin:2rem 0 1rem}h3{color:#22c55e;margin:1.5rem 0 1rem}p,ul{color:#cbd5e1;margin-bottom:1rem}ul{margin-left:2rem}.btn{padding:0.5rem 1rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:6px;color:#22c55e;text-decoration:none}.footer-nav{display:flex;justify-content:space-between;margin-top:3rem;padding-top:2rem;border-top:1px solid rgba(34,197,94,0.2)}.code{background:rgba(15,23,42,0.8);border:1px solid rgba(34,197,94,0.3);padding:1.5rem;margin:1rem 0;border-radius:8px;overflow-x:auto}.code pre{color:#22c55e;font-family:monospace}</style></head><body><header class="header"><div style="max-width:900px;margin:0 auto;display:flex;justify-content:space-between;align-items:center"><div><h1 style="font-size:1.8rem;background:linear-gradient(135deg,#22c55e,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Chapter 5: AI/ML Model Development</h1><p style="color:#94a3b8">📊 WIA-FIN-020</p></div><div style="display:flex;gap:1rem"><a href="chapter4.html" class="btn">← Prev</a><a href="index.html" class="btn">Contents</a><a href="chapter6.html" class="btn">Next →</a></div></div></header><div class="container"><div class="content"><h2>Machine Learning Pipeline</h2><p>Building production-ready credit scoring models requires systematic approach combining data science best practices with regulatory requirements.</p><h3>1. Data Preparation</h3><div class="code"><pre>
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+# Load historical applications with outcomes
+df = pd.read_parquet('credit_applications_2020_2024.parquet')
+
+# Target variable: 1=default, 0=paid as agreed
+# Definition: 90+ days past due within 24 months
+df['target'] = (df['worst_status_24m'] >= 90).astype(int)
+
+# Train/Val/Test split (60/20/20) with time-based split
+train = df[df['application_date'] < '2023-01-01']
+val = df[(df['application_date'] >= '2023-01-01') & 
+         (df['application_date'] < '2024-01-01')]
+test = df[df['application_date'] >= '2024-01-01']
+
+print(f"Train: {len(train):,} | Val: {len(val):,} | Test: {len(test):,}")
+print(f"Default Rate - Train: {train.target.mean():.2%}")
+</pre></div><h3>2. Feature Engineering</h3><ul><li><strong>Bureau Features (50+):</strong> Payment history, utilization, inquiries, derogatory marks</li><li><strong>Alternative Data (100+):</strong> Bank transactions, rent, utilities</li><li><strong>Derived Features (200+):</strong> Ratios, trends, aggregations</li><li><strong>Interaction Features (150+):</strong> Combinations of important variables</li></ul><h3>3. Model Training</h3><div class="code"><pre>
+import xgboost as xgb
+from sklearn.metrics import roc_auc_score
+
+# XGBoost for credit scoring
+model = xgb.XGBClassifier(
+    max_depth=6,
+    learning_rate=0.05,
+    n_estimators=200,
+    objective='binary:logistic',
+    subsample=0.8,
+    colsample_bytree=0.8,
+    scale_pos_weight=10,  # Handle imbalance
+    eval_metric='auc',
+    early_stopping_rounds=20
+)
+
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_val, y_val)],
+    verbose=10
+)
+
+# Evaluate
+val_pred = model.predict_proba(X_val)[:, 1]
+auc = roc_auc_score(y_val, val_pred)
+print(f"Validation AUC: {auc:.4f}")
+</pre></div><h3>4. Model Calibration</h3><p>Ensure predicted probabilities match observed default rates:</p><div class="code"><pre>
+from sklearn.calibration import CalibratedClassifierCV
+
+# Isotonic regression calibration
+calibrated_model = CalibratedClassifierCV(
+    model, 
+    method='isotonic',
+    cv='prefit'
+)
+calibrated_model.fit(X_val, y_val)
+
+# Verify calibration
+from sklearn.calibration import calibration_curve
+
+prob_true, prob_pred = calibration_curve(
+    y_test, 
+    calibrated_model.predict_proba(X_test)[:, 1],
+    n_bins=10
+)
+# Plot and verify diagonal alignment
+</pre></div><h3>5. Model Explainability</h3><div class="code"><pre>
+import shap
+
+# Generate SHAP explanations
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(X_test)
+
+# Global feature importance
+shap.summary_plot(shap_values, X_test)
+
+# Individual explanation
+def explain_score(applicant_features):
+    shap_vals = explainer.shap_values(applicant_features)
+    
+    # Get top factors
+    factors = []
+    for idx in np.argsort(np.abs(shap_vals[0]))[-5:]:
+        factors.append({
+            'name': feature_names[idx],
+            'value': applicant_features[0, idx],
+            'impact': shap_vals[0, idx],
+            'direction': 'positive' if shap_vals[0, idx] > 0 else 'negative'
+        })
+    
+    return factors
+</pre></div><h2>Advanced Techniques</h2><h3>Ensemble Methods</h3><ul><li>Combine XGBoost + LightGBM + Neural Network</li><li>Stacking with logistic regression meta-learner</li><li>Weighted averaging based on validation performance</li><li>Improves robustness and accuracy</li></ul><h3>Hyperparameter Optimization</h3><ul><li><strong>Grid Search:</strong> Exhaustive but slow</li><li><strong>Random Search:</strong> More efficient</li><li><strong>Bayesian Optimization:</strong> Most efficient (Optuna, Hyperopt)</li><li><strong>AutoML:</strong> H2O.ai, Auto-sklearn for automated tuning</li></ul><h3>Class Imbalance Handling</h3><ul><li><strong>SMOTE:</strong> Synthetic minority oversampling</li><li><strong>Undersampling:</strong> Reduce majority class</li><li><strong>Class Weights:</strong> Penalize false negatives more</li><li><strong>Threshold Tuning:</strong> Optimize decision boundary</li></ul><h3>Feature Selection</h3><ul><li>Remove low-importance features (< 0.1% contribution)</li><li>Eliminate highly correlated features (r > 0.95)</li><li>Recursive feature elimination (RFE)</li><li>L1 regularization (Lasso) for sparsity</li></ul><h2>Model Validation</h2><h3>Performance Metrics</h3><ul><li><strong>AUC-ROC:</strong> Primary metric (target: 0.82+)</li><li><strong>Precision-Recall AUC:</strong> For imbalanced data</li><li><strong>KS Statistic:</strong> Maximum separation between good/bad</li><li><strong>Gini Coefficient:</strong> 2×AUC - 1</li><li><strong>Brier Score:</strong> Calibration quality</li></ul><h3>Stability Testing</h3><ul><li><strong>PSI:</strong> Population Stability Index (< 0.1 stable)</li><li><strong>CSI:</strong> Characteristic Stability Index</li><li><strong>Out-of-time validation:</strong> Test on future data</li><li><strong>Stress testing:</strong> Recession scenarios</li></ul><h3>Fairness Validation</h3><ul><li>Demographic parity across protected groups</li><li>Equal opportunity (TPR equality)</li><li>Calibration by subgroup</li><li>Disparate impact ratio (> 0.80)</li></ul><h2>Deployment Strategy</h2><h3>Model Serialization</h3><div class="code"><pre>
+import joblib
+import mlflow
+
+# Save model artifacts
+joblib.dump(model, 'credit_model_v1.pkl')
+joblib.dump(scaler, 'scaler_v1.pkl')
+joblib.dump(feature_names, 'features_v1.pkl')
+
+# MLflow tracking
+mlflow.log_model(model, "credit_scoring_model")
+mlflow.log_metrics({
+    'auc': auc,
+    'precision': precision,
+    'recall': recall
+})
+</pre></div><h3>A/B Testing</h3><ul><li>Run new model on 10% of traffic initially</li><li>Compare approval rates, default rates, revenue</li><li>Gradually increase to 25% → 50% → 100%</li><li>Revert if performance degrades</li></ul><h3>Monitoring</h3><ul><li><strong>Model Performance:</strong> Track AUC, precision, recall weekly</li><li><strong>Data Drift:</strong> Compare feature distributions</li><li><strong>Prediction Drift:</strong> Monitor score distribution changes</li><li><strong>Business Metrics:</strong> Approval rate, default rate, revenue</li></ul><h2>Retraining Schedule</h2><ul><li><strong>Quarterly:</strong> Standard retraining with new data</li><li><strong>Monthly:</strong> If rapid market changes</li><li><strong>Triggered:</strong> If PSI > 0.25 or performance drops > 5%</li><li><strong>Annual:</strong> Major model overhaul with architecture changes</li></ul><p>Next chapter covers ensuring fairness, ethics, and regulatory compliance in credit scoring systems.</p><div class="footer-nav"><a href="chapter4.html" class="btn">← Prev: Implementation</a><a href="chapter6.html" class="btn">Next: Fairness & Compliance →</a></div></div></div></body></html>

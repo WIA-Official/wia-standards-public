@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Cloud Simulator - WIA-ENE-014</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --primary: #3B82F6;
+            --secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --accent: #60a5fa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--secondary);
+            padding: 1rem 2rem;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .back-btn {
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--secondary);
+            border-bottom: 1px solid var(--primary);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            color: var(--text);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .content {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel {
+            background: var(--secondary);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .panel h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .code-block {
+            background: #000;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            overflow-x: auto;
+            font-size: 0.875rem;
+            border: 1px solid var(--primary);
+        }
+
+        .code-block pre {
+            margin: 0;
+            color: #10b981;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-dim);
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg);
+            border: 1px solid var(--primary);
+            border-radius: 0.375rem;
+            color: var(--text);
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .metric {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 0.375rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .metric-label {
+            color: var(--text-dim);
+            font-size: 0.875rem;
+        }
+
+        .chart {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 0.375rem;
+            height: 200px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-online {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .status-offline {
+            background: var(--danger);
+        }
+
+        .log-output {
+            background: #000;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 0.875rem;
+            border: 1px solid var(--primary);
+        }
+
+        .log-entry {
+            margin-bottom: 0.25rem;
+            font-family: 'Monaco', monospace;
+        }
+
+        .log-info { color: #3B82F6; }
+        .log-success { color: #10b981; }
+        .log-warning { color: #f59e0b; }
+        .log-error { color: #ef4444; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        th {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.3s;
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Energy Cloud</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="header">
+        <div class="logo">☁️ Energy Cloud Simulator</div>
+        <a href="../index.html" class="back-btn">← Back to Home</a>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab(0)">📊 Data Format</button>
+        <button class="tab" onclick="switchTab(1)">🧮 Algorithms</button>
+        <button class="tab" onclick="switchTab(2)">🔌 Protocol</button>
+        <button class="tab" onclick="switchTab(3)">🔗 Integration</button>
+        <button class="tab" onclick="switchTab(4)">🧪 Test</button>
+    </div>
+
+    <div class="content">
+        <!-- Tab 1: Data Format -->
+        <div class="tab-content active" id="tab-0">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Energy Data Format</h2>
+
+            <div class="panel">
+                <h3>Energy Consumption Data Model</h3>
+                <div class="code-block">
+                    <pre>{
+  "version": "1.0",
+  "standard": "WIA-ENE-014",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "energyData": {
+    "consumption": {
+      "total": 1250.5,
+      "unit": "kWh",
+      "breakdown": {
+        "residential": 450.2,
+        "commercial": 550.8,
+        "industrial": 249.5
+      }
+    },
+    "generation": {
+      "total": 1300.0,
+      "unit": "kWh",
+      "sources": {
+        "solar": 420.5,
+        "wind": 380.2,
+        "hydro": 250.0,
+        "grid": 249.3
+      }
+    },
+    "storage": {
+      "capacity": 500.0,
+      "current": 325.5,
+      "unit": "kWh",
+      "status": "charging"
+    }
+  },
+  "metadata": {
+    "location": "Seoul, South Korea",
+    "gridId": "KR-SE-001",
+    "quality": "high",
+    "confidence": 0.98
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Virtual Power Plant Data</h3>
+                <div class="code-block">
+                    <pre>{
+  "vppId": "VPP-KR-001",
+  "name": "Seoul Smart Grid VPP",
+  "capacity": 50000,
+  "unit": "kW",
+  "resources": [
+    {
+      "id": "SOLAR-001",
+      "type": "solar",
+      "capacity": 15000,
+      "current": 12500,
+      "efficiency": 0.83,
+      "location": { "lat": 37.5665, "lng": 126.9780 }
+    },
+    {
+      "id": "WIND-002",
+      "type": "wind",
+      "capacity": 20000,
+      "current": 18000,
+      "efficiency": 0.90,
+      "location": { "lat": 37.5700, "lng": 126.9850 }
+    },
+    {
+      "id": "BATTERY-003",
+      "type": "storage",
+      "capacity": 15000,
+      "current": 10000,
+      "soc": 0.67,
+      "location": { "lat": 37.5600, "lng": 126.9750 }
+    }
+  ],
+  "aggregatedOutput": 40500,
+  "status": "operational",
+  "lastUpdate": "2025-12-25T10:30:00Z"
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Data Format Generator</h3>
+                <div class="input-group">
+                    <label>Select Data Type</label>
+                    <select id="dataType">
+                        <option value="consumption">Energy Consumption</option>
+                        <option value="vpp">Virtual Power Plant</option>
+                        <option value="forecast">Demand Forecast</option>
+                        <option value="trading">Energy Trading</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="generateData()">Generate Sample Data</button>
+                <div id="generatedData" class="code-block" style="margin-top: 1rem; display: none;">
+                    <pre id="generatedDataOutput"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div class="tab-content" id="tab-1">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Energy Management Algorithms</h2>
+
+            <div class="panel">
+                <h3>Demand Forecasting Algorithm</h3>
+                <div class="code-block">
+                    <pre>// LSTM-based Energy Demand Forecasting
+class EnergyDemandForecaster {
+  constructor(config) {
+    this.lookbackPeriod = config.lookbackPeriod || 168; // 7 days in hours
+    this.forecastHorizon = config.forecastHorizon || 24; // 24 hours ahead
+    this.features = ['hour', 'dayOfWeek', 'temperature', 'humidity', 'historical'];
+  }
+
+  async forecast(historicalData) {
+    // Normalize input data
+    const normalized = this.normalize(historicalData);
+
+    // Extract features
+    const features = this.extractFeatures(normalized);
+
+    // LSTM prediction
+    const prediction = await this.lstmPredict(features);
+
+    // Denormalize and return
+    return this.denormalize(prediction);
+  }
+
+  extractFeatures(data) {
+    return data.map((point, index) => ({
+      hour: new Date(point.timestamp).getHours(),
+      dayOfWeek: new Date(point.timestamp).getDay(),
+      temperature: point.weather.temperature,
+      humidity: point.weather.humidity,
+      historical: data.slice(Math.max(0, index - this.lookbackPeriod), index)
+        .map(p => p.consumption)
+    }));
+  }
+
+  normalize(data) {
+    const max = Math.max(...data.map(d => d.consumption));
+    const min = Math.min(...data.map(d => d.consumption));
+    return data.map(d => ({
+      ...d,
+      consumption: (d.consumption - min) / (max - min)
+    }));
+  }
+
+  async lstmPredict(features) {
+    // TensorFlow.js LSTM model inference
+    // Returns array of predicted values for next 24 hours
+    return features; // Simplified for demo
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Virtual Power Plant Optimization</h3>
+                <div class="code-block">
+                    <pre>// Genetic Algorithm for VPP Resource Allocation
+class VPPOptimizer {
+  optimize(vpp, demand, constraints) {
+    const population = this.initializePopulation(100);
+    const generations = 50;
+
+    for (let gen = 0; gen < generations; gen++) {
+      // Evaluate fitness
+      const fitness = population.map(individual =>
+        this.evaluateFitness(individual, demand, constraints)
+      );
+
+      // Selection
+      const selected = this.tournamentSelection(population, fitness);
+
+      // Crossover
+      const offspring = this.crossover(selected);
+
+      // Mutation
+      const mutated = this.mutate(offspring);
+
+      population = mutated;
+    }
+
+    return this.getBestSolution(population, demand, constraints);
+  }
+
+  evaluateFitness(allocation, demand, constraints) {
+    let fitness = 0;
+
+    // Minimize cost
+    const cost = allocation.reduce((sum, resource) =>
+      sum + resource.output * resource.costPerKWh, 0
+    );
+    fitness -= cost;
+
+    // Maximize renewable usage
+    const renewableRatio = allocation
+      .filter(r => r.type === 'solar' || r.type === 'wind')
+      .reduce((sum, r) => sum + r.output, 0) / demand;
+    fitness += renewableRatio * 1000;
+
+    // Penalty for unmet demand
+    const totalOutput = allocation.reduce((sum, r) => sum + r.output, 0);
+    if (totalOutput < demand) {
+      fitness -= (demand - totalOutput) * 10;
+    }
+
+    return fitness;
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Run Demand Forecast Simulation</h3>
+                <div class="grid">
+                    <div class="metric">
+                        <div class="metric-label">Current Demand</div>
+                        <div class="metric-value" id="currentDemand">1,250 kW</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Predicted (1h)</div>
+                        <div class="metric-value" id="predicted1h">1,320 kW</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Predicted (24h)</div>
+                        <div class="metric-value" id="predicted24h">1,450 kW</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Accuracy</div>
+                        <div class="metric-value" id="accuracy">94.2%</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="runForecast()" style="margin-top: 1rem;">Run Forecast</button>
+                <div class="chart" id="forecastChart" style="margin-top: 1rem; background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(16,185,129,0.1));"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div class="tab-content" id="tab-2">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Communication Protocols</h2>
+
+            <div class="panel">
+                <h3>REST API Endpoints</h3>
+                <div class="code-block">
+                    <pre>// Energy Cloud REST API v1.0
+
+BASE_URL: https://api.energy-cloud.wia.org/v1
+
+# Authentication
+POST   /auth/login
+POST   /auth/refresh
+POST   /auth/logout
+
+# Virtual Power Plants
+GET    /vpp                          # List all VPPs
+GET    /vpp/:id                      # Get VPP details
+POST   /vpp                          # Create new VPP
+PUT    /vpp/:id                      # Update VPP
+DELETE /vpp/:id                      # Delete VPP
+GET    /vpp/:id/resources            # Get VPP resources
+POST   /vpp/:id/optimize             # Run optimization
+
+# Energy Data
+GET    /energy/consumption            # Get consumption data
+GET    /energy/generation             # Get generation data
+POST   /energy/forecast               # Request forecast
+GET    /energy/real-time              # WebSocket upgrade endpoint
+
+# Trading
+GET    /trading/markets               # List energy markets
+POST   /trading/orders                # Place order
+GET    /trading/orders/:id            # Get order status
+DELETE /trading/orders/:id            # Cancel order
+GET    /trading/history               # Trading history
+
+# Analytics
+GET    /analytics/dashboard           # Dashboard metrics
+POST   /analytics/query               # Custom analytics query
+GET    /analytics/reports/:id         # Get report
+
+# Example Request
+curl -X POST https://api.energy-cloud.wia.org/v1/vpp/VPP-001/optimize \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "demand": 50000,
+    "constraints": {
+      "minRenewable": 0.6,
+      "maxCost": 0.15
+    }
+  }'</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>WebSocket Real-Time Data Stream</h3>
+                <div class="code-block">
+                    <pre>// WebSocket Connection for Real-Time Energy Data
+const ws = new WebSocket('wss://api.energy-cloud.wia.org/v1/energy/real-time');
+
+ws.onopen = () => {
+  console.log('Connected to Energy Cloud');
+
+  // Subscribe to energy data streams
+  ws.send(JSON.stringify({
+    action: 'subscribe',
+    channels: [
+      'consumption.real-time',
+      'generation.solar',
+      'vpp.VPP-001.status',
+      'trading.market.KRW-KWH'
+    ]
+  }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  switch(data.channel) {
+    case 'consumption.real-time':
+      updateConsumptionMetrics(data.payload);
+      break;
+    case 'generation.solar':
+      updateSolarGeneration(data.payload);
+      break;
+    case 'vpp.VPP-001.status':
+      updateVPPStatus(data.payload);
+      break;
+    case 'trading.market.KRW-KWH':
+      updateMarketPrice(data.payload);
+      break;
+  }
+};
+
+// Message Format
+{
+  "channel": "consumption.real-time",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "payload": {
+    "total": 1250.5,
+    "breakdown": {
+      "residential": 450.2,
+      "commercial": 550.8,
+      "industrial": 249.5
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>MQTT for IoT Device Integration</h3>
+                <div class="code-block">
+                    <pre>// MQTT Topics for Smart Grid Devices
+
+# Topic Structure: energy-cloud/{region}/{deviceType}/{deviceId}/{metric}
+
+# Publishing (Device → Cloud)
+energy-cloud/seoul/solar-panel/SP-001/generation
+energy-cloud/seoul/battery/BAT-001/soc
+energy-cloud/seoul/smart-meter/SM-001/consumption
+energy-cloud/busan/wind-turbine/WT-001/output
+
+# Subscribing (Cloud → Device)
+energy-cloud/seoul/battery/BAT-001/command
+energy-cloud/seoul/inverter/INV-001/config
+energy-cloud/+/+/+/status  # Wildcard subscription
+
+# Example: Solar Panel Publishing Data
+import mqtt from 'mqtt';
+
+const client = mqtt.connect('mqtts://mqtt.energy-cloud.wia.org', {
+  clientId: 'SP-001',
+  username: 'device-token',
+  password: 'YOUR_DEVICE_TOKEN',
+  clean: true
+});
+
+client.on('connect', () => {
+  setInterval(() => {
+    const generation = getCurrentGeneration();
+    client.publish(
+      'energy-cloud/seoul/solar-panel/SP-001/generation',
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        value: generation,
+        unit: 'kW',
+        quality: 'high'
+      }),
+      { qos: 1 }
+    );
+  }, 5000); // Every 5 seconds
+});
+
+// Subscribe to commands
+client.subscribe('energy-cloud/seoul/solar-panel/SP-001/command');
+client.on('message', (topic, message) => {
+  const command = JSON.parse(message.toString());
+  executeCommand(command);
+});</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Protocol Tester</h3>
+                <div class="input-group">
+                    <label>Select Protocol</label>
+                    <select id="protocolType">
+                        <option value="rest">REST API</option>
+                        <option value="websocket">WebSocket</option>
+                        <option value="mqtt">MQTT</option>
+                        <option value="grpc">gRPC</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Endpoint/Topic</label>
+                    <input type="text" id="endpoint" placeholder="/vpp/VPP-001" />
+                </div>
+                <button class="btn btn-primary" onclick="testProtocol()">Test Connection</button>
+                <div class="log-output" id="protocolLog" style="margin-top: 1rem;"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div class="tab-content" id="tab-3">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">System Integration</h2>
+
+            <div class="panel">
+                <h3>Smart Meter Integration</h3>
+                <div class="code-block">
+                    <pre>// Smart Meter Integration SDK
+import { EnergyCloudClient } from '@wia/energy-cloud-sdk';
+
+class SmartMeterIntegration {
+  constructor(config) {
+    this.client = new EnergyCloudClient({
+      apiKey: config.apiKey,
+      region: config.region
+    });
+    this.meterId = config.meterId;
+  }
+
+  async sendConsumptionData(data) {
+    try {
+      const response = await this.client.energy.consumption.create({
+        meterId: this.meterId,
+        timestamp: data.timestamp,
+        consumption: data.consumption,
+        voltage: data.voltage,
+        current: data.current,
+        powerFactor: data.powerFactor,
+        metadata: {
+          meterType: 'smart-meter-v2',
+          firmware: '2.1.5'
+        }
+      });
+
+      console.log('Data sent successfully:', response.id);
+      return response;
+    } catch (error) {
+      console.error('Failed to send data:', error);
+      throw error;
+    }
+  }
+
+  async getBillingData(startDate, endDate) {
+    return await this.client.energy.consumption.query({
+      meterId: this.meterId,
+      startDate,
+      endDate,
+      aggregation: 'hourly'
+    });
+  }
+
+  async subscribeToCommands(callback) {
+    this.client.on(`meter.${this.meterId}.command`, callback);
+  }
+}
+
+// Usage Example
+const meter = new SmartMeterIntegration({
+  apiKey: 'your-api-key',
+  region: 'kr-seoul',
+  meterId: 'SM-001'
+});
+
+// Send real-time data every minute
+setInterval(async () => {
+  const data = await readMeterData();
+  await meter.sendConsumptionData(data);
+}, 60000);</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>SCADA System Integration</h3>
+                <div class="code-block">
+                    <pre>// SCADA to Energy Cloud Bridge
+class SCADABridge {
+  constructor(scadaConfig, cloudConfig) {
+    this.scada = this.connectSCADA(scadaConfig);
+    this.cloud = new EnergyCloudClient(cloudConfig);
+    this.mappings = new Map();
+  }
+
+  // Map SCADA tags to Cloud entities
+  mapSCADATag(scadaTag, cloudEntity) {
+    this.mappings.set(scadaTag, cloudEntity);
+  }
+
+  async startBridge() {
+    // Subscribe to SCADA data changes
+    this.scada.on('data', async (tag, value) => {
+      const cloudEntity = this.mappings.get(tag);
+      if (cloudEntity) {
+        await this.cloud.updateEntity(cloudEntity, {
+          value: value.value,
+          timestamp: value.timestamp,
+          quality: value.quality
+        });
+      }
+    });
+
+    // Subscribe to Cloud commands
+    this.cloud.on('command', async (entity, command) => {
+      const scadaTag = this.findSCADATag(entity);
+      if (scadaTag) {
+        await this.scada.writeTag(scadaTag, command.value);
+      }
+    });
+  }
+
+  // Example mappings
+  setupMappings() {
+    this.mapSCADATag('SUBSTATION_1.VOLTAGE', 'vpp.VPP-001.voltage');
+    this.mapSCADATag('SUBSTATION_1.CURRENT', 'vpp.VPP-001.current');
+    this.mapSCADATag('TRANSFORMER_1.LOAD', 'vpp.VPP-001.load');
+    this.mapSCADATag('BREAKER_1.STATUS', 'vpp.VPP-001.breaker-status');
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Blockchain Energy Trading Integration</h3>
+                <div class="code-block">
+                    <pre>// Blockchain-based P2P Energy Trading
+import { ethers } from 'ethers';
+import { EnergyCloudClient } from '@wia/energy-cloud-sdk';
+
+class EnergyTradingBridge {
+  constructor(config) {
+    // Connect to blockchain
+    this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
+    this.wallet = new ethers.Wallet(config.privateKey, this.provider);
+    this.contract = new ethers.Contract(
+      config.contractAddress,
+      EnergyTradingABI,
+      this.wallet
+    );
+
+    // Connect to Energy Cloud
+    this.cloud = new EnergyCloudClient(config.cloudApiKey);
+  }
+
+  async createEnergyListing(amount, price) {
+    // Verify available energy in cloud
+    const available = await this.cloud.energy.getAvailable();
+    if (available < amount) {
+      throw new Error('Insufficient energy available');
+    }
+
+    // Create blockchain listing
+    const tx = await this.contract.createListing(
+      ethers.parseUnits(amount.toString(), 18),
+      ethers.parseUnits(price.toString(), 18),
+      Math.floor(Date.now() / 1000) + 3600 // 1 hour expiry
+    );
+    await tx.wait();
+
+    // Register in Energy Cloud
+    await this.cloud.trading.registerListing({
+      blockchainTxHash: tx.hash,
+      amount,
+      price,
+      seller: this.wallet.address
+    });
+
+    return tx.hash;
+  }
+
+  async executeTrade(listingId) {
+    const listing = await this.contract.listings(listingId);
+
+    // Execute blockchain transaction
+    const tx = await this.contract.executeTrade(listingId, {
+      value: listing.price
+    });
+    await tx.wait();
+
+    // Update Energy Cloud records
+    await this.cloud.trading.recordTrade({
+      listingId,
+      buyer: this.wallet.address,
+      seller: listing.seller,
+      amount: listing.amount,
+      price: listing.price,
+      blockchainTxHash: tx.hash,
+      timestamp: new Date().toISOString()
+    });
+
+    // Transfer energy allocation
+    await this.cloud.energy.transfer({
+      from: listing.seller,
+      to: this.wallet.address,
+      amount: listing.amount
+    });
+
+    return tx.hash;
+  }
+
+  // Listen for blockchain events
+  async subscribeToTrades() {
+    this.contract.on('TradeExecuted', async (listingId, buyer, seller, amount, price) => {
+      console.log('Trade executed:', { listingId, buyer, seller, amount, price });
+
+      // Sync with Energy Cloud
+      await this.cloud.trading.syncBlockchainTrade({
+        listingId: listingId.toString(),
+        buyer,
+        seller,
+        amount: ethers.formatUnits(amount, 18),
+        price: ethers.formatUnits(price, 18)
+      });
+    });
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Integration Status Dashboard</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>System</th>
+                            <th>Status</th>
+                            <th>Last Sync</th>
+                            <th>Messages/min</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="status-indicator status-online"></span>Smart Meters</td>
+                            <td style="color: var(--success);">Connected</td>
+                            <td>2 seconds ago</td>
+                            <td>1,250</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-indicator status-online"></span>SCADA Systems</td>
+                            <td style="color: var(--success);">Connected</td>
+                            <td>5 seconds ago</td>
+                            <td>450</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-indicator status-online"></span>Blockchain Network</td>
+                            <td style="color: var(--success);">Connected</td>
+                            <td>1 minute ago</td>
+                            <td>25</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-indicator status-online"></span>Weather API</td>
+                            <td style="color: var(--success);">Connected</td>
+                            <td>30 seconds ago</td>
+                            <td>12</td>
+                        </tr>
+                        <tr>
+                            <td><span class="status-indicator status-online"></span>DER Controllers</td>
+                            <td style="color: var(--success);">Connected</td>
+                            <td>3 seconds ago</td>
+                            <td>820</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 5: Test -->
+        <div class="tab-content" id="tab-4">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Testing Suite</h2>
+
+            <div class="panel">
+                <h3>Unit Tests</h3>
+                <div class="code-block">
+                    <pre>// Jest Unit Tests for Energy Cloud SDK
+import { EnergyCloudClient } from '@wia/energy-cloud-sdk';
+import { VPPOptimizer } from './algorithms/vpp-optimizer';
+
+describe('EnergyCloudClient', () => {
+  let client;
+
+  beforeEach(() => {
+    client = new EnergyCloudClient({
+      apiKey: 'test-api-key',
+      environment: 'test'
+    });
+  });
+
+  test('should authenticate successfully', async () => {
+    const response = await client.auth.login({
+      username: 'test@example.com',
+      password: 'password123'
+    });
+    expect(response.token).toBeDefined();
+    expect(response.expiresIn).toBe(3600);
+  });
+
+  test('should fetch VPP data', async () => {
+    const vpp = await client.vpp.get('VPP-001');
+    expect(vpp.id).toBe('VPP-001');
+    expect(vpp.resources).toBeInstanceOf(Array);
+    expect(vpp.capacity).toBeGreaterThan(0);
+  });
+
+  test('should create consumption record', async () => {
+    const record = await client.energy.consumption.create({
+      meterId: 'SM-001',
+      consumption: 125.5,
+      timestamp: new Date().toISOString()
+    });
+    expect(record.id).toBeDefined();
+    expect(record.consumption).toBe(125.5);
+  });
+});
+
+describe('VPPOptimizer', () => {
+  let optimizer;
+
+  beforeEach(() => {
+    optimizer = new VPPOptimizer({
+      populationSize: 100,
+      generations: 50
+    });
+  });
+
+  test('should optimize resource allocation', () => {
+    const vpp = {
+      resources: [
+        { id: 'SOLAR-001', type: 'solar', capacity: 1000, costPerKWh: 0.05 },
+        { id: 'WIND-001', type: 'wind', capacity: 1500, costPerKWh: 0.06 },
+        { id: 'GRID-001', type: 'grid', capacity: 5000, costPerKWh: 0.12 }
+      ]
+    };
+
+    const result = optimizer.optimize(vpp, 2000, { minRenewable: 0.7 });
+
+    const totalOutput = result.reduce((sum, r) => sum + r.output, 0);
+    expect(totalOutput).toBeGreaterThanOrEqual(2000);
+
+    const renewableRatio = result
+      .filter(r => r.type === 'solar' || r.type === 'wind')
+      .reduce((sum, r) => sum + r.output, 0) / totalOutput;
+    expect(renewableRatio).toBeGreaterThanOrEqual(0.7);
+  });
+});</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Integration Tests</h3>
+                <div class="code-block">
+                    <pre>// Integration Tests for Energy Cloud Platform
+describe('Energy Cloud Integration', () => {
+  test('End-to-end VPP optimization flow', async () => {
+    // 1. Create VPP
+    const vpp = await client.vpp.create({
+      name: 'Test VPP',
+      capacity: 10000,
+      location: { lat: 37.5665, lng: 126.9780 }
+    });
+    expect(vpp.id).toBeDefined();
+
+    // 2. Add resources
+    await client.vpp.addResource(vpp.id, {
+      type: 'solar',
+      capacity: 5000,
+      location: { lat: 37.5700, lng: 126.9800 }
+    });
+
+    // 3. Run optimization
+    const optimization = await client.vpp.optimize(vpp.id, {
+      demand: 8000,
+      constraints: { minRenewable: 0.8 }
+    });
+    expect(optimization.status).toBe('completed');
+    expect(optimization.allocation).toBeDefined();
+
+    // 4. Apply allocation
+    const result = await client.vpp.applyAllocation(vpp.id, optimization.allocation);
+    expect(result.success).toBe(true);
+
+    // 5. Verify actual output
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    const status = await client.vpp.getStatus(vpp.id);
+    expect(status.currentOutput).toBeCloseTo(8000, -2);
+  });
+
+  test('Real-time data flow: Smart Meter → Cloud → Analytics', async () => {
+    const meterId = 'SM-TEST-001';
+
+    // 1. Send consumption data
+    await client.energy.consumption.create({
+      meterId,
+      consumption: 150.5,
+      timestamp: new Date().toISOString()
+    });
+
+    // 2. Wait for processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 3. Query analytics
+    const analytics = await client.analytics.query({
+      metric: 'consumption',
+      filters: { meterId },
+      timeRange: 'last-1-hour'
+    });
+
+    expect(analytics.data.length).toBeGreaterThan(0);
+    expect(analytics.data[0].consumption).toBe(150.5);
+  });
+
+  test('Energy trading workflow', async () => {
+    // 1. Create listing
+    const listing = await client.trading.createListing({
+      amount: 100,
+      price: 0.10,
+      expiry: Date.now() + 3600000
+    });
+    expect(listing.id).toBeDefined();
+
+    // 2. Execute trade
+    const trade = await client.trading.executeTrade(listing.id);
+    expect(trade.status).toBe('completed');
+
+    // 3. Verify energy transfer
+    const balance = await client.energy.getBalance();
+    expect(balance).toBe(100);
+  });
+});</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Performance Tests</h3>
+                <div class="code-block">
+                    <pre>// Load Testing with Artillery
+config:
+  target: 'https://api.energy-cloud.wia.org'
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    - duration: 120
+      arrivalRate: 100
+      name: "Peak load"
+
+scenarios:
+  - name: "VPP Status Check"
+    flow:
+      - get:
+          url: "/v1/vpp/{{ vppId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 1
+
+  - name: "Real-time Consumption Data"
+    flow:
+      - post:
+          url: "/v1/energy/consumption"
+          json:
+            meterId: "{{ meterId }}"
+            consumption: "{{ $randomNumber(50, 500) }}"
+            timestamp: "{{ $timestamp }}"
+      - think: 0.5
+
+  - name: "Demand Forecast"
+    flow:
+      - post:
+          url: "/v1/energy/forecast"
+          json:
+            horizon: 24
+            location: "seoul"
+      - think: 2
+
+# Expected Performance Metrics
+# - Response time p95: < 200ms
+# - Response time p99: < 500ms
+# - Error rate: < 0.1%
+# - Throughput: > 10,000 req/s</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Test Execution Dashboard</h3>
+                <div class="grid">
+                    <div class="metric">
+                        <div class="metric-label">Tests Passed</div>
+                        <div class="metric-value" style="color: var(--success);">247</div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: 98%;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Tests Failed</div>
+                        <div class="metric-value" style="color: var(--danger);">5</div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: 2%; background: var(--danger);"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Code Coverage</div>
+                        <div class="metric-value">94.2%</div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: 94.2%;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Avg Response Time</div>
+                        <div class="metric-value">145ms</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-success" onclick="runTests()" style="margin-top: 1rem;">Run All Tests</button>
+                <button class="btn btn-warning" onclick="runLoadTests()" style="margin-top: 1rem; margin-left: 0.5rem;">Run Load Tests</button>
+
+                <div class="log-output" id="testOutput" style="margin-top: 1rem;">
+                    <div class="log-entry log-info">[INFO] Test suite initialized</div>
+                    <div class="log-entry log-success">[PASS] EnergyCloudClient authentication tests (5/5)</div>
+                    <div class="log-entry log-success">[PASS] VPP optimization tests (12/12)</div>
+                    <div class="log-entry log-success">[PASS] Energy trading tests (8/8)</div>
+                    <div class="log-entry log-warning">[WARN] Performance test: p99 latency 523ms (target: 500ms)</div>
+                    <div class="log-entry log-success">[PASS] Integration tests (25/25)</div>
+                    <div class="log-entry log-info">[INFO] All tests completed in 45.3s</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(index) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach((content, i) => {
+                content.classList.toggle('active', i === index);
+            });
+        }
+
+        function generateData() {
+            const type = document.getElementById('dataType').value;
+            const output = document.getElementById('generatedDataOutput');
+            const container = document.getElementById('generatedData');
+
+            const samples = {
+                consumption: {
+                    timestamp: new Date().toISOString(),
+                    total: Math.floor(Math.random() * 2000 + 1000),
+                    unit: 'kWh',
+                    breakdown: {
+                        residential: Math.floor(Math.random() * 500 + 200),
+                        commercial: Math.floor(Math.random() * 700 + 300),
+                        industrial: Math.floor(Math.random() * 400 + 100)
+                    }
+                },
+                vpp: {
+                    vppId: 'VPP-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                    capacity: Math.floor(Math.random() * 100000 + 50000),
+                    currentOutput: Math.floor(Math.random() * 80000 + 40000),
+                    efficiency: (Math.random() * 0.2 + 0.8).toFixed(2),
+                    status: 'operational'
+                },
+                forecast: {
+                    forecastId: 'FC-' + Date.now(),
+                    horizon: 24,
+                    predictions: Array.from({ length: 24 }, (_, i) => ({
+                        hour: i,
+                        predicted: Math.floor(Math.random() * 500 + 1000),
+                        confidence: (Math.random() * 0.1 + 0.9).toFixed(2)
+                    }))
+                },
+                trading: {
+                    orderId: 'ORD-' + Date.now(),
+                    type: 'sell',
+                    amount: Math.floor(Math.random() * 1000 + 100),
+                    price: (Math.random() * 0.1 + 0.08).toFixed(4),
+                    status: 'pending'
+                }
+            };
+
+            output.textContent = JSON.stringify(samples[type], null, 2);
+            container.style.display = 'block';
+        }
+
+        function testProtocol() {
+            const protocol = document.getElementById('protocolType').value;
+            const endpoint = document.getElementById('endpoint').value;
+            const log = document.getElementById('protocolLog');
+
+            const messages = [
+                { type: 'info', msg: `[${new Date().toISOString()}] Initializing ${protocol.toUpperCase()} connection...` },
+                { type: 'success', msg: `[${new Date().toISOString()}] Connected to ${endpoint}` },
+                { type: 'info', msg: `[${new Date().toISOString()}] Sending test request...` },
+                { type: 'success', msg: `[${new Date().toISOString()}] Response received (152ms)` },
+                { type: 'success', msg: `[${new Date().toISOString()}] Connection test successful` }
+            ];
+
+            log.innerHTML = '';
+            messages.forEach((msg, i) => {
+                setTimeout(() => {
+                    const entry = document.createElement('div');
+                    entry.className = `log-entry log-${msg.type}`;
+                    entry.textContent = msg.msg;
+                    log.appendChild(entry);
+                    log.scrollTop = log.scrollHeight;
+                }, i * 500);
+            });
+        }
+
+        function runForecast() {
+            const metrics = [
+                { id: 'currentDemand', value: () => Math.floor(Math.random() * 500 + 1000) + ' kW' },
+                { id: 'predicted1h', value: () => Math.floor(Math.random() * 600 + 1100) + ' kW' },
+                { id: 'predicted24h', value: () => Math.floor(Math.random() * 700 + 1200) + ' kW' },
+                { id: 'accuracy', value: () => (Math.random() * 5 + 92).toFixed(1) + '%' }
+            ];
+
+            metrics.forEach(metric => {
+                const el = document.getElementById(metric.id);
+                el.textContent = metric.value();
+                el.style.animation = 'none';
+                setTimeout(() => el.style.animation = 'fadeIn 0.5s', 10);
+            });
+        }
+
+        function runTests() {
+            const output = document.getElementById('testOutput');
+            const messages = [
+                { type: 'info', msg: '[INFO] Starting test suite...' },
+                { type: 'info', msg: '[INFO] Running unit tests...' },
+                { type: 'success', msg: '[PASS] Authentication tests (8/8)' },
+                { type: 'success', msg: '[PASS] VPP management tests (15/15)' },
+                { type: 'success', msg: '[PASS] Energy data tests (22/22)' },
+                { type: 'info', msg: '[INFO] Running integration tests...' },
+                { type: 'success', msg: '[PASS] End-to-end workflows (12/12)' },
+                { type: 'success', msg: '[PASS] All tests completed successfully!' }
+            ];
+
+            output.innerHTML = '';
+            messages.forEach((msg, i) => {
+                setTimeout(() => {
+                    const entry = document.createElement('div');
+                    entry.className = `log-entry log-${msg.type}`;
+                    entry.textContent = msg.msg;
+                    output.appendChild(entry);
+                    output.scrollTop = output.scrollHeight;
+                }, i * 600);
+            });
+        }
+
+        function runLoadTests() {
+            alert('Load tests would be executed using Artillery or k6. Check the Performance Tests section for configuration.');
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

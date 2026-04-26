@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 병원 수용 능력 데이터 - WIA MED-018</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #ef4444;">제5장: 병원 수용 능력 데이터 - 실시간 병상 및 자원 현황</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #fbbf24; margin: 20px 0;">
+<p style="color: #fbbf24; font-style: italic;">"빈 병상이 없는 병원으로 환자를 이송하는 것은 시간 낭비이자 생명 손실입니다."</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">5.1 병원 수용 능력의 중요성</h2>
+
+<p><strong style="color: #ef4444;">병원 수용 능력 (Hospital Capacity)</strong>은 병원이 새로운 환자를 받을 수 있는 능력을 실시간으로 나타냅니다. 이는 응급실 병상, 중환자실, 수술실, 특수 장비 등을 포함합니다.</p>
+
+<h3 style="color: #ef4444;">🏥 수용 능력 데이터 구조</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">{
+  "hospitalId": "HOSP-SNU-001",
+  "name": "서울대학교병원",
+  "updateTime": "2025-12-26T14:30:00Z",
+  
+  "emergencyDepartment": {
+    "status": "OPEN" | "CLOSED" | "DIVERTED",
+    "totalBeds": 45,
+    "availableBeds": 3,
+    "occupancyRate": 93.3,
+    "waitTime": 45,  // 분
+    "traumaRooms": {
+      "total": 4,
+      "available": 1
+    }
+  },
+
+  "intensiveCare": {
+    "medical": { "total": 20, "available": 0 },
+    "surgical": { "total": 15, "available": 2 },
+    "cardiac": { "total": 12, "available": 1 },
+    "neonatal": { "total": 10, "available": 3 }
+  },
+
+  "operatingRooms": {
+    "total": 18,
+    "available": 2,
+    "emergencyReserved": 3
+  },
+
+  "specializedServices": {
+    "cathLab": { "available": true, "nextSlot": "15분 후" },
+    "ctScanner": { "available": true, "waitTime": 10 },
+    "mri": { "available": false, "nextSlot": "2시간 후" },
+    "ecmo": { "available": 1, "total": 2 },
+    "strokeCenter": { "active": true, "teamReady": true }
+  },
+
+  "staffing": {
+    "emergencyPhysicians": 4,
+    "surgeons": { "general": 2, "neuro": 1, "cardiac": 1 },
+    "anesthesiologists": 3,
+    "nurses": { "ed": 12, "icu": 8 }
+  }
+}</code>
+</pre>
+
+<h3 style="color: #ef4444;">📊 수용 능력 레벨</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">레벨</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">가용 병상</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">상태</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">조치</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #10b981;"><strong>GREEN</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">&gt;20%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">정상 운영</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모든 환자 수용</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #fbbf24;"><strong>YELLOW</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">10-20%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">혼잡</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">중증 우선</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #f59e0b;"><strong>ORANGE</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">5-10%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">심각한 혼잡</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">응급 환자만</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #ef4444;"><strong>RED</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">&lt;5%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">포화</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">전환 고려</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #7c2d12;"><strong>BLACK</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">0%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">전환 중</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">수용 불가</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">5.2 실시간 병상 관리 시스템</h2>
+
+<p>병원은 1분 단위로 병상 현황을 업데이트하여 EMS에 제공합니다.</p>
+
+<h3 style="color: #ef4444;">🔄 자동 업데이트 메커니즘</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">EMR 연동</strong> — 전자의무기록과 실시간 동기화</li>
+    <li><strong style="color: #e2e8f0;">센서 통합</strong> — 병상 점유 센서 자동 감지</li>
+    <li><strong style="color: #e2e8f0;">예측 알고리즘</strong> — AI 기반 퇴원 시간 예측</li>
+    <li><strong style="color: #e2e8f0;">수동 조정</strong> — 간호사가 즉시 상태 업데이트 가능</li>
+</ul>
+
+<h3 style="color: #ef4444;">📱 EMS 대시보드</h3>
+
+<p>구급대원과 119 상황실은 모든 병원의 수용 능력을 한눈에 볼 수 있습니다.</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #475569;">
+<code style="color: #34d399;">지도 기반 병원 현황 (서울 지역)
+
+🟢 서울대병원: 병상 3개 | CT 가능 | Cath Lab 준비 | 거리 2.3km
+🟡 서울아산병원: 병상 2개 | 혼잡 | 대기 45분 | 거리 5.8km
+🟠 삼성서울병원: 병상 1개 | 심각 혼잡 | 중증만 | 거리 3.1km
+🔴 강남세브란스: 병상 없음 | 포화 | 전환 고려 | 거리 4.2km
+⚫ 분당서울대병원: 수용 불가 | 전환 중 | - | 거리 18.5km</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">5.3 병원 우회 (Hospital Diversion)</h2>
+
+<p>병원이 포화 상태일 때 환자를 다른 병원으로 우회시키는 프로토콜입니다.</p>
+
+<h3 style="color: #ef4444;">🚦 우회 기준</h3>
+
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">조건</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">임계값</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">조치</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">ED 병상 가용률</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">&lt; 5%</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">부분 전환</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">평균 대기 시간</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">&gt; 2시간</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">비응급 전환</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">ICU 만상</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">0개</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">중환자 전환</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">수술실 부재</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">응급 불가</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">외상 전환</td>
+    </tr>
+</table>
+
+<h3 style="color: #ef4444;">⚖️ 전환의 딜레마</h3>
+
+<p style="background: #1e293b; padding: 15px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+<strong>전환의 장점:</strong> 대기 시간 감소, 병원 부담 분산<br>
+<strong>전환의 단점:</strong> 이송 거리 증가, 시간 지연<br>
+<strong>최적 균형:</strong> 환자 중증도와 병원 거리/능력을 종합 고려
+</p>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">5.4 특수 자원 관리</h2>
+
+<h3 style="color: #ef4444;">🫀 심장중재시술실 (Cath Lab)</h3>
+
+<p>STEMI 환자를 위한 Cath Lab 가용성은 생사를 가릅니다.</p>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #475569;">
+<code style="color: #10b981;">{
+  "cathLab": {
+    "total": 3,
+    "status": [
+      {
+        "roomId": "CL-1",
+        "status": "OCCUPIED",
+        "procedure": "PCI 진행 중",
+        "estimatedCompletion": "2025-12-26T15:30:00Z"
+      },
+      {
+        "roomId": "CL-2",
+        "status": "READY",
+        "team": "대기 중",
+        "activationTime": 15  // 분
+      },
+      {
+        "roomId": "CL-3",
+        "status": "CLEANING",
+        "readyTime": "2025-12-26T15:00:00Z"
+      }
+    ],
+    "emergencyAvailable": true,
+    "teamOnCall": {
+      "cardiologist": "김심장 교수",
+      "fellows": 2,
+      "nurses": 3,
+      "technicians": 2
+    }
+  }
+}</code>
+</pre>
+
+<h3 style="color: #ef4444;">🧠 뇌졸중 센터 (Stroke Center)</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">tPA 가용성</strong> — 혈전용해제 재고 확인</li>
+    <li><strong style="color: #e2e8f0;">혈관조영술</strong> — 기계적 혈전제거술 가능 여부</li>
+    <li><strong style="color: #e2e8f0;">신경과 의사</strong> — 즉시 평가 가능한 전문의</li>
+    <li><strong style="color: #e2e8f0;">재활 시설</strong> — 조기 재활 프로그램 유무</li>
+</ul>
+
+<h3 style="color: #ef4444;">🔪 외상 센터 자원</h3>
+
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #ef4444;">레벨</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">필수 자원</th>
+        <th style="border: 1px solid #475569; color: #ef4444;">대응 시간</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">Level 1</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모든 전문과, 연구 시설</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">24/7 즉시</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">Level 2</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">핵심 전문과, ICU</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">24/7 대기</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">Level 3</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">일반 외과, 응급의학</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">24/7 기본</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">5.5 지역 응급의료 네트워크</h2>
+
+<p>개별 병원이 아닌 지역 전체의 수용 능력을 관리합니다.</p>
+
+<h3 style="color: #ef4444;">🌐 권역별 통합 관리</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">{
+  "region": "서울 강남권역",
+  "timestamp": "2025-12-26T14:30:00Z",
+  
+  "regionalCapacity": {
+    "totalHospitals": 12,
+    "totalEDBeds": 340,
+    "availableEDBeds": 28,
+    "regionalOccupancy": 91.8,  // %
+    
+    "byHospital": [
+      {"name": "서울대병원", "available": 3, "status": "GREEN"},
+      {"name": "서울아산병원", "available": 2, "status": "YELLOW"},
+      {"name": "삼성서울병원", "available": 1, "status": "ORANGE"},
+      // ... 나머지 병원들
+    ]
+  },
+
+  "specializedCenters": {
+    "traumaCenters": {
+      "total": 3,
+      "available": 2
+    },
+    "strokeCenters": {
+      "total": 5,
+      "available": 4
+    },
+    "burnCenters": {
+      "total": 1,
+      "available": 1
+    }
+  },
+
+  "alerts": [
+    {
+      "level": "WARNING",
+      "message": "강남권역 전체 점유율 90% 초과",
+      "action": "인근 권역 협조 요청"
+    }
+  ]
+}</code>
+</pre>
+
+<h3 style="color: #ef4444;">🚨 권역 간 협력</h3>
+
+<p>한 권역이 포화되면 자동으로 인근 권역과 협력합니다.</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">자동 알림</strong> — 인근 권역에 상황 공유</li>
+    <li><strong style="color: #e2e8f0;">환자 재배치</strong> — 중증도에 따라 권역 간 이동</li>
+    <li><strong style="color: #e2e8f0;">자원 공유</strong> — 의료진, 장비 임시 지원</li>
+    <li><strong style="color: #e2e8f0;">통합 지휘</strong> — 광역 재난 시 중앙 통제</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #f87171;">5.6 예측 모델링</h2>
+
+<p>AI를 활용하여 미래의 수용 능력을 예측합니다.</p>
+
+<h3 style="color: #ef4444;">🤖 머신러닝 예측</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">계절성 패턴</strong> — 독감 시즌, 휴가철 등 예측</li>
+    <li><strong style="color: #e2e8f0;">시간대 패턴</strong> — 시간대별 환자 유입 예측</li>
+    <li><strong style="color: #e2e8f0;">날씨 영향</strong> — 날씨와 응급 환자 상관관계</li>
+    <li><strong style="color: #e2e8f0;">이벤트 대응</strong> — 대형 행사, 재난 시 수요 예측</li>
+</ul>
+
+<p style="background: #1e293b; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
+<strong>예측 정확도:</strong> 2시간 후 병상 가용성을 <strong>87% 정확도</strong>로 예측<br>
+<strong>활용:</strong> 사전에 인력 배치, 병상 준비, 타 병원 협조 요청
+</p>
+
+<hr style="border-color: #334155;">
+
+<div style="background: #1e293b; padding: 20px; border-radius: 8px; margin: 30px 0;">
+    <h3 style="color: #ef4444;">📚 다음 장 미리보기</h3>
+    <p style="color: #94a3b8;">제6장에서는 <strong style="color: #e2e8f0;">응급분류 시스템</strong>을 다룹니다. 환자의 중증도를 신속하고 정확하게 평가하여 치료 우선순위를 결정하는 시스템을 학습합니다.</p>
+</div>
+</body>
+</html>
