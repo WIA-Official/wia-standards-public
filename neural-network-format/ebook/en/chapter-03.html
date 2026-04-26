@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: TensorFlow SavedModel | WIA-AI-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.8;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            padding: 60px 40px;
+            margin: -40px -20px 40px -20px;
+            border-radius: 0 0 20px 20px;
+        }
+        h1 { font-size: 2.8em; color: #0f172a; margin-bottom: 15px; }
+        .chapter-info { color: #1e293b; font-size: 1.1em; }
+        h2 {
+            color: #10B981;
+            font-size: 2em;
+            margin: 50px 0 25px 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #334155;
+        }
+        h3 { color: #34D399; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin-bottom: 20px; color: #cbd5e1; }
+        code {
+            background: #1e293b;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #10B981;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            border-left: 4px solid #10B981;
+        }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .highlight { background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; }
+        .note {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #f59e0b;
+        }
+        ul, ol { margin: 20px 0 20px 30px; }
+        li { margin: 10px 0; color: #cbd5e1; }
+        .summary {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 40px 0;
+            border: 2px solid #10B981;
+        }
+        .review-questions {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 40px 0;
+        }
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 2px solid #334155;
+        }
+        .btn {
+            padding: 12px 30px;
+            background: #10B981;
+            color: #0f172a;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn:hover { background: #059669; transform: translateY(-2px); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: #1e293b;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #10B981; color: #0f172a; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; margin: 40px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 3: TensorFlow SavedModel</h1>
+            <p class="chapter-info">Production-Ready Model Format for TensorFlow Ecosystem</p>
+            <p class="chapter-info" style="margin-top: 10px;">弘益人間 · Benefit All Humanity</p>
+        </header>
+
+        <h2>3.1 Introduction to SavedModel</h2>
+        <p>
+            TensorFlow SavedModel is the universal serialization format for TensorFlow models. Introduced in TensorFlow 1.0 and significantly improved in TensorFlow 2.0, SavedModel is designed for production deployment and provides a complete, self-contained package including the computation graph, variables, assets, and signatures.
+        </p>
+        <p>
+            Unlike earlier formats like checkpoint files or frozen graphs, SavedModel includes everything needed to serve, fine-tune, or convert the model to other formats. It's the recommended format for TensorFlow Serving, TensorFlow Lite, TensorFlow.js, and cloud ML platforms.
+        </p>
+
+        <div class="highlight">
+            <h3>SavedModel Advantages</h3>
+            <ul>
+                <li><strong>Self-Contained:</strong> Includes graph, variables, assets, and metadata</li>
+                <li><strong>Language Independent:</strong> Can be loaded in Python, C++, Java, Go</li>
+                <li><strong>Serving Ready:</strong> Direct deployment to TensorFlow Serving</li>
+                <li><strong>Versioned:</strong> Supports model versioning for A/B testing</li>
+                <li><strong>Convertible:</strong> Easy conversion to TFLite, TF.js, ONNX</li>
+            </ul>
+        </div>
+
+        <h2>3.2 SavedModel Directory Structure</h2>
+        <p>
+            A SavedModel is stored as a directory with the following structure:
+        </p>
+
+        <pre><code>saved_model/
+├── assets/                     # Additional files (vocabularies, etc.)
+│   └── vocab.txt
+├── variables/                  # Model weights and variables
+│   ├── variables.data-00000-of-00001
+│   └── variables.index
+└── saved_model.pb             # Serialized computation graph and metadata
+
+# With multiple versions:
+model_repository/
+├── my_model/
+│   ├── 1/                     # Version 1
+│   │   ├── assets/
+│   │   ├── variables/
+│   │   └── saved_model.pb
+│   └── 2/                     # Version 2
+│       ├── assets/
+│       ├── variables/
+│       └── saved_model.pb</code></pre>
+
+        <h3>File Descriptions</h3>
+        <ul>
+            <li><strong>saved_model.pb:</strong> Protocol buffer containing MetaGraphDef and SignatureDef</li>
+            <li><strong>variables/:</strong> Checkpoint files with trained weights</li>
+            <li><strong>assets/:</strong> External files referenced by the graph (vocabularies, configs)</li>
+        </ul>
+
+        <h2>3.3 Creating a SavedModel</h2>
+        <p>
+            TensorFlow 2.x makes it simple to save models in SavedModel format:
+        </p>
+
+        <h3>Saving Keras Models</h3>
+        <pre><code>import tensorflow as tf
+from tensorflow import keras
+
+# Create and train a model
+model = keras.Sequential([
+    keras.layers.Dense(128, activation='relu', input_shape=(784,)),
+    keras.layers.Dropout(0.2),
+    keras.layers.Dense(10, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# Train the model
+model.fit(train_data, train_labels, epochs=5)
+
+# Save as SavedModel
+model.save('my_model')  # Creates SavedModel directory
+
+# Or explicitly use SavedModel format
+model.save('my_model', save_format='tf')</code></pre>
+
+        <h3>Saving Custom Models</h3>
+        <pre><code>class CustomModel(tf.Module):
+    def __init__(self):
+        super().__init__()
+        self.v = tf.Variable(1.0)
+        self.w = tf.Variable(2.0)
+
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None], dtype=tf.float32)
+    ])
+    def __call__(self, x):
+        return self.v * x + self.w
+
+# Create and save
+model = CustomModel()
+tf.saved_model.save(model, 'custom_model')
+
+# With explicit signatures
+@tf.function(input_signature=[
+    tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32)
+])
+def serving_fn(images):
+    return model(images)
+
+tf.saved_model.save(
+    model,
+    'custom_model',
+    signatures={'serving_default': serving_fn}
+)</code></pre>
+
+        <h2>3.4 Signature Definitions</h2>
+        <p>
+            Signatures define the input/output interface for serving and inference:
+        </p>
+
+        <h3>Multiple Signatures</h3>
+        <pre><code>class MultiSignatureModel(tf.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = create_model()
+
+    @tf.function
+    def predict(self, images):
+        return self.model(images)
+
+    @tf.function
+    def preprocess_and_predict(self, raw_images):
+        processed = tf.image.resize(raw_images, [224, 224])
+        processed = processed / 255.0
+        return self.model(processed)
+
+# Save with multiple signatures
+model = MultiSignatureModel()
+
+signatures = {
+    'serving_default': model.predict.get_concrete_function(
+        tf.TensorSpec([None, 224, 224, 3], tf.float32)
+    ),
+    'preprocess': model.preprocess_and_predict.get_concrete_function(
+        tf.TensorSpec([None, None, None, 3], tf.float32)
+    )
+}
+
+tf.saved_model.save(
+    model,
+    'multi_signature_model',
+    signatures=signatures
+)</code></pre>
+
+        <h3>Inspecting Signatures</h3>
+        <pre><code># Load and inspect
+loaded = tf.saved_model.load('multi_signature_model')
+
+# List available signatures
+print(list(loaded.signatures.keys()))
+# ['serving_default', 'preprocess']
+
+# Get signature info
+infer = loaded.signatures['serving_default']
+print(infer.structured_input_signature)
+print(infer.structured_outputs)
+
+# Use signature
+import numpy as np
+test_input = np.random.randn(1, 224, 224, 3).astype(np.float32)
+output = infer(images=tf.constant(test_input))
+print(output)</code></pre>
+
+        <h2>3.5 Loading and Using SavedModel</h2>
+        <p>
+            SavedModel can be loaded in multiple ways depending on use case:
+        </p>
+
+        <h3>Loading in Python</h3>
+        <pre><code># Method 1: tf.saved_model.load (more control)
+loaded = tf.saved_model.load('my_model')
+predictions = loaded(test_data)
+
+# Method 2: keras.models.load_model (for Keras models)
+model = keras.models.load_model('my_model')
+predictions = model.predict(test_data)
+
+# Method 3: Using signatures
+loaded = tf.saved_model.load('my_model')
+infer = loaded.signatures['serving_default']
+output = infer(input_tensor=test_data)['output_0']</code></pre>
+
+        <h3>Loading in C++</h3>
+        <pre><code>// C++ API for TensorFlow Serving
+#include "tensorflow/cc/saved_model/loader.h"
+
+tensorflow::SavedModelBundle bundle;
+tensorflow::SessionOptions session_options;
+tensorflow::RunOptions run_options;
+
+// Load the model
+tensorflow::Status status = tensorflow::LoadSavedModel(
+    session_options,
+    run_options,
+    "/path/to/saved_model",
+    {"serve"},  // tags
+    &bundle
+);
+
+// Run inference
+std::vector<tensorflow::Tensor> outputs;
+status = bundle.session->Run(
+    {{"input", input_tensor}},
+    {"output"},
+    {},
+    &outputs
+);</code></pre>
+
+        <h2>3.6 TensorFlow Serving</h2>
+        <p>
+            TensorFlow Serving is a production-grade system for serving SavedModel:
+        </p>
+
+        <h3>Serving Configuration</h3>
+        <pre><code># Model configuration file (models.config)
+model_config_list {
+  config {
+    name: 'my_model'
+    base_path: '/models/my_model'
+    model_platform: 'tensorflow'
+    model_version_policy {
+      specific {
+        versions: 1
+        versions: 2
+      }
+    }
+  }
+}
+
+# Start TensorFlow Serving with Docker
+docker run -p 8501:8501 \
+  --mount type=bind,source=/path/to/models,target=/models \
+  -e MODEL_NAME=my_model \
+  -t tensorflow/serving
+
+# Or with model config
+docker run -p 8501:8501 \
+  --mount type=bind,source=/path/to/models,target=/models \
+  --mount type=bind,source=/path/to/models.config,target=/models/models.config \
+  -t tensorflow/serving \
+  --model_config_file=/models/models.config</code></pre>
+
+        <h3>REST API Client</h3>
+        <pre><code>import requests
+import json
+import numpy as np
+
+# Prepare input data
+data = {
+    "signature_name": "serving_default",
+    "instances": test_images.tolist()
+}
+
+# Send request
+response = requests.post(
+    'http://localhost:8501/v1/models/my_model:predict',
+    data=json.dumps(data)
+)
+
+# Parse response
+predictions = response.json()['predictions']
+print(f"Predictions: {predictions}")</code></pre>
+
+        <h3>gRPC Client</h3>
+        <pre><code>import grpc
+import tensorflow as tf
+from tensorflow_serving.apis import predict_pb2
+from tensorflow_serving.apis import prediction_service_pb2_grpc
+
+# Create gRPC channel
+channel = grpc.insecure_channel('localhost:8500')
+stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
+
+# Create request
+request = predict_pb2.PredictRequest()
+request.model_spec.name = 'my_model'
+request.model_spec.signature_name = 'serving_default'
+request.inputs['images'].CopyFrom(
+    tf.make_tensor_proto(test_images, shape=test_images.shape)
+)
+
+# Send request
+result = stub.Predict(request, 10.0)  # 10s timeout
+output = tf.make_ndarray(result.outputs['output'])
+print(f"Output: {output}")</code></pre>
+
+        <h2>3.7 Converting SavedModel to Other Formats</h2>
+        <p>
+            SavedModel serves as a hub for converting to deployment-specific formats:
+        </p>
+
+        <h3>SavedModel to TFLite</h3>
+        <pre><code>import tensorflow as tf
+
+# Load SavedModel
+converter = tf.lite.TFLiteConverter.from_saved_model('my_model')
+
+# Configure optimization
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.float16]
+
+# Convert
+tflite_model = converter.convert()
+
+# Save
+with open('model.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+print(f"TFLite model size: {len(tflite_model) / 1024:.2f} KB")</code></pre>
+
+        <h3>SavedModel to TensorFlow.js</h3>
+        <pre><code># Install tensorflowjs converter
+pip install tensorflowjs
+
+# Convert SavedModel to TF.js format
+tensorflowjs_converter \
+    --input_format=tf_saved_model \
+    --output_format=tfjs_graph_model \
+    --signature_name=serving_default \
+    --saved_model_tags=serve \
+    my_model \
+    tfjs_model/
+
+# The output can be loaded in JavaScript:
+# const model = await tf.loadGraphModel('model.json');</code></pre>
+
+        <h3>SavedModel to ONNX</h3>
+        <pre><code>import tf2onnx
+
+# Convert using command line
+python -m tf2onnx.convert \
+    --saved-model my_model \
+    --output model.onnx \
+    --opset 17
+
+# Or programmatically
+import tensorflow as tf
+import tf2onnx
+
+model = tf.saved_model.load('my_model')
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+
+output_path = "model.onnx"
+model_proto, _ = tf2onnx.convert.from_saved_model(
+    'my_model',
+    input_signature=spec,
+    opset=17,
+    output_path=output_path
+)</code></pre>
+
+        <h2>3.8 Advanced SavedModel Features</h2>
+        <p>
+            SavedModel supports advanced features for production deployments:
+        </p>
+
+        <h3>Model Assets</h3>
+        <pre><code>import tensorflow as tf
+import shutil
+
+class ModelWithAssets(tf.Module):
+    def __init__(self):
+        super().__init__()
+        # Load vocabulary from assets
+        self.vocab_file = tf.saved_model.Asset('vocab.txt')
+
+    @tf.function
+    def tokenize(self, text):
+        # Use the vocabulary file
+        vocab_table = tf.lookup.StaticVocabularyTable(
+            tf.lookup.TextFileInitializer(
+                self.vocab_file.asset_path,
+                key_dtype=tf.string,
+                key_index=tf.lookup.TextFileIndex.WHOLE_LINE,
+                value_dtype=tf.int64,
+                value_index=tf.lookup.TextFileIndex.LINE_NUMBER
+            ),
+            num_oov_buckets=1
+        )
+        return vocab_table.lookup(text)
+
+# Save model (vocab.txt will be copied to assets/)
+model = ModelWithAssets()
+tf.saved_model.save(model, 'model_with_assets')</code></pre>
+
+        <h3>Warmup Requests</h3>
+        <pre><code># Create warmup data for TensorFlow Serving
+import tensorflow as tf
+from tensorflow_serving.apis import predict_pb2
+from tensorflow_serving.apis import prediction_service_pb2_grpc
+
+# Generate warmup requests
+warmup_dir = 'my_model/1/assets.extra'
+os.makedirs(warmup_dir, exist_ok=True)
+
+# Create sample requests
+warmup_file = os.path.join(warmup_dir, 'tf_serving_warmup_requests')
+with tf.io.TFRecordWriter(warmup_file) as writer:
+    for _ in range(10):  # 10 warmup requests
+        request = predict_pb2.PredictRequest()
+        request.model_spec.name = 'my_model'
+        request.model_spec.signature_name = 'serving_default'
+
+        # Add sample input
+        sample_input = np.random.randn(1, 224, 224, 3).astype(np.float32)
+        request.inputs['images'].CopyFrom(
+            tf.make_tensor_proto(sample_input)
+        )
+
+        log = prediction_log_pb2.PredictionLog(
+            predict_log=prediction_log_pb2.PredictLog(request=request)
+        )
+        writer.write(log.SerializeToString())</code></pre>
+
+        <h2>3.9 SavedModel Optimization</h2>
+        <p>
+            Optimize SavedModel for better performance and smaller size:
+        </p>
+
+        <h3>Graph Optimization</h3>
+        <pre><code>from tensorflow.python.saved_model import tag_constants
+from tensorflow.python.tools import optimize_for_inference_lib
+
+# Load and optimize graph
+with tf.Session() as sess:
+    meta_graph = tf.saved_model.loader.load(
+        sess,
+        [tag_constants.SERVING],
+        'my_model'
+    )
+
+    # Optimize
+    optimized_graph = optimize_for_inference_lib.optimize_for_inference(
+        sess.graph_def,
+        ['input'],
+        ['output'],
+        tf.float32.as_datatype_enum
+    )
+
+    # Save optimized model
+    builder = tf.saved_model.builder.SavedModelBuilder('optimized_model')
+    # ... configure and save</code></pre>
+
+        <h3>Quantization</h3>
+        <pre><code># Post-training quantization
+converter = tf.lite.TFLiteConverter.from_saved_model('my_model')
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+# Full integer quantization
+def representative_dataset():
+    for _ in range(100):
+        yield [np.random.randn(1, 224, 224, 3).astype(np.float32)]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.uint8
+converter.inference_output_type = tf.uint8
+
+quantized_model = converter.convert()</code></pre>
+
+        <h2>3.10 Best Practices</h2>
+        <p>
+            Follow these best practices when working with SavedModel:
+        </p>
+
+        <h3>Use Concrete Functions</h3>
+        <pre><code># Define input specifications explicitly
+@tf.function(input_signature=[
+    tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32, name='images')
+])
+def inference_fn(images):
+    # Preprocessing
+    images = tf.image.resize(images, [224, 224])
+    images = (images - 127.5) / 127.5
+
+    # Model inference
+    return model(images, training=False)
+
+# Save with concrete function
+tf.saved_model.save(
+    model,
+    'my_model',
+    signatures={'serving_default': inference_fn}
+)</code></pre>
+
+        <h3>Version Your Models</h3>
+        <pre><code># Organize by version
+models/
+├── my_model/
+│   ├── 1/              # v1.0.0
+│   ├── 2/              # v1.1.0
+│   └── 3/              # v2.0.0
+
+# In your deployment config
+model_version_policy {
+  specific {
+    versions: 2  # Stable version
+    versions: 3  # Canary version (5% traffic)
+  }
+}</code></pre>
+
+        <h3>Test Before Deployment</h3>
+        <pre><code># Validation script
+def validate_savedmodel(model_path, test_data):
+    # Load model
+    model = tf.saved_model.load(model_path)
+    infer = model.signatures['serving_default']
+
+    # Test inputs
+    for i, (input_data, expected_output) in enumerate(test_data):
+        output = infer(**input_data)
+
+        # Verify output shape
+        assert output.shape == expected_output.shape
+
+        # Verify accuracy
+        diff = tf.abs(output - expected_output)
+        max_diff = tf.reduce_max(diff)
+        assert max_diff < 0.001, f"Test {i} failed: max_diff={max_diff}"
+
+    print("✓ All validation tests passed")
+
+# Run validation
+validate_savedmodel('my_model', test_dataset)</code></pre>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p>
+                This chapter covered TensorFlow SavedModel format in detail. Key points include:
+            </p>
+            <ul>
+                <li>SavedModel is TensorFlow's universal serialization format for production</li>
+                <li>Directory structure includes saved_model.pb, variables/, and assets/</li>
+                <li>Signatures define input/output interfaces for serving</li>
+                <li>Multiple saving methods: model.save(), tf.saved_model.save()</li>
+                <li>TensorFlow Serving provides production-grade model serving</li>
+                <li>Easy conversion to TFLite, TF.js, and ONNX formats</li>
+                <li>Support for assets, warmup requests, and model versioning</li>
+                <li>Optimization through graph optimization and quantization</li>
+                <li>Best practices include using concrete functions and version control</li>
+                <li>Always validate models before production deployment</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What files are included in a SavedModel directory and what does each contain?</li>
+                <li>What is a signature in SavedModel and why is it important?</li>
+                <li>Compare three methods for loading SavedModel in Python.</li>
+                <li>How do you serve a SavedModel using TensorFlow Serving with Docker?</li>
+                <li>Write code to convert a SavedModel to TensorFlow Lite format.</li>
+                <li>What are model assets and when would you use them?</li>
+                <li>Explain the purpose of warmup requests in TensorFlow Serving.</li>
+                <li>How do you implement model versioning with SavedModel?</li>
+                <li>Describe the quantization process for SavedModel.</li>
+                <li>What validation steps should you perform before deploying a SavedModel?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (Hongik Ingan) · Benefit All Humanity
+        </div>
+
+        </div>
+</body>
+</html>

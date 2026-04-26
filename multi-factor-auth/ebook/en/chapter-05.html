@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Implementation Patterns - WIA Security Standard</title>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --primary-dark: #DC2626;
+            --accent: #F59E0B;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-code: #011627;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            font-size: 17px;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a2e 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo-icon { font-size: 1.8rem; }
+        .logo-text { font-weight: 700; color: var(--primary); font-size: 1.1rem; }
+        .logo-divider { color: var(--border); }
+        .logo-subtitle { color: var(--text-muted); font-size: 0.95rem; }
+        .lang-switch a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .lang-switch a:hover, .lang-switch a.active {
+            background: var(--primary);
+            color: white;
+        }
+        .chapter-nav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 0;
+        }
+        .chapter-nav-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chapter-nav a {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .chapter-nav a:hover { text-decoration: underline; }
+        .chapter-indicator {
+            background: var(--bg);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 50px 20px;
+        }
+        .chapter-header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+        }
+        .chapter-number {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .chapter-header h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--text), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .chapter-subtitle {
+            font-size: 1.3rem;
+            color: var(--text-muted);
+        }
+        .section { margin-bottom: 50px; }
+        .section h2 {
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+        .section h3 { font-size: 1.4rem; color: var(--text); margin: 30px 0 15px; }
+        .section p { margin-bottom: 18px; color: var(--text-muted); }
+        .info-box {
+            background: var(--bg-card);
+            border-left: 4px solid var(--primary);
+            padding: 20px 25px;
+            border-radius: 0 12px 12px 0;
+            margin: 25px 0;
+        }
+        .info-box.warning { border-left-color: var(--warning); }
+        .info-box.success { border-left-color: var(--success); }
+        .info-box-title {
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 25px 0;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        th {
+            background: var(--bg-card);
+            color: var(--primary);
+            font-weight: 600;
+            text-align: left;
+            padding: 15px;
+            border-bottom: 2px solid var(--border);
+        }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+        tr:hover td { background: rgba(239, 68, 68, 0.05); }
+        pre {
+            background: var(--bg-code);
+            border-radius: 12px;
+            padding: 25px;
+            overflow-x: auto;
+            margin: 25px 0;
+            border: 1px solid var(--border);
+        }
+        code { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.9rem; line-height: 1.6; color: #a8b2d1; }
+        .code-label {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--primary); margin-bottom: 5px; }
+        .stat-label { color: var(--text-muted); font-size: 0.9rem; }
+        ul, ol { margin: 20px 0; padding-left: 25px; color: var(--text-muted); }
+        li { margin-bottom: 12px; padding-left: 10px; }
+        li::marker { color: var(--primary); }
+        .summary-box {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1));
+            border: 1px solid var(--primary);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        .summary-box h3 { color: var(--primary); margin-bottom: 20px; font-size: 1.5rem; }
+        .key-takeaway {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: var(--bg-card);
+            border-radius: 10px;
+        }
+        .takeaway-icon {
+            background: var(--primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .review-questions {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        .review-questions h3 { color: var(--accent); margin-bottom: 25px; }
+        .question {
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: var(--bg);
+            border-radius: 10px;
+            border-left: 3px solid var(--accent);
+        }
+        .question-num { color: var(--accent); font-weight: 700; margin-right: 10px; }
+        .looking-ahead {
+            background: linear-gradient(135deg, var(--bg-card), #1a1a2e);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 40px 0;
+            border: 1px solid var(--border);
+        }
+        .looking-ahead h3 { color: var(--success); margin-bottom: 15px; }
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border);
+            margin-top: 50px;
+        }
+        .footer .philosophy { font-size: 1.3rem; color: #fbbf24; margin-bottom: 15px; }
+        .footer p { color: var(--text-muted); margin: 5px 0; }
+        .flow-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: var(--bg);
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+        }
+        .step-number {
+            background: var(--primary);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">🔐</span>
+                <span class="logo-text">WIA Multi-Factor Authentication</span>
+                <span class="logo-divider">|</span>
+                <span class="logo-subtitle">Security Standard</span>
+            </div>
+            <div class="lang-switch">
+                <a href="chapter-05.html" class="active">EN</a>
+                <a href="../ko/chapter-05.html">KO</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="chapter-header">
+            <span class="chapter-number">Chapter 05</span>
+            <h1>Implementation Patterns</h1>
+            <p class="chapter-subtitle">Enrollment Flows, Recovery, Step-Up Authentication, and Adaptive Policies</p>
+        </div>
+
+        <section class="section">
+            <h2>5.1 MFA Enrollment Flow Design</h2>
+            <p>The enrollment experience sets the tone for users' perception of your MFA system. A well-designed enrollment flow balances security, usability, and accessibility while minimizing drop-off rates.</p>
+
+            <h3>Progressive Enrollment Strategy</h3>
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <strong>Account Creation</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Basic password-only authentication to reduce initial friction</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <strong>Soft MFA Prompt</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Explain benefits, allow users to skip with "Remind me later"</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <strong>Primary Factor Enrollment</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Guide user through TOTP app or security key setup with QR code</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">4</div>
+                    <div>
+                        <strong>Verification Test</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Immediate authentication to confirm setup works correctly</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">5</div>
+                    <div>
+                        <strong>Backup Methods</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Offer backup codes and optional secondary authenticator</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">6</div>
+                    <div>
+                        <strong>Recovery Contact</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Collect verified email/phone for account recovery</p>
+                    </div>
+                </div>
+            </div>
+
+            <span class="code-label">TOTP Enrollment API Flow</span>
+            <pre><code>// Step 1: Initiate MFA enrollment
+POST /api/mfa/enroll/totp
+Authorization: Bearer {session_token}
+
+Response:
+{
+  "enrollment_id": "enr_a1b2c3d4e5",
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qr_code_data": "otpauth://totp/MyApp:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=MyApp",
+  "qr_code_image": "data:image/png;base64,iVBORw0KGgo...",
+  "backup_codes": [
+    "1a2b-3c4d-5e6f",
+    "7g8h-9i0j-1k2l",
+    "3m4n-5o6p-7q8r",
+    "9s0t-1u2v-3w4x",
+    "5y6z-7a8b-9c0d"
+  ],
+  "expires_at": "2024-01-15T11:00:00Z"
+}
+
+// Step 2: User scans QR code with authenticator app
+// Step 3: Verify enrollment with TOTP code
+
+POST /api/mfa/enroll/totp/verify
+Authorization: Bearer {session_token}
+Content-Type: application/json
+
+{
+  "enrollment_id": "enr_a1b2c3d4e5",
+  "totp_code": "123456"
+}
+
+Response (Success):
+{
+  "success": true,
+  "factor_id": "fac_9x8y7z6w5v",
+  "factor_type": "totp",
+  "created_at": "2024-01-15T10:30:00Z",
+  "is_primary": true,
+  "message": "TOTP authentication enabled successfully"
+}
+
+Response (Failure):
+{
+  "success": false,
+  "error": "invalid_code",
+  "message": "The verification code is incorrect or expired",
+  "attempts_remaining": 2
+}</code></pre>
+
+            <h3>Enrollment UX Best Practices</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Principle</th><th>Implementation</th><th>Impact on Adoption</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Explain the "Why"</strong></td>
+                            <td>Show clear benefits (security, account protection) before requiring setup</td>
+                            <td>+35% enrollment completion</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Minimize Steps</strong></td>
+                            <td>Reduce enrollment to 3-4 screens maximum</td>
+                            <td>+40% completion rate</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Progressive Disclosure</strong></td>
+                            <td>Don't overwhelm users with all options at once</td>
+                            <td>+25% engagement</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Visual Guidance</strong></td>
+                            <td>Use animations, screenshots, and videos to guide users</td>
+                            <td>-60% support requests</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Immediate Verification</strong></td>
+                            <td>Test authentication before completing enrollment</td>
+                            <td>-85% post-enrollment failures</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Backup Planning</strong></td>
+                            <td>Require at least one backup method before activation</td>
+                            <td>-70% account lockout support tickets</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Graceful Deferral</strong></td>
+                            <td>Allow "Remind me later" but increase reminder frequency</td>
+                            <td>+50% eventual enrollment</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="info-box success">
+                <div class="info-box-title">✅ WIA-SEC Enrollment Requirements</div>
+                <ul>
+                    <li><strong>Minimum Two Factors:</strong> Users must enroll at least two different factor types (primary + backup)</li>
+                    <li><strong>Backup Codes:</strong> Generate and display 5-10 single-use recovery codes</li>
+                    <li><strong>Verification Test:</strong> Require successful authentication before activating MFA</li>
+                    <li><strong>Recovery Contact:</strong> Collect and verify at least one recovery email or phone number</li>
+                    <li><strong>Clear Instructions:</strong> Provide step-by-step guidance in plain language</li>
+                    <li><strong>Accessibility:</strong> Ensure enrollment flow is screen reader compatible and keyboard navigable</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>5.2 Authentication Workflows</h2>
+            <p>Different scenarios require different authentication strengths. A risk-based approach balances security and user experience by adjusting authentication requirements dynamically.</p>
+
+            <h3>Authentication Workflow Types</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Workflow</th><th>When to Use</th><th>Factors Required</th><th>Example Scenario</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Standard Login</strong></td>
+                            <td>Normal access from known device/location</td>
+                            <td>Password + one MFA factor</td>
+                            <td>Daily login from home IP address</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Step-Up Authentication</strong></td>
+                            <td>Accessing sensitive features mid-session</td>
+                            <td>Re-authenticate with MFA factor</td>
+                            <td>Changing account settings, initiating wire transfer</td>
+                        </tr>
+                        <tr>
+                            <td><strong>High-Risk Login</strong></td>
+                            <td>Unknown device, new location, or unusual pattern</td>
+                            <td>Password + multiple MFA factors</td>
+                            <td>Login from new country or after failed attempts</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Privileged Access</strong></td>
+                            <td>Administrative or high-privilege operations</td>
+                            <td>Hardware key + biometric</td>
+                            <td>Admin console access, production database access</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Passwordless</strong></td>
+                            <td>Modern apps with WebAuthn support</td>
+                            <td>FIDO2 key + biometric (or PIN)</td>
+                            <td>Face ID/Touch ID for app access</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Continuous Authentication</strong></td>
+                            <td>Ongoing session validation</td>
+                            <td>Behavioral biometrics monitoring</td>
+                            <td>Banking app monitoring typing/mouse patterns</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Step-Up Authentication Implementation</h3>
+            <span class="code-label">Step-Up Auth API Pattern</span>
+            <pre><code>// User attempts sensitive operation
+POST /api/account/change-email
+Authorization: Bearer {session_token}
+Content-Type: application/json
+
+{
+  "new_email": "newemail@example.com"
+}
+
+Response (Step-Up Required):
+{
+  "error": "step_up_required",
+  "message": "This operation requires additional authentication",
+  "step_up_challenge": {
+    "challenge_id": "ch_9f8e7d6c5b4a",
+    "required_factor_types": ["totp", "webauthn", "push"],
+    "expires_at": "2024-01-15T10:35:00Z"
+  }
+}
+
+// User completes step-up authentication
+POST /api/mfa/step-up
+Authorization: Bearer {session_token}
+Content-Type: application/json
+
+{
+  "challenge_id": "ch_9f8e7d6c5b4a",
+  "factor_type": "totp",
+  "code": "456789"
+}
+
+Response (Success):
+{
+  "success": true,
+  "step_up_token": "sup_a1b2c3d4e5f6",
+  "expires_at": "2024-01-15T10:45:00Z"
+}
+
+// Retry original operation with step-up token
+POST /api/account/change-email
+Authorization: Bearer {session_token}
+X-Step-Up-Token: sup_a1b2c3d4e5f6
+Content-Type: application/json
+
+{
+  "new_email": "newemail@example.com"
+}
+
+Response (Success):
+{
+  "success": true,
+  "email": "newemail@example.com",
+  "verification_sent": true
+}</code></pre>
+
+            <h3>When to Require Step-Up Authentication</h3>
+            <ul>
+                <li><strong>Account Settings Changes:</strong> Email, password, phone number, security questions</li>
+                <li><strong>Security Modifications:</strong> Adding/removing MFA factors, changing recovery options</li>
+                <li><strong>Financial Transactions:</strong> Wire transfers, ACH payments, large purchases</li>
+                <li><strong>Data Access:</strong> Exporting personal data, accessing sensitive records</li>
+                <li><strong>Privilege Escalation:</strong> Granting admin access, assuming different user role</li>
+                <li><strong>Destructive Actions:</strong> Account deletion, bulk data deletion</li>
+            </ul>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">78%</div>
+                    <div class="stat-label">Reduction in account takeover with step-up auth</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">92%</div>
+                    <div class="stat-label">User acceptance when context is explained</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">5-10min</div>
+                    <div class="stat-label">Typical step-up token validity period</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">3x</div>
+                    <div class="stat-label">Increase in fraud detection with adaptive policies</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>5.3 Account Recovery Mechanisms</h2>
+            <p>Robust account recovery is critical to MFA adoption. Users will lose devices, forget passwords, and need access when traditional methods fail. Recovery mechanisms must balance accessibility and security.</p>
+
+            <h3>Recovery Method Comparison</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Method</th><th>Security Level</th><th>User Friction</th><th>Time to Recover</th><th>Vulnerabilities</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Backup Codes</strong></td>
+                            <td>High</td>
+                            <td>Low (if saved)</td>
+                            <td>Immediate</td>
+                            <td>Codes stored insecurely, screenshot theft</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Backup TOTP Device</strong></td>
+                            <td>High</td>
+                            <td>Low</td>
+                            <td>Immediate</td>
+                            <td>Both devices lost simultaneously</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Verified Email</strong></td>
+                            <td>Medium</td>
+                            <td>Medium</td>
+                            <td>5-15 minutes</td>
+                            <td>Email account compromise</td>
+                        </tr>
+                        <tr>
+                            <td><strong>SMS to Verified Phone</strong></td>
+                            <td>Low-Medium</td>
+                            <td>Medium</td>
+                            <td>1-5 minutes</td>
+                            <td>SIM swapping, phone number porting</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Trusted Contacts</strong></td>
+                            <td>Medium-High</td>
+                            <td>High</td>
+                            <td>Hours-Days</td>
+                            <td>Social engineering of contacts</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Identity Verification</strong></td>
+                            <td>Very High</td>
+                            <td>Very High</td>
+                            <td>Days-Weeks</td>
+                            <td>Document forgery, identity theft</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Admin Override</strong></td>
+                            <td>Variable</td>
+                            <td>Very High</td>
+                            <td>Hours-Days</td>
+                            <td>Social engineering of support staff</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Backup Code Implementation</h3>
+            <span class="code-label">Backup Code Generation and Usage</span>
+            <pre><code>// Generate backup codes during enrollment
+function generateBackupCodes(userId, count = 10) {
+  const codes = [];
+  const crypto = require('crypto');
+
+  for (let i = 0; i < count; i++) {
+    // Generate cryptographically secure random code
+    const code = crypto.randomBytes(6).toString('hex').toUpperCase();
+
+    // Format: XXXX-XXXX-XXXX
+    const formatted = code.match(/.{1,4}/g).join('-');
+
+    // Hash for storage (never store plain text)
+    const hash = crypto.createHash('sha256')
+      .update(formatted + process.env.BACKUP_CODE_PEPPER)
+      .digest('hex');
+
+    codes.push({
+      code: formatted,
+      hash: hash,
+      created_at: new Date(),
+      used_at: null,
+      ip_address: null
+    });
+  }
+
+  // Store hashed codes in database
+  database.backupCodes.insertMany({
+    user_id: userId,
+    codes: codes.map(c => ({
+      hash: c.hash,
+      created_at: c.created_at,
+      used: false
+    }))
+  });
+
+  // Return plain codes to user (display once, never shown again)
+  return codes.map(c => c.code);
+}
+
+// Verify backup code during authentication
+async function verifyBackupCode(userId, submittedCode) {
+  const pepper = process.env.BACKUP_CODE_PEPPER;
+  const hash = crypto.createHash('sha256')
+    .update(submittedCode + pepper)
+    .digest('hex');
+
+  const codeRecord = await database.backupCodes.findOne({
+    user_id: userId,
+    'codes.hash': hash,
+    'codes.used': false
+  });
+
+  if (!codeRecord) {
+    return {
+      success: false,
+      error: 'invalid_or_used',
+      message: 'Backup code is invalid or already used'
+    };
+  }
+
+  // Mark code as used (one-time use only)
+  await database.backupCodes.updateOne(
+    { user_id: userId, 'codes.hash': hash },
+    {
+      $set: {
+        'codes.$.used': true,
+        'codes.$.used_at': new Date(),
+        'codes.$.ip_address': getRequestIP()
+      }
+    }
+  );
+
+  // Check remaining codes
+  const remaining = await database.backupCodes.countDocuments({
+    user_id: userId,
+    'codes.used': false
+  });
+
+  return {
+    success: true,
+    remaining_codes: remaining,
+    warning: remaining < 3 ? 'Low backup code count. Generate new codes.' : null
+  };
+}</code></pre>
+
+            <h3>Recovery Flow Best Practices</h3>
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <strong>Recovery Initiation</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">User clicks "Lost access to authenticator" during login</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <strong>Identity Verification</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Verify email/phone, ask security questions, or check device fingerprint</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <strong>Recovery Method Selection</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Offer backup codes, backup device, or email recovery link</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">4</div>
+                    <div>
+                        <strong>Temporary Access Grant</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Provide limited session to set up new MFA factors</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">5</div>
+                    <div>
+                        <strong>MFA Re-enrollment</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Guide user through enrolling new primary and backup factors</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-number">6</div>
+                    <div>
+                        <strong>Audit and Notification</strong>
+                        <p style="margin-top:5px;font-size:0.9rem;color:var(--text-muted);">Log recovery event, notify all recovery contacts, revoke old factors</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">⚠️ Recovery Security Considerations</div>
+                <ul>
+                    <li><strong>Rate Limiting:</strong> Limit recovery attempts to 3 per 24 hours to prevent brute force</li>
+                    <li><strong>Cooling Period:</strong> Delay MFA removal by 24-72 hours with email notification</li>
+                    <li><strong>Session Restrictions:</strong> Recovery sessions should have limited permissions (can't transfer money, change email, etc.)</li>
+                    <li><strong>Full Re-enrollment:</strong> Require complete MFA setup, not just restoration of old factors</li>
+                    <li><strong>Audit Trail:</strong> Log all recovery events with IP, device, and timestamp</li>
+                    <li><strong>Multi-channel Notification:</strong> Alert user via email, SMS, and push notification</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>5.4 Adaptive Authentication Policies</h2>
+            <p>Adaptive (or risk-based) authentication dynamically adjusts security requirements based on contextual risk factors, providing strong security without unnecessary user friction.</p>
+
+            <h3>Risk Scoring Factors</h3>
+            <span class="code-label">Risk Assessment Algorithm</span>
+            <pre><code>class RiskScorer {
+  async calculateRiskScore(authenticationContext) {
+    let riskScore = 0; // 0 (lowest risk) to 100 (highest risk)
+    const factors = [];
+
+    // 1. Device Recognition (Weight: 20)
+    const deviceRisk = await this.assessDeviceRisk(authenticationContext.device);
+    riskScore += deviceRisk.score * 0.20;
+    factors.push({ name: 'device', score: deviceRisk.score, details: deviceRisk.details });
+
+    // 2. Location Analysis (Weight: 15)
+    const locationRisk = await this.assessLocationRisk(authenticationContext.location);
+    riskScore += locationRisk.score * 0.15;
+    factors.push({ name: 'location', score: locationRisk.score, details: locationRisk.details });
+
+    // 3. Network Analysis (Weight: 10)
+    const networkRisk = await this.assessNetworkRisk(authenticationContext.network);
+    riskScore += networkRisk.score * 0.10;
+    factors.push({ name: 'network', score: networkRisk.score, details: networkRisk.details });
+
+    // 4. Time Pattern Analysis (Weight: 10)
+    const timeRisk = await this.assessTimePattern(authenticationContext.timestamp);
+    riskScore += timeRisk.score * 0.10;
+    factors.push({ name: 'time_pattern', score: timeRisk.score, details: timeRisk.details });
+
+    // 5. Velocity Checks (Weight: 15)
+    const velocityRisk = await this.assessVelocity(authenticationContext.userId);
+    riskScore += velocityRisk.score * 0.15;
+    factors.push({ name: 'velocity', score: velocityRisk.score, details: velocityRisk.details });
+
+    // 6. Historical Behavior (Weight: 20)
+    const behaviorRisk = await this.assessBehavior(authenticationContext.userId);
+    riskScore += behaviorRisk.score * 0.20;
+    factors.push({ name: 'behavior', score: behaviorRisk.score, details: behaviorRisk.details });
+
+    // 7. Threat Intelligence (Weight: 10)
+    const threatRisk = await this.checkThreatIntelligence(authenticationContext.ipAddress);
+    riskScore += threatRisk.score * 0.10;
+    factors.push({ name: 'threat_intel', score: threatRisk.score, details: threatRisk.details });
+
+    return {
+      totalScore: Math.round(riskScore),
+      level: this.getRiskLevel(riskScore),
+      factors: factors,
+      recommendedAction: this.getRecommendedAction(riskScore)
+    };
+  }
+
+  async assessDeviceRisk(device) {
+    let score = 0;
+    const details = [];
+
+    // Unknown device
+    if (!device.recognized) {
+      score += 40;
+      details.push('Device not recognized');
+    }
+
+    // Device fingerprint changed
+    if (device.fingerprintChanged) {
+      score += 25;
+      details.push('Device fingerprint mismatch');
+    }
+
+    // Suspicious browser/OS combination
+    if (this.isSuspiciousCombination(device.userAgent)) {
+      score += 15;
+      details.push('Unusual browser/OS combination');
+    }
+
+    // Automation detected (headless browser, selenium, etc.)
+    if (device.automationDetected) {
+      score += 50;
+      details.push('Automation tools detected');
+    }
+
+    return { score, details };
+  }
+
+  async assessLocationRisk(location) {
+    let score = 0;
+    const details = [];
+
+    const userHistory = await this.getUserLocationHistory(location.userId);
+
+    // New country
+    if (!userHistory.countries.includes(location.country)) {
+      score += 30;
+      details.push(`First login from ${location.country}`);
+    }
+
+    // Impossible travel (e.g., Tokyo to New York in 2 hours)
+    if (this.isImpossibleTravel(userHistory.lastLocation, location)) {
+      score += 60;
+      details.push('Impossible travel detected');
+    }
+
+    // High-risk country
+    if (this.isHighRiskCountry(location.country)) {
+      score += 20;
+      details.push('Login from high-risk country');
+    }
+
+    // VPN/Tor detected
+    if (location.vpnDetected || location.torDetected) {
+      score += 25;
+      details.push('VPN or Tor network detected');
+    }
+
+    return { score, details };
+  }
+
+  getRiskLevel(score) {
+    if (score < 20) return 'low';
+    if (score < 40) return 'medium';
+    if (score < 70) return 'high';
+    return 'critical';
+  }
+
+  getRecommendedAction(score) {
+    if (score < 20) {
+      return { action: 'allow', mfaRequired: false };
+    } else if (score < 40) {
+      return { action: 'allow', mfaRequired: true, factorTypes: ['totp', 'push'] };
+    } else if (score < 70) {
+      return { action: 'challenge', mfaRequired: true, factorTypes: ['webauthn', 'totp'], additionalVerification: true };
+    } else {
+      return { action: 'block', mfaRequired: true, manualReview: true };
+    }
+  }
+}</code></pre>
+
+            <h3>Adaptive Policy Examples</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Risk Level</th><th>Score Range</th><th>Authentication Required</th><th>Additional Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Low</strong></td>
+                            <td>0-20</td>
+                            <td>Password only (MFA optional)</td>
+                            <td>Standard login, no restrictions</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medium</strong></td>
+                            <td>21-40</td>
+                            <td>Password + one MFA factor</td>
+                            <td>Email notification of login</td>
+                        </tr>
+                        <tr>
+                            <td><strong>High</strong></td>
+                            <td>41-70</td>
+                            <td>Password + hardware key or multiple factors</td>
+                            <td>24-hour cooling period for sensitive changes, SMS alert</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Critical</strong></td>
+                            <td>71-100</td>
+                            <td>Block login, require manual verification</td>
+                            <td>Freeze account, require ID verification, notify security team</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>5.5 Session Management</h2>
+            <p>After successful MFA authentication, session management determines how long users remain authenticated and when re-authentication is required.</p>
+
+            <h3>Session Lifetime Policies</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Session Type</th><th>Typical Lifetime</th><th>Re-auth Trigger</th><th>Use Case</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Short-Lived</strong></td>
+                            <td>15-30 minutes</td>
+                            <td>Idle timeout</td>
+                            <td>Banking, healthcare, admin consoles</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Standard</strong></td>
+                            <td>8-12 hours</td>
+                            <td>Idle timeout or daily re-auth</td>
+                            <td>Corporate applications, SaaS platforms</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Long-Lived</strong></td>
+                            <td>30 days</td>
+                            <td>Device-bound, periodic re-auth</td>
+                            <td>Consumer apps, mobile applications</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Persistent</strong></td>
+                            <td>90 days+</td>
+                            <td>Risk-based re-auth only</td>
+                            <td>Low-risk consumer services</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <span class="code-label">Session Management with Refresh Tokens</span>
+            <pre><code>{
+  "session_token_strategy": {
+    "access_token": {
+      "lifetime": "15 minutes",
+      "purpose": "Short-lived token for API requests",
+      "storage": "Memory only (never localStorage)",
+      "transmitted": "Authorization header"
+    },
+    "refresh_token": {
+      "lifetime": "30 days",
+      "purpose": "Obtain new access tokens",
+      "storage": "Secure, httpOnly cookie",
+      "rotation": "Each use issues new refresh token",
+      "device_binding": "Tied to device fingerprint"
+    },
+    "mfa_session": {
+      "lifetime": "12 hours",
+      "purpose": "Remember MFA completion",
+      "storage": "Encrypted cookie",
+      "revalidation": "Required for high-risk operations"
+    }
+  },
+  "re_authentication_triggers": {
+    "idle_timeout": "30 minutes of inactivity",
+    "absolute_timeout": "12 hours since login",
+    "sensitive_operation": "Password change, wire transfer",
+    "device_change": "Different device fingerprint",
+    "location_change": "New country or VPN detected",
+    "risk_increase": "Adaptive policy flags account"
+  },
+  "remember_device_feature": {
+    "enabled": true,
+    "lifetime": "30 days",
+    "mfa_requirement": "Reduce from every login to weekly",
+    "device_identification": "Cryptographic device fingerprint",
+    "user_control": "Can revoke trusted devices anytime",
+    "limit": "Maximum 5 trusted devices per user"
+  }
+}</code></pre>
+        </section>
+
+        <section class="section">
+            <h2>5.6 Chapter Summary</h2>
+            <div class="summary-box">
+                <h3>📋 Key Takeaways</h3>
+                <div class="key-takeaway">
+                    <span class="takeaway-icon">1</span>
+                    <div><strong>Enrollment UX drives adoption</strong>
+                    <p style="margin-top:5px;font-size:0.95rem;">Progressive disclosure, clear explanations, and minimal steps increase enrollment completion by 40%+.</p></div>
+                </div>
+                <div class="key-takeaway">
+                    <span class="takeaway-icon">2</span>
+                    <div><strong>Step-up authentication protects sensitive operations</strong>
+                    <p style="margin-top:5px;font-size:0.95rem;">Require re-authentication for high-risk actions even within an authenticated session.</p></div>
+                </div>
+                <div class="key-takeaway">
+                    <span class="takeaway-icon">3</span>
+                    <div><strong>Recovery must balance security and accessibility</strong>
+                    <p style="margin-top:5px;font-size:0.95rem;">Backup codes, verified emails, and cooling periods prevent lockouts without compromising security.</p></div>
+                </div>
+                <div class="key-takeaway">
+                    <span class="takeaway-icon">4</span>
+                    <div><strong>Adaptive policies reduce friction</strong>
+                    <p style="margin-top:5px;font-size:0.95rem;">Risk-based authentication adjusts requirements dynamically, requiring strong auth only when needed.</p></div>
+                </div>
+                <div class="key-takeaway">
+                    <span class="takeaway-icon">5</span>
+                    <div><strong>Session management affects user experience</strong>
+                    <p style="margin-top:5px;font-size:0.95rem;">Balance security (short sessions) with usability (remember device, refresh tokens).</p></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>5.7 Review Questions</h2>
+            <div class="review-questions">
+                <h3>🤔 Test Your Understanding</h3>
+                <div class="question"><span class="question-num">Q1.</span>Design a progressive enrollment flow for a healthcare application. What factors would you require and in what order?</div>
+                <div class="question"><span class="question-num">Q2.</span>When should step-up authentication be triggered? Provide 5 specific examples from different application types.</div>
+                <div class="question"><span class="question-num">Q3.</span>Calculate the risk score for a login attempt from a new device in a new country via VPN, occurring at 3 AM user local time.</div>
+                <div class="question"><span class="question-num">Q4.</span>Compare backup codes vs. SMS recovery. Which is more secure and why? When would you use each?</div>
+                <div class="question"><span class="question-num">Q5.</span>Design a session management policy for a financial application. Specify access token, refresh token, and MFA session lifetimes.</div>
+                <div class="question"><span class="question-num">Q6.</span>What security measures should be implemented during account recovery to prevent social engineering attacks?</div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>5.8 Looking Ahead</h2>
+            <div class="looking-ahead">
+                <h3>📍 Coming Up in Chapter 6: Enterprise MFA</h3>
+                <p>We'll explore MFA in enterprise environments:</p>
+                <ul>
+                    <li><strong>SSO Integration:</strong> SAML, OAuth 2.0, OpenID Connect with MFA</li>
+                    <li><strong>Federation:</strong> Cross-organization authentication and trust</li>
+                    <li><strong>Conditional Access:</strong> Policy-based authentication requirements</li>
+                    <li><strong>Identity Providers:</strong> Azure AD, Okta, Auth0, Ping Identity</li>
+                    <li><strong>Zero Trust Architecture:</strong> Continuous verification and least privilege</li>
+                </ul>
+            </div>
+        </section>
+
+        </main>
+</body>
+</html>

@@ -476,3 +476,7 @@ Example: `"PROD-SENIOR-FORMULA-001"`
 
 © 2025 WIA (World Certification Industry Association)  
 Standard ID: WIA-PET-009 | Version: 1.0 | Phase: 1
+
+## JSON Schema Registry
+
+All Phase 1 types are also published as JSON Schema 2020-12 documents at `https://standards.wia.example/pet-nutrition/schemas/v1/`. Implementations MUST cache the schema set with the published `ETag` and refresh whenever the upstream `Last-Modified` advances. Schemas SHOULD ship inside SDK distributions so offline validation works in clinic kiosks without internet access.

@@ -403,6 +403,61 @@ Utilization = (10^7 × 50 × 10^-9) = 0.5
 Average_Latency = 50 / (1 - 0.5) = 100 ns
 ```
 
+### 8.2 Memory Controller Scheduling
+
+WIA-SEMI-002 RECOMMENDS the FR-FCFS (First-Ready, First-Come-First-Served) row-buffer scheduler for general-purpose workloads, with optional bank-aware extensions for QoS-sensitive deployments.
+
+```
+priority = (row_hit_bonus, age, criticality_class)
+
+while queue not empty:
+    eligible = {req | bus_free(req.bank) and timing_satisfied(req)}
+    pick = argmax(eligible, key=priority)
+    issue(pick)
+```
+
+Schedulers MUST honour the JEDEC tFAW (four-activate window) and tRRD limits to prevent supply-current spikes. Implementations SHOULD expose runtime knobs for the row-hit bonus so tenants can re-tune for their workload.
+
+### 8.3 NAND Flash Translation Layer (FTL) Algorithms
+
+| Algorithm | Mapping granularity | Pros | Trade-off |
+|-----------|---------------------|------|-----------|
+| Page-level FTL | 4 KiB / 16 KiB | Lowest write amplification | Largest map RAM footprint |
+| Block-level FTL | 256 KiB / 4 MiB | Tiny map | Highest WAF |
+| Hybrid FTL (DFTL) | Variable | Map cached on demand | More complex GC |
+
+```
+GC_score(block) = invalid_pages(block) / total_pages(block)
+                  - α × age(block)
+                  - β × p/e_count(block) / max_pe
+```
+
+Garbage collection MUST be wear-aware: blocks above 90% of their P/E lifetime budget MUST be excluded from victim selection unless the free-block reservoir is below the SLC mirror threshold.
+
+### 8.4 Worst-Case Latency Bounds
+
+For real-time and safety-critical deployments the controller MUST provide bounded latency guarantees:
+
+```
+L_worst = L_queue_max + L_arb + L_bus + L_device_max
+```
+
+Where `L_queue_max` is the bounded queue length × per-request service time, `L_arb` is the arbitration window, and `L_device_max` is the device-published worst-case service time (e.g. tRC for activate-precharge cycles). `L_worst` MUST be measurable on the deployed hardware via the telemetry stream defined in Phase 1 §11.
+
+### 8.5 RAS Decoder Selection
+
+The repair algorithm MUST be selected per technology node:
+
+| Storage class | Default code | Replacement threshold |
+|---------------|--------------|-----------------------|
+| DDR5 on-die | SEC-DED Hamming(72,64) | UE rate > 1 FIT/Mbit |
+| HBM3 PHY | RS(32,28) over 32 lanes | Lane retraining > 1/min |
+| TLC NAND | LDPC, 80–100 bits/KB | RBER > 1×10⁻³ |
+| QLC NAND | LDPC, 200+ bits/KB | RBER > 5×10⁻³ |
+| ReRAM (emerging) | Concatenated BCH+LDPC | TBD per generation |
+
+Decoder logs MUST emit telemetry frame type 0x05 (Phase 1) every 1 second so a host RAS daemon can integrate via standard Linux EDAC counters.
+
 ---
 
 **Document Control:**

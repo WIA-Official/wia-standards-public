@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEC-008 Multi-Factor Authentication Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            background: #1e293b;
+            color: #cbd5e1;
+            border: 2px solid #334155;
+            padding: 1rem 2rem;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .tab:hover {
+            background: #334155;
+            border-color: #8B5CF6;
+        }
+
+        .tab.active {
+            background: #8B5CF6;
+            color: white;
+            border-color: #8B5CF6;
+        }
+
+        .tab-content {
+            display: none;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 0 12px 12px 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            color: #8B5CF6;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+
+        .input-group textarea {
+            min-height: 120px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #8B5CF6;
+        }
+
+        .btn {
+            background: #8B5CF6;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #7C3AED;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: #334155;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .output {
+            background: #0f172a;
+            border: 2px solid #8B5CF6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            color: #22d3ee;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .card h3 {
+            color: #8B5CF6;
+            margin-bottom: 1rem;
+        }
+
+        .info-box {
+            background: #1e293b;
+            border-left: 4px solid #8B5CF6;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .qr-canvas {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: inline-block;
+        }
+
+        .factor-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            margin: 0.25rem;
+            background: #8B5CF6;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #8B5CF6;
+            text-decoration: none;
+            margin-bottom: 1rem;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #7C3AED;
+        }
+
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab {
+                border-radius: 8px;
+            }
+
+            .tab-content {
+                border-radius: 12px;
+            }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Multi Factor Auth</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="header">
+        <h1>🔑 WIA-SEC-008 Multi-Factor Authentication Simulator</h1>
+        <p>Interactive demonstration of MFA data formats, algorithms, protocols, and integrations</p>
+    </div>
+
+    <div class="container">
+        <a href="../index.html" class="back-link">← Back to WIA-SEC-008 Home</a>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(0)">Data Format</div>
+            <div class="tab" onclick="switchTab(1)">Algorithms</div>
+            <div class="tab" onclick="switchTab(2)">Protocol</div>
+            <div class="tab" onclick="switchTab(3)">Integration</div>
+            <div class="tab" onclick="switchTab(4)">QR & VC</div>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div class="tab-content active">
+            <h2 style="color: #8B5CF6; margin-bottom: 1.5rem;">Authentication Factor Data Formats</h2>
+
+            <div class="info-box">
+                <strong>Three Authentication Factors:</strong>
+                <div style="margin-top: 0.5rem;">
+                    <span class="factor-badge">🧠 Knowledge (What you know)</span>
+                    <span class="factor-badge">📱 Possession (What you have)</span>
+                    <span class="factor-badge">🫱 Inherence (What you are)</span>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>Knowledge Factor</h3>
+                    <div class="input-group">
+                        <label>Factor Type</label>
+                        <select id="knowledgeType">
+                            <option value="password">Password</option>
+                            <option value="pin">PIN</option>
+                            <option value="security_question">Security Question</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Value</label>
+                        <input type="text" id="knowledgeValue" placeholder="Enter value">
+                    </div>
+                    <button class="btn" onclick="generateKnowledgeFactor()">Generate JSON</button>
+                </div>
+
+                <div class="card">
+                    <h3>Possession Factor (OTP)</h3>
+                    <div class="input-group">
+                        <label>OTP Type</label>
+                        <select id="otpType">
+                            <option value="totp">TOTP (Time-based)</option>
+                            <option value="hotp">HOTP (Counter-based)</option>
+                            <option value="sms">SMS OTP</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Secret/Phone</label>
+                        <input type="text" id="otpSecret" placeholder="Enter secret or phone">
+                    </div>
+                    <button class="btn" onclick="generateOTPFactor()">Generate JSON</button>
+                </div>
+
+                <div class="card">
+                    <h3>Push Notification</h3>
+                    <div class="input-group">
+                        <label>Device ID</label>
+                        <input type="text" id="pushDeviceId" placeholder="Enter device ID">
+                    </div>
+                    <div class="input-group">
+                        <label>Push Token</label>
+                        <input type="text" id="pushToken" placeholder="Enter FCM/APNS token">
+                    </div>
+                    <button class="btn" onclick="generatePushFactor()">Generate JSON</button>
+                </div>
+            </div>
+
+            <div id="dataFormatOutput" class="output"></div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div class="tab-content">
+            <h2 style="color: #8B5CF6; margin-bottom: 1.5rem;">MFA Algorithms (TOTP/HOTP & Risk-Based)</h2>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>TOTP Generator</h3>
+                    <div class="input-group">
+                        <label>Secret Key (Base32)</label>
+                        <input type="text" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" value="JBSWY3DPEHPK3PXP">
+                    </div>
+                    <div class="input-group">
+                        <label>Time Step (seconds)</label>
+                        <input type="number" id="totpTimeStep" value="30">
+                    </div>
+                    <div class="input-group">
+                        <label>Digits</label>
+                        <input type="number" id="totpDigits" value="6" min="6" max="8">
+                    </div>
+                    <button class="btn" onclick="generateTOTP()">Generate TOTP</button>
+                </div>
+
+                <div class="card">
+                    <h3>HOTP Generator</h3>
+                    <div class="input-group">
+                        <label>Secret Key (Base32)</label>
+                        <input type="text" id="hotpSecret" placeholder="JBSWY3DPEHPK3PXP" value="JBSWY3DPEHPK3PXP">
+                    </div>
+                    <div class="input-group">
+                        <label>Counter</label>
+                        <input type="number" id="hotpCounter" value="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Digits</label>
+                        <input type="number" id="hotpDigits" value="6" min="6" max="8">
+                    </div>
+                    <button class="btn" onclick="generateHOTP()">Generate HOTP</button>
+                </div>
+
+                <div class="card">
+                    <h3>Risk-Based Authentication</h3>
+                    <div class="input-group">
+                        <label>IP Address</label>
+                        <input type="text" id="riskIP" placeholder="192.168.1.1" value="192.168.1.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Device Fingerprint</label>
+                        <input type="text" id="riskDevice" placeholder="Chrome/Mac/1920x1080">
+                    </div>
+                    <div class="input-group">
+                        <label>Location</label>
+                        <input type="text" id="riskLocation" placeholder="Seoul, KR">
+                    </div>
+                    <button class="btn" onclick="calculateRiskScore()">Calculate Risk Score</button>
+                </div>
+            </div>
+
+            <div id="algorithmOutput" class="output"></div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div class="tab-content">
+            <h2 style="color: #8B5CF6; margin-bottom: 1.5rem;">MFA Registration & Authentication Protocol</h2>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>MFA Enrollment</h3>
+                    <div class="input-group">
+                        <label>User ID</label>
+                        <input type="text" id="enrollUserId" placeholder="user@example.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Factor Type</label>
+                        <select id="enrollFactorType">
+                            <option value="totp">TOTP Authenticator</option>
+                            <option value="sms">SMS</option>
+                            <option value="push">Push Notification</option>
+                            <option value="hardware">Hardware Token</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="enrollMFA()">Enroll Factor</button>
+                </div>
+
+                <div class="card">
+                    <h3>MFA Authentication</h3>
+                    <div class="input-group">
+                        <label>User ID</label>
+                        <input type="text" id="authUserId" placeholder="user@example.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Primary Factor (Password)</label>
+                        <input type="password" id="authPassword" placeholder="Enter password">
+                    </div>
+                    <div class="input-group">
+                        <label>OTP Code</label>
+                        <input type="text" id="authOTP" placeholder="Enter 6-digit code">
+                    </div>
+                    <button class="btn" onclick="authenticateMFA()">Authenticate</button>
+                </div>
+
+                <div class="card">
+                    <h3>Challenge-Response Flow</h3>
+                    <div class="input-group">
+                        <label>Session ID</label>
+                        <input type="text" id="challengeSession" readonly>
+                    </div>
+                    <div class="input-group">
+                        <label>Challenge</label>
+                        <textarea id="challengeData" readonly></textarea>
+                    </div>
+                    <button class="btn" onclick="generateChallenge()">Generate Challenge</button>
+                    <button class="btn btn-secondary" onclick="verifyResponse()">Verify Response</button>
+                </div>
+            </div>
+
+            <div id="protocolOutput" class="output"></div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div class="tab-content">
+            <h2 style="color: #8B5CF6; margin-bottom: 1.5rem;">SSO & Identity Provider Integration</h2>
+
+            <div class="info-box">
+                <strong>Supported Integrations:</strong> OAuth2, SAML 2.0, OpenID Connect
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>OAuth2 Integration</h3>
+                    <div class="input-group">
+                        <label>Client ID</label>
+                        <input type="text" id="oauth2ClientId" placeholder="your-client-id">
+                    </div>
+                    <div class="input-group">
+                        <label>Redirect URI</label>
+                        <input type="text" id="oauth2Redirect" placeholder="https://app.example.com/callback">
+                    </div>
+                    <div class="input-group">
+                        <label>Scope</label>
+                        <input type="text" id="oauth2Scope" value="openid profile mfa">
+                    </div>
+                    <button class="btn" onclick="generateOAuth2Flow()">Generate OAuth2 Flow</button>
+                </div>
+
+                <div class="card">
+                    <h3>SAML 2.0 Integration</h3>
+                    <div class="input-group">
+                        <label>Entity ID</label>
+                        <input type="text" id="samlEntityId" placeholder="https://idp.example.com">
+                    </div>
+                    <div class="input-group">
+                        <label>ACS URL</label>
+                        <input type="text" id="samlACS" placeholder="https://sp.example.com/acs">
+                    </div>
+                    <div class="input-group">
+                        <label>MFA Required</label>
+                        <select id="samlMFA">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="generateSAMLAssertion()">Generate SAML Assertion</button>
+                </div>
+
+                <div class="card">
+                    <h3>OpenID Connect</h3>
+                    <div class="input-group">
+                        <label>Issuer</label>
+                        <input type="text" id="oidcIssuer" placeholder="https://accounts.example.com">
+                    </div>
+                    <div class="input-group">
+                        <label>ACR Values</label>
+                        <input type="text" id="oidcACR" value="http://schemas.wia.org/mfa/totp">
+                    </div>
+                    <button class="btn" onclick="generateOIDCToken()">Generate ID Token</button>
+                </div>
+            </div>
+
+            <div id="integrationOutput" class="output"></div>
+        </div>
+
+        <!-- Tab 5: QR & VC -->
+        <div class="tab-content">
+            <h2 style="color: #8B5CF6; margin-bottom: 1.5rem;">QR Code & Verifiable Credentials</h2>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>TOTP QR Code Generator</h3>
+                    <div class="input-group">
+                        <label>Account Name</label>
+                        <input type="text" id="qrAccount" placeholder="user@example.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Issuer</label>
+                        <input type="text" id="qrIssuer" placeholder="MyApp">
+                    </div>
+                    <div class="input-group">
+                        <label>Secret (Base32)</label>
+                        <input type="text" id="qrSecret" placeholder="Auto-generated" readonly>
+                    </div>
+                    <button class="btn" onclick="generateQRCode()">Generate QR Code</button>
+                </div>
+
+                <div class="card">
+                    <h3>MFA Verifiable Credential</h3>
+                    <div class="input-group">
+                        <label>Subject DID</label>
+                        <input type="text" id="vcSubject" placeholder="did:example:123456">
+                    </div>
+                    <div class="input-group">
+                        <label>Issuer DID</label>
+                        <input type="text" id="vcIssuer" placeholder="did:wia:issuer">
+                    </div>
+                    <div class="input-group">
+                        <label>MFA Method</label>
+                        <select id="vcMethod">
+                            <option value="totp">TOTP</option>
+                            <option value="hardware">Hardware Token</option>
+                            <option value="biometric">Biometric</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="generateMFACredential()">Generate VC</button>
+                </div>
+            </div>
+
+            <div id="qrDisplay"></div>
+            <div id="qrvcOutput" class="output"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+        function switchTab(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab-content').forEach((content, i) => {
+                content.classList.toggle('active', i === index);
+            });
+        }
+
+        // Tab 1: Data Format Functions
+        function generateKnowledgeFactor() {
+            const type = document.getElementById('knowledgeType').value;
+            const value = document.getElementById('knowledgeValue').value;
+            const factor = {
+                type: 'knowledge',
+                subtype: type,
+                hash: hashValue(value),
+                salt: generateSalt(),
+                algorithm: 'bcrypt',
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('dataFormatOutput').textContent = JSON.stringify(factor, null, 2);
+        }
+
+        function generateOTPFactor() {
+            const type = document.getElementById('otpType').value;
+            const secret = document.getElementById('otpSecret').value;
+            const factor = {
+                type: 'possession',
+                subtype: type,
+                secret: type === 'sms' ? null : secret,
+                phone: type === 'sms' ? secret : null,
+                algorithm: type === 'totp' ? 'SHA1' : 'SHA256',
+                digits: 6,
+                period: type === 'totp' ? 30 : null,
+                counter: type === 'hotp' ? 0 : null,
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('dataFormatOutput').textContent = JSON.stringify(factor, null, 2);
+        }
+
+        function generatePushFactor() {
+            const deviceId = document.getElementById('pushDeviceId').value;
+            const token = document.getElementById('pushToken').value;
+            const factor = {
+                type: 'possession',
+                subtype: 'push_notification',
+                deviceId: deviceId,
+                pushToken: token,
+                platform: 'fcm',
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('dataFormatOutput').textContent = JSON.stringify(factor, null, 2);
+        }
+
+        // Tab 2: Algorithm Functions
+        function generateTOTP() {
+            const secret = document.getElementById('totpSecret').value;
+            const timeStep = parseInt(document.getElementById('totpTimeStep').value);
+            const digits = parseInt(document.getElementById('totpDigits').value);
+
+            const time = Math.floor(Date.now() / 1000 / timeStep);
+            const otp = simpleTOTP(secret, time, digits);
+
+            const result = {
+                algorithm: 'TOTP',
+                otp: otp,
+                secret: secret,
+                timeStep: timeStep,
+                timestamp: new Date().toISOString(),
+                validFor: timeStep + ' seconds',
+                timeRemaining: timeStep - (Math.floor(Date.now() / 1000) % timeStep)
+            };
+            document.getElementById('algorithmOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function generateHOTP() {
+            const secret = document.getElementById('hotpSecret').value;
+            const counter = parseInt(document.getElementById('hotpCounter').value);
+            const digits = parseInt(document.getElementById('hotpDigits').value);
+
+            const otp = simpleHOTP(secret, counter, digits);
+
+            const result = {
+                algorithm: 'HOTP',
+                otp: otp,
+                secret: secret,
+                counter: counter,
+                nextCounter: counter + 1,
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('algorithmOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function calculateRiskScore() {
+            const ip = document.getElementById('riskIP').value;
+            const device = document.getElementById('riskDevice').value;
+            const location = document.getElementById('riskLocation').value;
+
+            let riskScore = 0;
+            const factors = [];
+
+            // Simulate risk analysis
+            if (!ip.startsWith('192.168')) {
+                riskScore += 20;
+                factors.push('Unknown IP range');
+            }
+
+            if (!device.includes('Chrome')) {
+                riskScore += 15;
+                factors.push('Unusual browser');
+            }
+
+            const hour = new Date().getHours();
+            if (hour < 6 || hour > 22) {
+                riskScore += 10;
+                factors.push('Unusual time of day');
+            }
+
+            const result = {
+                riskScore: riskScore,
+                riskLevel: riskScore > 30 ? 'HIGH' : riskScore > 15 ? 'MEDIUM' : 'LOW',
+                factors: factors,
+                recommendation: riskScore > 30 ? 'Require additional MFA' : 'Proceed with standard MFA',
+                ipAddress: ip,
+                deviceFingerprint: device,
+                location: location,
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('algorithmOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Tab 3: Protocol Functions
+        function enrollMFA() {
+            const userId = document.getElementById('enrollUserId').value;
+            const factorType = document.getElementById('enrollFactorType').value;
+
+            const secret = generateRandomSecret();
+            const enrollment = {
+                enrollmentId: generateId(),
+                userId: userId,
+                factorType: factorType,
+                secret: factorType === 'totp' ? secret : null,
+                qrCode: factorType === 'totp' ? `otpauth://totp/${userId}?secret=${secret}&issuer=WIA-MFA` : null,
+                status: 'pending_verification',
+                timestamp: new Date().toISOString(),
+                expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+            };
+            document.getElementById('protocolOutput').textContent = JSON.stringify(enrollment, null, 2);
+        }
+
+        function authenticateMFA() {
+            const userId = document.getElementById('authUserId').value;
+            const password = document.getElementById('authPassword').value;
+            const otp = document.getElementById('authOTP').value;
+
+            const result = {
+                authenticationId: generateId(),
+                userId: userId,
+                primaryFactor: {
+                    type: 'password',
+                    verified: password.length > 0
+                },
+                secondaryFactor: {
+                    type: 'totp',
+                    code: otp,
+                    verified: otp.length === 6
+                },
+                sessionToken: generateToken(),
+                expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('protocolOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function generateChallenge() {
+            const sessionId = generateId();
+            const challenge = {
+                sessionId: sessionId,
+                challenge: generateRandomSecret(),
+                method: 'push_notification',
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+                timestamp: new Date().toISOString()
+            };
+
+            document.getElementById('challengeSession').value = sessionId;
+            document.getElementById('challengeData').value = JSON.stringify(challenge, null, 2);
+            document.getElementById('protocolOutput').textContent = 'Challenge generated. User must approve on device.';
+        }
+
+        function verifyResponse() {
+            const sessionId = document.getElementById('challengeSession').value;
+            const result = {
+                sessionId: sessionId,
+                verified: true,
+                response: 'approved',
+                timestamp: new Date().toISOString()
+            };
+            document.getElementById('protocolOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Tab 4: Integration Functions
+        function generateOAuth2Flow() {
+            const clientId = document.getElementById('oauth2ClientId').value;
+            const redirect = document.getElementById('oauth2Redirect').value;
+            const scope = document.getElementById('oauth2Scope').value;
+
+            const authUrl = `https://auth.example.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirect)}&scope=${encodeURIComponent(scope)}&response_type=code&acr_values=mfa`;
+
+            const flow = {
+                step1_authorization: {
+                    url: authUrl,
+                    method: 'GET'
+                },
+                step2_mfa_challenge: {
+                    required: true,
+                    methods: ['totp', 'push', 'sms']
+                },
+                step3_token_exchange: {
+                    url: 'https://auth.example.com/oauth2/token',
+                    method: 'POST',
+                    params: {
+                        grant_type: 'authorization_code',
+                        code: '{authorization_code}',
+                        client_id: clientId,
+                        redirect_uri: redirect
+                    }
+                }
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(flow, null, 2);
+        }
+
+        function generateSAMLAssertion() {
+            const entityId = document.getElementById('samlEntityId').value;
+            const acs = document.getElementById('samlACS').value;
+            const mfaRequired = document.getElementById('samlMFA').value === 'true';
+
+            const assertion = {
+                issuer: entityId,
+                subject: 'user@example.com',
+                audience: acs,
+                authenticationContext: mfaRequired ? 'urn:oasis:names:tc:SAML:2.0:ac:classes:MultiFactor' : 'urn:oasis:names:tc:SAML:2.0:ac:classes:Password',
+                authenticationMethods: mfaRequired ? ['password', 'totp'] : ['password'],
+                attributes: {
+                    email: 'user@example.com',
+                    mfaVerified: mfaRequired,
+                    mfaMethod: 'totp'
+                },
+                notBefore: new Date().toISOString(),
+                notOnOrAfter: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(assertion, null, 2);
+        }
+
+        function generateOIDCToken() {
+            const issuer = document.getElementById('oidcIssuer').value;
+            const acr = document.getElementById('oidcACR').value;
+
+            const idToken = {
+                iss: issuer,
+                sub: 'user-123456',
+                aud: 'client-app-id',
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                iat: Math.floor(Date.now() / 1000),
+                acr: acr,
+                amr: ['pwd', 'totp'],
+                email: 'user@example.com',
+                email_verified: true,
+                mfa_verified: true,
+                mfa_method: 'totp'
+            };
+            document.getElementById('integrationOutput').textContent = JSON.stringify(idToken, null, 2);
+        }
+
+        // Tab 5: QR & VC Functions
+        function generateQRCode() {
+            const account = document.getElementById('qrAccount').value;
+            const issuer = document.getElementById('qrIssuer').value;
+            const secret = generateRandomSecret();
+
+            document.getElementById('qrSecret').value = secret;
+
+            const otpauthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+
+            const qrDisplay = document.getElementById('qrDisplay');
+            qrDisplay.innerHTML = '<div class="qr-canvas" id="qrcode"></div>';
+
+            new QRCode(document.getElementById('qrcode'), {
+                text: otpauthUrl,
+                width: 256,
+                height: 256
+            });
+
+            const result = {
+                otpauthUrl: otpauthUrl,
+                account: account,
+                issuer: issuer,
+                secret: secret,
+                algorithm: 'SHA1',
+                digits: 6,
+                period: 30
+            };
+            document.getElementById('qrvcOutput').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function generateMFACredential() {
+            const subject = document.getElementById('vcSubject').value;
+            const issuer = document.getElementById('vcIssuer').value;
+            const method = document.getElementById('vcMethod').value;
+
+            const vc = {
+                '@context': [
+                    'https://www.w3.org/2018/credentials/v1',
+                    'https://wia.org/credentials/mfa/v1'
+                ],
+                type: ['VerifiableCredential', 'MFACredential'],
+                issuer: issuer,
+                issuanceDate: new Date().toISOString(),
+                credentialSubject: {
+                    id: subject,
+                    mfaMethod: method,
+                    verificationLevel: method === 'hardware' ? 'high' : method === 'biometric' ? 'high' : 'medium',
+                    enrolledAt: new Date().toISOString()
+                },
+                proof: {
+                    type: 'Ed25519Signature2020',
+                    created: new Date().toISOString(),
+                    proofPurpose: 'assertionMethod',
+                    verificationMethod: issuer + '#key-1',
+                    proofValue: generateToken()
+                }
+            };
+            document.getElementById('qrvcOutput').textContent = JSON.stringify(vc, null, 2);
+        }
+
+        // Utility Functions
+        function hashValue(value) {
+            return 'hash_' + btoa(value).substring(0, 32);
+        }
+
+        function generateSalt() {
+            return 'salt_' + Math.random().toString(36).substring(2, 18);
+        }
+
+        function generateId() {
+            return 'id_' + Math.random().toString(36).substring(2, 18) + Date.now().toString(36);
+        }
+
+        function generateToken() {
+            return btoa(Math.random().toString(36).substring(2) + Date.now().toString(36));
+        }
+
+        function generateRandomSecret() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+            let secret = '';
+            for (let i = 0; i < 32; i++) {
+                secret += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return secret;
+        }
+
+        function simpleTOTP(secret, time, digits) {
+            // Simplified TOTP for demonstration
+            const hash = (secret + time).split('').reduce((a, b) => {
+                a = ((a << 5) - a) + b.charCodeAt(0);
+                return a & a;
+            }, 0);
+            return Math.abs(hash).toString().substring(0, digits).padStart(digits, '0');
+        }
+
+        function simpleHOTP(secret, counter, digits) {
+            // Simplified HOTP for demonstration
+            const hash = (secret + counter).split('').reduce((a, b) => {
+                a = ((a << 5) - a) + b.charCodeAt(0);
+                return a & a;
+            }, 0);
+            return Math.abs(hash).toString().substring(0, digits).padStart(digits, '0');
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

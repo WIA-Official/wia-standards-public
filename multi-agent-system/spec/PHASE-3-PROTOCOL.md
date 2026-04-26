@@ -379,6 +379,170 @@ Periodic status updates (every 30s):
 }
 ```
 
+## Task Lifecycle State Machine
+
+Every accepted task MUST progress through one of the following terminal states. State transitions MUST be reflected in the SSE stream defined in Phase 2 §Streaming.
+
+```
+                  +----------+
+                  | submitted|
+                  +-----+----+
+                        |
+                        v
+                  +-----+----+
+                  | accepted |
+                  +--+----+--+
+                     |    |
+            (assign) |    | (refuse)
+                     v    v
+              +------+--+ +-------+
+              | working | | failed|
+              +--+---+--+ +-------+
+                 |   |
+        (need)   |   | (await peer)
+                 v   v
+        +-------+--+ +----------+
+        | inputs   | | awaiting |
+        |  needed  | |  agent   |
+        +----+-----+ +----+-----+
+             |            |
+             +------+-----+
+                    v
+              +-----+-----+
+              | completed |
+              +-----------+
+```
+
+| State | Description | Allowed transitions |
+|-------|-------------|---------------------|
+| `submitted` | Task accepted by manager, not yet assigned | `accepted`, `rejected` |
+| `accepted` | Manager has chosen at least one contractor | `working`, `failed` |
+| `working` | Contractor executing | `inputs-needed`, `awaiting-agent`, `completed`, `failed`, `cancelled` |
+| `inputs-needed` | Task is paused awaiting client clarification | `working`, `cancelled` |
+| `awaiting-agent` | Sub-task delegated to another agent | `working`, `failed` |
+| `completed` | Result delivered, idempotent reads available | terminal |
+| `failed` | Permanent failure with diagnostic | terminal |
+| `cancelled` | Cancelled by client or supervisor | terminal |
+
+Each transition MUST be reported as an event whose `from` and `to` fields are members of the table above. Receivers MUST treat unknown transitions as `failed`.
+
+## JSON-RPC 2.0 Envelope
+
+Bilateral agent-to-agent invocation reuses JSON-RPC 2.0. Beyond the MCP-aligned `tools/*` methods, WIA-AI-016 reserves the namespace `wia/agent/*`:
+
+| Method | Direction | Description |
+|--------|-----------|-------------|
+| `wia/agent/describe` | client → server | Returns the Agent Card |
+| `wia/agent/ping` | client → server | Liveness probe |
+| `wia/agent/cancel` | client → server | Cancels a running task |
+| `wia/agent/tasks/get` | client → server | Reads task state |
+| `wia/agent/tasks/stream` | client → server | Subscribes to lifecycle events |
+| `wia/agent/notify` | server → client | Server-pushed event |
+
+Notifications (no `id`) MUST be used for all server-pushed events; clients MUST tolerate unknown notifications without erroring.
+
+## Trust Establishment
+
+Pairs of agents that have not previously interacted MUST run the trust handshake before exchanging anything beyond `wia/agent/describe`:
+
+```
+Initiator                       Responder
+   |                                |
+   |--TLS 1.3 ClientHello---------->|
+   |<-TLS 1.3 ServerHello-----------|
+   |   (cert chain incl. SPIFFE ID) |
+   |                                |
+   |--POST /trust/initiate--------->|
+   |   { nonce, agentCard }         |
+   |<-200 OK { challenge }----------|
+   |                                |
+   |--POST /trust/prove------------>|
+   |   { sig(challenge, privKey) }  |
+   |<-200 OK { token, ttl }---------|
+```
+
+Tokens MUST be JWTs whose `iss` matches the responder's Agent Card `provider.url`, `aud` matches the initiator agent ID, and `exp` is ≤ 1 hour in the future. Verification MUST follow RFC 7515 (JWS) and RFC 7519 (JWT). Mutual TLS endpoints MAY rely on SPIFFE Verifiable Identity Documents (SVIDs) instead of JWTs.
+
+## Rate Limit Signaling
+
+When an agent must throttle a peer it MUST respond per RFC 6585 §4 with HTTP 429 and the headers:
+
+```
+Retry-After: 30
+WIA-RateLimit-Limit: 100
+WIA-RateLimit-Remaining: 0
+WIA-RateLimit-Reset: 1735128030
+WIA-RateLimit-Policy: "100;w=60"
+```
+
+Clients MUST honour `Retry-After` and SHOULD apply jitter (full-jitter exponential backoff) before retrying.
+
+## Conflict Resolution
+
+When two agents independently mutate replicated state (e.g. shared blackboard tuples), conflicts MUST be reconciled with the following precedence:
+
+1. **Vector clocks**: each replica maintains a per-writer counter. The merged value is the pair-wise max of vectors.
+2. **Last-writer-wins fallback**: if vectors are concurrent (`A ‖ B`), the writer with the lexicographically smallest `agentId` wins.
+3. **Application override**: applications MAY register a `merge(a, b) -> c` callback that supersedes step 2.
+
+Reconciliation events MUST be logged with `event.type = "conflict-resolved"` and include both originals plus the merged value.
+
+## Saga-Style Multi-Agent Transactions
+
+For workflows that span multiple agents WIA-AI-016 RECOMMENDS the saga pattern: each step has an inverse compensation that is invoked on rollback.
+
+```json
+{
+  "sagaId": "saga-001",
+  "steps": [
+    {"agent": "agent-payment", "action": "charge", "compensate": "refund"},
+    {"agent": "agent-inventory", "action": "reserve", "compensate": "release"},
+    {"agent": "agent-shipping", "action": "dispatch", "compensate": "recall"}
+  ],
+  "policy": "abort-on-first-failure"
+}
+```
+
+Coordinators MUST persist the saga log before invoking each forward step so that crash recovery can resume compensation. Compensations MUST be idempotent.
+
+## Failure Detection
+
+Agents that maintain peer liveness views MUST use a phi-accrual style failure detector. Recommended parameters: window size 1000 samples, threshold φ = 8, sampling interval 1 s. Suspect peers MUST be moved to `degraded` for 30 s before being declared `offline`; this prevents flapping under transient packet loss.
+
+## Time Synchronisation
+
+All timestamps in protocol events MUST be UTC formatted per ISO 8601 with millisecond precision and the `Z` designator. Clocks SHOULD be disciplined via NTP (RFC 5905) or PTP (IEEE 1588) with drift below 250 ms across the agent fleet. Receivers MUST tolerate clock skew up to 5 minutes for tokens (`exp`/`nbf`) per RFC 7519.
+
+## Conformance Test Vectors
+
+Phase 3 ships a vector file at `cli/test-vectors/phase-3.json` whose entries take the form:
+
+```json
+{
+  "name": "request-protocol/happy-path",
+  "trace": [
+    {"from": "initiator", "to": "participant", "performative": "request", "content": {"action": "ping"}},
+    {"from": "participant", "to": "initiator", "performative": "agree"},
+    {"from": "participant", "to": "initiator", "performative": "inform", "content": {"result": "pong"}}
+  ],
+  "expected": {"final": "completed"}
+}
+```
+
+Implementations MUST pass every vector with no warnings before claiming WIA-AI-016 Phase 3 conformance.
+
+## Normative References
+
+- JSON-RPC 2.0 — JSON-RPC Working Group
+- IETF RFC 8446 — TLS 1.3
+- IETF RFC 7515 — JSON Web Signature (JWS)
+- IETF RFC 7519 — JSON Web Token (JWT)
+- IETF RFC 6585 — Additional HTTP Status Codes
+- IETF RFC 5905 — Network Time Protocol Version 4
+- IEEE 1588-2019 — Precision Time Protocol
+- ISO 8601:2019 — Date and time representations
+- SPIFFE — Secure Production Identity Framework for Everyone
+
 ---
 
 **WIA-AI-016 Phase 3 Specification v1.0**

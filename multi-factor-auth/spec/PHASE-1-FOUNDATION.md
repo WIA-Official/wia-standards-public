@@ -279,6 +279,58 @@ Dynamically adjusts authentication requirements based on risk assessment.
 - **Website**: https://github.com/WIA-Official/wia-standards
 - **Email**: standards@wia.org
 
+## 13. Threat Model
+
+WIA-SEC-008 addresses the following adversaries explicitly:
+
+| Adversary | Capability | MFA mitigation |
+|-----------|-----------|----------------|
+| Phishing operator | Captures credentials via cloned site | WebAuthn origin binding; TOTP delivers limited value |
+| SIM-swap attacker | Hijacks SMS delivery | SMS factor MUST NOT be the sole second factor |
+| Network adversary (passive) | Sniffs auth traffic | TLS 1.3 + Channel Binding (RFC 9266) |
+| Network adversary (active) | MITM with valid TLS termination | WebAuthn challenge nonce + device attestation |
+| Endpoint malware | Reads memory of victim browser | Hardware-backed authenticators (TPM, Secure Enclave) |
+| Insider with admin access | Modifies authenticator policy | Tamper-evident audit log + dual-control changes |
+
+### 13.1 Out-of-Scope Adversaries
+
+- Nation-state hardware attacks against shipped FIDO authenticators (deferred to FIDO Alliance certification track)
+- Physical coercion of the user (mitigated by procedural controls outside this spec)
+
+## 14. Conformance Levels
+
+| Level | Description | Required factors |
+|-------|-------------|------------------|
+| L1 — Basic | Personal accounts | Password + TOTP or push |
+| L2 — Standard | Employee accounts | Password + WebAuthn (any) |
+| L3 — High Assurance | Privileged accounts | WebAuthn (platform or roaming, attestation enforced) + step-up biometric |
+| L4 — Restricted | Administrators / break-glass | WebAuthn (roaming, FIDO L2 attested) + signed approval ceremony |
+
+L3 and L4 MUST refuse SMS / voice OTP fall-back. Promotion between levels requires re-enrolment of factors so that the lower-tier factors are not silently re-used.
+
+## 14.1 Promotion Ceremony
+
+Promoting an account from L2 to L3/L4 MUST trigger a ceremony with these mandatory steps:
+
+1. **Identity Proofing Refresh** — re-verify government ID or peer attestation per organisation policy.
+2. **Hardware Authenticator Enrolment** — enrol at least one FIDO2 roaming key with attestation enabled.
+3. **Step-up Test** — execute a synthetic step-up flow against a privileged endpoint and confirm success.
+4. **Witness Approval** — a separate operator MUST approve the promotion in the admin console (dual control).
+5. **Audit Note** — record the promotion ID, ceremony participants, and policy version that authorised it.
+
+The ceremony MUST NOT be skippable through bulk operations; each promotion is an individual record that can be revoked atomically. Operators MUST review the L3/L4 inventory at least quarterly and revoke unused promotions.
+
+## 15. Normative References
+
+- IETF RFC 6238 — TOTP
+- IETF RFC 4226 — HOTP
+- W3C Web Authentication Level 3
+- FIDO2 / CTAP 2.1
+- IETF RFC 6749 / RFC 6750 — OAuth 2.0
+- IETF RFC 9068 — JWT Profile for OAuth 2.0 Access Tokens
+- IETF RFC 9266 — Channel Bindings for TLS 1.3
+- NIST SP 800-63B — Digital Identity Guidelines: Authentication
+
 ---
 
 **Copyright © 2025 SmileStory Inc. / WIA**

@@ -172,6 +172,63 @@ Detector Specifications:
 - Backup power systems sustain operations for 30+ days without external support
 - Data fusion accurately correlates multi-sensor inputs with <5% false correlation rate
 
+## 12. Detection Network Topology
+
+WIA-DEF-014 Phase 1 establishes a quad-modal detection network so no single failure mode masks an event:
+
+| Modality | Sensor count target | Primary signal | Failure tolerance |
+|----------|---------------------|----------------|-------------------|
+| Seismic | 170 | Sub-surface body waves | Loss of any 5 stations triggers backfill |
+| Hydro-acoustic | 11 | Underwater pressure waves | Triple-redundant cabling per node |
+| Infrasound | 60 | Atmospheric pressure waves | Solar-PV powered for week-long outage tolerance |
+| Radionuclide | 80 | Aerosol + noble-gas filters | Lab redundancy across continents |
+
+The union of all modalities MUST identify at minimum a 1-kt yield with > 99% probability anywhere on the planet, and MUST cross-correlate across at least three modalities before issuing a high-confidence determination.
+
+## 13. Civil-Defense Coordination
+
+Detection alone is insufficient. The standard requires explicit handoff to civil-defense actors:
+
+1. Initial detection log enters the WIA Detection Trust Broker within 60 seconds.
+2. The broker fans out to each member nation's civil-defense liaison via mutually-authenticated channels.
+3. Civil-defense actors may pre-stage shelters even before formal escalation.
+4. A formal escalation requires two-person integrity at the WIA control centre.
+
+The protocol MUST be tested with a tabletop exercise quarterly and a live drill annually.
+
+## 14. Risk Communication Principles
+
+Public communication during a detection event follows three principles:
+
+- **Calm-First**: messages SHOULD prioritise actionable steps over technical detail.
+- **No-Speculation**: the WIA broker NEVER attributes events to a specific actor in initial bulletins.
+- **Multilingual**: bulletins MUST be issued in at least the official languages of the affected jurisdiction.
+
+These principles align with the IAEA International Nuclear and Radiological Event Scale (INES) public-communication recommendations.
+
+## 15. Cybersecurity Baseline
+
+The detection network is a high-value target. Every node MUST:
+
+- Run signed firmware verified at boot
+- Use mutually-authenticated TLS for all peer-to-peer communication
+- Rotate session keys at most every 24 hours
+- Reject any update channel that does not present a valid SLSA Provenance v1 attestation
+- Log every administrative action through the central audit broker with two-person integrity
+
+A node failing any of the above MUST self-isolate from the network and surface a tamper alert at the central operations centre within 60 seconds.
+
+## 16. Governance Touchpoints
+
+The detection apparatus has authority to influence millions of lives — its governance MUST be visible:
+
+- Operating-policy changes require unanimous consent of the WIA standing committee
+- Annual public review at a documented WIA assembly
+- Independent audit every 3 years by a rotating member-state team
+- Whistleblower channel for analysts who suspect the apparatus is being misused
+
+These touchpoints MUST be funded as core infrastructure rather than as discretionary line items. Funding obligations are stipulated in the WIA member-state accession agreement and revisited at the annual review.
+
 ---
 
 © 2025 SmileStory Inc. / WIA | 弘益人間

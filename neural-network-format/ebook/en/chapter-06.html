@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Optimization and Quantization | WIA-AI-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 60px 40px; margin: -40px -20px 40px -20px; border-radius: 0 0 20px 20px; }
+        h1 { font-size: 2.8em; color: #0f172a; margin-bottom: 15px; }
+        .chapter-info { color: #1e293b; font-size: 1.1em; }
+        h2 { color: #10B981; font-size: 2em; margin: 50px 0 25px 0; padding-bottom: 15px; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.5em; margin: 30px 0 15px 0; }
+        p { margin-bottom: 20px; color: #cbd5e1; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .highlight { background: #1e293b; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 20px 0 20px 30px; }
+        li { margin: 10px 0; color: #cbd5e1; }
+        .summary { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e293b; padding: 30px; border-radius: 10px; margin: 40px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 40px; border-top: 2px solid #334155; }
+        .btn { padding: 12px 30px; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 5px; font-weight: 600; transition: all 0.3s ease; }
+        .btn:hover { background: #059669; transform: translateY(-2px); }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #10B981; color: #0f172a; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; margin: 40px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 6: Optimization and Quantization</h1>
+            <p class="chapter-info">Techniques for Efficient Model Deployment</p>
+            <p class="chapter-info" style="margin-top: 10px;">弘益人間 · Benefit All Humanity</p>
+        </header>
+
+        <h2>6.1 Introduction to Model Optimization</h2>
+        <p>
+            Model optimization is crucial for production deployment, especially on resource-constrained devices. Optimization techniques reduce model size, improve inference speed, and decrease memory usage while maintaining accuracy. This chapter covers quantization, pruning, knowledge distillation, and hardware-specific optimizations.
+        </p>
+
+        <div class="highlight">
+            <h3>Optimization Goals</h3>
+            <ul>
+                <li><strong>Smaller Size:</strong> Reduce storage and bandwidth requirements</li>
+                <li><strong>Faster Inference:</strong> Lower latency for real-time applications</li>
+                <li><strong>Less Memory:</strong> Enable deployment on edge devices</li>
+                <li><strong>Energy Efficiency:</strong> Extend battery life on mobile devices</li>
+            </ul>
+        </div>
+
+        <h2>6.2 Quantization Fundamentals</h2>
+        <p>
+            Quantization reduces the precision of model weights and activations from floating-point (FP32) to lower bit-widths (INT8, INT4):
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Precision</th>
+                    <th>Size/Weight</th>
+                    <th>Typical Use</th>
+                    <th>Accuracy Impact</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>FP32</td>
+                    <td>4 bytes</td>
+                    <td>Training baseline</td>
+                    <td>None (baseline)</td>
+                </tr>
+                <tr>
+                    <td>FP16</td>
+                    <td>2 bytes</td>
+                    <td>Mixed precision training</td>
+                    <td>Minimal (&lt;0.1%)</td>
+                </tr>
+                <tr>
+                    <td>INT8</td>
+                    <td>1 byte</td>
+                    <td>Edge inference</td>
+                    <td>Small (&lt;1%)</td>
+                </tr>
+                <tr>
+                    <td>INT4</td>
+                    <td>0.5 bytes</td>
+                    <td>Extreme compression</td>
+                    <td>Moderate (1-3%)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Quantization Formula</h3>
+        <pre><code># Linear quantization mapping
+q = round(r / scale) + zero_point
+
+Where:
+  r = real value (FP32)
+  q = quantized value (INT8)
+  scale = (r_max - r_min) / (q_max - q_min)
+  zero_point = q_min - round(r_min / scale)
+
+# Dequantization
+r = (q - zero_point) * scale</code></pre>
+
+        <h2>6.3 Post-Training Quantization</h2>
+        <p>
+            Apply quantization to a trained model without retraining:
+        </p>
+
+        <h3>Dynamic Quantization (PyTorch)</h3>
+        <pre><code>import torch
+
+# Load trained model
+model = torch.load('model.pth')
+model.eval()
+
+# Dynamic quantization (weights only)
+quantized_model = torch.quantization.quantize_dynamic(
+    model,
+    {torch.nn.Linear, torch.nn.LSTM},  # Layers to quantize
+    dtype=torch.qint8
+)
+
+# Save quantized model
+torch.save(quantized_model.state_dict(), 'quantized_model.pth')
+
+# Test inference
+with torch.no_grad():
+    output = quantized_model(test_input)
+
+# Model size comparison
+import os
+original_size = os.path.getsize('model.pth') / 1024 / 1024
+quantized_size = os.path.getsize('quantized_model.pth') / 1024 / 1024
+print(f"Original: {original_size:.2f} MB")
+print(f"Quantized: {quantized_size:.2f} MB")
+print(f"Reduction: {(1 - quantized_size/original_size) * 100:.1f}%")</code></pre>
+
+        <h3>Static Quantization (TensorFlow)</h3>
+        <pre><code>import tensorflow as tf
+import numpy as np
+
+# Load model
+model = tf.keras.models.load_model('model.h5')
+
+# Create representative dataset for calibration
+def representative_dataset():
+    for _ in range(100):
+        yield [np.random.randn(1, 224, 224, 3).astype(np.float32)]
+
+# Convert with quantization
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.representative_dataset = representative_dataset
+
+# Full integer quantization
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.uint8
+converter.inference_output_type = tf.uint8
+
+# Convert
+quantized_tflite = converter.convert()
+
+# Save
+with open('quantized_model.tflite', 'wb') as f:
+    f.write(quantized_tflite)</code></pre>
+
+        <h2>6.4 Quantization-Aware Training (QAT)</h2>
+        <p>
+            Train the model while simulating quantization effects for better accuracy:
+        </p>
+
+        <pre><code>import torch
+import torch.quantization
+
+class QuantizableModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.quant = torch.quantization.QuantStub()
+        self.conv1 = torch.nn.Conv2d(3, 64, 3)
+        self.bn1 = torch.nn.BatchNorm2d(64)
+        self.relu = torch.nn.ReLU()
+        self.conv2 = torch.nn.Conv2d(64, 128, 3)
+        self.bn2 = torch.nn.BatchNorm2d(128)
+        self.dequant = torch.quantization.DeQuantStub()
+
+    def forward(self, x):
+        x = self.quant(x)
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.dequant(x)
+        return x
+
+# Prepare model for QAT
+model = QuantizableModel()
+model.train()
+
+# Fuse modules
+model.fuse_model = lambda: torch.quantization.fuse_modules(
+    model, [['conv1', 'bn1', 'relu'], ['conv2', 'bn2', 'relu']]
+)
+model.fuse_model()
+
+# Configure quantization
+model.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
+torch.quantization.prepare_qat(model, inplace=True)
+
+# Train with fake quantization
+for epoch in range(num_epochs):
+    for data, target in train_loader:
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+
+# Convert to quantized model
+model.eval()
+quantized_model = torch.quantization.convert(model, inplace=False)</code></pre>
+
+        <h2>6.5 Model Pruning</h2>
+        <p>
+            Remove unnecessary weights to reduce model size and computation:
+        </p>
+
+        <h3>Magnitude-Based Pruning</h3>
+        <pre><code>import torch
+import torch.nn.utils.prune as prune
+
+model = MyModel()
+
+# Prune 40% of weights in conv layers
+for name, module in model.named_modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.l1_unstructured(module, name='weight', amount=0.4)
+
+# Make pruning permanent
+for module in model.modules():
+    if isinstance(module, torch.nn.Conv2d):
+        prune.remove(module, 'weight')
+
+# Global pruning (across all layers)
+parameters_to_prune = [
+    (module, 'weight') for module in model.modules()
+    if isinstance(module, (torch.nn.Conv2d, torch.nn.Linear))
+]
+
+prune.global_unstructured(
+    parameters_to_prune,
+    pruning_method=prune.L1Unstructured,
+    amount=0.5  # 50% global sparsity
+)
+
+# Check sparsity
+def check_sparsity(model):
+    zeros = 0
+    elements = 0
+    for param in model.parameters():
+        zeros += torch.sum(param == 0).item()
+        elements += param.nelement()
+    return zeros / elements
+
+print(f"Sparsity: {check_sparsity(model) * 100:.2f}%")</code></pre>
+
+        <h3>Structured Pruning</h3>
+        <pre><code># Prune entire channels/filters
+import torch.nn.utils.prune as prune
+
+# Prune 30% of output channels in conv layer
+prune.ln_structured(
+    model.conv1,
+    name="weight",
+    amount=0.3,
+    n=2,  # L2 norm
+    dim=0  # Output channel dimension
+)
+
+# Custom pruning based on importance scores
+class ImportanceScorePruning(prune.BasePruningMethod):
+    PRUNING_TYPE = "unstructured"
+
+    def __init__(self, importance_scores, amount):
+        self.importance_scores = importance_scores
+        self.amount = amount
+
+    def compute_mask(self, t, default_mask):
+        mask = default_mask.clone()
+        nparams_toprune = round(self.amount * t.numel())
+        topk = torch.topk(
+            self.importance_scores.view(-1),
+            k=nparams_toprune,
+            largest=False
+        )
+        mask.view(-1)[topk.indices] = 0
+        return mask</code></pre>
+
+        <h2>6.6 Knowledge Distillation</h2>
+        <p>
+            Train a smaller student model to mimic a larger teacher model:
+        </p>
+
+        <pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DistillationLoss(nn.Module):
+    def __init__(self, temperature=3.0, alpha=0.5):
+        super().__init__()
+        self.temperature = temperature
+        self.alpha = alpha
+        self.ce_loss = nn.CrossEntropyLoss()
+
+    def forward(self, student_logits, teacher_logits, labels):
+        # Soft target loss (KL divergence)
+        soft_targets = F.softmax(teacher_logits / self.temperature, dim=1)
+        soft_prob = F.log_softmax(student_logits / self.temperature, dim=1)
+        soft_loss = -torch.sum(soft_targets * soft_prob) / soft_prob.size(0)
+        soft_loss *= (self.temperature ** 2)
+
+        # Hard target loss
+        hard_loss = self.ce_loss(student_logits, labels)
+
+        # Combined loss
+        return self.alpha * soft_loss + (1 - self.alpha) * hard_loss
+
+# Training loop
+teacher_model = LargeModel()  # Pre-trained
+teacher_model.eval()
+
+student_model = SmallModel()
+criterion = DistillationLoss(temperature=4.0, alpha=0.7)
+optimizer = torch.optim.Adam(student_model.parameters())
+
+for epoch in range(num_epochs):
+    for images, labels in train_loader:
+        # Teacher predictions (no gradient)
+        with torch.no_grad():
+            teacher_logits = teacher_model(images)
+
+        # Student predictions
+        student_logits = student_model(images)
+
+        # Distillation loss
+        loss = criterion(student_logits, teacher_logits, labels)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()</code></pre>
+
+        <h2>6.7 Graph Optimization</h2>
+        <p>
+            Optimize the computational graph for efficient execution:
+        </p>
+
+        <h3>Operator Fusion</h3>
+        <pre><code># ONNX Runtime optimization
+import onnxruntime as ort
+
+# Configure session with optimizations
+sess_options = ort.SessionOptions()
+sess_options.graph_optimization_level = \
+    ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+# Optimizations include:
+# - Conv + BatchNorm fusion
+# - Conv + ReLU fusion
+# - Gemm fusion
+# - Dropout elimination (inference)
+# - Constant folding
+
+session = ort.InferenceSession(
+    "model.onnx",
+    sess_options,
+    providers=['CPUExecutionProvider']
+)
+
+# Save optimized model
+sess_options.optimized_model_filepath = "optimized_model.onnx"
+session = ort.InferenceSession("model.onnx", sess_options)</code></pre>
+
+        <h3>Memory Planning</h3>
+        <pre><code># TensorFlow XLA (Accelerated Linear Algebra)
+import tensorflow as tf
+
+# Enable XLA compilation
+@tf.function(jit_compile=True)
+def optimized_inference(x):
+    return model(x, training=False)
+
+# XLA optimizations:
+# - Operator fusion
+# - Memory layout optimization
+# - Dead code elimination
+# - Algebraic simplification
+
+# Benchmark
+import time
+
+# Without XLA
+start = time.time()
+for _ in range(100):
+    _ = model(test_input)
+no_xla_time = time.time() - start
+
+# With XLA
+start = time.time()
+for _ in range(100):
+    _ = optimized_inference(test_input)
+xla_time = time.time() - start
+
+print(f"Speedup: {no_xla_time / xla_time:.2f}x")</code></pre>
+
+        <h2>6.8 Hardware-Specific Optimizations</h2>
+
+        <h3>NVIDIA TensorRT</h3>
+        <pre><code>import tensorrt as trt
+import pycuda.driver as cuda
+import pycuda.autoinit
+
+# Create TensorRT builder
+logger = trt.Logger(trt.Logger.WARNING)
+builder = trt.Builder(logger)
+network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+
+# Parse ONNX model
+parser = trt.OnnxParser(network, logger)
+with open('model.onnx', 'rb') as model:
+    parser.parse(model.read())
+
+# Configure builder
+config = builder.create_builder_config()
+config.max_workspace_size = 1 << 30  # 1GB
+config.set_flag(trt.BuilderFlag.FP16)  # Enable FP16
+
+# Build engine
+engine = builder.build_engine(network, config)
+
+# Serialize and save
+with open('model.trt', 'wb') as f:
+    f.write(engine.serialize())
+
+# Inference
+context = engine.create_execution_context()
+# ... allocate buffers and run inference</code></pre>
+
+        <h3>Intel OpenVINO</h3>
+        <pre><code>from openvino.runtime import Core
+
+# Initialize OpenVINO
+ie = Core()
+
+# Read ONNX model
+model = ie.read_model('model.onnx')
+
+# Compile for CPU with optimizations
+compiled_model = ie.compile_model(model, 'CPU')
+
+# Create inference request
+infer_request = compiled_model.create_infer_request()
+
+# Run inference
+import numpy as np
+input_data = np.random.randn(1, 3, 224, 224).astype(np.float32)
+results = infer_request.infer({0: input_data})
+output = results[0]</code></pre>
+
+        <h2>6.9 Benchmarking and Profiling</h2>
+
+        <pre><code>import torch
+import time
+import numpy as np
+
+class ModelBenchmark:
+    def __init__(self, model, input_shape):
+        self.model = model
+        self.input_shape = input_shape
+        self.model.eval()
+
+    def benchmark(self, num_runs=100, warmup=10):
+        # Warmup
+        for _ in range(warmup):
+            with torch.no_grad():
+                _ = self.model(torch.randn(*self.input_shape))
+
+        # Benchmark
+        times = []
+        for _ in range(num_runs):
+            input_data = torch.randn(*self.input_shape)
+
+            start = time.perf_counter()
+            with torch.no_grad():
+                _ = self.model(input_data)
+            end = time.perf_counter()
+
+            times.append((end - start) * 1000)  # ms
+
+        return {
+            'mean': np.mean(times),
+            'std': np.std(times),
+            'min': np.min(times),
+            'max': np.max(times),
+            'p50': np.percentile(times, 50),
+            'p95': np.percentile(times, 95),
+            'p99': np.percentile(times, 99)
+        }
+
+# Usage
+benchmark = ModelBenchmark(model, (1, 3, 224, 224))
+results = benchmark.benchmark()
+print(f"Inference time: {results['mean']:.2f}ms ± {results['std']:.2f}ms")
+print(f"P95 latency: {results['p95']:.2f}ms")</code></pre>
+
+        <h2>6.10 Trade-off Analysis</h2>
+
+        <div class="highlight">
+            <h3>Optimization Decision Matrix</h3>
+            <ul>
+                <li><strong>Quantization:</strong> 4x size reduction, 2-4x speedup, &lt;1% accuracy loss</li>
+                <li><strong>Pruning:</strong> 2-3x size reduction, 1.5-2x speedup, &lt;2% accuracy loss</li>
+                <li><strong>Distillation:</strong> Variable reduction, maintains accuracy better</li>
+                <li><strong>Graph Opt:</strong> 1.5-2x speedup, no accuracy loss, minimal size reduction</li>
+                <li><strong>Hardware Opt:</strong> 3-10x speedup, no accuracy loss, platform-specific</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <ul>
+                <li>Quantization reduces precision from FP32 to INT8/INT4 for 4x compression</li>
+                <li>Post-training quantization is simple; QAT achieves better accuracy</li>
+                <li>Pruning removes unnecessary weights (magnitude-based or structured)</li>
+                <li>Knowledge distillation trains small models to mimic large ones</li>
+                <li>Graph optimization fuses operators and optimizes memory layout</li>
+                <li>Hardware-specific optimizations (TensorRT, OpenVINO) provide major speedups</li>
+                <li>Always benchmark and profile to measure real-world impact</li>
+                <li>Trade-offs exist between size, speed, and accuracy</li>
+                <li>Combine multiple techniques for best results</li>
+                <li>Validate accuracy after each optimization step</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain the quantization formula for converting FP32 to INT8.</li>
+                <li>What is the difference between dynamic and static quantization?</li>
+                <li>Write code to apply post-training quantization in PyTorch.</li>
+                <li>How does quantization-aware training improve accuracy?</li>
+                <li>Compare magnitude-based pruning vs structured pruning.</li>
+                <li>Describe the knowledge distillation training process.</li>
+                <li>What graph optimizations does operator fusion provide?</li>
+                <li>How would you optimize a model for NVIDIA GPUs using TensorRT?</li>
+                <li>Write a benchmarking script to measure inference latency.</li>
+                <li>Analyze the trade-offs between different optimization techniques.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (Hongik Ingan) · Benefit All Humanity
+        </div>
+
+        </div>
+</body>
+</html>

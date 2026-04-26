@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: TensorFlow SavedModel | WIA-AI-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 60px 40px; margin: -40px -20px 40px -20px; border-radius: 0 0 20px 20px; }
+        h1 { font-size: 2.5em; color: #0f172a; margin-bottom: 15px; }
+        .chapter-info { color: #1e293b; font-size: 1.1em; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3em; margin: 25px 0 12px 0; }
+        p { margin-bottom: 18px; color: #cbd5e1; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #1e293b; padding: 18px; border-radius: 8px; overflow-x: auto; margin: 18px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .highlight { background: #1e293b; padding: 18px; border-radius: 8px; margin: 18px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 18px 0 18px 30px; }
+        li { margin: 8px 0; color: #cbd5e1; }
+        .summary { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 35px; border-top: 2px solid #334155; }
+        .btn { padding: 12px 28px; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 5px; font-weight: 600; }
+        .btn:hover { background: #059669; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #10B981; color: #0f172a; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; margin: 35px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>3장: TensorFlow SavedModel</h1>
+            <p class="chapter-info">TensorFlow 생태계를 위한 프로덕션 준비 모델 형식</p>
+            <p class="chapter-info" style="margin-top: 10px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+        </header>
+
+        <h2>3.1 SavedModel 소개</h2>
+        <p>
+            TensorFlow SavedModel은 TensorFlow 모델을 위한 범용 직렬화 형식입니다. TensorFlow 1.0에서 도입되고 TensorFlow 2.0에서 크게 개선된 SavedModel은 계산 그래프, 변수, 에셋 및 시그니처를 포함하는 완전하고 독립적인 패키지로 프로덕션 배포를 위해 설계되었습니다.
+        </p>
+        <p>
+            체크포인트 파일이나 동결된 그래프와 같은 이전 형식과 달리, SavedModel은 모델을 서빙하거나 미세 조정하거나 다른 형식으로 변환하는 데 필요한 모든 것을 포함합니다. TensorFlow Serving, TensorFlow Lite, TensorFlow.js 및 클라우드 ML 플랫폼에 권장되는 형식입니다.
+        </p>
+
+        <div class="highlight">
+            <h3>SavedModel의 장점</h3>
+            <ul>
+                <li><strong>독립적:</strong> 그래프, 변수, 에셋, 메타데이터 포함</li>
+                <li><strong>언어 독립적:</strong> Python, C++, Java, Go에서 로드 가능</li>
+                <li><strong>서빙 준비:</strong> TensorFlow Serving에 직접 배포</li>
+                <li><strong>버전 관리:</strong> A/B 테스팅을 위한 모델 버전 관리 지원</li>
+                <li><strong>변환 가능:</strong> TFLite, TF.js, ONNX로 쉽게 변환</li>
+            </ul>
+        </div>
+
+        <h2>3.2 SavedModel 디렉토리 구조</h2>
+        <p>SavedModel은 다음 구조를 가진 디렉토리로 저장됩니다:</p>
+
+        <pre><code>saved_model/
+├── assets/                     # 추가 파일 (어휘, 등)
+│   └── vocab.txt
+├── variables/                  # 모델 가중치 및 변수
+│   ├── variables.data-00000-of-00001
+│   └── variables.index
+└── saved_model.pb             # 직렬화된 계산 그래프 및 메타데이터
+
+# 여러 버전이 있는 경우:
+model_repository/
+├── my_model/
+│   ├── 1/                     # 버전 1
+│   │   ├── assets/
+│   │   ├── variables/
+│   │   └── saved_model.pb
+│   └── 2/                     # 버전 2
+│       ├── assets/
+│       ├── variables/
+│       └── saved_model.pb</code></pre>
+
+        <h3>파일 설명</h3>
+        <ul>
+            <li><strong>saved_model.pb:</strong> MetaGraphDef와 SignatureDef를 포함하는 Protocol buffer</li>
+            <li><strong>variables/:</strong> 훈련된 가중치가 있는 체크포인트 파일</li>
+            <li><strong>assets/:</strong> 그래프가 참조하는 외부 파일 (어휘, 구성)</li>
+        </ul>
+
+        <h2>3.3 SavedModel 생성하기</h2>
+
+        <h3>Keras 모델 저장</h3>
+        <pre><code>import tensorflow as tf
+from tensorflow import keras
+
+# 모델 생성 및 훈련
+model = keras.Sequential([
+    keras.layers.Dense(128, activation='relu', input_shape=(784,)),
+    keras.layers.Dropout(0.2),
+    keras.layers.Dense(10, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# 모델 훈련
+model.fit(train_data, train_labels, epochs=5)
+
+# SavedModel로 저장
+model.save('my_model')  # SavedModel 디렉토리 생성
+
+# 또는 명시적으로 SavedModel 형식 사용
+model.save('my_model', save_format='tf')</code></pre>
+
+        <h3>사용자 정의 모델 저장</h3>
+        <pre><code>class CustomModel(tf.Module):
+    def __init__(self):
+        super().__init__()
+        self.v = tf.Variable(1.0)
+        self.w = tf.Variable(2.0)
+
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[None], dtype=tf.float32)
+    ])
+    def __call__(self, x):
+        return self.v * x + self.w
+
+# 생성 및 저장
+model = CustomModel()
+tf.saved_model.save(model, 'custom_model')
+
+# 명시적 시그니처와 함께
+@tf.function(input_signature=[
+    tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32)
+])
+def serving_fn(images):
+    return model(images)
+
+tf.saved_model.save(
+    model,
+    'custom_model',
+    signatures={'serving_default': serving_fn}
+)</code></pre>
+
+        <h2>3.4 시그니처 정의</h2>
+        <p>시그니처는 서빙 및 추론을 위한 입출력 인터페이스를 정의합니다:</p>
+
+        <h3>여러 시그니처</h3>
+        <pre><code>class MultiSignatureModel(tf.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = create_model()
+
+    @tf.function
+    def predict(self, images):
+        return self.model(images)
+
+    @tf.function
+    def preprocess_and_predict(self, raw_images):
+        processed = tf.image.resize(raw_images, [224, 224])
+        processed = processed / 255.0
+        return self.model(processed)
+
+# 여러 시그니처로 저장
+model = MultiSignatureModel()
+
+signatures = {
+    'serving_default': model.predict.get_concrete_function(
+        tf.TensorSpec([None, 224, 224, 3], tf.float32)
+    ),
+    'preprocess': model.preprocess_and_predict.get_concrete_function(
+        tf.TensorSpec([None, None, None, 3], tf.float32)
+    )
+}
+
+tf.saved_model.save(
+    model,
+    'multi_signature_model',
+    signatures=signatures
+)</code></pre>
+
+        <h2>3.5 SavedModel 로드 및 사용</h2>
+
+        <h3>Python에서 로드</h3>
+        <pre><code># 방법 1: tf.saved_model.load (더 많은 제어)
+loaded = tf.saved_model.load('my_model')
+predictions = loaded(test_data)
+
+# 방법 2: keras.models.load_model (Keras 모델용)
+model = keras.models.load_model('my_model')
+predictions = model.predict(test_data)
+
+# 방법 3: 시그니처 사용
+loaded = tf.saved_model.load('my_model')
+infer = loaded.signatures['serving_default']
+output = infer(input_tensor=test_data)['output_0']</code></pre>
+
+        <h3>C++에서 로드</h3>
+        <pre><code>// TensorFlow Serving용 C++ API
+#include "tensorflow/cc/saved_model/loader.h"
+
+tensorflow::SavedModelBundle bundle;
+tensorflow::SessionOptions session_options;
+tensorflow::RunOptions run_options;
+
+// 모델 로드
+tensorflow::Status status = tensorflow::LoadSavedModel(
+    session_options,
+    run_options,
+    "/path/to/saved_model",
+    {"serve"},  // 태그
+    &bundle
+);
+
+// 추론 실행
+std::vector<tensorflow::Tensor> outputs;
+status = bundle.session->Run(
+    {{"input", input_tensor}},
+    {"output"},
+    {},
+    &outputs
+);</code></pre>
+
+        <h2>3.6 TensorFlow Serving</h2>
+
+        <h3>서빙 구성</h3>
+        <pre><code># 모델 구성 파일 (models.config)
+model_config_list {
+  config {
+    name: 'my_model'
+    base_path: '/models/my_model'
+    model_platform: 'tensorflow'
+    model_version_policy {
+      specific {
+        versions: 1
+        versions: 2
+      }
+    }
+  }
+}
+
+# Docker로 TensorFlow Serving 시작
+docker run -p 8501:8501 \
+  --mount type=bind,source=/path/to/models,target=/models \
+  -e MODEL_NAME=my_model \
+  -t tensorflow/serving</code></pre>
+
+        <h3>REST API 클라이언트</h3>
+        <pre><code>import requests
+import json
+import numpy as np
+
+# 입력 데이터 준비
+data = {
+    "signature_name": "serving_default",
+    "instances": test_images.tolist()
+}
+
+# 요청 전송
+response = requests.post(
+    'http://localhost:8501/v1/models/my_model:predict',
+    data=json.dumps(data)
+)
+
+# 응답 파싱
+predictions = response.json()['predictions']
+print(f"예측 결과: {predictions}")</code></pre>
+
+        <h2>3.7 SavedModel을 다른 형식으로 변환</h2>
+
+        <h3>SavedModel에서 TFLite로</h3>
+        <pre><code>import tensorflow as tf
+
+# SavedModel 로드
+converter = tf.lite.TFLiteConverter.from_saved_model('my_model')
+
+# 최적화 구성
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.float16]
+
+# 변환
+tflite_model = converter.convert()
+
+# 저장
+with open('model.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+print(f"TFLite 모델 크기: {len(tflite_model) / 1024:.2f} KB")</code></pre>
+
+        <h3>SavedModel에서 TensorFlow.js로</h3>
+        <pre><code># tensorflowjs 변환기 설치
+pip install tensorflowjs
+
+# SavedModel을 TF.js 형식으로 변환
+tensorflowjs_converter \
+    --input_format=tf_saved_model \
+    --output_format=tfjs_graph_model \
+    --signature_name=serving_default \
+    --saved_model_tags=serve \
+    my_model \
+    tfjs_model/
+
+# JavaScript에서 로드할 수 있음:
+# const model = await tf.loadGraphModel('model.json');</code></pre>
+
+        <h2>3.8 고급 SavedModel 기능</h2>
+
+        <h3>모델 에셋</h3>
+        <pre><code>import tensorflow as tf
+import shutil
+
+class ModelWithAssets(tf.Module):
+    def __init__(self):
+        super().__init__()
+        # 에셋에서 어휘 로드
+        self.vocab_file = tf.saved_model.Asset('vocab.txt')
+
+    @tf.function
+    def tokenize(self, text):
+        # 어휘 파일 사용
+        vocab_table = tf.lookup.StaticVocabularyTable(
+            tf.lookup.TextFileInitializer(
+                self.vocab_file.asset_path,
+                key_dtype=tf.string,
+                key_index=tf.lookup.TextFileIndex.WHOLE_LINE,
+                value_dtype=tf.int64,
+                value_index=tf.lookup.TextFileIndex.LINE_NUMBER
+            ),
+            num_oov_buckets=1
+        )
+        return vocab_table.lookup(text)
+
+# 모델 저장 (vocab.txt가 assets/로 복사됨)
+model = ModelWithAssets()
+tf.saved_model.save(model, 'model_with_assets')</code></pre>
+
+        <h2>3.9 SavedModel 최적화</h2>
+
+        <h3>양자화</h3>
+        <pre><code># 후처리 양자화
+converter = tf.lite.TFLiteConverter.from_saved_model('my_model')
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+# 완전 정수 양자화
+def representative_dataset():
+    for _ in range(100):
+        yield [np.random.randn(1, 224, 224, 3).astype(np.float32)]
+
+converter.representative_dataset = representative_dataset
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.uint8
+converter.inference_output_type = tf.uint8
+
+quantized_model = converter.convert()</code></pre>
+
+        <h2>3.10 모범 사례</h2>
+
+        <h3>구체적 함수 사용</h3>
+        <pre><code># 입력 사양을 명시적으로 정의
+@tf.function(input_signature=[
+    tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32, name='images')
+])
+def inference_fn(images):
+    # 전처리
+    images = tf.image.resize(images, [224, 224])
+    images = (images - 127.5) / 127.5
+
+    # 모델 추론
+    return model(images, training=False)
+
+# 구체적 함수로 저장
+tf.saved_model.save(
+    model,
+    'my_model',
+    signatures={'serving_default': inference_fn}
+)</code></pre>
+
+        <h3>배포 전 테스트</h3>
+        <pre><code># 검증 스크립트
+def validate_savedmodel(model_path, test_data):
+    # 모델 로드
+    model = tf.saved_model.load(model_path)
+    infer = model.signatures['serving_default']
+
+    # 입력 테스트
+    for i, (input_data, expected_output) in enumerate(test_data):
+        output = infer(**input_data)
+
+        # 출력 형상 확인
+        assert output.shape == expected_output.shape
+
+        # 정확도 확인
+        diff = tf.abs(output - expected_output)
+        max_diff = tf.reduce_max(diff)
+        assert max_diff < 0.001, f"테스트 {i} 실패: max_diff={max_diff}"
+
+    print("✓ 모든 검증 테스트 통과")
+
+# 검증 실행
+validate_savedmodel('my_model', test_dataset)</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <p>이 장에서는 TensorFlow SavedModel 형식을 상세히 다루었습니다. 주요 내용:</p>
+            <ul>
+                <li>SavedModel은 프로덕션을 위한 TensorFlow의 범용 직렬화 형식입니다</li>
+                <li>디렉토리 구조에는 saved_model.pb, variables/, assets/가 포함됩니다</li>
+                <li>시그니처는 서빙을 위한 입출력 인터페이스를 정의합니다</li>
+                <li>여러 저장 방법: model.save(), tf.saved_model.save()</li>
+                <li>TensorFlow Serving은 프로덕션급 모델 서빙을 제공합니다</li>
+                <li>TFLite, TF.js, ONNX 형식으로 쉽게 변환할 수 있습니다</li>
+                <li>에셋, 웜업 요청, 모델 버전 관리를 지원합니다</li>
+                <li>그래프 최적화와 양자화를 통한 최적화가 가능합니다</li>
+                <li>구체적 함수 사용과 버전 관리가 모범 사례입니다</li>
+                <li>프로덕션 배포 전에 항상 모델을 검증해야 합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>SavedModel 디렉토리에 포함된 파일들과 각각의 내용은 무엇인가요?</li>
+                <li>SavedModel의 시그니처란 무엇이며 왜 중요한가요?</li>
+                <li>Python에서 SavedModel을 로드하는 세 가지 방법을 비교하세요.</li>
+                <li>Docker로 TensorFlow Serving을 사용하여 SavedModel을 서빙하는 방법은?</li>
+                <li>SavedModel을 TensorFlow Lite 형식으로 변환하는 코드를 작성하세요.</li>
+                <li>모델 에셋이란 무엇이며 언제 사용하나요?</li>
+                <li>TensorFlow Serving에서 웜업 요청의 목적을 설명하세요.</li>
+                <li>SavedModel로 모델 버전 관리를 구현하는 방법은?</li>
+                <li>SavedModel의 양자화 프로세스를 설명하세요.</li>
+                <li>SavedModel을 배포하기 전에 수행해야 할 검증 단계는 무엇인가요?</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · 널리 인간을 이롭게 하라
+        </div>
+
+        </div>
+</body>
+</html>

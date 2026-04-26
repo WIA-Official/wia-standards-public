@@ -185,6 +185,58 @@ Interceptor Specifications:
 - Continuity of government maintains command authority through all simulated scenarios
 - International monitoring network operational availability >98%
 
+## 12. Operational Continuity
+
+The detection network must be assumed adversarial — power, network, and supply chains may be disrupted simultaneously with the event being detected. The standard requires:
+
+- **Power autonomy**: every sensor node MUST sustain operation for ≥ 7 days on internal power (solar+battery or fuel reserve).
+- **Network autonomy**: when the public Internet is unavailable, sensor logs MUST queue locally and ship via store-and-forward over secondary radio links.
+- **Logical autonomy**: each node MUST independently reach an "anomaly detected" verdict before the central broker is reachable.
+- **Hardened firmware**: signed, attested, and field-replaceable through a documented dual-control procedure.
+
+## 13. False-Positive Discipline
+
+Public alerts have life-or-death consequences. The standard imposes strict false-positive discipline:
+
+| Tier | Civil notification | Required cross-modal corroboration |
+|------|---------------------|------------------------------------|
+| L0 — internal | Analyst pager only | 1 modality |
+| L1 — restricted | Liaison to gov agencies | 2 modalities |
+| L2 — public | Public broadcast + SMS / cell broadcast | 3 modalities + analyst sign-off |
+| L3 — international | UN / IAEA notification | 4 modalities + dual-control + 2 analysts |
+
+Demoting a tier (e.g. retracting a public alert) MUST itself be logged and explained to the population that received the original alert.
+
+## 14. Sensor Lifecycle Management
+
+Every sensor's lifecycle MUST be tracked from procurement to decommissioning:
+
+- Procurement chain (vendor, contract, customs)
+- Calibration record (every 12 months)
+- Field-deployment audit (location, mounting, environmental)
+- Firmware version + measurement attestation
+- Decommissioning (sanitize keys, document destruction, replace with successor)
+
+Records MUST be retained for the operational lifetime plus 25 years.
+
+## 15. Sample Bulletin Schema
+
+```json
+{
+  "bulletinId": "WIA-DEF-014-2026-04-26-001",
+  "tier": "L1",
+  "ts": "2026-04-26T13:00:00Z",
+  "modalities": ["seismic", "infrasound"],
+  "confidence": 0.62,
+  "regionRef": "WGS84-bbox(...)",
+  "civilDefenseAction": "pre-stage shelters; no public alert",
+  "previousBulletin": null,
+  "signature": "ed25519:..."
+}
+```
+
+Bulletins MUST be issued in machine-readable JSON plus the WIA narrative format. Localisation is appended downstream by member-state liaisons; the original bulletin remains the canonical record. Bulletins are signed with the WIA broker key and propagate over the same mTLS channels that carry telemetry, so a compromised relay cannot inject forged content.
+
 ---
 
 © 2025 SmileStory Inc. / WIA | 弘益人間

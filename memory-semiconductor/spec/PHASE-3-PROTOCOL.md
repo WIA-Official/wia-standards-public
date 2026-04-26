@@ -418,6 +418,65 @@ Requirements:
 - Flag protocol violations
 - Generate test patterns
 
+## 8. CXL Memory Sub-Protocol
+
+### 8.1 Discovery
+
+CXL.mem devices participating in WIA-SEMI-002 MUST publish their range descriptors through the CXL Component Register block (DVSEC) and additionally expose a JSON manifest:
+
+```json
+{
+  "schemaVersion": "wia.semi-002.cxl-range/1",
+  "rangeId": "cxl-mem-0",
+  "base": "0x000000400000000000",
+  "length": "0x100000000",
+  "interleaveWays": 4,
+  "interleaveGranularity": 256,
+  "memoryClass": "PMEM",
+  "persistencePolicy": "ADR",
+  "qosControlEnabled": true
+}
+```
+
+Hosts MUST consume this manifest before issuing any CXL.mem M2S Req traffic so address mapping never drifts from the device-advertised view.
+
+### 8.2 Latency Class Reporting
+
+Each CXL range MUST report a latency class so software can route allocations:
+
+| Class | Typical access latency | Use case |
+|-------|------------------------|----------|
+| L0 | < 200 ns | Tier-0 expansion DRAM |
+| L1 | 200–500 ns | Tier-1 expansion / pooled |
+| L2 | 500 ns–2 µs | PMEM / tiered persistent |
+| L3 | > 2 µs | Far memory / disaggregated |
+
+Latency-class transitions (e.g. fail-over from L0 to L1 cache after lane retraining) MUST raise telemetry frame type 0x06 within 100 ms.
+
+### 8.3 Persistence Domain Boundaries
+
+For PMEM-class ranges the device MUST honour ACPI ADR (Asynchronous DRAM Refresh) so that cache-line writes flushed before a power loss reach the persistence domain. The standard reuses the SNIA NVM Programming Model power-fail-protected store semantics:
+
+```
+flush_domain(addr, len)
+    -> CLWB(addr..addr+len-1)
+    -> SFENCE
+    -> persistence guaranteed by ADR window
+```
+
+Devices MUST publish `adrWindowMicroseconds` in their manifest; hosts MUST size their hardened deferred-flush queue to fit inside that window.
+
+## 9. Normative References
+
+- ISO/IEC 17025:2017 — Testing and calibration laboratories
+- JEDEC JESD79-4D, JESD79-5C, JESD235D
+- JEDEC JESD230 — NVDIMM-N
+- ONFI 5.1 — Open NAND Flash Interface
+- CXL 3.1 Specification — Compute Express Link
+- SNIA NVM Programming Model 1.2
+- IETF RFC 8949 — CBOR
+- ISO/IEC 9899:2018 — C language (for reference implementations)
+
 ---
 
 **Document Control:**

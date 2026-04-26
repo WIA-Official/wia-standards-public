@@ -239,6 +239,44 @@ Implementation Standards:
 - Automated key rotation completing within defined time windows
 - 100% audit trail coverage with tamper detection active
 
+## 12. Threat Model & Adversary Capability
+
+WIA-DEF-017 Phase 1 explicitly assumes the following adversary capabilities:
+
+| Adversary | Capability | Mitigation |
+|-----------|-----------|------------|
+| Tactical-net interceptor | Passive RF / fiber capture | TLS 1.3 + AEAD with per-message nonces |
+| State-level harvester | Long-term storage of captured traffic | Hybrid PQ handshake (classical + ML-KEM) |
+| Compromised relay | Active MITM attempt with forged certs | Mutual TLS + SPIFFE identity, channel binding (RFC 9266) |
+| Malicious insider | Read access to one operator workstation | Hardware-bound keys (TPM 2.0 / Secure Enclave) |
+| Quantum-capable adversary (future) | Recovery of ECDH ciphertexts | PQ posture covers session keys |
+| Supply-chain attacker | Tampered firmware on field radios | Signed boot + SBOM verification |
+
+Out-of-scope: physical coercion, side-channel attacks against tamper-resistant hardware enclosures (HSM scope).
+
+## 13. Cryptographic Inventory Discipline
+
+Every deployed instance MUST maintain a cryptographic inventory that lists:
+
+- Algorithm name and parameters (e.g. `AES-256-GCM` with 96-bit nonce)
+- Library / hardware module (vendor, version, FIPS 140-3 cert if applicable)
+- Use case (transport, archive, code signing, audit log seal)
+- Key material lifecycle policy (generation, rotation interval, destruction)
+- Owner and reviewer
+
+The inventory MUST be reviewed quarterly. Algorithms entering deprecation windows (e.g. RSA < 3072 bits, SHA-1) MUST trigger automated remediation tickets.
+
+## 14. Field-Replacement Discipline
+
+Tactical hardware fails. Replacement units MUST not be hot-keyed in the field; instead they:
+
+1. Boot with a default identity that can only enroll into the trust framework.
+2. Authenticate via a one-time enrolment token signed by the deployment officer.
+3. Bind to the operator's identity through dual control.
+4. Receive their first session keys via the standard hybrid handshake — never a static key pre-loaded on the bench.
+
+This prevents an exfiltrated radio from carrying any usable keying material.
+
 ---
 
 © 2025 SmileStory Inc. / WIA | 弘益人間

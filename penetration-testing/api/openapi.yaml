@@ -1,0 +1,264 @@
+openapi: 3.1.0
+info:
+  title: WIA-SEC-019 Penetration Testing API
+  version: 1.0.0
+  description: |
+    REST surface for the WIA-SEC-019 penetration testing platform.
+    Covers engagement lifecycle, finding ingestion, triage, and
+    SLA reporting. All errors follow RFC 9457 (application/problem+json).
+  license:
+    name: WIA Standards License
+    url: https://standards.wia.example/license
+
+servers:
+  - url: https://api.wia.org/pentest/v1
+    description: Production
+  - url: https://staging-api.wia.org/pentest/v1
+    description: Staging
+
+security:
+  - bearerAuth: []
+  - mtls: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    mtls:
+      type: mutualTLS
+
+  schemas:
+    Severity:
+      type: string
+      enum: [info, low, medium, high, critical]
+
+    CVSS:
+      type: object
+      required: [version, vector]
+      properties:
+        version:
+          type: string
+          enum: ["3.0", "3.1", "4.0"]
+        vector:
+          type: string
+        baseScore:
+          type: number
+          minimum: 0
+          maximum: 10
+
+    Asset:
+      type: object
+      required: [type, value]
+      properties:
+        type:
+          type: string
+          enum: [url, host, image, repo, iamRole, k8sResource]
+        value:
+          type: string
+
+    Finding:
+      type: object
+      required: [findingId, discoveredAt, source, ruleId, title, severity, asset, status]
+      properties:
+        findingId: { type: string, pattern: "^WIA-PT-[0-9]{4}-[0-9]{5}$" }
+        discoveredAt: { type: string, format: date-time }
+        source: { type: string }
+        ruleId: { type: string }
+        title: { type: string }
+        severity: { $ref: "#/components/schemas/Severity" }
+        cvss: { $ref: "#/components/schemas/CVSS" }
+        asset: { $ref: "#/components/schemas/Asset" }
+        evidence:
+          type: object
+          additionalProperties: true
+        remediation: { type: string }
+        owner: { type: string }
+        status:
+          type: string
+          enum: [open, in_progress, fixed, retest, accepted-risk, false-positive]
+
+    Engagement:
+      type: object
+      required: [engagementId, type, startedAt]
+      properties:
+        engagementId: { type: string }
+        type:
+          type: string
+          enum: [pentest, redteam, purpleteam, continuous]
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        scope:
+          type: array
+          items: { type: string }
+        owner: { type: string }
+        roeUrl: { type: string, format: uri }
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:    { type: string, format: uri }
+        title:   { type: string }
+        status:  { type: integer }
+        detail:  { type: string }
+        instance:{ type: string }
+
+paths:
+  /findings:
+    post:
+      summary: Submit a batch of findings
+      operationId: submitFindings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [findings]
+              properties:
+                runId: { type: string, description: "ULID of the producing run" }
+                findings:
+                  type: array
+                  items: { $ref: "#/components/schemas/Finding" }
+      responses:
+        "202":
+          description: Accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: integer }
+                  duplicates: { type: integer }
+                  rejected: { type: integer }
+        "400":
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+    get:
+      summary: List findings
+      operationId: listFindings
+      parameters:
+        - in: query
+          name: severity
+          schema: { $ref: "#/components/schemas/Severity" }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Paginated results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Finding" }
+                  nextCursor: { type: string, nullable: true }
+
+  /findings/{findingId}:
+    parameters:
+      - in: path
+        name: findingId
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get a finding
+      operationId: getFinding
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Finding" }
+        "404":
+          description: Not found
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+    patch:
+      summary: Triage a finding
+      operationId: triageFinding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [in_progress, fixed, retest, accepted-risk, false-positive]
+                comment: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Finding" }
+
+  /engagements:
+    post:
+      summary: Open a new engagement
+      operationId: createEngagement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Engagement" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Engagement" }
+
+  /engagements/{engagementId}/findings:
+    parameters:
+      - in: path
+        name: engagementId
+        required: true
+        schema: { type: string }
+    get:
+      summary: List findings for an engagement
+      operationId: listEngagementFindings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Finding" }
+
+  /metrics/sla:
+    get:
+      summary: SLA compliance metrics
+      operationId: slaMetrics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  windowDays: { type: integer }
+                  triageOnTimePct: { type: number }
+                  remediationOnTimePct: { type: number }
+                  retestOnTimePct: { type: number }

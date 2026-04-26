@@ -494,6 +494,71 @@ Testing:
 - Electrical fast transient (EFT)
 ```
 
+## 10. Server Platform Integration
+
+### 10.1 BMC Telemetry Pipeline
+
+All servers MUST forward the WIA telemetry frames defined in Phase 1 §11 to the platform Baseboard Management Controller (BMC). The pipeline:
+
+```
+DIMM SPD/PMIC --(SMBus)--> BMC ingest agent ---(Redfish)---> Out-of-band collector
+NVMe SSD     --(NVMe-MI over SMBus)--> BMC --(Redfish events)-->
+```
+
+The BMC MUST publish each event as a Redfish `LogService` entry conforming to DMTF DSP0266 (Redfish Specification) so that off-host RAS daemons can ingest them without bespoke parsers.
+
+### 10.2 Linux EDAC Mapping
+
+| Telemetry frame type | Linux EDAC counter | Notes |
+|----------------------|--------------------|-------|
+| 0x01 RAS error | `ce_count`, `ue_count` | per-channel/per-DIMM |
+| 0x03 Refresh-rate change | new sysfs `wia_refresh_state` | optional |
+| 0x05 Bit-error histogram | tracepoint `wia:ber_bucket` | for analytics |
+| 0x06 CXL latency class | sysfs `cxl_range/<id>/class` | new |
+
+### 10.3 Persistent Memory Region Layout
+
+For PMEM-class memory the platform firmware MUST publish ACPI NFIT (NVDIMM Firmware Interface Table) regions describing every range. The ACPI labels MUST match the WIA manifest `rangeId` so user-space tools (`ndctl`, `daxctl`) can navigate by name.
+
+```
+NFIT entry:
+  Type: 0 (System Physical Address Range)
+  AddressRangeStartingAddress: 0x000000400000000000
+  AddressRangeLength: 0x100000000
+  AddressRangeMemoryMappingAttribute: 0x000C  (UC + WB)
+  AddressRangeTypeGUID: 66f0d379-b4f3-4074-ac43-0d3318b78cdb (PMEM)
+  ProximityDomain: 1
+  RangeIndex: 1
+```
+
+## 11. Conformance & Certification
+
+### 11.1 WIA-SEMI-002 Conformance Suites
+
+| Suite | Target | Tooling |
+|-------|--------|---------|
+| `phase-1-data` | SPD blob, mode register dump | `wia-semi-spd-validate` |
+| `phase-2-algorithms` | Live workload | `wia-semi-fr-fcfs-replay` |
+| `phase-3-protocol` | Logic-analyzer trace | `wia-semi-jesd-decode` |
+| `phase-4-integration` | Platform under test | Redfish + EDAC validators |
+
+A device MAY claim "WIA-SEMI-002 Conformant" only if every suite passes on the released firmware revision. Reports MUST be archived with the device serial number and remain retrievable for the lifetime of the part.
+
+### 11.2 Field-Failure Reporting
+
+Manufacturers MUST publish a field-failure rate (FIT/Mbit) update on a quarterly cadence. Reports MUST include population size, observed failures, and the decoder telemetry summary so independent reviewers can audit. The aggregated repository is hosted at `https://standards.wia.example/multi-agent-system/<wait, semi-002>/fit/`.
+
+## 12. Normative References
+
+- ISO/IEC 17025:2017 — Testing and calibration laboratories
+- IEC 60068-2 series — Environmental testing
+- DMTF DSP0266 — Redfish Specification
+- DMTF DSP0274 — Redfish Telemetry Service
+- ACPI 6.5 — Advanced Configuration and Power Interface
+- JEDEC JESD79-5C, JESD235D
+- IETF RFC 8949 — CBOR
+- AEC-Q100 / Q104 — Reliability Stress Tests for ICs
+
 ---
 
 **Document Control:**

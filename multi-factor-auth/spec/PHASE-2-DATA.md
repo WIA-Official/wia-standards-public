@@ -457,12 +457,40 @@ Do not share this code with anyone.
 
 ---
 
-## 11. References
+## 11. Audit Log Schema
+
+Every authentication decision MUST be recorded in a tamper-evident log:
+
+```json
+{
+  "eventId": "01HG…",
+  "ts": "2026-04-26T13:00:00Z",
+  "subjectId": "u-12345",
+  "tenantId": "acme",
+  "factorTypes": ["webauthn-platform"],
+  "outcome": "success",
+  "ip": "203.0.113.42",
+  "userAgent": "Mozilla/5.0 …",
+  "geoCity": "Seoul",
+  "geoCountry": "KR",
+  "riskScore": 0.12,
+  "stepUpReasons": [],
+  "policyVersion": "2026-04-21",
+  "previousEntryHash": "sha256:…"
+}
+```
+
+Logs MUST be append-only; mutation requires creating a new event whose `previousEntryHash` chains to the entry being superseded. Storage MUST be object-locked for at least 13 months.
+
+## 12. References
 
 - [RFC 6238 - TOTP](https://datatracker.ietf.org/doc/html/rfc6238)
 - [RFC 4226 - HOTP](https://datatracker.ietf.org/doc/html/rfc4226)
 - [FIDO2 CTAP](https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html)
 - [JWT RFC 7519](https://datatracker.ietf.org/doc/html/rfc7519)
+- [WebAuthn Level 3 (W3C)](https://www.w3.org/TR/webauthn-3/)
+- [RFC 9457 — Problem Details for HTTP APIs](https://datatracker.ietf.org/doc/html/rfc9457)
+- [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html)
 
 ---
 

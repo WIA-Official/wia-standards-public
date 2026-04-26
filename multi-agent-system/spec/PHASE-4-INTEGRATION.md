@@ -579,6 +579,206 @@ const token = jwt.sign(
 const decoded = jwt.verify(token, process.env.JWT_SECRET);
 ```
 
+## A2A Bridge Adapter
+
+Many WIA-AI-016 deployments need to interoperate with peers that speak the open Agent2Agent (A2A) protocol. The reference adapter exposes a WIA agent over the A2A `agent.json` discovery surface and forwards A2A `tasks/*` JSON-RPC methods to the local FIPA-ACL bus.
+
+```typescript
+import { A2ABridge } from '@wia/a2a-bridge';
+import { Agent } from '@wia/multi-agent-system';
+
+const bridge = new A2ABridge({
+  agent: localAgent,
+  agentCardUrl: 'https://api.example.com/.well-known/agent.json',
+  taskMapping: {
+    'a2a:tasks/send':   wiaPerformative('request'),
+    'a2a:tasks/cancel': wiaPerformative('cancel'),
+    'a2a:tasks/get':    wiaPerformative('query-if')
+  }
+});
+
+bridge.mountOn(httpServer, '/a2a');
+```
+
+The bridge MUST:
+
+- Translate A2A messages whose role is `agent` into FIPA-ACL `inform`.
+- Translate A2A messages whose role is `user` into FIPA-ACL `request`.
+- Surface A2A streaming via the SSE endpoint declared in Phase 2.
+- Mirror authentication: A2A's `securitySchemes` MUST be re-published in the WIA Agent Card.
+
+Reverse direction (WIA agent calls a remote A2A peer) is provided by the same package's `A2AClient` class which speaks plain JSON-RPC 2.0 to the remote `agent.json#url`.
+
+## MCP Server Adapter
+
+Agents that expose tools to LLM-driven hosts MUST be reachable as Model Context Protocol servers. The reference adapter wraps a WIA tool descriptor catalog as a JSON-RPC endpoint conforming to the MCP `tools/list`, `tools/call`, and `notifications/tools/list_changed` shapes.
+
+```typescript
+import { createMcpServer } from '@wia/mcp-adapter';
+
+const mcp = createMcpServer({
+  agent: localAgent,
+  transport: 'http+sse',           // or 'stdio' for local launch
+  authentication: { mode: 'oauth' },
+  tools: localAgent.toolCatalog()
+});
+
+mcp.listen({ host: '0.0.0.0', port: 3333 });
+```
+
+Local-only deployments (developer laptops, CI sandboxes) SHOULD prefer the `stdio` transport so that MCP-aware hosts can spawn the adapter as a child process. Production deployments SHOULD use HTTP plus Server-Sent Events with mTLS or OAuth2.
+
+## LangChain & LangGraph Integration
+
+```python
+from wia_multi_agent import WiaAgentTool
+from langchain_core.tools import StructuredTool
+
+# Wrap a WIA tool descriptor for use inside a LangChain Runnable
+wia_tool = WiaAgentTool(
+    base_url="https://api.example.com",
+    agent_id="agent-001",
+    tool_name="measure-temperature",
+    bearer_token=os.environ["WIA_TOKEN"],
+)
+
+structured = StructuredTool.from_function(
+    func=wia_tool.invoke,
+    name=wia_tool.name,
+    description=wia_tool.description,
+    args_schema=wia_tool.args_schema,
+)
+```
+
+```python
+# LangGraph multi-agent supervisor
+from langgraph.graph import StateGraph
+graph = StateGraph(state_schema)
+graph.add_node("sensing", wia_tool.as_node())
+graph.add_node("planner", llm_planner)
+graph.add_edge("planner", "sensing")
+```
+
+## Service Mesh (Istio) Sidecar
+
+```yaml
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: wia-agent-sidecar
+spec:
+  workloadSelector:
+    labels:
+      app: wia-agent
+  ingress:
+    - port:
+        number: 8080
+        protocol: HTTP
+        name: http
+      defaultEndpoint: 127.0.0.1:8080
+  egress:
+    - hosts:
+        - "./platform.svc.cluster.local"
+        - "./tracing.svc.cluster.local"
+```
+
+```yaml
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: wia-agent-mtls
+spec:
+  selector:
+    matchLabels:
+      app: wia-agent
+  mtls:
+    mode: STRICT
+```
+
+mTLS SHOULD be terminated by the sidecar so application code never handles raw certificates. Identities are issued by SPIFFE/SPIRE and embedded in the SVID; the agent reads its identity through the Workload API socket at `/run/spire/agent.sock`.
+
+## Webhook Signature Verification
+
+All inbound webhooks (Phase 2 §Webhook Events) MUST be verified before processing:
+
+```typescript
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verifyWiaSignature(headers, rawBody, secret) {
+  const sig = headers['wia-signature'];
+  if (!sig) throw new Error('missing signature');
+  const [tPart, vPart] = sig.split(',');
+  const t = Number(tPart.split('=')[1]);
+  if (Math.abs(Date.now()/1000 - t) > 300) throw new Error('stale event');
+  const v1 = vPart.split('=')[1];
+  const expected = createHmac('sha256', secret)
+    .update(`${t}.${rawBody}`)
+    .digest('hex');
+  if (!timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(expected, 'hex'))) {
+    throw new Error('bad signature');
+  }
+}
+```
+
+Webhook handlers MUST be idempotent on `WIA-Event-Id` and MUST return 2xx within 5 seconds; longer work belongs on an internal queue.
+
+## Conformance Test Suites
+
+`cli/conformance.sh` orchestrates four suites:
+
+| Suite | Target | Scope |
+|-------|--------|-------|
+| `phase-1-data` | Local schemas | JSON Schema validation of every fixture |
+| `phase-2-api` | Deployed REST endpoint | OpenAPI replay (Schemathesis or Dredd) |
+| `phase-3-protocol` | Pair of running agents | FIPA-ACL trace vectors |
+| `phase-4-integration` | Integration sandbox | A2A bridge, MCP adapter, webhook delivery |
+
+```bash
+./cli/conformance.sh --suite all \
+  --target https://api.example.com \
+  --token $WIA_TOKEN \
+  --report ./conformance-report.json
+```
+
+A clean run is a precondition for shipping the `WIA-AI-016 Conformant` mark in any product surface.
+
+## Operations Runbook
+
+| Event | Detection | Remediation |
+|-------|-----------|-------------|
+| Agent flapping | `agent-state-changed` rate > 6/min | Pin to `degraded`, drain, redeploy |
+| Webhook backlog | Delivery latency p95 > 30 s | Scale workers, raise `concurrency` |
+| Token expiry storm | Spike in 401 responses | Rotate keys, extend grace via `kid` |
+| Saga stuck | Open sagas > 1 h | Resume coordinator from saga log |
+| Trust handshake failures | 4xx on `/trust/prove` | Validate clock skew, re-issue SVID |
+
+Runbooks SHOULD be encoded as machine-readable workflows in your incident system (PagerDuty, Opsgenie, or open-source equivalents) and rehearsed at least quarterly.
+
+## Migration Checklist (Pre-Deep)
+
+Before announcing Deep deployment of WIA-AI-016 in a production network:
+
+- [ ] All agents publish a valid Agent Card at `/.well-known/wia-agent-card`.
+- [ ] All tools have JSON Schema 2020-12 input/output schemas.
+- [ ] Phase 2 conformance suite passes against staging and production.
+- [ ] mTLS or OAuth2 enforced on every external surface.
+- [ ] Webhook secrets rotated within the last 90 days.
+- [ ] Saga coordinator persists logs with at least 7 days retention.
+- [ ] Phi-accrual failure detector deployed for every clustered agent group.
+- [ ] Disaster-recovery plan covers Agent Card registry restore.
+
+## Normative References
+
+- IETF RFC 8259 — JSON Data Interchange Format
+- IETF RFC 8446 — TLS 1.3
+- IETF RFC 7519 — JSON Web Token (JWT)
+- IETF RFC 9457 — Problem Details for HTTP APIs
+- ISO/IEC 27001:2022 — Information Security Management Systems
+- ISO/IEC 27002:2022 — Information Security Controls
+- W3C JSON-LD 1.1 — A JSON-based Serialization for Linked Data
+- OpenAPI Specification 3.1 — OpenAPI Initiative
+- JSON-RPC 2.0 — JSON-RPC Working Group
+
 ---
 
 **WIA-AI-016 Phase 4 Specification v1.0**

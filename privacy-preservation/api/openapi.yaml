@@ -1,0 +1,273 @@
+openapi: 3.1.0
+info:
+  title: WIA-SEC-023 Privacy Preservation API
+  version: 1.0.0
+  description: |
+    REST surface for Privacy-Preserving operations defined in WIA-SEC-023.
+    Operations cover: differential-privacy budget management, homomorphic
+    encryption sessions, secure-MPC sessions, federated learning rounds,
+    verifiable-credentials, consent management, and audit trail exposure.
+    Errors follow RFC 9457.
+
+servers:
+  - url: https://api.wia.org/privacy/v1
+    description: Production
+  - url: https://staging-api.wia.org/privacy/v1
+    description: Staging
+
+security:
+  - bearerAuth: []
+  - mtls: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    mtls:
+      type: mutualTLS
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:    { type: string, format: uri }
+        title:   { type: string }
+        status:  { type: integer }
+        detail:  { type: string }
+        instance:{ type: string }
+
+    DPBudget:
+      type: object
+      required: [datasetId, epsilonTotal, epsilonSpent]
+      properties:
+        datasetId:    { type: string }
+        purpose:      { type: string }
+        epsilonTotal: { type: number, minimum: 0 }
+        epsilonSpent: { type: number, minimum: 0 }
+        delta:        { type: number, minimum: 0 }
+        windowDays:   { type: integer, minimum: 1, default: 30 }
+
+    DPQuery:
+      type: object
+      required: [datasetId, mechanism, query]
+      properties:
+        datasetId: { type: string }
+        mechanism:
+          type: string
+          enum: [laplace, gaussian, exponential]
+        query:
+          type: string
+          description: SQL or DSL expression evaluated under DP
+        epsilon: { type: number }
+        delta:   { type: number }
+
+    HESession:
+      type: object
+      required: [sessionId, scheme, polyModulusDegree]
+      properties:
+        sessionId: { type: string }
+        scheme:
+          type: string
+          enum: [BFV, BGV, CKKS]
+        polyModulusDegree: { type: integer, enum: [4096, 8192, 16384, 32768] }
+        plaintextModulus:  { type: integer }
+        publicKey:         { type: string, format: byte }
+
+    MPCSession:
+      type: object
+      required: [sessionId, parties, protocol]
+      properties:
+        sessionId: { type: string }
+        parties:
+          type: array
+          items:
+            type: object
+            required: [partyId, address]
+            properties:
+              partyId: { type: string }
+              address: { type: string, format: uri }
+        protocol:
+          type: string
+          enum: [GMW, BGW, SPDZ, BMR, ABY3]
+        threshold: { type: integer, minimum: 1 }
+
+    ConsentRecord:
+      type: object
+      required: [subjectIdHash, purposes, timestamp]
+      properties:
+        subjectIdHash:
+          type: string
+          description: SHA-256 of opaque subject identifier
+        purposes:
+          type: array
+          items: { type: string }
+        timestamp: { type: string, format: date-time }
+        proofUrl:  { type: string, format: uri }
+        revoked:   { type: boolean, default: false }
+
+    ZKProof:
+      type: object
+      required: [circuit, proof]
+      properties:
+        circuit: { type: string }
+        proof:   { type: string, format: byte }
+        publicInputs:
+          type: array
+          items: { type: string }
+
+paths:
+  /dp/budgets/{datasetId}:
+    parameters:
+      - in: path
+        name: datasetId
+        required: true
+        schema: { type: string }
+    get:
+      summary: Read current DP budget
+      operationId: getDpBudget
+      responses:
+        "200":
+          description: Budget snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DPBudget" }
+
+  /dp/queries:
+    post:
+      summary: Run a DP query
+      operationId: runDpQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DPQuery" }
+      responses:
+        "200":
+          description: Query result with noise
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result: { type: number }
+                  epsilonCharged: { type: number }
+                  budgetRemaining: { type: number }
+        "402":
+          description: Budget exhausted
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /he/sessions:
+    post:
+      summary: Open a homomorphic-encryption session
+      operationId: createHeSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HESession" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HESession" }
+
+  /mpc/sessions:
+    post:
+      summary: Bootstrap a secure multi-party computation session
+      operationId: createMpcSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MPCSession" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MPCSession" }
+
+  /consent:
+    post:
+      summary: Record a consent decision
+      operationId: recordConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConsentRecord" }
+      responses:
+        "201":
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsentRecord" }
+
+  /consent/{subjectIdHash}/revoke:
+    parameters:
+      - in: path
+        name: subjectIdHash
+        required: true
+        schema: { type: string }
+    post:
+      summary: Revoke consent for a subject
+      operationId: revokeConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                purposes:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsentRecord" }
+
+  /zkp/verify:
+    post:
+      summary: Verify a zero-knowledge proof
+      operationId: verifyZkp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ZKProof" }
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+
+  /audit/events:
+    get:
+      summary: Stream audit events
+      operationId: streamAuditEvents
+      parameters:
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }

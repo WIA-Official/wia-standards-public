@@ -1,0 +1,322 @@
+openapi: 3.1.0
+info:
+  title: WIA-PET-009 Pet Nutrition API
+  version: 1.0.0
+  description: |
+    REST surface for the WIA-PET-009 Pet Nutrition standard. Covers pet
+    profiles, nutritional requirement calculations, feeding plan
+    generation, recipe lookup, webhook registration, and audit trail.
+    Errors follow RFC 9457.
+
+servers:
+  - url: https://api.wia.org/pet-nutrition/v1
+    description: Production
+  - url: https://staging-api.wia.org/pet-nutrition/v1
+    description: Staging
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:    { type: string, format: uri }
+        title:   { type: string }
+        status:  { type: integer }
+        detail:  { type: string }
+        instance:{ type: string }
+
+    Species:
+      type: string
+      enum: [dog, cat, rabbit, ferret, guinea-pig]
+
+    LifeStage:
+      type: string
+      enum: [puppy, kitten, adolescent, adult, senior, pregnant, lactating]
+
+    Pet:
+      type: object
+      required: [petId, species, age, weight, activityLevel]
+      properties:
+        petId:    { type: string, pattern: "^pet-[A-Za-z0-9]{6,32}$" }
+        species:  { $ref: "#/components/schemas/Species" }
+        breed:    { type: string }
+        age:
+          type: object
+          required: [years, months]
+          properties:
+            years:  { type: integer, minimum: 0, maximum: 30 }
+            months: { type: integer, minimum: 0, maximum: 11 }
+        weight:
+          type: object
+          required: [current, units]
+          properties:
+            current: { type: number, minimum: 0 }
+            target:  { type: number, minimum: 0 }
+            units:   { type: string, enum: [kg, lb] }
+        activityLevel:
+          type: string
+          enum: [sedentary, light, moderate, active, working]
+        healthFlags:
+          type: array
+          items: { type: string }
+
+    NutritionResult:
+      type: object
+      required: [petId, dailyCaloricNeeds, macronutrients]
+      properties:
+        petId: { type: string }
+        lifeStage: { $ref: "#/components/schemas/LifeStage" }
+        dailyCaloricNeeds: { type: number }
+        macronutrients:
+          type: object
+          properties:
+            protein:
+              type: object
+              properties:
+                minimumGrams: { type: number }
+                idealGrams:   { type: number }
+            fat:
+              type: object
+              properties:
+                minimumGrams: { type: number }
+                idealGrams:   { type: number }
+            carbs:
+              type: object
+              properties:
+                idealGrams: { type: number }
+
+    Plan:
+      type: object
+      required: [planId, petId, startDate, days]
+      properties:
+        planId:    { type: string }
+        petId:     { type: string }
+        startDate: { type: string, format: date }
+        days:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              meals:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    time: { type: string }
+                    recipeId: { type: string }
+                    grams: { type: number }
+
+paths:
+  /pets:
+    get:
+      summary: List pets
+      operationId: listPets
+      parameters:
+        - in: query
+          name: ownerId
+          schema: { type: string }
+        - in: query
+          name: species
+          schema: { $ref: "#/components/schemas/Species" }
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Pet" }
+                  nextCursor: { type: string, nullable: true }
+    post:
+      summary: Create a pet
+      operationId: createPet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Pet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+        "409":
+          description: Already exists
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /pets/{petId}:
+    parameters:
+      - in: path
+        name: petId
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get a pet
+      operationId: getPet
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+    patch:
+      summary: Update a pet
+      operationId: updatePet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Pet" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+    delete:
+      summary: Delete (soft) a pet
+      operationId: deletePet
+      responses:
+        "204": { description: Deleted }
+
+  /nutrition/calculate:
+    post:
+      summary: Calculate nutritional requirements
+      operationId: calculateNutrition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Pet" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NutritionResult" }
+
+  /plans:
+    post:
+      summary: Generate a feeding plan
+      operationId: createPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [petId, durationDays]
+              properties:
+                petId: { type: string }
+                durationDays: { type: integer, enum: [7, 14, 30] }
+                startDate: { type: string, format: date }
+                preferences:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Plan" }
+        "422":
+          description: Infeasible plan
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /plans/{planId}:
+    parameters:
+      - in: path
+        name: planId
+        required: true
+        schema: { type: string }
+    get:
+      summary: Read a plan
+      operationId: getPlan
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Plan" }
+
+  /webhooks:
+    post:
+      summary: Register a webhook
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, secret, events]
+              properties:
+                url:    { type: string, format: uri }
+                secret: { type: string }
+                events:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhookId: { type: string }
+
+  /audit:
+    get:
+      summary: Stream tenant audit events
+      operationId: auditStream
+      parameters:
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /health:
+    get:
+      summary: Liveness probe
+      operationId: health
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [healthy, degraded, unhealthy] }
+                  uptimeSeconds: { type: integer }

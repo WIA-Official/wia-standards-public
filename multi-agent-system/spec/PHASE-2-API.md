@@ -418,6 +418,244 @@ GET /v1/agents
 Accept: application/vnd.wia.v1+json
 ```
 
+## Discovery (Agent Card Endpoint)
+
+Every WIA-AI-016 host MUST expose its Agent Card at a stable well-known URL:
+
+```
+GET /.well-known/wia-agent-card
+Accept: application/json
+```
+
+**Response 200 OK** — body matches the Agent Card schema in Phase 1. Hosts that front multiple agents MUST also expose:
+
+```
+GET /.well-known/wia-agent-index
+Accept: application/json
+```
+
+```json
+{
+  "schemaVersion": "wia.ai-016.agent-index/1",
+  "agents": [
+    {"agentId": "agent-001", "agentCardUrl": "https://api.example.com/agents/agent-001/card"},
+    {"agentId": "agent-002", "agentCardUrl": "https://api.example.com/agents/agent-002/card"}
+  ],
+  "next": null
+}
+```
+
+Discovery responses MUST set `Cache-Control: max-age=300` or shorter; clients MUST honour `ETag`/`If-None-Match` per RFC 9111.
+
+## JSON-RPC Tools Endpoint (MCP-compatible)
+
+In addition to the REST surface, every agent SHOULD expose a JSON-RPC 2.0 endpoint for direct tool invocation by LLM-aware peers. This endpoint adopts the Model Context Protocol method shapes so MCP hosts can connect without a translator.
+
+```
+POST /agents/{agentId}/jsonrpc
+Content-Type: application/json
+```
+
+### `tools/list`
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list",
+  "params": {"cursor": null}
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "measure-temperature",
+        "title": "Measure room temperature",
+        "description": "Returns the current temperature for a named zone in degrees Celsius.",
+        "inputSchema": {"$ref": "../schemas/measure-temperature.input.json"},
+        "outputSchema": {"$ref": "../schemas/measure-temperature.output.json"},
+        "annotations": {"readOnlyHint": true, "idempotentHint": true}
+      }
+    ],
+    "nextCursor": null
+  }
+}
+```
+
+### `tools/call`
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "measure-temperature",
+    "arguments": {"zone": "room-101"}
+  }
+}
+```
+
+**Response**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "content": [
+      {"type": "text", "text": "Temperature in room-101 is 25.0 °C."}
+    ],
+    "structuredContent": {
+      "zone": "room-101",
+      "celsius": 25.0,
+      "measuredAt": "2025-12-25T10:00:00Z"
+    },
+    "isError": false
+  }
+}
+```
+
+JSON-RPC error replies MUST follow JSON-RPC 2.0 error semantics. Reserved error codes:
+
+| Code | Meaning |
+|------|---------|
+| -32700 | Parse error |
+| -32600 | Invalid Request |
+| -32601 | Method not found |
+| -32602 | Invalid params |
+| -32603 | Internal error |
+| -32001 | Tool execution error (WIA-AI-016 reserved) |
+| -32002 | Tool not authorized (WIA-AI-016 reserved) |
+
+### `notifications/tools/list_changed`
+
+Servers MAY send the JSON-RPC notification `notifications/tools/list_changed` (no `id`) over a long-lived transport when their tool catalog changes. Clients receiving this notification SHOULD re-issue `tools/list`.
+
+## Server-Sent Events (Streaming Tasks)
+
+For tasks whose results emerge over time, agents MUST offer an SSE stream alongside the create response:
+
+```
+GET /tasks/{taskId}/events
+Accept: text/event-stream
+```
+
+Each event uses the `text/event-stream` media type (HTML Living Standard `EventSource` semantics):
+
+```
+event: task.update
+data: {"taskId":"task-001","status":"in-progress","progress":0.4}
+
+event: task.completed
+data: {"taskId":"task-001","status":"completed","result":{"celsius":25.0}}
+```
+
+Streams MUST emit a heartbeat comment line (`:keepalive`) at least every 30 seconds.
+
+## Webhook Events
+
+Agents that prefer push delivery to long-lived sockets MAY register webhooks:
+
+**POST** `/agents/{agentId}/webhooks`
+
+```json
+{
+  "url": "https://callbacks.example.com/wia",
+  "events": ["task.completed", "agent-state-changed"],
+  "secret": "<base64 random ≥ 32 bytes>",
+  "ttl": "30d"
+}
+```
+
+Each delivery MUST include:
+
+```
+POST /wia
+Content-Type: application/json
+WIA-Event-Id: 01HG...
+WIA-Event-Type: task.completed
+WIA-Signature: t=1735128000,v1=hexdigest
+```
+
+Receivers MUST recompute `HMAC-SHA-256(secret, "{t}.{body}")` and compare in constant time. Replays older than 5 minutes MUST be rejected.
+
+## Bulk Operations
+
+To reduce request fan-out, agents MAY accept batched requests at:
+
+**POST** `/agents/{agentId}/messages:batch`
+
+```json
+{
+  "messages": [
+    {"performative": "inform", "receiver": ["agent-002"], "content": {"x": 1}},
+    {"performative": "inform", "receiver": ["agent-002"], "content": {"x": 2}}
+  ]
+}
+```
+
+Batches MUST contain ≤ 100 entries and ≤ 5 MB total. Each entry returns an individual status:
+
+```json
+{
+  "results": [
+    {"index": 0, "status": "queued", "messageId": "msg-001"},
+    {"index": 1, "status": "rejected", "error": "rate_limit_exceeded"}
+  ]
+}
+```
+
+## Idempotency
+
+State-changing requests SHOULD accept the header `Idempotency-Key: <ULID>`. The server MUST cache the response body and status for at least 24 hours and replay them when the same key reappears, even if the original request is retried. Keys are scoped to (agentId, route, key).
+
+## Problem Details (RFC 9457)
+
+All error responses MUST be encoded as `application/problem+json` per RFC 9457:
+
+```json
+{
+  "type": "https://standards.wia.example/multi-agent-system/errors/rate-limit",
+  "title": "Rate limit exceeded",
+  "status": 429,
+  "detail": "Standard agents are limited to 100 requests/minute.",
+  "instance": "/agents/agent-001/messages",
+  "retryAfter": 60
+}
+```
+
+Vendor-specific fields MUST be added under unique top-level keys; never override the core RFC 9457 members.
+
+## OpenAPI Conformance
+
+A normative OpenAPI 3.1 document for this Phase is published at:
+
+```
+https://standards.wia.example/multi-agent-system/openapi.yaml
+```
+
+Implementations MUST pass the conformance suite at `cli/conformance.sh`, which exercises every operation listed above against a deployed endpoint and asserts schema-valid responses.
+
+## Normative References
+
+- JSON-RPC 2.0 — JSON-RPC Working Group
+- IETF RFC 9457 — Problem Details for HTTP APIs
+- IETF RFC 9110 — HTTP Semantics
+- IETF RFC 9111 — HTTP Caching
+- IETF RFC 6585 — Additional HTTP Status Codes
+- IETF RFC 7235 — HTTP/1.1 Authentication
+- IETF RFC 8615 — Well-Known URIs
+- WHATWG HTML — Server-Sent Events (`EventSource`)
+- OpenAPI Specification 3.1 — OpenAPI Initiative
+
 ---
 
 **WIA-AI-016 Phase 2 Specification v1.0**

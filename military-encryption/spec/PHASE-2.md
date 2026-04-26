@@ -242,6 +242,61 @@ Tactical Mobile Encryption:
 - Zero mission failures due to cryptographic system issues
 - Automated key rotation with 100% success rate
 
+## 12. Conformance Test Vectors
+
+Every implementation MUST replay the canonical test vectors before deployment:
+
+```
+cli/test-vectors/
+├── aead/
+│   ├── aes-256-gcm.json     # NIST KAT-derived input/output pairs
+│   └── chacha20-poly1305.json
+├── kdf/
+│   └── hkdf-sha256.json
+├── pq-kem/
+│   ├── ml-kem-512.json
+│   ├── ml-kem-768.json
+│   └── ml-kem-1024.json
+└── handshake/
+    └── hybrid-x25519-mlkem768.json
+```
+
+Each vector MUST round-trip with bit-exact equality. Vector files are treated as part of the standard; modifying them outside a versioned WIA-DEF-017 update is forbidden.
+
+## 13. Secure Boot & Firmware Attestation
+
+Every cryptographic device MUST:
+
+- Verify a signed bootloader before executing firmware (chain of trust rooted in a hardware key)
+- Measure firmware into PCRs (TPM) or equivalent platform attestation registers
+- Refuse to release session keys unless the measurement matches a known-good policy
+- Report the attestation evidence to the trust broker on each connect
+
+If the measurement disagrees with the policy the device MUST display a clear visible warning and require operator acknowledgement before proceeding.
+
+## 14. Tactical Mode Switch
+
+Operators frequently move between training and live operations. The standard requires explicit mode switching:
+
+| Mode | Effect |
+|------|--------|
+| `training` | Synthetic keying material, no audit on real C2 |
+| `exercise` | Real keys, isolated network segment, full audit |
+| `live` | Production keys, online check with trust broker required |
+
+Switching from `training` to `live` MUST require dual-control approval and an explicit operator ceremony; accidental drift between modes is the leading cause of operator error.
+
+## 15. Logging Discipline
+
+Each device MUST record:
+
+- All key operations (generate, derive, rotate, destroy)
+- All authentication results (success and failure, with reason)
+- All policy changes (with operator ID and dual-control witness)
+- All network attestation challenges (with response status)
+
+Logs MUST be append-only, hash-chained, and shipped to the central audit broker within 60 seconds of generation when network connectivity is available; offline operations MUST queue logs and ship them on next contact.
+
 ---
 
 © 2025 SmileStory Inc. / WIA | 弘益人間

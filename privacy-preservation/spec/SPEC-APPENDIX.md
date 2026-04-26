@@ -862,22 +862,18 @@ k-anonymity satisfied: TRUE
 
 ## 8. References
 
-### 8.1 Academic Papers
+### 8.1 Foundational Concepts
 
-1. 선행 연구. "Calibrating Noise to Sensitivity in Private Data Analysis"
-   - https://doi.org/10.1007/11681878_14
+The privacy techniques referenced in this standard build on established public concepts:
 
-2. Sweeney, L. (2002). "k-anonymity: A model for protecting privacy"
-   - International Journal of Uncertainty, Fuzziness and Knowledge-Based Systems
+- **k-anonymity** — equivalence-class based de-identification model
+- **l-diversity** — homogeneity-attack-resistant generalisation of k-anonymity
+- **t-closeness** — distribution-based extension of l-diversity
+- **Differential privacy** — formal noise-based privacy guarantee
+- **Secret sharing** (Shamir t-of-n) — information-theoretic key splitting
+- **Fully homomorphic encryption** — computation over ciphertext
 
-3. 선행 연구. "l-Diversity: Privacy Beyond k-Anonymity"
-   - ACM Transactions on Knowledge Discovery from Data
-
-4. 선행 연구. "t-Closeness: Privacy Beyond k-Anonymity and l-Diversity"
-   - IEEE 23rd International Conference on Data Engineering
-
-5. Gentry, C. (2009). "Fully homomorphic encryption using ideal lattices"
-   - STOC '09: Proceedings of the forty-first annual ACM symposium
+Detailed algorithm complexity and proof sketches are in §1–§2 above. Readers should consult the relevant ISO/IEC and NIST documents listed in §8.2 for normative requirements; primary research literature is intentionally omitted from this standard to keep references verifiable and free of citation drift.
 
 ### 8.2 Standards and Specifications
 

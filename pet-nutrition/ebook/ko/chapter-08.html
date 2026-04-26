@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: WIA-PET-009 표준 구현 가이드 - WIA-PET-009</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #334155; }
+        .chapter-number { color: #F59E0B; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { color: #F59E0B; font-size: 2.2rem; margin-bottom: 1rem; }
+        .content { background: #1e293b; padding: 2.5rem; border-radius: 12px; border: 1px solid #334155; margin-bottom: 2rem; }
+        h2 { color: #F59E0B; font-size: 1.6rem; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+        h3 { color: #fbbf24; font-size: 1.3rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        pre { background: #0f172a; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        code { color: #fbbf24; font-family: 'Courier New', monospace; }
+        .note { background: #1e3a8a; border-left: 4px solid #3b82f6; padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .summary-box { background: #14532d; border: 2px solid #16a34a; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .summary-box h2 { color: #86efac; border-bottom: 2px solid #16a34a; }
+        footer { text-align: center; padding: 2rem; color: #64748b; border-top: 1px solid #334155; margin-top: 3rem; }
+        .philosophy { color: #F59E0B; font-size: 1.1rem; margin-top: 1rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 2rem; }
+        .nav-link { padding: 1rem 2rem; background: #F59E0B; color: #0f172a; text-decoration: none; border-radius: 8px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">제8장</div>
+            <h1>WIA-PET-009 표준 구현 가이드</h1>
+        </header>
+
+        <div class="content">
+            <h2>8.1 WIA-PET-009 표준 개요</h2>
+
+            <p>WIA-PET-009는 반려동물 영양 데이터의 표준화된 교환을 위한 국제 표준입니다. 이 장에서는 표준의 구조, 데이터 모델, API 사양, 그리고 실제 구현 방법을 다룹니다.</p>
+
+            <h3>8.1.1 표준의 목적</h3>
+
+            <ul>
+                <li>반려동물 영양 데이터의 상호운용성 확보</li>
+                <li>사료 제조업체, 수의사, 반려동물 보호자 간 정보 교환 표준화</li>
+                <li>급여 계산 및 영양 추적 시스템의 호환성</li>
+                <li>국제적으로 통일된 영양 데이터 형식 제공</li>
+            </ul>
+
+            <h3>8.1.2 표준 구성요소</h3>
+
+            <ul>
+                <li><strong>데이터 모델:</strong> JSON Schema 기반 영양 데이터 구조</li>
+                <li><strong>API 사양:</strong> RESTful API 엔드포인트 정의</li>
+                <li><strong>계산 알고리즘:</strong> 에너지 요구량 및 급여량 계산</li>
+                <li><strong>검증 규칙:</strong> 데이터 유효성 검사 기준</li>
+            </ul>
+
+            <h2>8.2 데이터 모델</h2>
+
+            <h3>8.2.1 반려동물 프로파일</h3>
+
+            <pre><code>{
+  "$schema": "https://wia.org/schemas/pet-009/pet-profile.json",
+  "type": "object",
+  "required": ["id", "species", "name", "birthDate", "weight"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "고유 식별자"
+    },
+    "species": {
+      "type": "string",
+      "enum": ["dog", "cat", "bird", "rabbit", "ferret", "reptile", "other"],
+      "description": "동물 종"
+    },
+    "breed": {
+      "type": "string",
+      "description": "품종"
+    },
+    "name": {
+      "type": "string",
+      "description": "반려동물 이름"
+    },
+    "birthDate": {
+      "type": "string",
+      "format": "date",
+      "description": "출생일 (YYYY-MM-DD)"
+    },
+    "weight": {
+      "type": "object",
+      "properties": {
+        "value": {"type": "number", "minimum": 0},
+        "unit": {"type": "string", "enum": ["kg", "lb"]},
+        "measuredAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "sex": {
+      "type": "string",
+      "enum": ["male", "female", "neutered_male", "spayed_female", "unknown"]
+    },
+    "activityLevel": {
+      "type": "string",
+      "enum": ["sedentary", "normal", "active", "working", "athletic"]
+    },
+    "bodyConditionScore": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9
+    },
+    "healthConditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "condition": {"type": "string"},
+          "diagnosedDate": {"type": "string", "format": "date"},
+          "severity": {"type": "string", "enum": ["mild", "moderate", "severe"]}
+        }
+      }
+    },
+    "allergies": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}</code></pre>
+
+            <h3>8.2.2 사료 제품 스키마</h3>
+
+            <pre><code>{
+  "$schema": "https://wia.org/schemas/pet-009/food-product.json",
+  "type": "object",
+  "required": ["id", "name", "manufacturer", "targetSpecies", "guaranteedAnalysis"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "제품 고유 식별자 (UPC/EAN 또는 내부 ID)"
+    },
+    "name": {
+      "type": "string"
+    },
+    "manufacturer": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "country": {"type": "string", "format": "iso-3166-1-alpha-2"}
+      }
+    },
+    "productType": {
+      "type": "string",
+      "enum": ["dry", "wet", "semi-moist", "freeze-dried", "raw", "treat", "supplement"]
+    },
+    "targetSpecies": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["dog", "cat", "bird", "rabbit", "other"]}
+    },
+    "lifeStage": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["puppy", "kitten", "adult", "senior", "all"]}
+    },
+    "ingredients": {
+      "type": "array",
+      "description": "중량 내림차순",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "aafcoDefinition": {"type": "string"},
+          "percentage": {"type": "number", "description": "선택적"}
+        }
+      }
+    },
+    "guaranteedAnalysis": {
+      "type": "object",
+      "properties": {
+        "basis": {"type": "string", "enum": ["as_fed", "dry_matter"]},
+        "crudeProtein": {"$ref": "#/definitions/nutrientRange"},
+        "crudeFat": {"$ref": "#/definitions/nutrientRange"},
+        "crudeFiber": {"$ref": "#/definitions/nutrientRange"},
+        "moisture": {"$ref": "#/definitions/nutrientRange"},
+        "ash": {"$ref": "#/definitions/nutrientRange"},
+        "calcium": {"$ref": "#/definitions/nutrientRange"},
+        "phosphorus": {"$ref": "#/definitions/nutrientRange"},
+        "omega6": {"$ref": "#/definitions/nutrientRange"},
+        "omega3": {"$ref": "#/definitions/nutrientRange"},
+        "taurine": {"$ref": "#/definitions/nutrientRange"}
+      }
+    },
+    "metabolizableEnergy": {
+      "type": "object",
+      "properties": {
+        "value": {"type": "number"},
+        "unit": {"type": "string", "enum": ["kcal/kg", "kJ/kg", "kcal/cup"]}
+      }
+    },
+    "feedingGuidelines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "weightRange": {
+            "type": "object",
+            "properties": {
+              "min": {"type": "number"},
+              "max": {"type": "number"},
+              "unit": {"type": "string"}
+            }
+          },
+          "dailyAmount": {
+            "type": "object",
+            "properties": {
+              "min": {"type": "number"},
+              "max": {"type": "number"},
+              "unit": {"type": "string", "enum": ["g", "cup", "oz"]}
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "nutrientRange": {
+      "type": "object",
+      "properties": {
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "typical": {"type": "number"},
+        "unit": {"type": "string"}
+      }
+    }
+  }
+}</code></pre>
+
+            <h2>8.3 API 사양</h2>
+
+            <h3>8.3.1 엔드포인트 정의</h3>
+
+            <pre><code>// WIA-PET-009 REST API 엔드포인트
+
+// 반려동물 관리
+GET    /api/v1/pets                    # 반려동물 목록
+POST   /api/v1/pets                    # 반려동물 등록
+GET    /api/v1/pets/{id}               # 반려동물 상세
+PUT    /api/v1/pets/{id}               # 반려동물 수정
+DELETE /api/v1/pets/{id}               # 반려동물 삭제
+
+// 체중 기록
+POST   /api/v1/pets/{id}/weights       # 체중 기록 추가
+GET    /api/v1/pets/{id}/weights       # 체중 이력 조회
+
+// 급여 계산
+POST   /api/v1/calculate/energy        # 에너지 요구량 계산
+POST   /api/v1/calculate/feeding       # 급여량 계산
+
+// 사료 제품
+GET    /api/v1/products                # 사료 제품 검색
+GET    /api/v1/products/{id}           # 사료 제품 상세
+POST   /api/v1/products/compare        # 제품 비교
+
+// 영양 분석
+POST   /api/v1/analyze/diet            # 식단 영양 분석
+GET    /api/v1/nutrients/requirements  # 영양 요구량 조회</code></pre>
+
+            <h3>8.3.2 에너지 계산 API</h3>
+
+            <pre><code>// POST /api/v1/calculate/energy
+// Request
+{
+  "species": "dog",
+  "weight_kg": 15,
+  "age_months": 36,
+  "sex": "neutered_male",
+  "activityLevel": "normal",
+  "bodyConditionScore": 5,
+  "healthConditions": []
+}
+
+// Response
+{
+  "success": true,
+  "data": {
+    "RER_kcal": 534,
+    "activityFactor": 1.6,
+    "adjustmentFactors": [],
+    "DER_kcal": 854,
+    "confidence": "high",
+    "notes": [
+      "중성화된 성견 기준 계산",
+      "이상적인 체형 상태 유지 권장"
+    ],
+    "calculationMethod": "NRC_2006",
+    "timestamp": "2024-08-15T10:30:00Z"
+  }
+}</code></pre>
+
+            <h3>8.3.3 급여량 계산 API</h3>
+
+            <pre><code>// POST /api/v1/calculate/feeding
+// Request
+{
+  "petId": "pet-uuid-123",
+  "productId": "product-456",
+  "DER_kcal": 854
+}
+
+// Response
+{
+  "success": true,
+  "data": {
+    "product": {
+      "name": "프리미엄 성견 사료",
+      "energyDensity_kcal_per_kg": 3600
+    },
+    "dailyAmount": {
+      "grams": 237,
+      "cups": 2.4,
+      "cupSize_g": 100
+    },
+    "mealsPerDay": 2,
+    "perMealAmount": {
+      "grams": 119,
+      "cups": 1.2
+    },
+    "adjustmentRecommendations": [
+      "2주 후 체중 확인 권장",
+      "BCS 변화에 따라 10% 범위 내 조정"
+    ]
+  }
+}</code></pre>
+
+            <h2>8.4 TypeScript SDK 구현</h2>
+
+            <h3>8.4.1 SDK 설치 및 초기화</h3>
+
+            <pre><code>// npm install @wia/pet-nutrition-sdk
+
+import { WiaPetNutrition, Pet, FoodProduct } from '@wia/pet-nutrition-sdk';
+
+// SDK 초기화
+const wia = new WiaPetNutrition({
+  apiKey: 'your-api-key',
+  region: 'asia-northeast3', // 한국
+  language: 'ko'
+});
+
+// 반려동물 등록
+const pet: Pet = await wia.pets.create({
+  species: 'dog',
+  name: '멍멍이',
+  breed: '골든 리트리버',
+  birthDate: '2021-03-15',
+  weight: { value: 28, unit: 'kg' },
+  sex: 'neutered_male',
+  activityLevel: 'normal',
+  bodyConditionScore: 5
+});
+
+console.log(`등록된 반려동물 ID: ${pet.id}`);</code></pre>
+
+            <h3>8.4.2 에너지 및 급여량 계산</h3>
+
+            <pre><code>// 에너지 요구량 계산
+const energy = await wia.calculate.energy({
+  species: pet.species,
+  weight_kg: pet.weight.value,
+  age_months: wia.utils.calculateAgeMonths(pet.birthDate),
+  sex: pet.sex,
+  activityLevel: pet.activityLevel,
+  bodyConditionScore: pet.bodyConditionScore
+});
+
+console.log(`RER: ${energy.RER_kcal} kcal`);
+console.log(`DER: ${energy.DER_kcal} kcal`);
+
+// 사료 검색
+const products = await wia.products.search({
+  species: 'dog',
+  lifeStage: 'adult',
+  productType: 'dry',
+  limit: 10
+});
+
+// 급여량 계산
+const feeding = await wia.calculate.feeding({
+  petId: pet.id,
+  productId: products[0].id,
+  DER_kcal: energy.DER_kcal
+});
+
+console.log(`일일 급여량: ${feeding.dailyAmount.grams}g`);
+console.log(`1회 급여량: ${feeding.perMealAmount.grams}g (${feeding.mealsPerDay}회/일)`);</code></pre>
+
+            <h3>8.4.3 체중 추적</h3>
+
+            <pre><code>// 체중 기록 추가
+await wia.pets.addWeight(pet.id, {
+  value: 27.5,
+  unit: 'kg',
+  measuredAt: new Date().toISOString()
+});
+
+// 체중 이력 조회
+const weightHistory = await wia.pets.getWeights(pet.id, {
+  startDate: '2024-01-01',
+  endDate: '2024-08-15'
+});
+
+// 체중 변화 분석
+const analysis = wia.utils.analyzeWeightTrend(weightHistory);
+console.log(`체중 변화: ${analysis.changePercent}%`);
+console.log(`트렌드: ${analysis.trend}`); // 'stable' | 'gaining' | 'losing'</code></pre>
+
+            <h2>8.5 데이터 검증</h2>
+
+            <h3>8.5.1 유효성 검사 규칙</h3>
+
+            <pre><code>// WIA-PET-009 검증 규칙
+const validationRules = {
+  pet: {
+    weight: {
+      dog: { min: 0.5, max: 120, unit: 'kg' },
+      cat: { min: 0.5, max: 15, unit: 'kg' }
+    },
+    bodyConditionScore: { min: 1, max: 9 },
+    age: { min: 0, max: 300, unit: 'months' }
+  },
+  product: {
+    guaranteedAnalysis: {
+      crudeProtein: { min: 0, max: 100, unit: '%' },
+      crudeFat: { min: 0, max: 50, unit: '%' },
+      crudeFiber: { min: 0, max: 30, unit: '%' },
+      moisture: { min: 0, max: 90, unit: '%' }
+    },
+    energyDensity: {
+      dry: { min: 2500, max: 5000, unit: 'kcal/kg' },
+      wet: { min: 500, max: 1500, unit: 'kcal/kg' }
+    }
+  },
+  calculation: {
+    RER: { min: 30, max: 10000, unit: 'kcal' },
+    activityFactor: { min: 0.5, max: 10 }
+  }
+};</code></pre>
+
+            <h3>8.5.2 오류 처리</h3>
+
+            <pre><code>import { WiaError, ValidationError, NotFoundError } from '@wia/pet-nutrition-sdk';
+
+try {
+  const result = await wia.calculate.feeding({
+    petId: 'invalid-id',
+    productId: 'product-123'
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('유효성 검사 실패:', error.details);
+  } else if (error instanceof NotFoundError) {
+    console.error('리소스를 찾을 수 없음:', error.message);
+  } else if (error instanceof WiaError) {
+    console.error('WIA API 오류:', error.code, error.message);
+  }
+}</code></pre>
+
+            <h2>8.6 구현 모범 사례</h2>
+
+            <h3>8.6.1 데이터 동기화</h3>
+
+            <ul>
+                <li>체중 데이터는 최소 2주마다 업데이트</li>
+                <li>BCS 평가는 월 1회 권장</li>
+                <li>급여량 재계산은 체중 변화 5% 이상 시</li>
+            </ul>
+
+            <h3>8.6.2 보안 고려사항</h3>
+
+            <ul>
+                <li>API 키는 환경 변수로 관리</li>
+                <li>개인 정보(보호자 정보) 최소 수집</li>
+                <li>데이터 전송 시 TLS 1.3 사용</li>
+                <li>민감 데이터 암호화 저장</li>
+            </ul>
+
+            <h3>8.6.3 성능 최적화</h3>
+
+            <pre><code>// 배치 처리로 API 호출 최소화
+const petIds = ['pet-1', 'pet-2', 'pet-3'];
+const results = await wia.calculate.energyBatch(
+  petIds.map(id => ({ petId: id }))
+);
+
+// 캐싱 활용
+const cachedProduct = await wia.products.get('product-id', {
+  cache: true,
+  maxAge: 3600 // 1시간
+});</code></pre>
+
+            <h2>8.7 인증 및 준수</h2>
+
+            <h3>8.7.1 WIA 인증 프로그램</h3>
+
+            <ul>
+                <li><strong>WIA-PET-009 Compliant:</strong> 기본 데이터 형식 준수</li>
+                <li><strong>WIA-PET-009 Certified:</strong> API 호환성 검증 완료</li>
+                <li><strong>WIA-PET-009 Premium:</strong> 고급 기능 및 분석 지원</li>
+            </ul>
+
+            <h3>8.7.2 준수 검증</h3>
+
+            <pre><code>// 준수 검증 도구 사용
+import { WiaValidator } from '@wia/pet-nutrition-sdk/validator';
+
+const validator = new WiaValidator();
+
+// 데이터 스키마 검증
+const petValidation = validator.validatePet(petData);
+if (!petValidation.valid) {
+  console.error('검증 실패:', petValidation.errors);
+}
+
+// API 응답 검증
+const apiValidation = validator.validateApiResponse(response, 'energy');
+console.log('API 응답 준수:', apiValidation.compliant);</code></pre>
+        </div>
+
+        <div class="summary-box">
+            <h2>장 요약</h2>
+            <ol>
+                <li><strong>표준 목적:</strong> WIA-PET-009는 반려동물 영양 데이터의 국제적 상호운용성을 위한 표준으로, 사료 업체, 수의사, 보호자 간 정보 교환을 표준화합니다.</li>
+                <li><strong>데이터 모델:</strong> JSON Schema 기반의 반려동물 프로파일과 사료 제품 스키마를 정의하여 일관된 데이터 구조를 제공합니다.</li>
+                <li><strong>RESTful API:</strong> 반려동물 관리, 에너지/급여량 계산, 사료 제품 검색 등의 표준화된 엔드포인트를 제공합니다.</li>
+                <li><strong>SDK 구현:</strong> TypeScript SDK를 통해 개발자가 쉽게 표준을 구현하고 활용할 수 있습니다.</li>
+                <li><strong>인증 프로그램:</strong> WIA 인증을 통해 제품 및 서비스의 표준 준수를 검증받을 수 있습니다.</li>
+            </ol>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-07.html" class="nav-link">← 제7장</a>
+            <a href="index.html" class="nav-link">목차로 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 구현 패턴 - WIA 보안 표준</title>
+    <style>
+        :root { --primary: #EF4444; --primary-dark: #DC2626; --accent: #F59E0B; --bg: #0f172a; --bg-card: #1e293b; --bg-code: #011627; --text: #f1f5f9; --text-muted: #94a3b8; --border: #334155; --success: #10b981; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.9; font-size: 17px; }
+        .header { background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a2e 100%); border-bottom: 1px solid var(--border); padding: 15px 0; position: sticky; top: 0; z-index: 100; }
+        .header-inner { max-width: 900px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo-icon { font-size: 1.8rem; }
+        .logo-text { font-weight: 700; color: var(--primary); font-size: 1.1rem; }
+        .nav-link { color: var(--text-muted); text-decoration: none; padding: 8px 16px; border-radius: 6px; transition: all 0.3s; }
+        .nav-link:hover { background: var(--bg); color: var(--primary); }
+        .content { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+        .chapter-badge { display: inline-block; background: var(--primary); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-bottom: 20px; }
+        h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 20px; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .intro { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid var(--border); }
+        h2 { font-size: 1.8rem; color: var(--primary); margin: 50px 0 25px; padding-bottom: 10px; border-bottom: 2px solid var(--border); }
+        h3 { font-size: 1.4rem; color: var(--text); margin: 35px 0 20px; }
+        p { margin-bottom: 20px; }
+        .info-box { background: var(--bg-card); border-left: 4px solid var(--primary); padding: 25px; border-radius: 0 12px 12px 0; margin: 30px 0; }
+        .info-box h4 { color: var(--primary); margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: var(--bg-card); border-radius: 12px; overflow: hidden; }
+        th, td { padding: 15px 20px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: white; font-weight: 600; }
+        tr:hover { background: rgba(239, 68, 68, 0.05); }
+        code { background: var(--bg-code); padding: 3px 8px; border-radius: 4px; font-family: 'Fira Code', monospace; font-size: 0.9em; color: var(--accent); }
+        pre { background: var(--bg-code); padding: 25px; border-radius: 12px; overflow-x: auto; margin: 25px 0; border: 1px solid var(--border); }
+        pre code { background: none; padding: 0; color: var(--text); }
+        ul, ol { margin: 20px 0 20px 30px; }
+        li { margin-bottom: 12px; }
+        .nav-footer { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--border); }
+        .nav-btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 24px; background: var(--bg-card); color: var(--text); text-decoration: none; border-radius: 8px; transition: all 0.3s; border: 1px solid var(--border); }
+        .nav-btn:hover { background: var(--primary); border-color: var(--primary); }
+        .footer { text-align: center; padding: 40px 20px; background: var(--bg-card); border-top: 1px solid var(--border); }
+        .footer p { color: var(--text-muted); margin: 0; }
+        .flow-diagram { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin: 30px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">🔐</span>
+                <span class="logo-text">WIA-SEC | 다중 인증</span>
+            </div>
+            <a href="index.html" class="nav-link">← 목차로</a>
+        </div>
+    </header>
+
+    <main class="content">
+        <span class="chapter-badge">제5장</span>
+        <h1>구현 패턴</h1>
+        <p class="intro">
+            MFA 시스템의 실제 구현 패턴을 살펴봅니다. 사용자 등록 흐름, 복구 프로세스,
+            단계별 인증(Step-up Authentication), 그리고 다양한 아키텍처 패턴을 다룹니다.
+        </p>
+
+        <h2>5.1 사용자 등록 흐름</h2>
+
+        <p>
+            MFA 등록은 사용자가 인증 수단을 시스템에 등록하는 과정입니다.
+            보안과 사용자 경험의 균형을 맞추는 것이 중요합니다.
+        </p>
+
+        <h3>5.1.1 등록 흐름 설계</h3>
+
+        <div class="flow-diagram">
+<pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                    MFA 등록 흐름                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+사용자                    프론트엔드                    백엔드
+  │                          │                          │
+  │──로그인 (비밀번호)───────▶│                          │
+  │                          │──인증 요청──────────────▶│
+  │                          │◀──세션 + MFA 등록 필요───│
+  │                          │                          │
+  │◀──MFA 등록 화면 표시─────│                          │
+  │                          │                          │
+  │──방법 선택 (TOTP)────────▶│                          │
+  │                          │──TOTP 시크릿 요청───────▶│
+  │                          │◀──시크릿 + QR 코드───────│
+  │                          │                          │
+  │◀──QR 코드 표시───────────│                          │
+  │                          │                          │
+  │──앱에서 스캔 후 OTP 입력─▶│                          │
+  │                          │──OTP 검증 요청──────────▶│
+  │                          │◀──등록 완료───────────────│
+  │                          │                          │
+  │◀──백업 방법 등록 권장────│                          │
+  │                          │                          │
+</pre>
+        </div>
+
+        <h3>5.1.2 등록 API 구현</h3>
+
+        <pre><code>// TOTP 등록 API (Node.js/Express)
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
+
+// 1단계: TOTP 시크릿 생성
+app.post('/api/mfa/totp/setup', async (req, res) => {
+  const userId = req.user.id;
+
+  // 시크릿 생성
+  const secret = speakeasy.generateSecret({
+    name: `WIA보안시스템:${req.user.email}`,
+    issuer: 'WIA Security',
+    length: 32
+  });
+
+  // 임시 저장 (아직 검증되지 않음)
+  await db.users.update(userId, {
+    totpSecretPending: secret.base32,
+    totpSetupAt: new Date()
+  });
+
+  // QR 코드 생성
+  const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+
+  res.json({
+    secret: secret.base32,  // 수동 입력용
+    qrCode: qrCodeUrl,
+    expiresIn: 600  // 10분 내 검증 필요
+  });
+});
+
+// 2단계: OTP 검증 및 등록 완료
+app.post('/api/mfa/totp/verify', async (req, res) => {
+  const { token } = req.body;
+  const userId = req.user.id;
+
+  const user = await db.users.findById(userId);
+
+  // 토큰 검증
+  const verified = speakeasy.totp.verify({
+    secret: user.totpSecretPending,
+    encoding: 'base32',
+    token: token,
+    window: 1  // ±30초 허용
+  });
+
+  if (!verified) {
+    return res.status(400).json({ error: '잘못된 인증 코드입니다' });
+  }
+
+  // 등록 완료
+  await db.users.update(userId, {
+    totpSecret: user.totpSecretPending,
+    totpSecretPending: null,
+    totpEnabled: true,
+    mfaEnabled: true
+  });
+
+  // 복구 코드 생성
+  const recoveryCodes = generateRecoveryCodes(8);
+  await db.recoveryCodes.create(userId, recoveryCodes);
+
+  res.json({
+    success: true,
+    recoveryCodes: recoveryCodes,
+    message: '복구 코드를 안전한 곳에 저장하세요'
+  });
+});</code></pre>
+
+        <h2>5.2 복구 프로세스</h2>
+
+        <p>
+            사용자가 MFA 디바이스를 분실하거나 접근할 수 없을 때를 대비한
+            복구 메커니즘이 필수적입니다.
+        </p>
+
+        <h3>5.2.1 복구 코드</h3>
+
+        <table>
+            <tr>
+                <th>특성</th>
+                <th>권장 사항</th>
+            </tr>
+            <tr>
+                <td>개수</td>
+                <td>8-16개</td>
+            </tr>
+            <tr>
+                <td>길이</td>
+                <td>8-12자 (영숫자)</td>
+            </tr>
+            <tr>
+                <td>사용 방식</td>
+                <td>일회용 (사용 후 무효화)</td>
+            </tr>
+            <tr>
+                <td>저장</td>
+                <td>해시하여 저장 (bcrypt)</td>
+            </tr>
+            <tr>
+                <td>표시</td>
+                <td>등록 시 한 번만 표시</td>
+            </tr>
+            <tr>
+                <td>재생성</td>
+                <td>MFA 인증 후 가능</td>
+            </tr>
+        </table>
+
+        <h3>5.2.2 복구 흐름 구현</h3>
+
+        <pre><code>// 복구 코드 생성
+function generateRecoveryCodes(count: number): string[] {
+  const codes: string[] = [];
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  // 혼동 문자 제외
+
+  for (let i = 0; i < count; i++) {
+    let code = '';
+    for (let j = 0; j < 8; j++) {
+      code += charset[crypto.randomInt(charset.length)];
+      if (j === 3) code += '-';  // 가독성을 위한 하이픈
+    }
+    codes.push(code);
+  }
+  return codes;
+}
+
+// 복구 코드로 로그인
+app.post('/api/auth/recover', async (req, res) => {
+  const { email, password, recoveryCode } = req.body;
+
+  // 1. 비밀번호 확인
+  const user = await authenticateUser(email, password);
+  if (!user) {
+    return res.status(401).json({ error: '자격 증명이 올바르지 않습니다' });
+  }
+
+  // 2. 복구 코드 확인
+  const normalizedCode = recoveryCode.replace(/-/g, '').toUpperCase();
+  const codes = await db.recoveryCodes.findByUserId(user.id);
+
+  const validCode = codes.find(c =>
+    !c.usedAt && bcrypt.compareSync(normalizedCode, c.hash)
+  );
+
+  if (!validCode) {
+    await logSecurityEvent(user.id, 'RECOVERY_CODE_FAILED');
+    return res.status(401).json({ error: '유효하지 않은 복구 코드입니다' });
+  }
+
+  // 3. 복구 코드 사용 처리
+  await db.recoveryCodes.markUsed(validCode.id);
+
+  // 4. 세션 생성 및 MFA 재등록 요구
+  const session = await createSession(user.id, {
+    requireMfaReenrollment: true,
+    recoveryUsed: true
+  });
+
+  await logSecurityEvent(user.id, 'RECOVERY_CODE_USED');
+
+  res.json({
+    sessionToken: session.token,
+    remainingCodes: codes.filter(c => !c.usedAt).length - 1,
+    message: '새 MFA 방법을 등록해야 합니다'
+  });
+});</code></pre>
+
+        <h2>5.3 단계별 인증 (Step-up Authentication)</h2>
+
+        <p>
+            단계별 인증은 민감한 작업을 수행할 때 추가 인증을 요구하는 패턴입니다.
+            사용자 경험을 해치지 않으면서 보안을 강화합니다.
+        </p>
+
+        <h3>5.3.1 Step-up 인증 시나리오</h3>
+
+        <table>
+            <tr>
+                <th>작업</th>
+                <th>기본 인증</th>
+                <th>Step-up 요구</th>
+            </tr>
+            <tr>
+                <td>프로필 조회</td>
+                <td>세션 토큰</td>
+                <td>없음</td>
+            </tr>
+            <tr>
+                <td>비밀번호 변경</td>
+                <td>세션 토큰</td>
+                <td>현재 비밀번호 + MFA</td>
+            </tr>
+            <tr>
+                <td>결제 정보 변경</td>
+                <td>세션 토큰</td>
+                <td>MFA (최근 5분 이내)</td>
+            </tr>
+            <tr>
+                <td>대량 자금 이체</td>
+                <td>세션 토큰</td>
+                <td>MFA + 추가 승인</td>
+            </tr>
+            <tr>
+                <td>계정 삭제</td>
+                <td>세션 토큰</td>
+                <td>비밀번호 + MFA + 대기 기간</td>
+            </tr>
+        </table>
+
+        <h3>5.3.2 Step-up 구현</h3>
+
+        <pre><code>// Step-up 인증 미들웨어
+interface StepUpOptions {
+  maxAge?: number;        // MFA 인증 후 유효 시간 (초)
+  requiredLevel?: string; // 필요한 인증 수준
+}
+
+function requireStepUp(options: StepUpOptions = {}) {
+  const { maxAge = 300, requiredLevel = 'mfa' } = options;
+
+  return async (req, res, next) => {
+    const session = req.session;
+
+    // 마지막 MFA 인증 시간 확인
+    const lastMfaAt = session.lastMfaAuthAt;
+    const elapsed = (Date.now() - lastMfaAt) / 1000;
+
+    if (!lastMfaAt || elapsed > maxAge) {
+      return res.status(403).json({
+        error: 'STEP_UP_REQUIRED',
+        message: '이 작업을 수행하려면 추가 인증이 필요합니다',
+        requiredLevel: requiredLevel,
+        authUrl: '/api/auth/step-up'
+      });
+    }
+
+    // 인증 수준 확인
+    if (session.authLevel < requiredLevel) {
+      return res.status(403).json({
+        error: 'INSUFFICIENT_AUTH_LEVEL',
+        message: '더 강력한 인증이 필요합니다',
+        requiredLevel: requiredLevel,
+        currentLevel: session.authLevel
+      });
+    }
+
+    next();
+  };
+}
+
+// 사용 예시
+app.post('/api/settings/payment',
+  authenticate,
+  requireStepUp({ maxAge: 300 }),  // 5분 이내 MFA 필요
+  async (req, res) => {
+    // 결제 정보 업데이트 로직
+  }
+);
+
+app.post('/api/transfers/large',
+  authenticate,
+  requireStepUp({ maxAge: 60, requiredLevel: 'hardware_key' }),
+  async (req, res) => {
+    // 대량 이체 로직 (1분 이내 하드웨어 키 인증 필요)
+  }
+);</code></pre>
+
+        <h2>5.4 아키텍처 패턴</h2>
+
+        <h3>5.4.1 중앙화 vs 분산화</h3>
+
+        <div class="info-box">
+            <h4>🏗️ MFA 아키텍처 비교</h4>
+            <table>
+                <tr>
+                    <th>패턴</th>
+                    <th>장점</th>
+                    <th>단점</th>
+                </tr>
+                <tr>
+                    <td>중앙화 (IdP)</td>
+                    <td>일관된 정책, 단일 관리</td>
+                    <td>단일 실패점, 지연</td>
+                </tr>
+                <tr>
+                    <td>분산화 (앱별)</td>
+                    <td>유연성, 독립적</td>
+                    <td>복잡성, 일관성 부족</td>
+                </tr>
+                <tr>
+                    <td>하이브리드</td>
+                    <td>균형 잡힌 접근</td>
+                    <td>설계 복잡성</td>
+                </tr>
+            </table>
+        </div>
+
+        <h3>5.4.2 마이크로서비스 MFA</h3>
+
+        <pre><code>// MFA 서비스 인터페이스 (gRPC)
+service MFAService {
+  // 인증 방법 관리
+  rpc ListAuthenticators(ListRequest) returns (AuthenticatorList);
+  rpc RegisterAuthenticator(RegisterRequest) returns (RegisterResponse);
+  rpc RemoveAuthenticator(RemoveRequest) returns (RemoveResponse);
+
+  // 인증 수행
+  rpc InitiateChallenge(ChallengeRequest) returns (Challenge);
+  rpc VerifyChallenge(VerifyRequest) returns (VerifyResponse);
+
+  // 복구
+  rpc GenerateRecoveryCodes(RecoveryRequest) returns (RecoveryCodes);
+  rpc ValidateRecoveryCode(ValidateRequest) returns (ValidateResponse);
+}
+
+message ChallengeRequest {
+  string user_id = 1;
+  string session_id = 2;
+  AuthenticatorType preferred_type = 3;
+  map<string, string> context = 4;  // IP, 디바이스 등
+}
+
+message Challenge {
+  string challenge_id = 1;
+  AuthenticatorType type = 2;
+  bytes challenge_data = 3;  // TOTP면 없음, WebAuthn이면 챌린지
+  int64 expires_at = 4;
+}</code></pre>
+
+        <h2>5.5 신뢰할 수 있는 디바이스</h2>
+
+        <p>
+            자주 사용하는 디바이스를 신뢰 디바이스로 등록하면 MFA 프롬프트 빈도를
+            줄여 사용자 경험을 개선할 수 있습니다.
+        </p>
+
+        <h3>5.5.1 디바이스 핑거프린팅</h3>
+
+        <pre><code>// 디바이스 식별자 생성
+interface DeviceFingerprint {
+  userAgent: string;
+  screenResolution: string;
+  timezone: string;
+  language: string;
+  platform: string;
+  cookiesEnabled: boolean;
+  localStorage: boolean;
+  hardwareConcurrency: number;
+  deviceMemory?: number;
+  // 캔버스 핑거프린트는 프라이버시 우려로 제외 권장
+}
+
+async function generateDeviceId(fp: DeviceFingerprint): Promise<string> {
+  const data = JSON.stringify(fp);
+  const hash = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(data)
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(hash)));
+}
+
+// 신뢰 디바이스 등록
+app.post('/api/devices/trust', async (req, res) => {
+  const { deviceId, name } = req.body;
+  const userId = req.user.id;
+
+  // MFA 검증 필요
+  if (!req.session.mfaVerified) {
+    return res.status(403).json({ error: 'MFA 인증이 필요합니다' });
+  }
+
+  await db.trustedDevices.create({
+    userId,
+    deviceId: await hashDeviceId(deviceId),
+    name: name || 'Unknown Device',
+    createdAt: new Date(),
+    expiresAt: addDays(new Date(), 30)  // 30일 후 만료
+  });
+
+  res.json({ success: true });
+});</code></pre>
+
+        <h3>5.5.2 적응형 MFA 정책</h3>
+
+        <table>
+            <tr>
+                <th>조건</th>
+                <th>위험 점수</th>
+                <th>MFA 요구</th>
+            </tr>
+            <tr>
+                <td>신뢰 디바이스 + 알려진 위치</td>
+                <td>낮음</td>
+                <td>선택적</td>
+            </tr>
+            <tr>
+                <td>신뢰 디바이스 + 새 위치</td>
+                <td>중간</td>
+                <td>필수</td>
+            </tr>
+            <tr>
+                <td>새 디바이스 + 알려진 위치</td>
+                <td>중간</td>
+                <td>필수</td>
+            </tr>
+            <tr>
+                <td>새 디바이스 + 새 위치</td>
+                <td>높음</td>
+                <td>필수 + 알림</td>
+            </tr>
+            <tr>
+                <td>불가능한 이동 감지</td>
+                <td>매우 높음</td>
+                <td>차단 + 경고</td>
+            </tr>
+        </table>
+
+        <div class="nav-footer">
+            <a href="chapter-04.html" class="nav-btn">← 이전: 생체 인증</a>
+            <a href="chapter-06.html" class="nav-btn">다음: 기업용 MFA →</a>
+        </div>
+    </main>
+</body>
+</html>

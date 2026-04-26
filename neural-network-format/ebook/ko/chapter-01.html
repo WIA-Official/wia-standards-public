@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1장: 신경망 직렬화 기초 | WIA-AI-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 60px 40px; margin: -40px -20px 40px -20px; border-radius: 0 0 20px 20px; }
+        h1 { font-size: 2.5em; color: #0f172a; margin-bottom: 15px; }
+        .chapter-info { color: #1e293b; font-size: 1.1em; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3em; margin: 25px 0 12px 0; }
+        p { margin-bottom: 18px; color: #cbd5e1; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #1e293b; padding: 18px; border-radius: 8px; overflow-x: auto; margin: 18px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .highlight { background: #1e293b; padding: 18px; border-radius: 8px; margin: 18px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 18px 0 18px 30px; }
+        li { margin: 8px 0; color: #cbd5e1; }
+        .summary { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 35px; border-top: 2px solid #334155; }
+        .btn { padding: 12px 28px; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 5px; font-weight: 600; }
+        .btn:hover { background: #059669; }
+        .philosophy { text-align: center; color: #10B981; margin: 35px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>1장: 신경망 직렬화 기초</h1>
+            <p class="chapter-info">모델 영속성의 기본 이해</p>
+            <p class="chapter-info" style="margin-top: 10px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+        </header>
+
+        <h2>1.1 신경망 직렬화 소개</h2>
+        <p>
+            신경망 직렬화는 훈련된 모델을 메모리 내 표현에서 다양한 시스템과 프레임워크에서 저장, 전송 및 로드할 수 있는 영구 형식으로 변환하는 프로세스입니다. 이 기본 기능은 연구에서 프로덕션 배포까지 전체 AI/ML 생태계를 가능하게 합니다.
+        </p>
+        <p>
+            표준화된 직렬화 형식 없이는 각 프레임워크가 호환되지 않는 모델 파일을 생성하여 모델 공유, 배포 유연성 및 상호 운용성을 방해합니다. WIA-AI-014 표준은 범용 형식과 변환 프로토콜을 정의하여 이러한 중요한 요구를 해결합니다.
+        </p>
+        <p>
+            직렬화 과정은 단순히 데이터를 저장하는 것 이상입니다. 모델의 전체 지식과 능력을 보존하고, 다양한 환경에서 재현 가능한 결과를 보장하며, 효율적인 전송과 배포를 가능하게 합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>직렬화가 중요한 이유</h3>
+            <ul>
+                <li><strong>이식성:</strong> 다양한 프레임워크와 플랫폼 간 모델 이동 (PyTorch → TensorFlow → ONNX)</li>
+                <li><strong>영속성:</strong> 향후 사용 및 배포를 위한 훈련된 모델 저장 및 버전 관리</li>
+                <li><strong>협업:</strong> 전 세계 연구자 및 실무자와 모델 공유 (Hugging Face, GitHub)</li>
+                <li><strong>프로덕션:</strong> 다양한 서빙 인프라에 모델 배포 (클라우드, 엣지, 모바일)</li>
+                <li><strong>버전 관리:</strong> 모델 진화 추적 및 재현성 활성화 (MLOps)</li>
+                <li><strong>최적화:</strong> 추론 성능 향상을 위한 모델 변환 및 압축</li>
+                <li><strong>호환성:</strong> 레거시 시스템과 최신 기술 간 브릿지 역할</li>
+            </ul>
+        </div>
+
+        <h2>1.2 모델 형식의 핵심 개념</h2>
+        <p>신경망 모델은 직렬화 중에 보존되어야 하는 여러 구성 요소로 이루어져 있습니다:</p>
+
+        <h3>모델 아키텍처</h3>
+        <p>레이어를 통해 데이터가 흐르는 방식을 정의하는 계산 그래프:</p>
+        <ul>
+            <li>레이어 유형 및 구성 (Conv2D, Linear, Attention, LSTM 등)</li>
+            <li>레이어 간 연결 (순방향 전파 그래프, 잔차 연결)</li>
+            <li>활성화 함수 및 연산 (ReLU, GELU, Softmax)</li>
+            <li>입출력 텐서 형상 및 데이터 타입</li>
+            <li>정규화 레이어 (BatchNorm, LayerNorm)</li>
+            <li>드롭아웃 및 기타 훈련 전용 구성요소</li>
+        </ul>
+
+        <h3>학습된 파라미터</h3>
+        <p>훈련 중에 학습된 가중치 및 바이어스. 일반적으로 다차원 텐서로 저장됩니다:</p>
+        <pre><code>// 파라미터 구조 예시
+{
+  "layer1.weight": Tensor[64, 3, 7, 7],    // Conv2D 가중치 (출력, 입력, 높이, 너비)
+  "layer1.bias": Tensor[64],                // Conv2D 바이어스
+  "layer2.weight": Tensor[128, 64, 3, 3],  // 두 번째 Conv2D 가중치
+  "layer2.bias": Tensor[128],              // 두 번째 Conv2D 바이어스
+  "bn1.weight": Tensor[64],                // BatchNorm 감마
+  "bn1.bias": Tensor[64],                  // BatchNorm 베타
+  "bn1.running_mean": Tensor[64],          // BatchNorm 이동 평균
+  "bn1.running_var": Tensor[64]            // BatchNorm 이동 분산
+}</code></pre>
+
+        <h3>메타데이터 및 구성</h3>
+        <ul>
+            <li>입력 전처리 요구사항 (정규화, 크기 조정, 색상 공간 변환)</li>
+            <li>출력 해석 (클래스 레이블, 경계 상자, 세그멘테이션 마스크)</li>
+            <li>훈련 하이퍼파라미터 및 데이터셋 정보</li>
+            <li>프레임워크 버전 및 종속성 (PyTorch 2.0, CUDA 11.8)</li>
+            <li>모델 성능 메트릭 (정확도, F1 스코어, mAP)</li>
+            <li>라이선스 및 사용 제약사항</li>
+        </ul>
+
+        <h2>1.3 텐서 표현 기본</h2>
+        <p>텐서는 신경망의 기본 데이터 구조입니다. 직렬화된 형식에서 텐서가 어떻게 표현되는지 이해하는 것이 중요합니다:</p>
+
+        <h3>텐서 속성</h3>
+        <ul>
+            <li><code>shape</code>: 텐서의 차원 (예: [1, 3, 224, 224] = 배치, 채널, 높이, 너비)</li>
+            <li><code>dtype</code>: 요소의 데이터 타입 (float32, int8, bfloat16, float16)</li>
+            <li><code>layout</code>: 메모리 레이아웃 (NCHW vs NHWC, 연속성)</li>
+            <li><code>data</code>: 원시 텐서 값 (바이트 배열)</li>
+            <li><code>strides</code>: 각 차원의 메모리 스트라이드</li>
+            <li><code>offset</code>: 메모리 버퍼 내 시작 오프셋</li>
+        </ul>
+
+        <h3>데이터 타입 고려사항</h3>
+        <pre><code>// 일반적인 텐서 데이터 타입
+FP32 (float32):  32비트 부동소수점 (표준 훈련)
+                 범위: ±3.4e38, 정밀도: ~7자리
+
+FP16 (float16):  16비트 부동소수점 (혼합 정밀도)
+                 범위: ±65,504, 정밀도: ~3자리
+
+BF16 (bfloat16): 16비트 브레인 플로트 (Google TPU)
+                 범위: FP32와 동일, 정밀도: ~3자리
+
+INT8:            8비트 정수 (양자화 추론)
+                 범위: -128~127 또는 0~255
+
+INT4:            4비트 정수 (극단적 양자화)
+                 범위: -8~7 또는 0~15
+
+// 다양한 정밀도의 텐서 예시 (ResNet-50 기준)
+FP32: 4 bytes/element → 모델 크기 ~100MB
+FP16: 2 bytes/element → 모델 크기 ~50MB (2배 압축)
+INT8: 1 byte/element  → 모델 크기 ~25MB (4배 압축)
+INT4: 0.5 bytes/elem  → 모델 크기 ~12.5MB (8배 압축)</code></pre>
+
+        <h3>텐서 직렬화 예제</h3>
+        <pre><code>import numpy as np
+import torch
+
+# PyTorch 텐서 생성
+tensor = torch.randn(3, 4, 5)
+
+# 텐서 속성 확인
+print(f"형상: {tensor.shape}")        # torch.Size([3, 4, 5])
+print(f"데이터 타입: {tensor.dtype}")  # torch.float32
+print(f"메모리 크기: {tensor.numel() * tensor.element_size()} bytes")
+
+# NumPy로 변환 (직렬화 준비)
+numpy_array = tensor.numpy()
+
+# 바이너리 형식으로 저장
+np.save('tensor.npy', numpy_array)
+
+# 텍스트 형식으로 메타데이터 저장
+metadata = {
+    'shape': list(tensor.shape),
+    'dtype': str(tensor.dtype),
+    'min': float(tensor.min()),
+    'max': float(tensor.max()),
+    'mean': float(tensor.mean())
+}
+import json
+with open('tensor_metadata.json', 'w') as f:
+    json.dump(metadata, f, indent=2)</code></pre>
+
+        <h2>1.4 그래프 기반 모델 표현</h2>
+        <p>현대 신경망은 계산 그래프로 표현됩니다. 노드는 연산을 나타내고 엣지는 데이터 흐름을 나타냅니다:</p>
+
+        <pre><code>// 단순화된 그래프 구조 (ResNet 블록 예시)
+{
+  "nodes": [
+    {
+      "id": "input",
+      "op": "Input",
+      "shape": [1, 3, 224, 224],
+      "dtype": "float32"
+    },
+    {
+      "id": "conv1",
+      "op": "Conv2D",
+      "inputs": ["input"],
+      "attributes": {
+        "kernel_size": [7, 7],
+        "stride": [2, 2],
+        "padding": [3, 3],
+        "out_channels": 64
+      },
+      "weights": "conv1.weight"
+    },
+    {
+      "id": "bn1",
+      "op": "BatchNorm2d",
+      "inputs": ["conv1"],
+      "attributes": {
+        "num_features": 64,
+        "eps": 1e-5,
+        "momentum": 0.1
+      }
+    },
+    {
+      "id": "relu1",
+      "op": "ReLU",
+      "inputs": ["bn1"],
+      "attributes": {
+        "inplace": false
+      }
+    },
+    {
+      "id": "maxpool1",
+      "op": "MaxPool2D",
+      "inputs": ["relu1"],
+      "attributes": {
+        "kernel_size": [3, 3],
+        "stride": [2, 2],
+        "padding": [1, 1]
+      }
+    }
+  ],
+  "edges": [
+    {"from": "input", "to": "conv1"},
+    {"from": "conv1", "to": "bn1"},
+    {"from": "bn1", "to": "relu1"},
+    {"from": "relu1", "to": "maxpool1"}
+  ]
+}</code></pre>
+
+        <h3>그래프 표현의 장점</h3>
+        <ul>
+            <li><strong>프레임워크 독립성:</strong> 표준화된 연산자 세트 사용</li>
+            <li><strong>최적화 가능성:</strong> 그래프 수준 최적화 (연산 융합, 상수 폴딩)</li>
+            <li><strong>시각화:</strong> 모델 구조 이해 및 디버깅</li>
+            <li><strong>검증:</strong> 데이터 흐름 및 형상 호환성 확인</li>
+        </ul>
+
+        <h2>1.5 형식 카테고리 및 트레이드오프</h2>
+        <p>신경망 형식은 설계 목표와 사용 사례에 따라 분류할 수 있습니다:</p>
+
+        <h3>프레임워크별 형식</h3>
+        <div class="highlight">
+            <p><strong>PyTorch (.pt, .pth):</strong> Python pickle 기반, Python 객체 보존, 동적 그래프 지원</p>
+            <p><strong>TensorFlow SavedModel:</strong> Protocol buffers, 서빙 시그니처 포함, 정적 그래프</p>
+            <p><strong>Keras (.h5, .keras):</strong> HDF5 기반, 계층적 모델 구조, 고수준 API</p>
+            <p><strong>JAX (Flax):</strong> MessagePack, 함수형 프로그래밍 패러다임</p>
+        </div>
+
+        <h3>교환 형식</h3>
+        <div class="highlight">
+            <p><strong>ONNX:</strong> 프레임워크 독립적, 연산자 기반 그래프 표현, 광범위한 지원</p>
+            <p><strong>CoreML:</strong> Apple 생태계, iOS/macOS 최적화, 신경 엔진 지원</p>
+            <p><strong>TFLite:</strong> 모바일/엣지 배포, 크기 최적화, 하드웨어 가속</p>
+            <p><strong>GGUF:</strong> LLM 특화, 양자화 지원, llama.cpp 생태계</p>
+        </div>
+
+        <h3>형식 비교</h3>
+        <pre><code>// 형식별 특징 비교
+형식          크기      로딩속도    호환성    최적화    사용처
+─────────────────────────────────────────────────────────
+.pt/.pth     중간      빠름        낮음      중간      PyTorch 연구
+SavedModel   큼        느림        중간      높음      TF 프로덕션
+ONNX         중간      중간        높음      높음      크로스 플랫폼
+TFLite       작음      매우빠름    낮음      매우높음  모바일
+CoreML       작음      매우빠름    낮음      매우높음  iOS/macOS
+GGUF         작음      빠름        중간      높음      LLM 추론</code></pre>
+
+        <h2>1.6 직렬화 도전과제</h2>
+        <p>신경망 직렬화 시 해결해야 할 몇 가지 기술적 과제:</p>
+
+        <h3>사용자 정의 연산</h3>
+        <p>모델이 표준 형식에서 지원하지 않는 사용자 정의 레이어나 연산을 사용할 수 있습니다. 해결책:</p>
+        <ul>
+            <li>사용자 정의 연산을 기본 연산으로 분해 (decomposition)</li>
+            <li>사용자 정의 연산자 구현 제공 (custom op registration)</li>
+            <li>형식 확장 메커니즘 사용 (plugin system)</li>
+            <li>서브그래프 대체 (subgraph substitution)</li>
+        </ul>
+
+        <h3>동적 형상</h3>
+        <p>일부 모델은 가변 입력 크기를 허용하거나 동적 제어 흐름을 사용합니다. 대응 방법:</p>
+        <ul>
+            <li>심볼릭 형상 표현 사용 (N, H, W 등)</li>
+            <li>최소/최대 형상 범위 지정</li>
+            <li>동적 차원 지원 형식 선택 (ONNX, TensorFlow)</li>
+            <li>여러 고정 형상 프로파일 제공</li>
+        </ul>
+
+        <h3>버전 호환성</h3>
+        <p>프레임워크 버전 변경으로 인한 문제:</p>
+        <ul>
+            <li>이전 버전과의 호환성 유지</li>
+            <li>명시적 버전 정보 포함</li>
+            <li>변환 레이어 제공</li>
+        </ul>
+
+        <h2>1.7 WIA-AI-014 표준 개요</h2>
+        <p>WIA-AI-014 신경망 형식 표준이 제공하는 것:</p>
+
+        <div class="highlight">
+            <h3>핵심 원칙</h3>
+            <ul>
+                <li><strong>상호운용성:</strong> 주요 프레임워크 간 원활한 변환 (PyTorch ↔ TensorFlow ↔ ONNX)</li>
+                <li><strong>완전성:</strong> 모든 필요한 모델 정보 보존 (가중치, 구조, 메타데이터)</li>
+                <li><strong>효율성:</strong> 저장 및 로딩 성능 최적화 (메모리 맵, 지연 로딩)</li>
+                <li><strong>확장성:</strong> 미래 모델 아키텍처 및 연산 지원 (Transformer, Diffusion)</li>
+                <li><strong>보안:</strong> 모델 무결성 검증 (체크섬, 서명)</li>
+                <li><strong>접근성:</strong> 널리 사용 가능한 도구 및 라이브러리</li>
+                <li><strong>문서화:</strong> 명확한 스펙 및 예제 제공</li>
+            </ul>
+        </div>
+
+        <h3>WIA-AI-014 구조</h3>
+        <pre><code>// WIA-AI-014 모델 패키지 구조
+model.wia/
+├── manifest.json          # 모델 메타데이터 및 인덱스
+├── architecture.json      # 계산 그래프 정의
+├── weights/
+│   ├── layer1.bin        # 바이너리 가중치 데이터
+│   ├── layer2.bin
+│   └── ...
+├── config/
+│   ├── preprocessing.json # 전처리 설정
+│   ├── postprocessing.json# 후처리 설정
+│   └── deployment.json   # 배포 설정
+└── metadata/
+    ├── training.json      # 훈련 정보
+    ├── performance.json   # 벤치마크 결과
+    └── license.txt        # 라이선스 정보</code></pre>
+
+        <h2>1.8 모델 직렬화 모범 사례</h2>
+
+        <h3>항상 메타데이터 포함</h3>
+        <pre><code>{
+  "model_name": "ResNet50-ImageNet",
+  "version": "1.0.0",
+  "framework": "pytorch",
+  "framework_version": "2.0.1",
+  "created_date": "2025-01-15T10:30:00Z",
+  "author": "WIA Research Team",
+  "input_shape": [1, 3, 224, 224],
+  "input_preprocessing": {
+    "mean": [0.485, 0.456, 0.406],
+    "std": [0.229, 0.224, 0.225],
+    "resize": 256,
+    "center_crop": 224
+  },
+  "output_classes": 1000,
+  "accuracy": {
+    "top1": 0.761,
+    "top5": 0.931
+  },
+  "dataset": "ImageNet-1K",
+  "license": "MIT"
+}</code></pre>
+
+        <h3>변환 후 검증</h3>
+        <p>변환된 모델이 동일한 출력을 생성하는지 항상 확인하세요:</p>
+        <pre><code>import numpy as np
+import torch
+
+def validate_conversion(original_model, converted_model, num_tests=10):
+    """모델 변환 검증"""
+    original_model.eval()
+    converted_model.eval()
+
+    max_diff = 0.0
+    for i in range(num_tests):
+        # 랜덤 입력 생성
+        test_input = np.random.randn(1, 3, 224, 224).astype(np.float32)
+
+        # 원본 모델 실행
+        with torch.no_grad():
+            output_original = original_model(torch.from_numpy(test_input))
+
+        # 변환된 모델 실행
+        with torch.no_grad():
+            output_converted = converted_model(torch.from_numpy(test_input))
+
+        # 차이 계산
+        diff = np.abs(
+            output_original.numpy() - output_converted.numpy()
+        )
+        current_max = np.max(diff)
+        max_diff = max(max_diff, current_max)
+
+        print(f"테스트 {i+1}: 최대 차이 = {current_max:.2e}")
+
+    print(f"\n전체 최대 차이: {max_diff:.2e}")
+    assert max_diff < 1e-5, f"차이가 너무 큼: {max_diff}"
+    print("✓ 검증 성공!")
+
+    return max_diff
+
+# 사용 예
+validate_conversion(original_model, converted_model)</code></pre>
+
+        <h2>1.9 일반적인 직렬화 워크플로우</h2>
+
+        <h3>연구에서 프로덕션까지 파이프라인</h3>
+        <pre><code>1. 모델 훈련 (Research Phase)
+   - 선호하는 프레임워크에서 모델 개발 (PyTorch/TensorFlow)
+   - 실험 추적 및 버전 관리 (Weights & Biases, MLflow)
+   - 최적 체크포인트 선택
+
+2. 프레임워크 형식으로 내보내기 (Export Phase)
+   - PyTorch: .pt, .pth, TorchScript
+   - TensorFlow: SavedModel, .h5
+   - 메타데이터 및 훈련 정보 포함
+
+3. 중간 형식으로 변환 (Conversion Phase)
+   - 프레임워크 독립성을 위해 ONNX로 변환
+   - 형상 및 출력 검증
+   - 성능 벤치마킹
+
+4. 최적화 (Optimization Phase)
+   - 양자화 (FP32 → INT8)
+   - 프루닝 (가중치 제거)
+   - 그래프 최적화 (연산 융합)
+   - 지식 증류 (선택사항)
+
+5. 타겟 형식으로 변환 (Target Deployment)
+   - 모바일: TFLite, CoreML
+   - 서버: TensorRT, OpenVINO
+   - 웹: ONNX.js, TensorFlow.js
+   - LLM: GGUF, AWQ
+
+6. 검증 및 테스트 (Validation Phase)
+   - 정확도 검증 (원본과 비교)
+   - 성능 측정 (지연시간, 처리량)
+   - 메모리 사용량 확인
+   - 엣지 케이스 테스트
+
+7. 프로덕션 배포 (Production Phase)
+   - 모니터링 설정
+   - A/B 테스트
+   - 점진적 롤아웃
+   - 성능 추적</code></pre>
+
+        <h2>1.10 모델 형식의 미래 트렌드</h2>
+
+        <h3>새로운 형식 및 기술</h3>
+        <ul>
+            <li><strong>모듈식 모델:</strong> 컴포넌트 기반 아키텍처 (어댑터, LoRA, QLoRA)</li>
+            <li><strong>희소 형식:</strong> 프루닝된 모델을 위한 효율적인 저장 (CSR, COO)</li>
+            <li><strong>양자화 인식:</strong> 혼합 정밀도에 대한 네이티브 지원 (INT4, NF4, FP8)</li>
+            <li><strong>하드웨어별:</strong> NPU, TPU, 사용자 정의 가속기 최적화</li>
+            <li><strong>스트리밍 형식:</strong> 대형 모델의 부분 로딩 지원</li>
+            <li><strong>보안 강화:</strong> 암호화, 워터마킹, 무결성 검증</li>
+        </ul>
+
+        <h3>대형 언어 모델 (LLM) 시대</h3>
+        <p>수십억 파라미터 모델의 등장으로 새로운 요구사항이 생겼습니다:</p>
+        <ul>
+            <li>샤딩 및 분산 저장</li>
+            <li>레이지 로딩 및 메모리 맵핑</li>
+            <li>극단적 양자화 (1-4비트)</li>
+            <li>효율적인 파인튜닝 (LoRA, QLoRA)</li>
+        </ul>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>직렬화는 모델 영속성, 공유, 플랫폼 간 배포를 가능하게 하는 핵심 기술입니다</li>
+                <li>모델은 아키텍처(계산 그래프), 파라미터(가중치), 메타데이터로 구성됩니다</li>
+                <li>텐서는 형상, dtype, 레이아웃, 데이터 속성으로 표현되며 다양한 정밀도를 지원합니다</li>
+                <li>계산 그래프는 프레임워크 독립적인 모델 표현을 제공하고 최적화를 가능하게 합니다</li>
+                <li>다양한 형식이 다양한 목적을 제공합니다 - 연구용, 프로덕션용, 교환용, 모바일용</li>
+                <li>WIA-AI-014는 상호 운용 가능한 신경망 형식을 위한 포괄적인 표준을 제공합니다</li>
+                <li>모범 사례에는 메타데이터 포함, 철저한 검증, 버전 관리가 포함됩니다</li>
+                <li>사용자 정의 연산, 동적 형상, 버전 호환성 등의 도전과제를 이해하고 대응해야 합니다</li>
+                <li>연구에서 프로덕션까지의 전체 파이프라인을 고려한 워크플로우가 중요합니다</li>
+                <li>모듈식 모델, 극단적 양자화, 하드웨어별 최적화가 미래의 주요 트렌드입니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>신경망 직렬화가 필요한 이유를 세 가지 이상 설명하세요.</li>
+                <li>모델을 구성하는 핵심 요소(아키텍처, 파라미터, 메타데이터)를 각각 설명하고 예를 드세요.</li>
+                <li>FP32, FP16, INT8의 차이점과 각각의 사용 사례를 설명하세요.</li>
+                <li>계산 그래프 기반 모델 표현의 장점은 무엇인가요?</li>
+                <li>PyTorch .pt 형식과 ONNX 형식의 차이점을 설명하고, 각각 언제 사용해야 하는지 설명하세요.</li>
+                <li>사용자 정의 연산을 포함한 모델을 직렬화할 때 어떤 문제가 발생할 수 있고, 어떻게 해결할 수 있나요?</li>
+                <li>모델 변환 후 검증이 중요한 이유는 무엇이며, 어떻게 수행하나요?</li>
+                <li>WIA-AI-014 표준의 핵심 원칙 다섯 가지를 나열하고 각각을 설명하세요.</li>
+                <li>연구 단계에서 프로덕션 배포까지의 전형적인 모델 직렬화 워크플로우를 단계별로 설명하세요.</li>
+                <li>대형 언어 모델(LLM) 시대에 새롭게 등장한 직렬화 요구사항과 기술을 설명하세요.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · 널리 인간을 이롭게 하라
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 크로스 프레임워크 변환 | WIA-AI-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 60px 40px; margin: -40px -20px 40px -20px; border-radius: 0 0 20px 20px; }
+        h1 { font-size: 2.5em; color: #0f172a; margin-bottom: 15px; }
+        .chapter-info { color: #1e293b; font-size: 1.1em; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3em; margin: 25px 0 12px 0; }
+        p { margin-bottom: 18px; color: #cbd5e1; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #1e293b; padding: 18px; border-radius: 8px; overflow-x: auto; margin: 18px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .highlight { background: #1e293b; padding: 18px; border-radius: 8px; margin: 18px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 18px 0 18px 30px; }
+        li { margin: 8px 0; color: #cbd5e1; }
+        .summary { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 35px; border-top: 2px solid #334155; }
+        .btn { padding: 12px 28px; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 5px; font-weight: 600; }
+        .btn:hover { background: #059669; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #10B981; color: #0f172a; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; margin: 35px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>5장: 크로스 프레임워크 변환</h1>
+            <p class="chapter-info">PyTorch, TensorFlow 및 그 너머</p>
+            <p class="chapter-info" style="margin-top: 10px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+        </header>
+
+        <h2>5.1 크로스 프레임워크 변환의 필요성</h2>
+        <p>
+            현대 AI 개발에는 여러 프레임워크가 관여합니다. 연구자는 실험을 위해 PyTorch를 사용할 수 있지만 프로덕션 시스템은 TensorFlow Serving을 실행합니다. 크로스 프레임워크 변환은 원활한 모델 전송을 가능하게 하여 팀이 ML 라이프사이클의 각 단계에 가장 적합한 도구를 활용할 수 있게 합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>일반적인 변환 시나리오</h3>
+            <ul>
+                <li><strong>연구에서 프로덕션으로:</strong> PyTorch → TensorFlow/ONNX</li>
+                <li><strong>모바일 배포:</strong> 모든 프레임워크 → TFLite/CoreML</li>
+                <li><strong>클라우드 배포:</strong> 로컬 훈련 → 클라우드 최적화 형식</li>
+                <li><strong>레거시 마이그레이션:</strong> TensorFlow 1.x → TensorFlow 2.x/PyTorch</li>
+            </ul>
+        </div>
+
+        <h2>5.2 변환 경로</h2>
+        <p>ONNX는 대부분의 변환을 위한 중앙 허브 역할을 합니다:</p>
+
+        <pre><code>변환 그래프:
+
+PyTorch ←→ ONNX ←→ TensorFlow
+   ↓          ↓         ↓
+TorchScript  ↓      SavedModel
+   ↓          ↓         ↓
+Mobile     TFLite   TF.js
+   ↓          ↓         ↓
+   └──────→ CoreML ←──┘
+
+ONNX → TensorRT (NVIDIA)
+ONNX → OpenVINO (Intel)
+ONNX → ONNX.js (웹)</code></pre>
+
+        <h2>5.3 PyTorch → ONNX → TensorFlow</h2>
+
+        <h3>단계 1: PyTorch에서 ONNX로</h3>
+        <pre><code>import torch
+import torch.onnx
+
+# PyTorch 모델
+class ResNetBlock(torch.nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = torch.nn.Conv2d(channels, channels, 3, padding=1)
+        self.bn1 = torch.nn.BatchNorm2d(channels)
+        self.conv2 = torch.nn.Conv2d(channels, channels, 3, padding=1)
+        self.bn2 = torch.nn.BatchNorm2d(channels)
+
+    def forward(self, x):
+        residual = x
+        out = torch.nn.functional.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        return torch.nn.functional.relu(out + residual)
+
+model = ResNetBlock(64)
+dummy_input = torch.randn(1, 64, 56, 56)
+
+# ONNX로 내보내기
+torch.onnx.export(
+    model,
+    dummy_input,
+    "resnet_block.onnx",
+    export_params=True,         # 파라미터 내보내기
+    opset_version=17,           # ONNX opset 버전
+    do_constant_folding=True,   # 상수 폴딩 최적화
+    input_names=['input'],      # 입력 이름
+    output_names=['output'],    # 출력 이름
+    dynamic_axes={              # 동적 축
+        'input': {0: 'batch'},
+        'output': {0: 'batch'}
+    }
+)</code></pre>
+
+        <h3>단계 2: ONNX에서 TensorFlow로</h3>
+        <pre><code>import onnx
+from onnx_tf.backend import prepare
+
+# ONNX 모델 로드
+onnx_model = onnx.load("resnet_block.onnx")
+
+# TensorFlow로 변환
+tf_rep = prepare(onnx_model)
+
+# SavedModel로 내보내기
+tf_rep.export_graph("resnet_block_tf")
+
+# 또는 Python에서 직접 사용
+import numpy as np
+output = tf_rep.run(np.random.randn(1, 64, 56, 56).astype(np.float32))
+print(output)</code></pre>
+
+        <h2>5.4 TensorFlow → ONNX → PyTorch</h2>
+
+        <h3>TensorFlow에서 ONNX로</h3>
+        <pre><code>import tensorflow as tf
+import tf2onnx
+
+# TensorFlow 모델 생성
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(64, 3, padding='same', input_shape=(224, 224, 3)),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.ReLU(),
+    tf.keras.layers.GlobalAveragePooling2D(),
+    tf.keras.layers.Dense(1000)
+])
+
+# ONNX로 변환
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+model_proto, _ = tf2onnx.convert.from_keras(
+    model,
+    input_signature=spec,
+    opset=17,
+    output_path="tf_model.onnx"
+)</code></pre>
+
+        <h3>ONNX에서 PyTorch로</h3>
+        <pre><code>import onnx
+import torch
+from onnx2pytorch import ConvertModel
+
+# ONNX 모델 로드
+onnx_model = onnx.load("tf_model.onnx")
+
+# PyTorch로 변환
+pytorch_model = ConvertModel(onnx_model)
+
+# 모델 사용
+test_input = torch.randn(1, 3, 224, 224)
+output = pytorch_model(test_input)
+print(f"출력 형상: {output.shape}")</code></pre>
+
+        <h2>5.5 변환 문제 처리</h2>
+
+        <h3>연산자 호환성</h3>
+        <p>모든 연산이 프레임워크 간에 직접적인 대응 관계를 갖는 것은 아닙니다:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PyTorch</th>
+                    <th>ONNX</th>
+                    <th>TensorFlow</th>
+                    <th>참고사항</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>F.interpolate</td>
+                    <td>Resize</td>
+                    <td>tf.image.resize</td>
+                    <td>정렬 방식 차이</td>
+                </tr>
+                <tr>
+                    <td>torch.einsum</td>
+                    <td>Einsum</td>
+                    <td>tf.einsum</td>
+                    <td>Opset 12+</td>
+                </tr>
+                <tr>
+                    <td>torch.nn.GELU</td>
+                    <td>Gelu</td>
+                    <td>tf.nn.gelu</td>
+                    <td>근사 방법 차이</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>비호환성 해결</h3>
+        <pre><code>import torch
+import math
+
+# 변환 전: 지원되지 않는 연산 교체
+class ModelWithCompatibleOps(torch.nn.Module):
+    def forward(self, x):
+        # 대신: x = torch.special.erf(x)
+        # 지원되는 연산 사용:
+        x = 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))  # GELU 근사
+        return x
+
+# 또는 사용자 정의 ONNX 연산자 사용
+@torch.onnx.symbolic_helper.parse_args('v', 'f')
+def custom_op(g, input, scale):
+    return g.op("CustomNamespace::CustomOp", input, scale_f=scale)</code></pre>
+
+        <h2>5.6 데이터 레이아웃 차이</h2>
+        <p>PyTorch는 NCHW(배치, 채널, 높이, 너비)를 사용하는 반면 TensorFlow는 NHWC를 선호합니다:</p>
+
+        <pre><code>import torch
+import numpy as np
+
+# PyTorch: NCHW
+pytorch_tensor = torch.randn(1, 3, 224, 224)
+
+# TensorFlow로 변환: NHWC
+tf_tensor = pytorch_tensor.permute(0, 2, 3, 1)  # [1, 224, 224, 3]
+
+# TensorFlow 처리 후 다시 변환
+pytorch_result = tf_output.permute(0, 3, 1, 2)  # [1, 3, H, W]
+
+# ONNX에서 자동 변환
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    input_names=['input'],
+    output_names=['output']
+)
+# ONNX가 자동으로 레이아웃 변환 처리</code></pre>
+
+        <h2>5.7 검증 프레임워크</h2>
+        <p>변환된 모델의 수치 정확도를 보장하기 위해 항상 검증하세요:</p>
+
+        <pre><code>import torch
+import numpy as np
+import onnxruntime as ort
+
+class ModelValidator:
+    """모델 변환 검증 도구"""
+
+    def __init__(self, original_model, onnx_path):
+        self.pt_model = original_model
+        self.ort_session = ort.InferenceSession(onnx_path)
+
+    def validate(self, test_inputs, tolerance=1e-5):
+        results = []
+
+        for i, test_input in enumerate(test_inputs):
+            # PyTorch 추론
+            self.pt_model.eval()
+            with torch.no_grad():
+                pt_output = self.pt_model(test_input).numpy()
+
+            # ONNX 추론
+            ort_input = {
+                self.ort_session.get_inputs()[0].name: test_input.numpy()
+            }
+            ort_output = self.ort_session.run(None, ort_input)[0]
+
+            # 비교
+            diff = np.abs(pt_output - ort_output)
+            max_diff = diff.max()
+            mean_diff = diff.mean()
+
+            passed = max_diff < tolerance
+
+            results.append({
+                'test_id': i,
+                'passed': passed,
+                'max_diff': max_diff,
+                'mean_diff': mean_diff
+            })
+
+            print(f"테스트 {i}: {'✓ 통과' if passed else '✗ 실패'}")
+            print(f"  최대 차이: {max_diff:.2e}, 평균 차이: {mean_diff:.2e}")
+
+        return results
+
+# 사용 예
+validator = ModelValidator(pytorch_model, "model.onnx")
+test_data = [torch.randn(1, 3, 224, 224) for _ in range(10)]
+results = validator.validate(test_data)</code></pre>
+
+        <h2>5.8 모바일 형식으로 변환</h2>
+
+        <h3>TensorFlow Lite로</h3>
+        <pre><code>import tensorflow as tf
+
+# SavedModel에서
+converter = tf.lite.TFLiteConverter.from_saved_model('model_tf')
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+with open('model.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+# ONNX에서 (TensorFlow 경유)
+# 1. ONNX → TensorFlow
+# 2. TensorFlow → TFLite (위와 같음)</code></pre>
+
+        <h3>CoreML로</h3>
+        <pre><code>import coremltools as ct
+
+# ONNX에서
+from onnx_coreml import convert
+
+# 변환
+coreml_model = convert(
+    model='model.onnx',
+    minimum_ios_deployment_target='13',
+    preprocessing_args={
+        'image_scale': 1.0/255.0,
+        'red_bias': -0.485/0.229,
+        'green_bias': -0.456/0.224,
+        'blue_bias': -0.406/0.225
+    }
+)
+
+# 저장
+coreml_model.save('model.mlmodel')
+
+# PyTorch에서 (ONNX 경유)
+# 1. PyTorch → ONNX
+# 2. ONNX → CoreML (위와 같음)</code></pre>
+
+        <h2>5.9 자동 변환 파이프라인</h2>
+
+        <pre><code>from pathlib import Path
+import torch
+import onnx
+import tensorflow as tf
+
+class ModelConverter:
+    """다중 형식 모델 변환기"""
+
+    def __init__(self, output_dir="converted_models"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(exist_ok=True)
+
+    def pytorch_to_all(self, model, dummy_input, name="model"):
+        """PyTorch 모델을 여러 형식으로 변환"""
+        results = {}
+
+        # PyTorch → ONNX
+        onnx_path = self.output_dir / f"{name}.onnx"
+        torch.onnx.export(model, dummy_input, onnx_path, opset_version=17)
+        results['onnx'] = onnx_path
+
+        # ONNX → TensorFlow
+        try:
+            from onnx_tf.backend import prepare
+            onnx_model = onnx.load(str(onnx_path))
+            tf_path = self.output_dir / f"{name}_tf"
+            tf_rep = prepare(onnx_model)
+            tf_rep.export_graph(str(tf_path))
+            results['tensorflow'] = tf_path
+        except Exception as e:
+            print(f"TensorFlow 변환 실패: {e}")
+
+        # ONNX → TFLite
+        try:
+            converter = tf.lite.TFLiteConverter.from_saved_model(str(tf_path))
+            tflite_model = converter.convert()
+            tflite_path = self.output_dir / f"{name}.tflite"
+            with open(tflite_path, 'wb') as f:
+                f.write(tflite_model)
+            results['tflite'] = tflite_path
+        except Exception as e:
+            print(f"TFLite 변환 실패: {e}")
+
+        return results
+
+# 사용 예
+converter = ModelConverter()
+results = converter.pytorch_to_all(
+    pytorch_model,
+    torch.randn(1, 3, 224, 224),
+    name="resnet50"
+)
+print(f"변환된 형식: {list(results.keys())}")</code></pre>
+
+        <h2>5.10 모범 사례</h2>
+
+        <div class="highlight">
+            <h3>변환 체크리스트</h3>
+            <ol>
+                <li><strong>모델 단순화:</strong> 훈련 전용 코드 제거 (eval 모드의 dropout)</li>
+                <li><strong>표준 연산 사용:</strong> 가능한 한 사용자 정의 연산 피하기</li>
+                <li><strong>광범위한 테스트:</strong> 다양한 입력으로 검증</li>
+                <li><strong>연산자 지원 확인:</strong> 모든 연산이 대상 형식에서 지원되는지 확인</li>
+                <li><strong>동적 형상 처리:</strong> ONNX 내보내기에서 동적 축 지정</li>
+                <li><strong>수치 정밀도 모니터링:</strong> fp32 vs fp16 차이 추적</li>
+                <li><strong>변환 문서화:</strong> 변환 단계와 매개변수 기록</li>
+                <li><strong>버전 관리:</strong> 원본과 변환된 모델의 버전 유지</li>
+            </ol>
+        </div>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <ul>
+                <li>ONNX는 크로스 프레임워크 변환의 중앙 허브 역할을 합니다</li>
+                <li>일반적인 경로: PyTorch ↔ ONNX ↔ TensorFlow</li>
+                <li>데이터 레이아웃 차이(NCHW vs NHWC)에 주의가 필요합니다</li>
+                <li>모든 연산자가 프레임워크 간에 직접 대응되는 것은 아닙니다</li>
+                <li>수치 비교로 변환된 모델을 항상 검증해야 합니다</li>
+                <li>모바일 형식(TFLite, CoreML)은 일반적으로 ONNX 중간 단계가 필요합니다</li>
+                <li>자동화된 파이프라인은 다중 형식 변환을 간소화합니다</li>
+                <li>호환성 문제를 피하기 위해 변환 전 모델을 단순화하세요</li>
+                <li>재현성을 위해 모든 변환 단계를 문서화하세요</li>
+                <li>견고성을 보장하기 위해 다양한 입력으로 테스트하세요</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>크로스 프레임워크 변환에 ONNX가 중간 형식으로 자주 사용되는 이유는?</li>
+                <li>PyTorch 모델을 ONNX로 변환한 다음 TensorFlow로 변환하는 코드를 작성하세요.</li>
+                <li>NCHW와 NHWC 데이터 레이아웃의 차이점은 무엇인가요?</li>
+                <li>변환된 모델의 수치 정확도를 어떻게 검증하나요?</li>
+                <li>세 가지 일반적인 연산자 호환성 문제와 해결책을 설명하세요.</li>
+                <li>PyTorch 모델을 TFLite로 변환하는 파이프라인을 작성하세요.</li>
+                <li>모바일 배포를 위해 TFLite 대신 CoreML을 언제 사용하나요?</li>
+                <li>모델을 변환하기 전에 취해야 할 전처리 단계는 무엇인가요?</li>
+                <li>변환 중 사용자 정의 연산을 어떻게 처리하나요?</li>
+                <li>변환된 모델 버전을 유지하기 위한 모범 사례를 설명하세요.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · 널리 인간을 이롭게 하라
+        </div>
+
+        </div>
+</body>
+</html>

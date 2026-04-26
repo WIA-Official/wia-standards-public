@@ -1,0 +1,244 @@
+openapi: 3.1.0
+info:
+  title: WIA-SEC-008 Multi-Factor Authentication API
+  version: 1.0.0
+  description: |
+    REST surface for the WIA-SEC-008 Multi-Factor Authentication standard.
+    Covers enrolment, factor verification, step-up flows, recovery codes,
+    administrative bulk operations, and audit-trail exposure.
+    Errors follow RFC 9457.
+
+servers:
+  - url: https://api.wia.org/mfa/v1
+    description: Production
+  - url: https://staging-api.wia.org/mfa/v1
+    description: Staging
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:    { type: string, format: uri }
+        title:   { type: string }
+        status:  { type: integer }
+        detail:  { type: string }
+        instance:{ type: string }
+
+    FactorType:
+      type: string
+      enum: [totp, hotp, webauthn-platform, webauthn-roaming, push, sms, voice, recovery-code]
+
+    Factor:
+      type: object
+      required: [factorId, type, createdAt, status]
+      properties:
+        factorId:   { type: string }
+        type:       { $ref: "#/components/schemas/FactorType" }
+        label:      { type: string }
+        createdAt:  { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [active, disabled, expired]
+        attestation:
+          type: object
+          additionalProperties: true
+
+    EnrolmentChallenge:
+      type: object
+      required: [challengeId, type, expiresAt]
+      properties:
+        challengeId: { type: string }
+        type:        { $ref: "#/components/schemas/FactorType" }
+        expiresAt:   { type: string, format: date-time }
+        webauthnPublicKeyCredentialCreationOptions:
+          type: object
+          additionalProperties: true
+        totpSecret:
+          type: string
+          description: Base32-encoded shared secret (only for TOTP enrolment)
+
+    VerificationRequest:
+      type: object
+      required: [factorId]
+      properties:
+        factorId: { type: string }
+        otpCode:  { type: string }
+        webauthnAssertion:
+          type: object
+          additionalProperties: true
+
+    VerificationResult:
+      type: object
+      required: [verified]
+      properties:
+        verified:        { type: boolean }
+        sessionToken:    { type: string }
+        stepUpRequired:  { type: boolean }
+        stepUpReasons:
+          type: array
+          items: { type: string }
+
+    RecoveryCodeBatch:
+      type: object
+      required: [codes]
+      properties:
+        codes:
+          type: array
+          items: { type: string }
+        generatedAt: { type: string, format: date-time }
+
+paths:
+  /factors:
+    get:
+      summary: List factors enrolled for the caller
+      operationId: listFactors
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Factor" }
+
+  /factors/enrol:
+    post:
+      summary: Begin factor enrolment
+      operationId: beginEnrolment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:  { $ref: "#/components/schemas/FactorType" }
+                label: { type: string }
+      responses:
+        "200":
+          description: Challenge issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnrolmentChallenge" }
+
+  /factors/enrol/{challengeId}:
+    parameters:
+      - in: path
+        name: challengeId
+        required: true
+        schema: { type: string }
+    post:
+      summary: Complete factor enrolment
+      operationId: completeEnrolment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                otpCode: { type: string }
+                webauthnAttestation:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Factor enrolled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Factor" }
+        "400":
+          description: Validation failed
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /factors/{factorId}:
+    parameters:
+      - in: path
+        name: factorId
+        required: true
+        schema: { type: string }
+    delete:
+      summary: Remove a factor
+      operationId: removeFactor
+      responses:
+        "204": { description: Removed }
+
+  /verify:
+    post:
+      summary: Verify a factor for the current session
+      operationId: verify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerificationRequest" }
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerificationResult" }
+
+  /step-up:
+    post:
+      summary: Request step-up verification for a high-assurance action
+      operationId: stepUp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+                allowedTypes:
+                  type: array
+                  items: { $ref: "#/components/schemas/FactorType" }
+      responses:
+        "200":
+          description: Step-up challenge issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnrolmentChallenge" }
+
+  /recovery-codes:
+    post:
+      summary: Generate a fresh recovery-code batch
+      operationId: generateRecoveryCodes
+      responses:
+        "201":
+          description: Codes generated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecoveryCodeBatch" }
+
+  /audit/events:
+    get:
+      summary: Stream MFA audit events (SSE)
+      operationId: streamAuditEvents
+      parameters:
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Stream
+          content:
+            text/event-stream:
+              schema: { type: string }

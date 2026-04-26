@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: ONNX 포맷 심층 분석 | WIA-AI-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 60px 40px; margin: -40px -20px 40px -20px; border-radius: 0 0 20px 20px; }
+        h1 { font-size: 2.5em; color: #0f172a; margin-bottom: 15px; }
+        .chapter-info { color: #1e293b; font-size: 1.1em; }
+        h2 { color: #10B981; font-size: 1.8em; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #334155; }
+        h3 { color: #34D399; font-size: 1.3em; margin: 25px 0 12px 0; }
+        p { margin-bottom: 18px; color: #cbd5e1; }
+        code { background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #10B981; font-family: 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #1e293b; padding: 18px; border-radius: 8px; overflow-x: auto; margin: 18px 0; border-left: 4px solid #10B981; }
+        pre code { background: none; padding: 0; color: #e2e8f0; }
+        .highlight { background: #1e293b; padding: 18px; border-radius: 8px; margin: 18px 0; border-left: 4px solid #10B981; }
+        ul, ol { margin: 18px 0 18px 30px; }
+        li { margin: 8px 0; color: #cbd5e1; }
+        .summary { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; border: 2px solid #10B981; }
+        .review-questions { background: #1e293b; padding: 25px; border-radius: 10px; margin: 35px 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 50px; padding-top: 35px; border-top: 2px solid #334155; }
+        .btn { padding: 12px 28px; background: #10B981; color: #0f172a; text-decoration: none; border-radius: 5px; font-weight: 600; }
+        .btn:hover { background: #059669; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #10B981; color: #0f172a; font-weight: 600; }
+        .philosophy { text-align: center; color: #10B981; margin: 35px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>2장: ONNX 포맷 심층 분석</h1>
+            <p class="chapter-info">범용 AI 형식의 표준</p>
+            <p class="chapter-info" style="margin-top: 10px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+        </header>
+
+        <h2>2.1 ONNX 소개</h2>
+        <p>
+            ONNX(Open Neural Network Exchange) 포맷은 2017년 Microsoft와 Facebook(현 Meta)에 의해 머신러닝 모델을 표현하는 개방형 표준으로 만들어졌습니다. ONNX는 PyTorch, TensorFlow, scikit-learn 등의 프레임워크 간 원활한 모델 전송을 가능하게 하는 사실상의 교환 형식이 되었습니다.
+        </p>
+        <p>
+            ONNX는 Google의 언어 중립적 데이터 직렬화 형식인 Protocol Buffers(protobuf) 위에 구축되었습니다. 이러한 선택은 프로덕션급 형식에 필수적인 효율적인 바이너리 인코딩, 강력한 타이핑, 스키마 진화 기능을 제공합니다.
+        </p>
+
+        <div class="highlight">
+            <h3>ONNX가 중요한 이유</h3>
+            <ul>
+                <li><strong>프레임워크 독립성:</strong> PyTorch에서 훈련하고 TensorFlow로 배포</li>
+                <li><strong>하드웨어 최적화:</strong> 최적화된 추론을 위한 ONNX Runtime 활용</li>
+                <li><strong>생태계 지원:</strong> 100개 이상의 도구와 프레임워크가 ONNX 지원</li>
+                <li><strong>프로덕션 준비:</strong> Microsoft, Meta, AWS 등 많은 기업에서 사용</li>
+            </ul>
+        </div>
+
+        <h2>2.2 ONNX 모델 구조</h2>
+        <p>
+            ONNX 모델은 계층적 구조로 구성된 여러 핵심 구성 요소로 이루어져 있습니다:
+        </p>
+
+        <h3>ModelProto</h3>
+        <p>전체 모델을 담는 최상위 컨테이너:</p>
+        <pre><code>message ModelProto {
+  int64 ir_version = 1;           // ONNX IR 버전
+  repeated OpsetImport opset_import = 8;  // 연산자 세트
+  string producer_name = 2;        // 모델을 생성한 프레임워크
+  string producer_version = 3;     // 프레임워크 버전
+  string domain = 4;               // 모델 도메인
+  int64 model_version = 5;         // 모델 버전
+  string doc_string = 6;           // 문서
+  GraphProto graph = 7;            // 계산 그래프
+  repeated StringStringEntryProto metadata_props = 14;
+}</code></pre>
+
+        <h3>GraphProto</h3>
+        <p>모델의 아키텍처를 정의하는 계산 그래프:</p>
+        <pre><code>message GraphProto {
+  repeated NodeProto node = 1;           // 계산 노드
+  string name = 2;                       // 그래프 이름
+  repeated TensorProto initializer = 5;  // 상수 텐서 (가중치)
+  string doc_string = 10;                // 문서
+  repeated ValueInfoProto input = 11;    // 입력 사양
+  repeated ValueInfoProto output = 12;   // 출력 사양
+  repeated ValueInfoProto value_info = 13; // 중간 값
+}</code></pre>
+
+        <h3>NodeProto</h3>
+        <p>계산 그래프의 개별 연산:</p>
+        <pre><code>message NodeProto {
+  repeated string input = 1;       // 입력 텐서 이름
+  repeated string output = 2;      // 출력 텐서 이름
+  string name = 3;                 // 노드 이름
+  string op_type = 4;              // 연산 타입 (Conv, Gemm 등)
+  string domain = 7;               // 연산자 도메인
+  repeated AttributeProto attribute = 5;  // 연산 속성
+  string doc_string = 6;           // 문서
+}</code></pre>
+
+        <h2>2.3 ONNX 연산자 세트</h2>
+        <p>
+            ONNX는 버전이 지정된 연산자 세트(opset)를 통해 연산자를 정의합니다:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Opset</th>
+                    <th>출시</th>
+                    <th>주요 기능</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1-6</td>
+                    <td>2017-2018</td>
+                    <td>기본 연산, CNN</td>
+                </tr>
+                <tr>
+                    <td>7-10</td>
+                    <td>2019</td>
+                    <td>RNN, 제어 흐름</td>
+                </tr>
+                <tr>
+                    <td>11-13</td>
+                    <td>2020-2021</td>
+                    <td>Transformer, 동적 형상</td>
+                </tr>
+                <tr>
+                    <td>14-16</td>
+                    <td>2022-2023</td>
+                    <td>양자화, 최적화</td>
+                </tr>
+                <tr>
+                    <td>17-18</td>
+                    <td>2023-2024</td>
+                    <td>LLM 연산, 효율성</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>주요 ONNX 연산자</h3>
+        <pre><code>// 합성곱
+Conv: 합성곱 연산
+  - dilations, group, kernel_shape, pads, strides
+  - 입력: X[N,C_in,H,W], W[C_out,C_in/group,kH,kW]
+  - 출력: Y[N,C_out,H_out,W_out]
+
+// 행렬 곱셈
+Gemm: 일반 행렬 곱셈 (Y = α·AB + β·C)
+  - alpha, beta, transA, transB
+
+// 활성화 함수
+Relu, Sigmoid, Tanh, LeakyRelu, Elu, Selu, Swish
+
+// 정규화
+BatchNormalization, LayerNormalization, InstanceNormalization
+
+// 풀링
+MaxPool, AveragePool, GlobalMaxPool, GlobalAveragePool
+
+// 어텐션 (Opset 14+)
+Attention, MultiHeadAttention</code></pre>
+
+        <h2>2.4 ONNX의 텐서 표현</h2>
+        <p>
+            ONNX 텐서는 상수 값과 가중치를 위해 TensorProto 메시지를 사용합니다:
+        </p>
+
+        <pre><code>message TensorProto {
+  repeated int64 dims = 1;         // 텐서 차원
+  int32 data_type = 2;             // 요소 데이터 타입
+  Segment segment = 3;             // 큰 텐서용
+
+  // 데이터 저장 (다음 중 하나):
+  repeated float float_data = 4;   // FP32 값
+  repeated int32 int32_data = 5;   // INT32 값
+  bytes raw_data = 9;              // 원시 바이너리 데이터
+
+  // 외부 데이터 참조
+  repeated StringStringEntryProto external_data = 13;
+  DataLocation data_location = 14;
+
+  string name = 8;                 // 텐서 이름
+  string doc_string = 12;          // 문서
+}</code></pre>
+
+        <h2>2.5 모델을 ONNX로 변환</h2>
+
+        <h3>PyTorch에서 ONNX로</h3>
+        <pre><code>import torch
+import torch.onnx
+
+# 훈련된 모델 로드
+model = MyModel()
+model.load_state_dict(torch.load('model.pth'))
+model.eval()
+
+# 더미 입력 생성
+dummy_input = torch.randn(1, 3, 224, 224)
+
+# ONNX로 내보내기
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    export_params=True,        # 파라미터 내보내기
+    opset_version=17,          # ONNX opset 버전
+    do_constant_folding=True,  # 상수 폴딩 최적화
+    input_names=['input'],     # 입력 이름
+    output_names=['output'],   // 출력 이름
+    dynamic_axes={             # 동적 축 정의
+        'input': {0: 'batch_size'},
+        'output': {0: 'batch_size'}
+    }
+)</code></pre>
+
+        <h3>TensorFlow에서 ONNX로</h3>
+        <pre><code>import tensorflow as tf
+import tf2onnx
+
+# SavedModel 로드
+model = tf.saved_model.load('saved_model')
+
+# ONNX로 변환
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+output_path = "model.onnx"
+
+model_proto, _ = tf2onnx.convert.from_keras(
+    model,
+    input_signature=spec,
+    opset=17,
+    output_path=output_path
+)
+
+print(f"ONNX 모델이 {output_path}에 저장되었습니다")</code></pre>
+
+        <h2>2.6 ONNX Runtime</h2>
+        <p>
+            ONNX Runtime은 ONNX 모델을 위한 고성능 추론 엔진입니다:
+        </p>
+
+        <h3>기본 추론</h3>
+        <pre><code>import onnxruntime as ort
+import numpy as np
+
+# 추론 세션 생성
+session = ort.InferenceSession("model.onnx")
+
+# 입출력 이름 가져오기
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
+
+# 입력 준비
+input_data = np.random.randn(1, 3, 224, 224).astype(np.float32)
+
+# 추론 실행
+outputs = session.run(
+    [output_name],
+    {input_name: input_data}
+)
+
+print(f"출력 형상: {outputs[0].shape}")
+print(f"예측 결과: {outputs[0]}")</code></pre>
+
+        <h3>성능 최적화</h3>
+        <pre><code># 세션 옵션 구성
+sess_options = ort.SessionOptions()
+
+# 그래프 최적화 활성화
+sess_options.graph_optimization_level = \
+    ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+# 스레드 수 설정
+sess_options.intra_op_num_threads = 4
+sess_options.inter_op_num_threads = 4
+
+# 프로파일링 활성화
+sess_options.enable_profiling = True
+
+# 최적화된 세션 생성
+session = ort.InferenceSession(
+    "model.onnx",
+    sess_options,
+    providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+)
+
+# 사용 중인 프로바이더 확인
+print(f"실행 프로바이더: {session.get_providers()}")</code></pre>
+
+        <h2>2.7 ONNX 모델 최적화</h2>
+
+        <h3>양자화</h3>
+        <pre><code>from onnxruntime.quantization import quantize_dynamic, quantize_static
+
+# 동적 양자화 (보정 데이터 불필요)
+quantize_dynamic(
+    model_input="model_fp32.onnx",
+    model_output="model_int8.onnx",
+    weight_type=QuantType.QInt8
+)
+
+# 정적 양자화 (보정 필요)
+from onnxruntime.quantization import CalibrationDataReader
+
+class DataReader(CalibrationDataReader):
+    def __init__(self, calibration_data):
+        self.data = calibration_data
+        self.index = 0
+
+    def get_next(self):
+        if self.index < len(self.data):
+            result = {"input": self.data[self.index]}
+            self.index += 1
+            return result
+        return None
+
+quantize_static(
+    model_input="model_fp32.onnx",
+    model_output="model_int8_static.onnx",
+    calibration_data_reader=DataReader(calibration_dataset)
+)</code></pre>
+
+        <h2>2.8 사용자 정의 연산자</h2>
+        <pre><code>from onnx import helper, TensorProto
+
+# 사용자 정의 연산자 정의
+custom_op = helper.make_node(
+    'CustomOp',
+    inputs=['X'],
+    outputs=['Y'],
+    domain='ai.onnx.custom',
+    custom_attribute=42
+)
+
+# ONNX Runtime에 구현 등록
+import onnxruntime as ort
+
+class CustomOpKernel:
+    def __init__(self, custom_attribute):
+        self.custom_attribute = custom_attribute
+
+    def compute(self, x):
+        # 사용자 정의 연산 로직
+        return x * self.custom_attribute
+
+# 커널 등록
+ort.register_custom_ops_library("custom_ops.so")</code></pre>
+
+        <h2>2.9 ONNX 모델 분석 도구</h2>
+
+        <h3>Netron - 비주얼 모델 탐색기</h3>
+        <pre><code># Netron 설치
+pip install netron
+
+# 브라우저에서 모델 보기
+netron model.onnx
+
+# 또는 Python API 사용
+import netron
+netron.start('model.onnx', port=8080)</code></pre>
+
+        <h3>ONNX Checker와 형상 추론</h3>
+        <pre><code>import onnx
+
+# 모델 로드
+model = onnx.load("model.onnx")
+
+# 모델 유효성 검사
+onnx.checker.check_model(model)
+print("✓ 모델이 유효합니다")
+
+# 형상 추론
+model = onnx.shape_inference.infer_shapes(model)
+
+# 모델 구조 출력
+for node in model.graph.node:
+    print(f"노드: {node.name}")
+    print(f"  연산: {node.op_type}")
+    print(f"  입력: {node.input}")
+    print(f"  출력: {node.output}")</code></pre>
+
+        <h2>2.10 ONNX 모범 사례</h2>
+
+        <h3>내보내기 후 항상 검증하기</h3>
+        <pre><code>import torch
+import onnxruntime as ort
+import numpy as np
+
+# 원본 PyTorch 모델
+model_pt = load_pytorch_model()
+model_pt.eval()
+
+# ONNX 모델
+session = ort.InferenceSession("model.onnx")
+
+# 테스트 입력
+test_input = np.random.randn(1, 3, 224, 224).astype(np.float32)
+
+# PyTorch 출력
+with torch.no_grad():
+    pt_output = model_pt(torch.from_numpy(test_input)).numpy()
+
+# ONNX 출력
+onnx_output = session.run(None, {"input": test_input})[0]
+
+# 비교
+diff = np.abs(pt_output - onnx_output)
+print(f"최대 차이: {diff.max():.2e}")
+print(f"평균 차이: {diff.mean():.2e}")
+
+assert diff.max() < 1e-5, "출력이 크게 다릅니다!"</code></pre>
+
+        <div class="summary">
+            <h2>요약</h2>
+            <p>이 장에서는 ONNX 포맷에 대해 심층적으로 다루었습니다. 주요 내용:</p>
+            <ul>
+                <li>ONNX는 프레임워크 독립성을 제공하는 신경망의 표준 교환 형식입니다</li>
+                <li>ONNX 모델은 ModelProto, GraphProto, NodeProto, TensorProto 구조로 구성됩니다</li>
+                <li>연산자 세트(opset)는 버전이 지정된 연산 모음을 정의합니다</li>
+                <li>ONNX는 FP32, FP16, INT8, BFLOAT16 등 15개 이상의 데이터 타입을 지원합니다</li>
+                <li>주요 프레임워크(PyTorch, TensorFlow, scikit-learn)에서 ONNX로 내보낼 수 있습니다</li>
+                <li>ONNX Runtime은 CPU, GPU 및 특수 하드웨어에서 최적화된 추론을 제공합니다</li>
+                <li>양자화와 그래프 최적화로 추론 성능을 크게 향상시킬 수 있습니다</li>
+                <li>사용자 정의 연산자를 통해 ONNX를 특수 연산으로 확장할 수 있습니다</li>
+                <li>Netron과 onnx.checker 같은 도구로 모델을 분석하고 검증할 수 있습니다</li>
+                <li>변환 후 항상 출력을 검증하고 유연성을 위해 동적 축을 사용해야 합니다</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>Protocol Buffers란 무엇이며 ONNX가 이를 사용하는 이유는 무엇인가요?</li>
+                <li>ONNX 모델 구성 요소의 계층 구조를 설명하세요: ModelProto, GraphProto, NodeProto.</li>
+                <li>opset이란 무엇이며 왜 버전이 지정되나요?</li>
+                <li>5가지 일반적인 ONNX 연산자와 그 목적을 나열하세요.</li>
+                <li>ONNX에서 텐서는 어떻게 표현되나요? 다양한 저장 옵션은 무엇인가요?</li>
+                <li>동적 배치 크기로 PyTorch 모델을 ONNX로 내보내는 Python 코드를 작성하세요.</li>
+                <li>ONNX Runtime의 세 가지 그래프 최적화 수준은 무엇인가요?</li>
+                <li>동적 양자화와 정적 양자화의 차이점을 설명하세요.</li>
+                <li>언제 사용자 정의 ONNX 연산자를 정의해야 하나요?</li>
+                <li>ONNX와 원본 모델이 동일한 출력을 생성하는지 확인하는 검증 프로세스를 설명하세요.</li>
+            </ol>
+        </div>
+
+        <div class="philosophy">
+            弘益人間 (홍익인간) · 널리 인간을 이롭게 하라
+        </div>
+
+        </div>
+</body>
+</html>

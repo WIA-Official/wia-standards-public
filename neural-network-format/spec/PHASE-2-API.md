@@ -351,6 +351,153 @@ const optimized = ModelOptimizer.quantize(model, {
 await optimized.save('optimized_model.wia');
 ```
 
+## 10. Python Reference Bindings
+
+```python
+from wia_ai_014 import WIAModel, InferenceSession, Tensor, DataType
+
+model = WIAModel.load("model.wia")
+sess = InferenceSession.create(
+    model,
+    execution_providers=["cuda", "cpu"],
+    graph_optimization_level="all",
+)
+
+x = Tensor.from_numpy(np.random.randn(1, 3, 224, 224).astype("float32"))
+y = sess.run({"input": x})
+print(y["output"].as_numpy().argmax(axis=1))
+sess.close()
+```
+
+The Python bindings MUST be a thin shim over the same C ABI used by Node.js, Go, and Rust SDKs so that behavioural drift is impossible.
+
+## 11. C ABI
+
+```c
+typedef struct wia_session_s* wia_session;
+typedef struct wia_tensor_s*  wia_tensor;
+
+wia_session wia_session_create(const char* model_path, const char* options_json);
+wia_tensor  wia_tensor_create(uint8_t dtype, uint8_t rank, const uint32_t* dims, const void* data, size_t bytes);
+int         wia_session_run(wia_session s, const wia_tensor* inputs, size_t n_in, wia_tensor* outputs, size_t n_out);
+void        wia_tensor_destroy(wia_tensor t);
+void        wia_session_destroy(wia_session s);
+const char* wia_last_error();
+```
+
+The ABI MUST be stable across patch and minor versions (SemVer-major break only). Symbol versioning MUST follow GNU ld script `WIA_AI_014_1.0`.
+
+## 12. CLI Surface
+
+```
+wia-ai-014 convert --from <fmt> --to wia <input> -o <output>
+wia-ai-014 optimize --quantize int8|fp16 --calibration <data> <model.wia>
+wia-ai-014 inspect <model.wia>             # prints layers, params, ops
+wia-ai-014 verify <model.wia>              # 21-rule validator
+wia-ai-014 serve <model.wia> --port 8080   # local debug server
+wia-ai-014 conformance run --target <url>
+```
+
+Every CLI subcommand MUST emit human-readable output by default and machine-readable JSON when `--json` is passed.
+
+## 13. SDK Versioning Policy
+
+- Public types follow Semantic Versioning 2.0.0.
+- Breaking changes require a new MAJOR and a 12-month deprecation window for the prior MAJOR.
+- Pre-release identifiers MUST follow the SemVer `-rc.N` convention; nightly builds use `0.0.0-nightly.<utc-date>`.
+
+## 14. Async / Reactive Surface
+
+For long-running inference (LLM batch, diffusion sampling) every SDK MUST expose an async iterator surface:
+
+```typescript
+const stream = await session.runStream({ prompt: "Hello" });
+for await (const chunk of stream) {
+    process.stdout.write(chunk.token);
+}
+```
+
+Cancellation MUST be cooperative via `AbortSignal` (Web standard) or its language-equivalent. Cancellation MUST flush in-flight device work and release allocator slots within 100 ms.
+
+## 15. Memory Allocation Hooks
+
+Hosts that integrate WIA-AI-014 into a larger runtime MAY install a custom allocator:
+
+```c
+typedef struct {
+    void* (*alloc)(size_t bytes, size_t alignment, void* userdata);
+    void  (*free)(void* ptr, void* userdata);
+    void* userdata;
+} wia_allocator;
+
+int wia_session_set_allocator(wia_session s, const wia_allocator* a);
+```
+
+The allocator MUST be thread-safe and MUST honour the requested alignment (≥ 64 bytes for tensor buffers). Custom allocators are typical inside HPC schedulers, real-time embedded runtimes, and unified-memory systems.
+
+## 16. Telemetry Hook
+
+```c
+typedef void (*wia_event_cb)(const char* event_json, void* userdata);
+int wia_session_set_event_callback(wia_session s, wia_event_cb cb, void* userdata);
+```
+
+`event_json` is a single CBOR or JSON document conforming to the WIA telemetry schema and emitted at every span boundary. Hosts can route these into OpenTelemetry, Prometheus, or proprietary observability stacks without modifying the runtime.
+
+## 17. Determinism Controls
+
+Reproducibility is a frequent regulatory ask. The runtime MUST honour the following determinism flags:
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `deterministic_kernels` | false | Forces deterministic GEMM/conv algorithms (slower) |
+| `seed` | random | Fixes RNG used by dropout, sampling |
+| `cudnn_benchmark` | true | Disables benchmark heuristic when `deterministic_kernels=true` |
+| `tf32_allowed` | true | Setting false forces strict FP32 matmul on Ampere+ |
+
+Sessions that set `deterministic_kernels=true` MUST log a structured warning when an op fails to find a deterministic implementation, naming the op so users can refactor.
+
+## 18. Threading & Concurrency
+
+The runtime MUST expose two parallel domains:
+
+- **Inter-op parallelism**: number of independent op subgraphs running concurrently per session.
+- **Intra-op parallelism**: number of threads inside a single op (e.g. GEMM workers).
+
+```typescript
+const session = InferenceSession.create(model, {
+  interOpThreads: 2,
+  intraOpThreads: 8,
+  cpuAffinity: [0,1,2,3,4,5,6,7]
+});
+```
+
+Embedded deployments (Cortex-A class) SHOULD pin threads to specific cores to avoid scheduler-induced jitter.
+
+## 19. Plugin Operator Registration
+
+Custom operators MUST be registered through the public Plugin API:
+
+```typescript
+import { OpRegistry, KernelContext } from "@wia/ai-014";
+
+OpRegistry.register({
+  domain: "com.example",
+  op: "FastGELU",
+  version: 1,
+  kernel: async (ctx: KernelContext) => {
+    const x = ctx.input(0).asFloat32();
+    const y = ctx.output(0).asFloat32();
+    for (let i = 0; i < x.length; i++) {
+      const xi = x[i];
+      y[i] = xi * 0.5 * (1.0 + Math.tanh(0.7978845608 * (xi + 0.044715 * xi*xi*xi)));
+    }
+  }
+});
+```
+
+Plugins MUST advertise their `(domain, op, version)` triple in their manifest so loaders can build the dependency graph at session-create time.
+
 ---
 
 **Copyright © 2025 WIA**

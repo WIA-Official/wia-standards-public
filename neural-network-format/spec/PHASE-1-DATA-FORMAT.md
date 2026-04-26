@@ -386,7 +386,119 @@ Implementations MAY support:
 - External tensor storage (Section 9)
 - Cryptographic signatures (Section 7.2)
 
-## 13. References
+## 13. Operator Set Manifest
+
+The graph IR is parameterized by an opset version that pins the semantics of every operator referenced. Models MUST embed:
+
+```json
+{
+  "opsets": [
+    {"domain": "ai.wia", "version": 14},
+    {"domain": "ai.onnx", "version": 18},
+    {"domain": "ai.onnx.ml", "version": 3}
+  ],
+  "extensions": ["wia.fp8", "wia.dynamic_shapes"]
+}
+```
+
+Loaders MUST refuse models that reference an opset version they do not implement. Mixing operators from incompatible opset versions in the same graph is forbidden.
+
+## 14. Graph Constraints
+
+| Rule | Required |
+|------|----------|
+| Graph MUST be a directed acyclic graph (DAG) | Yes |
+| Cycles in tensor dependencies | Forbidden |
+| Constant initializers MUST be declared in the `initializers` section | Yes |
+| Dynamic shapes MUST be expressed via symbolic dimensions, not -1 | Yes |
+| Custom ops MUST live under a non-empty `domain` string | Yes |
+| External weight references MUST use the `external_data` block per §9 | Yes |
+| Subgraphs (loops, branches) MUST inherit parent opset versions | Yes |
+
+A reference graph validator implementing the rules above is published at `cli/wia-ai-014-validate.sh`.
+
+## 15. Sample Round-Trip
+
+```python
+from wia_ai_014 import WIAModel, Graph, Node, ValueInfo, TensorType, DataType
+
+m = WIAModel(graph=Graph(
+    name="add_one",
+    nodes=[Node(name="add", op_type="Add", inputs=["x","one"], outputs=["y"])],
+    inputs=[ValueInfo("x", TensorType(DataType.FLOAT32, [None, 4]))],
+    outputs=[ValueInfo("y", TensorType(DataType.FLOAT32, [None, 4]))],
+    initializers={"one": [1.0,1.0,1.0,1.0]},
+))
+m.save("add_one.wia")
+assert WIAModel.load("add_one.wia").graph.nodes[0].op_type == "Add"
+```
+
+## 16. Tensor Layout & Strides
+
+Tensor data is stored contiguous in row-major (NCHW for 4-D feature maps) by default. When the producing framework natively prefers another layout the tensor MUST carry an explicit `layout` attribute.
+
+| Layout | Example shape | Notes |
+|--------|---------------|-------|
+| `row-major` (default) | `[N, C, H, W]` | most common |
+| `channels-last` | `[N, H, W, C]` | TF / TFLite / mobile |
+| `nd-hwc` | `[N, D, H, W, C]` | volumetric |
+| `packed-int8` | `[N, C/4, H, W, 4]` | int8 inference kernels |
+
+Strides MAY be omitted when the layout is contiguous; otherwise stride-per-axis MUST be present:
+
+```json
+{
+  "name": "conv1.weight",
+  "dims": [64, 3, 7, 7],
+  "dtype": "FLOAT32",
+  "layout": "row-major",
+  "strides": [147, 49, 7, 1],
+  "elementSize": 4
+}
+```
+
+## 17. Constant Folding & Initializer Promotion
+
+The format permits two physical homes for constants:
+
+1. **Inline initializers**: small constants (≤ 1 MiB) embedded in the graph proto.
+2. **External initializers**: large constants stored in companion files referenced by `external_data` per §9.
+
+Loaders MUST treat both forms identically at the API surface; the difference is only physical layout.
+
+```json
+{
+  "name": "embedding.weight",
+  "dims": [50257, 768],
+  "dtype": "FLOAT16",
+  "external_data": {
+    "location": "weights/embedding.bin",
+    "offset": 0,
+    "length": 77194752,
+    "checksum": "sha256:9c1c..."
+  }
+}
+```
+
+## 18. Quantization Metadata Block
+
+Every quantized model MUST carry a quantization manifest at the top of the model proto:
+
+```json
+{
+  "scheme": "post-training-static",
+  "calibrationDataset": "wia-internal://calib-2024-Q4",
+  "calibrationSamples": 256,
+  "perChannel": true,
+  "axis": 0,
+  "activationDtype": "INT8",
+  "weightDtype": "INT8",
+  "biasDtype": "INT32",
+  "outlierClipping": "percentile-99.99"
+}
+```
+
+QAT (quantization-aware training) and FP8 schemes MUST also include a `range` array (min/max per channel) so that runtime kernels can re-scale without re-running calibration.
 
 - ONNX Format Specification: https://github.com/onnx/onnx/blob/main/docs/IR.md
 - Protocol Buffers: https://developers.google.com/protocol-buffers

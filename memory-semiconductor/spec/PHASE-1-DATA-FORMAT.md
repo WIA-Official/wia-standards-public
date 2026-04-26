@@ -251,6 +251,105 @@ Bandwidth = (6.4 × 1024) / 8 = 819.2 GB/s per stack
 - **Data Retention:** Decreases at elevated temperatures
 - **tREFI (Refresh Interval):** 7.8 μs (normal), 3.9 μs (high temp)
 
+## 10. Mode Register Encoding
+
+WIA-SEMI-002 reuses the JEDEC mode-register conventions and adds a vendor-portable JSON manifest so that platform firmware, BIOS, and NVMe-MI tooling can interpret a part without proprietary blobs.
+
+### 10.1 DDR5 Mode Register (MR0–MR63) Manifest
+
+```json
+{
+  "schemaVersion": "wia.semi-002.mr-manifest/1",
+  "device": "DDR5-4800B",
+  "vendorId": "0x80AD",
+  "modeRegisters": [
+    {"mr": 0,  "name": "WL/READL/RL", "fields": [
+      {"name": "CL", "bits": "5:0", "value": 40, "units": "tCK"},
+      {"name": "WL", "bits": "11:6", "value": 38, "units": "tCK"}
+    ]},
+    {"mr": 12, "name": "Vref(DQ)", "fields": [
+      {"name": "VrefDQ", "bits": "5:0", "value": 0x18, "units": "0.65% Vdd step"}
+    ]},
+    {"mr": 51, "name": "RTT_CK/RTT_NOM", "fields": [
+      {"name": "RTT_CK", "bits": "2:0", "value": 5},
+      {"name": "RTT_NOM_WR", "bits": "5:3", "value": 4}
+    ]}
+  ],
+  "trainingFlows": ["CA training", "Read training", "Write leveling", "Per-DRAM addressability"]
+}
+```
+
+### 10.2 NVMe Identify Controller Excerpt
+
+For SSD-class NAND assemblies the standard MUST surface a NVMe Identify Controller (CNS=0x01) blob to OS-level discovery. The manifest mirrors the binary layout but is JSON-encoded for tooling:
+
+```json
+{
+  "schemaVersion": "wia.semi-002.nvme-id/1",
+  "VID": "0x1AF4",
+  "SSVID": "0x1AF4",
+  "MN": "WIA-CONFORMANT-NVME-001",
+  "FR": "1.0.0",
+  "RAB": 6,
+  "OAES": "0x00000200",
+  "CTRATT": "0x0000003F",
+  "SQES": {"min": 6, "max": 6},
+  "CQES": {"min": 4, "max": 4},
+  "MAXCMD": 256,
+  "NN": 32,
+  "ONCS": "0x005F"
+}
+```
+
+### 10.3 SPD (Serial Presence Detect) Profile
+
+DIMMs MUST publish a JEDEC SPD page with the following minimum fields populated:
+
+| Byte | Field | Required | Notes |
+|------|-------|----------|-------|
+| 0x00 | Bytes used | Yes | 0x23 for DDR5 |
+| 0x02 | Memory type | Yes | 0x12 = DDR5 |
+| 0x03 | Module type | Yes | UDIMM / RDIMM / LRDIMM |
+| 0x14 | tCKAVGmin | Yes | ps |
+| 0x18 | tAAmin | Yes | ps |
+| 0x80 | Module manufacturer | Yes | JEDEC bank+code |
+| 0x95 | Module serial number | Yes | 4-byte LE |
+
+Hosts MUST read SPD at every cold boot and validate the WIA hash extension at byte 0x1FE–0x1FF (CRC-16/XMODEM over bytes 0x00–0x1FD).
+
+## 11. Telemetry Stream Format
+
+For real-time observability (PMU counters, refresh-pause events, RAS errors) every device MUST stream telemetry over an out-of-band channel using the WIA telemetry frame:
+
+```
++--------+--------+----------+----------------+----------+
+| ver(1) | type(1)| ts_ns(8) | payload_len(2) | payload  |
++--------+--------+----------+----------------+----------+
+```
+
+| Type | Meaning |
+|------|---------|
+| 0x01 | RAS error log entry |
+| 0x02 | Thermal event |
+| 0x03 | Refresh-rate change |
+| 0x04 | Wear-level update (NAND) |
+| 0x05 | Bit-error histogram |
+
+Frames are encoded as CBOR per RFC 8949 inside the payload area. Aggregators MAY upgrade to CBOR Sequences (RFC 8742) for high-rate streams.
+
+## 12. Normative References
+
+- ISO/IEC 17025:2017 — Testing and calibration laboratories
+- IEC 60068-2 — Environmental testing
+- JEDEC JESD79-4D — DDR4 SDRAM
+- JEDEC JESD79-5C — DDR5 SDRAM
+- JEDEC JESD235D — High Bandwidth Memory (HBM3)
+- JEDEC JESD218B — Solid-State Drive Endurance Workloads
+- IETF RFC 8949 — Concise Binary Object Representation (CBOR)
+- IETF RFC 8742 — CBOR Sequences
+- IETF RFC 8259 — JSON Data Interchange Format
+- AEC-Q100 — Failure Mechanism-Based Stress Test for ICs
+
 ---
 
 **Document Control:**
