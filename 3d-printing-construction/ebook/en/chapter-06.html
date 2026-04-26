@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol</title>
+    <style>
+        :root{--bg:#0f172a;--bg-secondary:#1e293b;--bg-tertiary:#334155;--text:#f1f5f9;--text-secondary:#cbd5e1;--primary:#8B5CF6;--primary-dark:#0891b2;--primary-light:#22d3ee;--border:#475569;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px;}
+        .container{max-width:900px;margin:0 auto;}
+        .header{background:var(--bg-secondary);padding:40px;border-radius:12px;border:2px solid var(--primary);margin-bottom:40px;}
+        .chapter-number{color:var(--primary);font-size:18px;font-weight:600;margin-bottom:10px;}
+        h1{font-size:42px;color:var(--primary-light);margin-bottom:20px;}
+        .chapter-intro{font-size:18px;color:var(--text-secondary);line-height:1.8;}
+        .content{background:var(--bg-secondary);padding:40px;border-radius:12px;border:2px solid var(--border);margin-bottom:30px;}
+        h2{color:var(--primary);font-size:28px;margin-top:40px;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--border);}
+        h2:first-of-type{margin-top:0;}
+        h3{color:var(--primary-light);font-size:22px;margin-top:30px;margin-bottom:15px;}
+        p{margin-bottom:20px;color:var(--text);}
+        ul,ol{margin-left:30px;margin-bottom:20px;}
+        li{margin-bottom:10px;color:var(--text-secondary);}
+        table{width:100%;border-collapse:collapse;margin:30px 0;background:var(--bg-tertiary);border-radius:8px;overflow:hidden;}
+        th,td{padding:15px;text-align:left;border-bottom:1px solid var(--border);}
+        th{background:var(--bg);color:var(--primary);font-weight:600;}
+        tr:hover{background:rgba(6,182,212,0.05);}
+        .info-box{background:rgba(6,182,212,0.1);border-left:4px solid var(--primary);padding:20px;margin:30px 0;border-radius:4px;}
+        .info-box h4{color:var(--primary);margin-bottom:10px;}
+        .summary-box{background:var(--bg-tertiary);border:2px solid var(--primary);border-radius:12px;padding:30px;margin:40px 0;}
+        .summary-box h2{border:none;margin-top:0;}
+        .key-takeaways{background:var(--bg);padding:20px;border-radius:8px;margin-top:20px;}
+        .key-takeaways li{color:var(--primary-light);margin-bottom:15px;}
+        .questions{background:var(--bg-tertiary);border-radius:12px;padding:30px;margin:40px 0;}
+        .questions h2{border:none;margin-top:0;}
+        .questions ol li{color:var(--text);margin-bottom:15px;font-weight:500;}
+        .navigation{display:flex;justify-content:space-between;margin-top:40px;gap:20px;}
+        .nav-btn{flex:1;padding:15px 30px;background:var(--primary);color:var(--bg);text-decoration:none;border-radius:8px;text-align:center;font-weight:600;transition:all 0.3s;}
+        .nav-btn:hover{background:var(--primary-dark);transform:translateY(-2px);}
+        pre{background:var(--bg);border:2px solid var(--border);border-radius:8px;padding:20px;overflow-x:auto;margin:20px 0;font-size:13px;}
+        code{color:var(--primary-light);font-family:'Courier New',monospace;}
+        .highlight{background:rgba(6,182,212,0.2);padding:2px 6px;border-radius:3px;color:var(--primary-light);}
+        footer{text-align:center;margin-top:60px;padding-top:30px;border-top:2px solid var(--border);color:var(--text-secondary);}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="chapter-number">CHAPTER 6</div>
+            <h1>Phase 3 - Protocol</h1>
+            <p class="chapter-intro">
+                Real-time control of construction 3D printing requires continuous, low-latency communication beyond request-response
+                APIs. This chapter explores Phase 3 protocols for robot control, material flow management, sensor data streaming, and
+                safety monitoring using WebSocket and specialized communication patterns.
+            </p>
+        </div>
+
+        <div class="content">
+            <h2>Real-Time Communication Requirements</h2>
+            <p>
+                Construction 3D printing involves coordinating multiple systems in real-time: robotic motion controllers, material
+                pumps, sensors, safety systems, and monitoring tools. These systems require communication patterns different from
+                traditional request-response APIs.
+            </p>
+
+            <h3>Characteristics of Real-Time Control</h3>
+            <ul>
+                <li><strong>Continuous Communication:</strong> Data flows constantly rather than in discrete request-response exchanges</li>
+                <li><strong>Low Latency:</strong> Commands must reach equipment and responses return within milliseconds</li>
+                <li><strong>High Frequency:</strong> Updates occur multiple times per second (10-100 Hz typical)</li>
+                <li><strong>Bidirectional:</strong> Both client and server initiate messages</li>
+                <li><strong>State Synchronization:</strong> Multiple systems maintain consistent view of printing state</li>
+                <li><strong>Guaranteed Delivery:</strong> Critical commands must be reliably delivered</li>
+                <li><strong>Ordered Delivery:</strong> Commands must execute in correct sequence</li>
+            </ul>
+
+            <h3>Protocol Technology Stack</h3>
+            <p>The WIA standard adopts WebSocket as the primary real-time protocol with fallback options:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Protocol</th>
+                        <th>Use Case</th>
+                        <th>Frequency</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>WebSocket</td>
+                        <td>Primary real-time control</td>
+                        <td>10-100 Hz</td>
+                        <td>&lt;10ms</td>
+                    </tr>
+                    <tr>
+                        <td>MQTT</td>
+                        <td>Sensor data streaming</td>
+                        <td>1-50 Hz</td>
+                        <td>&lt;50ms</td>
+                    </tr>
+                    <tr>
+                        <td>gRPC</td>
+                        <td>High-performance control</td>
+                        <td>100+ Hz</td>
+                        <td>&lt;5ms</td>
+                    </tr>
+                    <tr>
+                        <td>UDP (custom)</td>
+                        <td>Emergency shutdown</td>
+                        <td>As needed</td>
+                        <td>&lt;1ms</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>WebSocket Foundation</h2>
+            <p>
+                WebSocket provides full-duplex communication channel over a single TCP connection, ideal for real-time control scenarios.
+            </p>
+
+            <h3>Connection Establishment</h3>
+<pre><code>// Client initiates WebSocket connection
+const ws = new WebSocket('wss://printer.example.com:8443/wia/v1/control');
+
+ws.onopen = function(event) {
+    console.log('Connection established');
+
+    // Authenticate
+    ws.send(JSON.stringify({
+        type: 'AUTH',
+        token: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+    }));
+};
+
+ws.onmessage = function(event) {
+    const message = JSON.parse(event.data);
+    handleMessage(message);
+};
+
+ws.onerror = function(error) {
+    console.error('WebSocket error:', error);
+};
+
+ws.onclose = function(event) {
+    console.log('Connection closed:', event.code, event.reason);
+};</code></pre>
+
+            <h3>Message Format</h3>
+            <p>All WebSocket messages follow standardized JSON format:</p>
+<pre><code>{
+  "type": "MESSAGE_TYPE",
+  "timestamp": "2025-03-12T10:30:45.123Z",
+  "sequenceNumber": 12345,
+  "payload": {
+    // Message-specific data
+  }
+}</code></pre>
+
+            <h3>Message Types</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Direction</th>
+                        <th>Purpose</th>
+                        <th>Frequency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>AUTH</td>
+                        <td>Client → Server</td>
+                        <td>Authentication</td>
+                        <td>Once per connection</td>
+                    </tr>
+                    <tr>
+                        <td>COMMAND</td>
+                        <td>Client → Server</td>
+                        <td>Control commands</td>
+                        <td>As needed</td>
+                    </tr>
+                    <tr>
+                        <td>STATUS</td>
+                        <td>Server → Client</td>
+                        <td>System status updates</td>
+                        <td>10 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>SENSOR</td>
+                        <td>Server → Client</td>
+                        <td>Sensor data</td>
+                        <td>50 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>EVENT</td>
+                        <td>Server → Client</td>
+                        <td>Significant events</td>
+                        <td>As occurs</td>
+                    </tr>
+                    <tr>
+                        <td>HEARTBEAT</td>
+                        <td>Bidirectional</td>
+                        <td>Connection alive</td>
+                        <td>1 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>ERROR</td>
+                        <td>Bidirectional</td>
+                        <td>Error notifications</td>
+                        <td>As occurs</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Robot Control Protocol</h2>
+            <p>
+                Robotic printing systems require precise motion control coordinated with material deposition. The protocol supports
+                path-based control, velocity management, and real-time adjustments.
+            </p>
+
+            <h3>Motion Commands</h3>
+<pre><code>{
+  "type": "COMMAND",
+  "timestamp": "2025-03-12T10:30:45.123Z",
+  "sequenceNumber": 12345,
+  "payload": {
+    "command": "MOVE",
+    "target": {
+      "position": {
+        "x": 5000.0,
+        "y": 2500.0,
+        "z": 120.0,
+        "unit": "mm"
+      },
+      "velocity": {
+        "linear": 100.0,
+        "unit": "mm/s"
+      },
+      "acceleration": {
+        "value": 500.0,
+        "unit": "mm/s²"
+      }
+    },
+    "materialFlow": {
+      "enabled": true,
+      "rate": 1000.0,
+      "unit": "mm³/s"
+    },
+    "coordinateSystem": "absolute"
+  }
+}</code></pre>
+
+            <h3>Path Streaming</h3>
+            <p>For smooth continuous motion, path segments are streamed in advance:</p>
+<pre><code>{
+  "type": "COMMAND",
+  "timestamp": "2025-03-12T10:30:45.123Z",
+  "sequenceNumber": 12346,
+  "payload": {
+    "command": "PATH_SEGMENT",
+    "pathId": "layer-025-perimeter",
+    "segmentNumber": 157,
+    "points": [
+      {"x": 5000.0, "y": 2500.0, "z": 120.0},
+      {"x": 5100.0, "y": 2500.0, "z": 120.0},
+      {"x": 5200.0, "y": 2510.0, "z": 120.0}
+    ],
+    "velocity": 100.0,
+    "materialFlow": 1000.0,
+    "blending": {
+      "enabled": true,
+      "radius": 5.0
+    }
+  }
+}</code></pre>
+
+            <h3>Real-Time Position Feedback</h3>
+<pre><code>{
+  "type": "STATUS",
+  "timestamp": "2025-03-12T10:30:45.223Z",
+  "sequenceNumber": 45678,
+  "payload": {
+    "robot": {
+      "position": {
+        "x": 5075.3,
+        "y": 2501.2,
+        "z": 120.0
+      },
+      "velocity": {
+        "linear": 98.5,
+        "angular": 0.0
+      },
+      "status": "moving",
+      "bufferFill": 0.75,
+      "lastCompletedSegment": 156
+    },
+    "materialPump": {
+      "flowRate": 995.0,
+      "pressure": 1.18,
+      "temperature": 24.3,
+      "status": "normal"
+    }
+  }
+}</code></pre>
+
+            <h3>Command Acknowledgment</h3>
+            <p>All commands receive acknowledgment for reliable delivery:</p>
+<pre><code>{
+  "type": "ACK",
+  "timestamp": "2025-03-12T10:30:45.125Z",
+  "payload": {
+    "acknowledgedSequence": 12346,
+    "status": "accepted",
+    "estimatedExecutionTime": "2025-03-12T10:30:46.500Z"
+  }
+}</code></pre>
+
+            <h2>Material Flow Management</h2>
+            <p>
+                Precise material control ensures consistent deposition. The protocol manages pump speed, pressure, mixing, and
+                temperature.
+            </p>
+
+<pre><code>{
+  "type": "COMMAND",
+  "timestamp": "2025-03-12T10:30:45.123Z",
+  "sequenceNumber": 12347,
+  "payload": {
+    "command": "SET_MATERIAL_FLOW",
+    "flowRate": {
+      "target": 1200.0,
+      "unit": "mm³/s",
+      "rampTime": 0.5
+    },
+    "pressure": {
+      "target": 1.25,
+      "max": 1.5,
+      "unit": "MPa"
+    },
+    "temperature": {
+      "target": 25.0,
+      "tolerance": 2.0,
+      "unit": "celsius"
+    },
+    "mixer": {
+      "enabled": true,
+      "speed": 60,
+      "unit": "rpm"
+    }
+  }
+}</code></pre>
+
+            <h3>Material Status Monitoring</h3>
+<pre><code>{
+  "type": "SENSOR",
+  "timestamp": "2025-03-12T10:30:45.145Z",
+  "sequenceNumber": 78901,
+  "payload": {
+    "sensor": "material-flow",
+    "measurements": {
+      "flowRate": {
+        "value": 1195.3,
+        "unit": "mm³/s"
+      },
+      "pressure": {
+        "value": 1.23,
+        "unit": "MPa"
+      },
+      "temperature": {
+        "value": 24.8,
+        "unit": "celsius"
+      },
+      "viscosity": {
+        "value": 45.2,
+        "unit": "Pa·s"
+      },
+      "density": {
+        "value": 2.38,
+        "unit": "g/cm³"
+      }
+    },
+    "status": "normal",
+    "alarms": []
+  }
+}</code></pre>
+
+            <h2>Sensor Data Streaming</h2>
+            <p>
+                Multiple sensors monitor printing quality, equipment health, and environmental conditions. Data streams enable real-time
+                quality control and predictive maintenance.
+            </p>
+
+            <h3>Sensor Types</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sensor Category</th>
+                        <th>Measurements</th>
+                        <th>Update Rate</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Position</td>
+                        <td>X, Y, Z coordinates</td>
+                        <td>100 Hz</td>
+                        <td>Motion control feedback</td>
+                    </tr>
+                    <tr>
+                        <td>Material Flow</td>
+                        <td>Flow rate, pressure, temp</td>
+                        <td>50 Hz</td>
+                        <td>Material control</td>
+                    </tr>
+                    <tr>
+                        <td>Laser Scanner</td>
+                        <td>Layer geometry, height</td>
+                        <td>10 Hz</td>
+                        <td>Quality verification</td>
+                    </tr>
+                    <tr>
+                        <td>Camera</td>
+                        <td>Visual inspection</td>
+                        <td>30 FPS</td>
+                        <td>Monitoring, documentation</td>
+                    </tr>
+                    <tr>
+                        <td>Environmental</td>
+                        <td>Temperature, humidity, wind</td>
+                        <td>1 Hz</td>
+                        <td>Condition monitoring</td>
+                    </tr>
+                    <tr>
+                        <td>Vibration</td>
+                        <td>Acceleration, frequency</td>
+                        <td>1000 Hz</td>
+                        <td>Equipment health</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Laser Scanner Data</h3>
+<pre><code>{
+  "type": "SENSOR",
+  "timestamp": "2025-03-12T10:30:45.245Z",
+  "sequenceNumber": 78902,
+  "payload": {
+    "sensor": "laser-scanner",
+    "scan": {
+      "layerNumber": 25,
+      "scanLine": 42,
+      "points": [
+        {"x": 0.0, "y": 0.0, "z": 119.8},
+        {"x": 10.0, "y": 0.0, "z": 120.1},
+        {"x": 20.0, "y": 0.0, "z": 119.9},
+        // ... hundreds of points
+      ],
+      "analysis": {
+        "meanHeight": 120.0,
+        "stdDeviation": 0.5,
+        "maxDeviation": 1.2,
+        "withinTolerance": true
+      }
+    }
+  }
+}</code></pre>
+
+            <h3>Environmental Monitoring</h3>
+<pre><code>{
+  "type": "SENSOR",
+  "timestamp": "2025-03-12T10:30:45.345Z",
+  "sequenceNumber": 78903,
+  "payload": {
+    "sensor": "environmental",
+    "measurements": {
+      "temperature": {
+        "ambient": 22.3,
+        "material": 24.8,
+        "surface": 23.1,
+        "unit": "celsius"
+      },
+      "humidity": {
+        "value": 45.2,
+        "unit": "percent"
+      },
+      "wind": {
+        "speed": 2.3,
+        "direction": 135,
+        "unit": "m/s"
+      },
+      "precipitation": {
+        "detected": false
+      }
+    },
+    "alerts": []
+  }
+}</code></pre>
+
+            <h2>Safety Monitoring and Emergency Stop</h2>
+            <p>
+                Safety is paramount in construction. The protocol includes multiple layers of safety monitoring and emergency procedures.
+            </p>
+
+            <h3>Safety Zones</h3>
+<pre><code>{
+  "type": "COMMAND",
+  "timestamp": "2025-03-12T10:30:45.123Z",
+  "sequenceNumber": 12348,
+  "payload": {
+    "command": "DEFINE_SAFETY_ZONE",
+    "zoneId": "exclusion-001",
+    "type": "exclusion",
+    "geometry": {
+      "type": "cylinder",
+      "center": {"x": 5000, "y": 3000, "z": 0},
+      "radius": 500,
+      "height": 3000
+    },
+    "action": "emergency-stop",
+    "enabled": true
+  }
+}</code></pre>
+
+            <h3>Safety Status</h3>
+<pre><code>{
+  "type": "STATUS",
+  "timestamp": "2025-03-12T10:30:45.445Z",
+  "sequenceNumber": 45679,
+  "payload": {
+    "safety": {
+      "emergencyStopEngaged": false,
+      "safetyZones": [
+        {
+          "id": "exclusion-001",
+          "status": "clear",
+          "violations": 0
+        }
+      ],
+      "interlocks": [
+        {
+          "id": "material-pressure",
+          "status": "normal",
+          "value": 1.23,
+          "threshold": 1.5
+        },
+        {
+          "id": "robot-speed",
+          "status": "normal",
+          "value": 98.5,
+          "limit": 200.0
+        }
+      ],
+      "overallStatus": "safe-to-operate"
+    }
+  }
+}</code></pre>
+
+            <h3>Emergency Stop</h3>
+<pre><code>{
+  "type": "COMMAND",
+  "timestamp": "2025-03-12T10:30:50.001Z",
+  "sequenceNumber": 12349,
+  "payload": {
+    "command": "EMERGENCY_STOP",
+    "reason": "safety-zone-violation",
+    "details": {
+      "zone": "exclusion-001",
+      "detectedObject": "person",
+      "location": {"x": 5100, "y": 3050, "z": 500}
+    },
+    "priority": "critical"
+  }
+}
+
+// System response
+{
+  "type": "STATUS",
+  "timestamp": "2025-03-12T10:30:50.005Z",
+  "sequenceNumber": 45680,
+  "payload": {
+    "system": "emergency-stopped",
+    "allMotionCeased": true,
+    "materialFlowStopped": true,
+    "timestamp": "2025-03-12T10:30:50.003Z"
+  }
+}</code></pre>
+
+            <h2>Event Notifications</h2>
+            <p>
+                Significant events are broadcast to all connected clients for coordination and logging.
+            </p>
+
+<pre><code>{
+  "type": "EVENT",
+  "timestamp": "2025-03-12T10:31:00.123Z",
+  "sequenceNumber": 99999,
+  "payload": {
+    "event": "LAYER_COMPLETED",
+    "severity": "info",
+    "data": {
+      "layerNumber": 25,
+      "startTime": "2025-03-12T10:20:00.000Z",
+      "endTime": "2025-03-12T10:31:00.123Z",
+      "duration": 660.123,
+      "materialUsed": 125.5,
+      "quality": {
+        "dimensionalAccuracy": "pass",
+        "surfaceQuality": "pass",
+        "overallScore": 96.3
+      }
+    }
+  }
+}</code></pre>
+
+            <h3>Event Types</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Severity</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>LAYER_STARTED</td>
+                        <td>Info</td>
+                        <td>New layer printing begun</td>
+                    </tr>
+                    <tr>
+                        <td>LAYER_COMPLETED</td>
+                        <td>Info</td>
+                        <td>Layer successfully finished</td>
+                    </tr>
+                    <tr>
+                        <td>MATERIAL_LOW</td>
+                        <td>Warning</td>
+                        <td>Material inventory below threshold</td>
+                    </tr>
+                    <tr>
+                        <td>QUALITY_ISSUE</td>
+                        <td>Warning</td>
+                        <td>Quality metric outside tolerance</td>
+                    </tr>
+                    <tr>
+                        <td>EQUIPMENT_FAULT</td>
+                        <td>Error</td>
+                        <td>Equipment malfunction detected</td>
+                    </tr>
+                    <tr>
+                        <td>SAFETY_VIOLATION</td>
+                        <td>Critical</td>
+                        <td>Safety system triggered</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Connection Management</h2>
+            <p>
+                Robust connection management ensures reliable communication despite network issues.
+            </p>
+
+            <h3>Heartbeat Protocol</h3>
+<pre><code>// Client sends heartbeat every second
+{
+  "type": "HEARTBEAT",
+  "timestamp": "2025-03-12T10:30:46.123Z",
+  "sequenceNumber": 20001
+}
+
+// Server responds
+{
+  "type": "HEARTBEAT",
+  "timestamp": "2025-03-12T10:30:46.125Z",
+  "sequenceNumber": 60001,
+  "payload": {
+    "latency": 2.0,
+    "serverLoad": 0.35
+  }
+}</code></pre>
+
+            <h3>Reconnection Strategy</h3>
+<pre><code>// Client-side reconnection logic
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 10;
+const reconnectDelay = [1000, 2000, 5000, 10000]; // ms
+
+function attemptReconnect() {
+    if (reconnectAttempts >= maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached');
+        return;
+    }
+
+    const delay = reconnectDelay[Math.min(reconnectAttempts, reconnectDelay.length - 1)];
+    console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})`);
+
+    setTimeout(() => {
+        reconnectAttempts++;
+        establishConnection();
+    }, delay);
+}
+
+ws.onclose = function(event) {
+    if (!event.wasClean) {
+        attemptReconnect();
+    }
+};</code></pre>
+
+            <h3>State Resynchronization</h3>
+<pre><code>// After reconnection, client requests current state
+{
+  "type": "COMMAND",
+  "timestamp": "2025-03-12T10:35:00.000Z",
+  "sequenceNumber": 1,
+  "payload": {
+    "command": "SYNC_STATE"
+  }
+}
+
+// Server sends complete current state
+{
+  "type": "STATUS",
+  "timestamp": "2025-03-12T10:35:00.050Z",
+  "sequenceNumber": 1,
+  "payload": {
+    "fullState": {
+      "job": {
+        "id": "job-12345",
+        "status": "printing",
+        "currentLayer": 27,
+        "totalLayers": 50
+      },
+      "robot": { /* current position, velocity, etc */ },
+      "material": { /* current flow, pressure, etc */ },
+      "safety": { /* safety status */ }
+    }
+  }
+}</code></pre>
+
+            <h2>Quality of Service</h2>
+            <p>
+                Different message types require different reliability guarantees. The protocol supports configurable QoS levels.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Message Type</th>
+                        <th>QoS Level</th>
+                        <th>Delivery Guarantee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>EMERGENCY_STOP</td>
+                        <td>Highest</td>
+                        <td>Guaranteed, ordered, acknowledged</td>
+                    </tr>
+                    <tr>
+                        <td>COMMAND</td>
+                        <td>High</td>
+                        <td>Guaranteed, acknowledged</td>
+                    </tr>
+                    <tr>
+                        <td>STATUS</td>
+                        <td>Medium</td>
+                        <td>Best effort, latest value</td>
+                    </tr>
+                    <tr>
+                        <td>SENSOR</td>
+                        <td>Low</td>
+                        <td>Best effort, okay to drop</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Performance Optimization</h2>
+            <p>
+                High-frequency communication requires optimization to minimize latency and bandwidth usage.
+            </p>
+
+            <h3>Message Compression</h3>
+<pre><code>// Enable compression for connection
+ws = new WebSocket('wss://printer.example.com/wia/v1/control', {
+    perMessageDeflate: true
+});
+
+// Binary encoding for high-frequency data
+{
+  "type": "SENSOR",
+  "encoding": "binary",
+  "payload": Base64EncodedBinaryData
+}</code></pre>
+
+            <h3>Batching</h3>
+<pre><code>// Batch multiple sensor readings
+{
+  "type": "SENSOR_BATCH",
+  "timestamp": "2025-03-12T10:30:45.345Z",
+  "sequenceNumber": 78904,
+  "payload": {
+    "sensors": [
+      {"sensor": "position", "timestamp": "2025-03-12T10:30:45.300Z", "data": {...}},
+      {"sensor": "material-flow", "timestamp": "2025-03-12T10:30:45.310Z", "data": {...}},
+      {"sensor": "environmental", "timestamp": "2025-03-12T10:30:45.320Z", "data": {...}}
+    ]
+  }
+}</code></pre>
+
+            <h3>Delta Updates</h3>
+<pre><code>// Only send changed values
+{
+  "type": "STATUS_DELTA",
+  "timestamp": "2025-03-12T10:30:45.445Z",
+  "sequenceNumber": 45680,
+  "payload": {
+    "changes": {
+      "robot.position.x": 5125.8,
+      "material.flowRate": 1005.2
+    }
+    // Unchanged values omitted
+  }
+}</code></pre>
+        </div>
+
+        <div class="summary-box">
+            <h2>Chapter Summary</h2>
+            <p>
+                Phase 3 protocols enable real-time control and monitoring of construction 3D printing systems. WebSocket provides
+                full-duplex communication for continuous data exchange with low latency. Standardized message formats cover robot
+                control, material flow management, sensor data streaming, safety monitoring, and event notifications.
+            </p>
+            <p>
+                Robot control messages support precise motion commands with path streaming and real-time position feedback. Material
+                flow protocols manage pump speed, pressure, mixing, and temperature with continuous monitoring. Sensor streams provide
+                data from position encoders, flow meters, laser scanners, cameras, and environmental monitors at appropriate frequencies.
+            </p>
+            <p>
+                Safety mechanisms include zone definition, continuous monitoring, and emergency stop procedures with guaranteed
+                delivery. Connection management with heartbeats, reconnection strategies, and state resynchronization ensures reliability.
+                Quality of Service levels match message criticality to delivery guarantees. Performance optimizations including
+                compression, batching, and delta updates enable efficient high-frequency communication.
+            </p>
+
+            <div class="key-takeaways">
+                <h3>Key Takeaways</h3>
+                <ol>
+                    <li><strong>WebSocket Foundation:</strong> Full-duplex persistent connections enable real-time bidirectional
+                        communication essential for continuous control and monitoring.</li>
+                    <li><strong>Comprehensive Control:</strong> Protocols cover all aspects of 3D printing—robot motion, material flow,
+                        sensor feedback, safety monitoring—with appropriate message types and frequencies.</li>
+                    <li><strong>Safety Priority:</strong> Multiple safety layers including zone monitoring, interlock checking, and
+                        emergency stop with highest-priority guaranteed delivery protect workers and equipment.</li>
+                    <li><strong>Reliability Mechanisms:</strong> Heartbeats, reconnection strategies, acknowledgments, sequence numbers,
+                        and state resynchronization ensure robust communication despite network issues.</li>
+                    <li><strong>Performance Optimization:</strong> Compression, batching, delta updates, and configurable QoS levels
+                        enable efficient high-frequency communication without overwhelming networks.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Compare request-response APIs (Phase 2) with real-time protocols (Phase 3). What specific characteristics of
+                    construction 3D printing require real-time communication beyond traditional APIs?</li>
+                <li>Explain how path streaming with buffering enables smooth continuous motion. What problems occur without buffering,
+                    and how does the buffer fill percentage inform control decisions?</li>
+                <li>The protocol defines different QoS levels for different message types. Why does emergency stop require highest QoS
+                    while sensor data uses best-effort? What are consequences of applying wrong QoS level?</li>
+                <li>Analyze the safety architecture including zones, interlocks, monitoring, and emergency stop. How do these layers
+                    work together? What happens if one layer fails?</li>
+                <li>Connection interruptions are inevitable in production environments. Trace the complete reconnection process from
+                    disconnect detection through state resynchronization. What data could be lost, and how does the system recover?</li>
+                <li>High-frequency sensor streams generate enormous data volumes. Compare compression, batching, and delta updates as
+                    optimization strategies. When is each appropriate, and can they be combined?</li>
+            </ol>
+        </div>
+
+        <div class="info-box">
+            <h4>Looking Ahead</h4>
+            <p>
+                With data formats (Phase 1), APIs (Phase 2), and real-time protocols (Phase 3) established, Chapter 7 explores
+                Phase 4—Integration with the broader construction ecosystem. We'll examine how 3D printing systems connect with BIM,
+                CAD, ERP, and other platforms, enabling comprehensive digital workflows from design through construction to operations.
+            </p>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-05.html" class="nav-btn">← Chapter 5</a>
+            <a href="chapter-07.html" class="nav-btn">Chapter 7: Phase 4 →</a>
+        </div>
+
+        </div>
+</body>
+</html>
