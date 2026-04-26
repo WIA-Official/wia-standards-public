@@ -365,7 +365,7 @@ GET /api/v1/bathymetry?bbox=-121.85,-121.84,36.79,36.80&resolution=1&format=geot
 
 **API 키 인증**:
 ```
-Authorization: ApiKey sk_live_abc123xyz
+Authorization: ApiKey EXAMPLE_API_KEY_REPLACE_ME
 ```
 
 **JWT 베어러 토큰**:
@@ -433,7 +433,7 @@ import { WIADeepSeaClient } from '@wia/deep-sea-sdk';
 
 const client = new WIADeepSeaClient({
   baseUrl: 'https://vehicle.example.com/api/v1',
-  apiKey: 'sk_live_abc123'
+  apiKey: 'EXAMPLE_API_KEY_REPLACE_ME'
 });
 
 // 현재 원격측정 가져오기
@@ -463,7 +463,7 @@ from wia_deepsea import DeepSeaClient
 
 client = DeepSeaClient(
     base_url='https://vehicle.example.com/api/v1',
-    api_key='sk_live_abc123'
+    api_key='EXAMPLE_API_KEY_REPLACE_ME'
 )
 
 # 현재 원격측정 가져오기

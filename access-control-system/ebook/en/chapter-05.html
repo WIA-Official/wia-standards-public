@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface | WIA-ACS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #EF4444; --text: #f1f5f9; --text-secondary: #cbd5e1; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: var(--primary); text-decoration: none; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 6px; }
+        h1 { font-size: 2.5rem; color: var(--primary); margin: 2rem 0 1rem; }
+        h2 { font-size: 1.8rem; color: var(--primary); margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--bg-tertiary); }
+        h3 { font-size: 1.4rem; color: var(--text); margin: 1.5rem 0 1rem; }
+        p { margin: 1rem 0; color: var(--text-secondary); }
+        strong { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg-secondary); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--bg-tertiary); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: 600; }
+        .code-block { background: var(--bg-secondary); border: 1px solid var(--bg-tertiary); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        pre { font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text); }
+        .info-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .summary { background: var(--bg-secondary); border: 2px solid var(--primary); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: var(--text-secondary); }
+        li { margin: 0.5rem 0; }
+        .questions { background: var(--bg-secondary); padding: 2rem; border-radius: 8px; margin: 2rem 0; }
+        .questions h2 { border: none; margin-top: 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .questions li { margin: 1rem 0; color: var(--text); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Phase 2 - API Interface</h1>
+
+        <p>
+            Phase 2 of WIA-ACS defines comprehensive RESTful and gRPC APIs for programmatic access to all access
+            control functions. These APIs enable automation, third-party integrations, mobile applications, and
+            custom workflows while maintaining security, consistency, and ease of use. This chapter details the
+            API design principles, authentication mechanisms, endpoint specifications, and SDKs.
+        </p>
+
+        <h2>API Design Principles</h2>
+
+        <p>
+            WIA-ACS APIs follow modern best practices and industry standards:
+        </p>
+
+        <h3>RESTful Architecture</h3>
+        <ul>
+            <li><strong>Resource-oriented:</strong> URLs represent resources (nouns), not actions (verbs)</li>
+            <li><strong>HTTP methods:</strong> GET (read), POST (create), PUT/PATCH (update), DELETE (delete)</li>
+            <li><strong>Stateless:</strong> Each request contains all necessary context</li>
+            <li><strong>HATEOAS:</strong> Responses include links to related resources</li>
+            <li><strong>Idempotency:</strong> Safe retries for PUT, DELETE operations</li>
+        </ul>
+
+        <h3>API Versioning</h3>
+        <div class="code-block">
+            <pre>
+URL-based versioning (recommended):
+  https://api.example.com/v1/users
+  https://api.example.com/v2/users
+
+Header-based versioning (alternative):
+  GET /users HTTP/1.1
+  Accept: application/vnd.wia-acs.v1+json
+
+Version lifecycle:
+  v1.0 → v1.1 (backward compatible)
+  v1.x → v2.0 (breaking changes, deprecated v1 for 12 months)
+            </pre>
+        </div>
+
+        <h3>Error Handling</h3>
+        <div class="code-block">
+            <pre>
+Standard error response format:
+
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": {
+    "code": "INVALID_CREDENTIAL_FORMAT",
+    "message": "Credential format is invalid",
+    "details": "Field 'expires_at' must be after 'issued_at'",
+    "field": "expires_at",
+    "request_id": "req-20251226-143217-xyz",
+    "documentation_url": "https://docs.wia-acs.org/errors/INVALID_CREDENTIAL_FORMAT"
+  }
+}
+
+HTTP Status Codes:
+  200 OK - Successful GET request
+  201 Created - Successful POST creating resource
+  204 No Content - Successful DELETE
+  400 Bad Request - Invalid input
+  401 Unauthorized - Missing or invalid authentication
+  403 Forbidden - Authenticated but not authorized
+  404 Not Found - Resource doesn't exist
+  409 Conflict - Resource already exists or version conflict
+  429 Too Many Requests - Rate limit exceeded
+  500 Internal Server Error - Server-side failure
+            </pre>
+        </div>
+
+        <h2>Authentication API</h2>
+
+        <p>
+            The Authentication API verifies user identity and issues access tokens:
+        </p>
+
+        <h3>POST /v1/authenticate</h3>
+        <div class="code-block">
+            <pre>
+Request:
+POST /v1/authenticate HTTP/1.1
+Content-Type: application/json
+
+{
+  "credential_id": "cred-20251226-xyz789",
+  "factors": [
+    {
+      "type": "pin",
+      "value": "1234"
+    }
+  ],
+  "device_info": {
+    "device_id": "reader-main-lobby-001",
+    "ip_address": "192.168.1.45",
+    "user_agent": "WIA-ACS-Reader/1.0"
+  }
+}
+
+Response (200 OK):
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "rt_abc123xyz789",
+  "user": {
+    "user_id": "usr-20251226-abc123",
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "roles": ["role-employee", "role-building-access"]
+  },
+  "session_id": "sess-20251226-143217-abc",
+  "mfa_required": false
+}
+
+Response (401 Unauthorized - MFA Required):
+{
+  "error": {
+    "code": "MFA_REQUIRED",
+    "message": "Multi-factor authentication required",
+    "mfa_token": "mfa_tmp_token_xyz",
+    "available_methods": ["totp", "sms", "biometric"],
+    "expires_in": 300
+  }
+}
+            </pre>
+        </div>
+
+        <h3>POST /v1/authenticate/mfa</h3>
+        <div class="code-block">
+            <pre>
+Request:
+POST /v1/authenticate/mfa HTTP/1.1
+Content-Type: application/json
+
+{
+  "mfa_token": "mfa_tmp_token_xyz",
+  "method": "totp",
+  "code": "123456"
+}
+
+Response (200 OK):
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user": { /* user object */ }
+}
+            </pre>
+        </div>
+
+        <h2>Authorization API</h2>
+
+        <p>
+            The Authorization API evaluates access requests against policies:
+        </p>
+
+        <h3>POST /v1/authorize</h3>
+        <div class="code-block">
+            <pre>
+Request:
+POST /v1/authorize HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "user_id": "usr-20251226-abc123",
+  "resource": {
+    "type": "door",
+    "id": "door-server-room-a",
+    "attributes": {
+      "location": "headquarters",
+      "security_zone": "high"
+    }
+  },
+  "action": "entry",
+  "context": {
+    "timestamp": "2025-12-26T14:32:17Z",
+    "ip_address": "192.168.1.45",
+    "mfa_verified": true,
+    "mfa_verified_at": "2025-12-26T14:30:00Z"
+  }
+}
+
+Response (200 OK - Access Granted):
+{
+  "decision": "permit",
+  "reason": "User has required role and meets all conditions",
+  "matched_policies": [
+    "policy-it-server-room-access"
+  ],
+  "valid_until": "2025-12-26T22:00:00Z",
+  "conditions": {
+    "badge_out_required": true,
+    "max_duration_minutes": 120
+  },
+  "audit_id": "audit-20251226-143217-xyz"
+}
+
+Response (200 OK - Access Denied):
+{
+  "decision": "deny",
+  "reason": "Access outside allowed time window",
+  "matched_policies": ["policy-default-deny"],
+  "requirements": {
+    "time": {
+      "required": "Monday-Friday 06:00-22:00",
+      "current": "2025-12-26T23:30:00Z (Thursday 23:30)"
+    }
+  },
+  "audit_id": "audit-20251226-233017-abc"
+}
+            </pre>
+        </div>
+
+        <h2>User Management API</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>/v1/users</td>
+                    <td>GET</td>
+                    <td>List users (paginated, filterable)</td>
+                </tr>
+                <tr>
+                    <td>/v1/users</td>
+                    <td>POST</td>
+                    <td>Create new user</td>
+                </tr>
+                <tr>
+                    <td>/v1/users/{id}</td>
+                    <td>GET</td>
+                    <td>Get user details</td>
+                </tr>
+                <tr>
+                    <td>/v1/users/{id}</td>
+                    <td>PATCH</td>
+                    <td>Update user (partial update)</td>
+                </tr>
+                <tr>
+                    <td>/v1/users/{id}</td>
+                    <td>DELETE</td>
+                    <td>Delete/deactivate user</td>
+                </tr>
+                <tr>
+                    <td>/v1/users/{id}/roles</td>
+                    <td>GET</td>
+                    <td>Get user's roles</td>
+                </tr>
+                <tr>
+                    <td>/v1/users/{id}/roles</td>
+                    <td>POST</td>
+                    <td>Assign role to user</td>
+                </tr>
+                <tr>
+                    <td>/v1/users/{id}/credentials</td>
+                    <td>GET</td>
+                    <td>List user's credentials</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>GET /v1/users (List with Pagination)</h3>
+        <div class="code-block">
+            <pre>
+Request:
+GET /v1/users?status=active&department=Engineering&page=1&per_page=20&sort=name
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+
+Response (200 OK):
+{
+  "users": [
+    {
+      "user_id": "usr-001",
+      "status": "active",
+      "identity": {
+        "given_name": "John",
+        "family_name": "Doe",
+        "email": "john.doe@example.com"
+      },
+      "employment": {
+        "department": "Engineering",
+        "title": "Senior Software Engineer"
+      },
+      "roles": ["role-employee", "role-engineering"]
+    },
+    /* ... more users ... */
+  ],
+  "pagination": {
+    "current_page": 1,
+    "per_page": 20,
+    "total_pages": 5,
+    "total_items": 97,
+    "has_next": true,
+    "has_previous": false
+  },
+  "links": {
+    "self": "/v1/users?page=1&per_page=20",
+    "next": "/v1/users?page=2&per_page=20",
+    "first": "/v1/users?page=1&per_page=20",
+    "last": "/v1/users?page=5&per_page=20"
+  }
+}
+            </pre>
+        </div>
+
+        <h2>Credential Management API</h2>
+
+        <h3>POST /v1/credentials</h3>
+        <div class="code-block">
+            <pre>
+Request:
+POST /v1/credentials HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "user_id": "usr-20251226-abc123",
+  "credential_type": "smart_card",
+  "issued_at": "2025-12-26T10:00:00Z",
+  "expires_at": "2026-12-26T10:00:00Z",
+  "encoding": {
+    "format": "piv",
+    "facility_code": 123,
+    "card_number": 45678
+  },
+  "access_profiles": ["profile-building-entry", "profile-office-floor-5"],
+  "factors": [
+    {
+      "factor_type": "something_you_have",
+      "method": "smart_card",
+      "strength": "high"
+    },
+    {
+      "factor_type": "something_you_know",
+      "method": "pin",
+      "strength": "medium",
+      "pin": "1234"
+    }
+  ]
+}
+
+Response (201 Created):
+{
+  "credential_id": "cred-20251226-xyz789",
+  "user_id": "usr-20251226-abc123",
+  "credential_type": "smart_card",
+  "status": "active",
+  "issued_at": "2025-12-26T10:00:00Z",
+  "expires_at": "2026-12-26T10:00:00Z",
+  "encoding": {
+    "format": "piv",
+    "facility_code": 123,
+    "card_number": 45678,
+    "chip_uid": "04:3F:2A:B5:C8:19:80"
+  },
+  "qr_code": "data:image/png;base64,iVBORw0KGgoAAAANS...",
+  "provisioning_url": "https://acs.example.com/provision/cred-20251226-xyz789"
+}
+            </pre>
+        </div>
+
+        <h3>DELETE /v1/credentials/{id} (Revocation)</h3>
+        <div class="code-block">
+            <pre>
+Request:
+DELETE /v1/credentials/cred-20251226-xyz789?reason=lost_stolen
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+
+Response (204 No Content):
+{
+  "revoked_at": "2025-12-26T14:35:00Z",
+  "revocation_reason": "lost_stolen",
+  "revoked_by": "usr-admin-001",
+  "replacement_credential": null
+}
+            </pre>
+        </div>
+
+        <h2>Audit and Event API</h2>
+
+        <h3>GET /v1/audit/events</h3>
+        <div class="code-block">
+            <pre>
+Request:
+GET /v1/audit/events?start_date=2025-12-26T00:00:00Z&end_date=2025-12-26T23:59:59Z
+    &event_type=access_denied&user_id=usr-20251226-abc123
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+
+Response (200 OK):
+{
+  "events": [
+    {
+      "event_id": "evt-20251226-143217-abc123",
+      "event_type": "access_denied",
+      "timestamp": "2025-12-26T14:32:17.234Z",
+      "actor": {
+        "user_id": "usr-20251226-abc123",
+        "user_name": "John Doe"
+      },
+      "target": {
+        "resource_type": "door",
+        "resource_id": "door-server-room-a"
+      },
+      "result": "denied",
+      "reason": "Insufficient clearance level"
+    }
+  ],
+  "pagination": { /* pagination info */ }
+}
+            </pre>
+        </div>
+
+        <h2>Webhooks and Real-time Events</h2>
+
+        <p>
+            WIA-ACS supports webhooks for real-time event notifications:
+        </p>
+
+        <h3>POST /v1/webhooks</h3>
+        <div class="code-block">
+            <pre>
+Request (Create Webhook):
+POST /v1/webhooks HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "url": "https://example.com/wia-acs-webhook",
+  "events": ["access_granted", "access_denied", "credential_revoked"],
+  "secret": "whsec_xyz123abc789",
+  "active": true,
+  "filters": {
+    "resource_type": "door",
+    "location": "headquarters"
+  }
+}
+
+Webhook Delivery (POST to subscribed URL):
+POST /wia-acs-webhook HTTP/1.1
+Content-Type: application/json
+X-WIA-ACS-Event: access_granted
+X-WIA-ACS-Signature: sha256=abc123...
+X-WIA-ACS-Delivery: delivery-20251226-143217-xyz
+
+{
+  "webhook_id": "webhook-001",
+  "event": {
+    "event_id": "evt-20251226-143217-abc123",
+    "event_type": "access_granted",
+    "timestamp": "2025-12-26T14:32:17.234Z",
+    /* full event object */
+  }
+}
+            </pre>
+        </div>
+
+        <h2>Rate Limiting and Throttling</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tier</th>
+                    <th>Rate Limit</th>
+                    <th>Burst</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Basic</td>
+                    <td>1,000 req/hour</td>
+                    <td>20 req/min</td>
+                    <td>Small deployments</td>
+                </tr>
+                <tr>
+                    <td>Standard</td>
+                    <td>10,000 req/hour</td>
+                    <td>100 req/min</td>
+                    <td>Medium enterprises</td>
+                </tr>
+                <tr>
+                    <td>Premium</td>
+                    <td>100,000 req/hour</td>
+                    <td>500 req/min</td>
+                    <td>Large enterprises</td>
+                </tr>
+                <tr>
+                    <td>Enterprise</td>
+                    <td>Custom</td>
+                    <td>Custom</td>
+                    <td>Global deployments</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+            <pre>
+Rate Limit Headers:
+
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 10000
+X-RateLimit-Remaining: 9847
+X-RateLimit-Reset: 1735225200
+
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 10000
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1735225200
+Retry-After: 3600
+
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "retry_after": 3600
+  }
+}
+            </pre>
+        </div>
+
+        <h2>SDK Libraries</h2>
+
+        <p>
+            WIA-ACS provides official SDKs in multiple languages:
+        </p>
+
+        <h3>TypeScript/JavaScript SDK</h3>
+        <div class="code-block">
+            <pre>
+import { WiaAcsClient } from '@wia/acs-sdk';
+
+const client = new WiaAcsClient({
+  apiUrl: 'https://api.example.com',
+  apiKey: 'your-api-key'
+});
+
+// Authenticate user
+const authResult = await client.authenticate({
+  credentialId: 'cred-xyz789',
+  factors: [
+    { type: 'pin', value: '1234' }
+  ]
+});
+
+// Check authorization
+const authzResult = await client.authorize({
+  userId: authResult.user.user_id,
+  resource: { type: 'door', id: 'door-main-lobby' },
+  action: 'entry'
+});
+
+if (authzResult.decision === 'permit') {
+  console.log('Access granted!');
+}
+            </pre>
+        </div>
+
+        <h3>Python SDK</h3>
+        <div class="code-block">
+            <pre>
+from wia_acs import WiaAcsClient
+
+client = WiaAcsClient(
+    api_url="https://api.example.com",
+    api_key="your-api-key"
+)
+
+# Create user
+user = client.users.create({
+    "identity": {
+        "given_name": "Jane",
+        "family_name": "Smith",
+        "email": "jane.smith@example.com"
+    },
+    "roles": ["role-employee"]
+})
+
+# Issue credential
+credential = client.credentials.create({
+    "user_id": user.user_id,
+    "credential_type": "smart_card",
+    "expires_at": "2026-12-26T10:00:00Z"
+})
+
+print(f"Created credential: {credential.credential_id}")
+            </pre>
+        </div>
+
+        <h2>gRPC API Alternative</h2>
+
+        <p>
+            For high-performance scenarios, WIA-ACS provides gRPC APIs alongside REST:
+        </p>
+
+        <div class="code-block">
+            <pre>
+// Protocol Buffer Definition
+service AuthenticationService {
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+  rpc AuthenticateMFA(MFARequest) returns (AuthenticateResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthenticateResponse);
+}
+
+message AuthenticateRequest {
+  string credential_id = 1;
+  repeated AuthFactor factors = 2;
+  DeviceInfo device_info = 3;
+}
+
+message AuthenticateResponse {
+  string access_token = 1;
+  string token_type = 2;
+  int32 expires_in = 3;
+  User user = 4;
+  bool mfa_required = 5;
+}
+
+Benefits of gRPC:
+• 5-10x faster than REST for high-frequency operations
+• Binary protocol reduces bandwidth
+• Built-in streaming for real-time events
+• Strong typing with Protocol Buffers
+• Automatic client generation in 10+ languages
+            </pre>
+        </div>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p>
+                This chapter covered Phase 2 of WIA-ACS: comprehensive API interfaces. We explored RESTful API
+                design, authentication and authorization endpoints, user and credential management, audit APIs,
+                webhooks for real-time events, rate limiting, and SDK libraries. These APIs enable automation,
+                integration, and custom application development while maintaining security and consistency.
+            </p>
+
+            <h3>Key Takeaways</h3>
+            <ol>
+                <li>RESTful APIs follow industry best practices including resource-oriented design, proper HTTP methods, and standard error handling</li>
+                <li>Authentication API supports multi-factor authentication with flexible factor combinations</li>
+                <li>Authorization API evaluates complex RBAC/ABAC policies and returns detailed decisions with reasoning</li>
+                <li>Comprehensive SDK libraries in TypeScript, Python, and other languages accelerate integration</li>
+                <li>gRPC APIs provide high-performance alternative for latency-sensitive applications</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the five core principles of RESTful API design in WIA-ACS? Provide an example of each.</li>
+                <li>Describe the authentication flow for a user requiring MFA. What API calls are made and what responses are returned?</li>
+                <li>How does the authorization API determine whether to grant access? What information must be provided in the request?</li>
+                <li>Why does WIA-ACS use pagination for list endpoints? What information is included in the pagination object?</li>
+                <li>Explain how webhooks enable real-time event notifications. How does the receiving application verify webhook authenticity?</li>
+                <li>Compare REST and gRPC APIs. When would you choose gRPC over REST for an access control application?</li>
+            </ol>
+        </div>
+
+        <div class="info-box">
+            <h3>Looking Ahead</h3>
+            <p>
+                With APIs defined, Chapter 6 examines Phase 3: secure communication protocols. We'll explore TLS 1.3
+                for transport security, OAuth 2.0 and OpenID Connect for authentication, SAML for enterprise SSO,
+                and certificate management best practices.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

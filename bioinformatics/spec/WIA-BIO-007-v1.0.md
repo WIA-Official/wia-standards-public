@@ -861,11 +861,8 @@ Track all data transformations:
 
 ### 10.1 Key Papers
 
-1. 선행 연구. "Basic local alignment search tool." *J Mol Biol* 215:403-410.
 2. Needleman, S.B. & Wunsch, C.D. (1970). "A general method applicable to the search for similarities in the amino acid sequence of two proteins." *J Mol Biol* 48:443-453.
 3. Smith, T.F. & Waterman, M.S. (1981). "Identification of common molecular subsequences." *J Mol Biol* 147:195-197.
-4. 선행 연구. "CLUSTAL W: improving the sensitivity of progressive multiple sequence alignment." *Nucleic Acids Res* 22:4673-4680.
-5. 선행 연구. "Highly accurate protein structure prediction with AlphaFold." *Nature* 596:583-589.
 
 ### 10.2 Databases
 
@@ -884,8 +881,8 @@ Track all data transformations:
 |------|---------|-----------|
 | BLAST+ | Sequence search | NCBI |
 | MUSCLE | Multiple alignment | Edgar 2004 |
-| MAFFT | Multiple alignment | 선행 연구|
-| IQ-TREE | Phylogeny | 선행 연구|
+| MAFFT | Multiple alignment | — |
+| IQ-TREE | Phylogeny | — |
 | RAxML | Phylogeny | Stamatakis 2014 |
 | HMMER | Profile HMMs | Eddy 2011 |
 

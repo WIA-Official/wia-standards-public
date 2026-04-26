@@ -832,8 +832,6 @@ Every biosafety program must have written SOPs for:
 
 ### 11.3 Scientific Literature
 
-1. 선행 연구. "Survey of Select Agent Repository Biosafety Practices"
-2. 선행 연구. "Biosafety: Guidelines for Working with Pathogenic Organisms"
 3. Richmond, J.Y., & McKinney, R.W. (1999). "Biosafety in Microbiological and Biomedical Laboratories"
 
 ### 11.4 WIA Standards

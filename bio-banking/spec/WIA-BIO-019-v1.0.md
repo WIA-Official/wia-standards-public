@@ -1172,8 +1172,6 @@ Cryogenic Spill (LN₂):
 ### 11.3 Scientific Literature
 
 1. Vaught, J. (2016). "Biobanking comes of age: The transition to biospecimen science." Annual Review of Pharmacology and Toxicology, 56, 211-228.
-2. 선행 연구. "Biobanking: The foundation of personalized medicine." Current Opinion in Oncology, 28(5), 441-448.
-3. 선행 연구. "Biospecimen science and its impact on research." Biopreservation and Biobanking, 15(5), 401-403.
 
 ### 11.4 Data Standards
 

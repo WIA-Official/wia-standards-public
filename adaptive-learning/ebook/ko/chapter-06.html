@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 시스템 통합과 표준 | WIA-ADAPTIVE_LEARNING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>6장: 시스템 통합과 표준</h1>
+
+    <h2>6.1 학습 기술 생태계</h2>
+    <p>적응형 학습 시스템은 독립적으로 운영되기보다 LMS(학습 관리 시스템), 콘텐츠 저장소, 분석 플랫폼 등 다양한 시스템과 통합되어야 합니다. 표준화된 인터페이스를 통한 상호운용성은 효과적인 학습 생태계 구축의 핵심입니다.</p>
+
+    <div class="highlight">
+        <strong>상호운용성 원칙:</strong> WIA-ADAPTIVE_LEARNING 준수 시스템은 IMS Global, ADL 등의 업계 표준을 지원하여 다양한 플랫폼과 원활하게 통합될 수 있어야 합니다.
+    </div>
+
+    <h2>6.2 LTI (Learning Tools Interoperability)</h2>
+    <p>LTI는 학습 도구와 플랫폼 간의 표준 통합 방법을 제공합니다:</p>
+
+    <pre><code>// LTI 1.3 통합 구현
+class LTIIntegration {
+    // 플랫폼에서 도구로의 런치 처리
+    async handleLaunch(request: LTILaunchRequest): Promise&lt;LaunchResponse&gt; {
+        // 1. ID 토큰 검증
+        const claims = await this.verifyIdToken(request.id_token);
+
+        // 2. 사용자 정보 추출
+        const user = this.extractUserInfo(claims);
+
+        // 3. 컨텍스트 정보 추출
+        const context = {
+            courseId: claims['https://purl.imsglobal.org/spec/lti/claim/context'].id,
+            resourceLinkId: claims['https://purl.imsglobal.org/spec/lti/claim/resource_link'].id,
+            roles: claims['https://purl.imsglobal.org/spec/lti/claim/roles']
+        };
+
+        // 4. 세션 생성 및 리다이렉트
+        const session = await this.createSession(user, context);
+        return { redirectUrl: `/learn?session=${session.id}` };
+    }
+
+    // 성적 반환 (Assignment and Grade Services)
+    async sendGrade(
+        lineItemUrl: string,
+        userId: string,
+        score: number
+    ): Promise&lt;void&gt; {
+        const accessToken = await this.getAccessToken(['lineitem', 'score']);
+
+        await fetch(`${lineItemUrl}/scores`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/vnd.ims.lis.v1.score+json'
+            },
+            body: JSON.stringify({
+                userId: userId,
+                scoreGiven: score,
+                scoreMaximum: 100,
+                activityProgress: 'Completed',
+                gradingProgress: 'FullyGraded'
+            })
+        });
+    }
+}</code></pre>
+
+    <h2>6.3 xAPI (Experience API)</h2>
+    <p>xAPI는 다양한 학습 경험을 추적하고 저장하는 표준입니다:</p>
+
+    <pre><code>// xAPI 문장 생성 및 전송
+class xAPIClient {
+    private lrsEndpoint: string;
+    private authToken: string;
+
+    // 학습 이벤트를 xAPI 문장으로 변환
+    createStatement(event: LearningEvent): xAPIStatement {
+        return {
+            actor: {
+                objectType: 'Agent',
+                account: {
+                    homePage: 'https://learning.example.com',
+                    name: event.learnerId
+                }
+            },
+            verb: {
+                id: this.mapEventToVerb(event.type),
+                display: { 'ko-KR': event.type }
+            },
+            object: {
+                objectType: 'Activity',
+                id: event.activityId,
+                definition: {
+                    name: { 'ko-KR': event.activityName },
+                    type: this.mapActivityType(event.activityType)
+                }
+            },
+            result: event.result ? {
+                score: event.result.score ? {
+                    scaled: event.result.score / 100,
+                    raw: event.result.score,
+                    max: 100
+                } : undefined,
+                success: event.result.success,
+                completion: event.result.completion,
+                duration: this.formatDuration(event.result.duration)
+            } : undefined,
+            context: {
+                registration: event.sessionId,
+                extensions: {
+                    'https://wia.org/xapi/adaptive': {
+                        masteryLevel: event.masteryLevel,
+                        difficultyLevel: event.difficultyLevel,
+                        adaptationType: event.adaptationType
+                    }
+                }
+            },
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    // LRS에 문장 전송
+    async sendStatement(statement: xAPIStatement): Promise&lt;string&gt; {
+        const response = await fetch(`${this.lrsEndpoint}/statements`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${this.authToken}`,
+                'Content-Type': 'application/json',
+                'X-Experience-API-Version': '1.0.3'
+            },
+            body: JSON.stringify(statement)
+        });
+
+        return response.headers.get('X-Experience-API-Consistent-Through');
+    }
+}</code></pre>
+
+    <h2>6.4 SCORM (Sharable Content Object Reference Model)</h2>
+    <table>
+        <tr>
+            <th>버전</th>
+            <th>특징</th>
+            <th>적응형 학습 지원</th>
+        </tr>
+        <tr>
+            <td>SCORM 1.2</td>
+            <td>기본 추적, 단순 시퀀싱</td>
+            <td>제한적</td>
+        </tr>
+        <tr>
+            <td>SCORM 2004</td>
+            <td>고급 시퀀싱, 탐색 제어</td>
+            <td>중간</td>
+        </tr>
+        <tr>
+            <td>cmi5 (xAPI 기반)</td>
+            <td>유연한 추적, 오프라인 지원</td>
+            <td>우수</td>
+        </tr>
+    </table>
+
+    <pre><code>// SCORM 런타임 API 래퍼
+class SCORMAdapter {
+    private api: SCORMAPI;
+
+    initialize(): boolean {
+        // SCORM 2004
+        this.api = window.API_1484_11 || window.API;
+        if (!this.api) {
+            console.error('SCORM API를 찾을 수 없습니다');
+            return false;
+        }
+        return this.api.Initialize('') === 'true';
+    }
+
+    // 적응형 학습 데이터 저장
+    saveAdaptiveData(data: AdaptiveData): void {
+        // suspend_data에 JSON으로 저장
+        const suspendData = JSON.stringify({
+            learnerModel: data.learnerModel,
+            currentPath: data.currentPath,
+            masteryLevels: data.masteryLevels
+        });
+
+        this.api.SetValue('cmi.suspend_data', suspendData);
+        this.api.Commit('');
+    }
+
+    // 적응형 학습 데이터 복원
+    loadAdaptiveData(): AdaptiveData | null {
+        const suspendData = this.api.GetValue('cmi.suspend_data');
+        if (suspendData) {
+            return JSON.parse(suspendData);
+        }
+        return null;
+    }
+}</code></pre>
+
+    <h2>6.5 Caliper Analytics</h2>
+    <p>IMS Caliper는 학습 분석을 위한 표준 데이터 모델입니다:</p>
+
+    <pre><code>// Caliper 이벤트 생성
+class CaliperClient {
+    createAssessmentEvent(event: AssessmentEvent): CaliperEvent {
+        return {
+            '@context': 'http://purl.imsglobal.org/ctx/caliper/v1p2',
+            type: 'AssessmentEvent',
+            actor: {
+                id: `urn:uuid:${event.learnerId}`,
+                type: 'Person'
+            },
+            action: event.action,  // 'Started', 'Submitted', 'Graded'
+            object: {
+                id: `urn:uuid:${event.assessmentId}`,
+                type: 'Assessment',
+                name: event.assessmentName
+            },
+            generated: event.result ? {
+                id: `urn:uuid:${crypto.randomUUID()}`,
+                type: 'Score',
+                scoreGiven: event.result.score,
+                maxScore: event.result.maxScore
+            } : undefined,
+            eventTime: new Date().toISOString()
+        };
+    }
+}</code></pre>
+
+    <h2>6.6 QTI (Question and Test Interoperability)</h2>
+    <p>QTI는 평가 항목과 테스트의 표준 형식입니다:</p>
+
+    <div class="highlight">
+        <strong>적응형 테스팅:</strong> QTI 3.0은 컴퓨터 적응형 테스팅(CAT)을 지원합니다. 학습자의 응답에 따라 다음 문항을 동적으로 선택하여 효율적이고 정확한 능력 측정이 가능합니다.
+    </div>
+
+    <h2>6.7 API 설계</h2>
+    <pre><code>// WIA-ADAPTIVE_LEARNING REST API
+const apiEndpoints = {
+    // 학습자 관련
+    learners: {
+        'GET /learners/:id': '학습자 프로필 조회',
+        'GET /learners/:id/progress': '학습 진도 조회',
+        'GET /learners/:id/recommendations': '추천 콘텐츠 조회',
+        'PUT /learners/:id/preferences': '학습 선호도 업데이트'
+    },
+
+    // 콘텐츠 관련
+    content: {
+        'GET /content/:id': '콘텐츠 상세 조회',
+        'GET /content/search': '콘텐츠 검색',
+        'GET /paths/:id': '학습 경로 조회',
+        'POST /paths/generate': '맞춤 학습 경로 생성'
+    },
+
+    // 적응 관련
+    adaptation: {
+        'POST /events': '학습 이벤트 기록',
+        'GET /adapt/next': '다음 추천 활동',
+        'GET /adapt/difficulty': '현재 난이도 수준'
+    },
+
+    // 분석 관련
+    analytics: {
+        'GET /analytics/mastery': '숙달도 분석',
+        'GET /analytics/engagement': '참여도 분석',
+        'GET /analytics/predictions': '학습 예측'
+    }
+};</code></pre>
+
+    <h2>6.8 데이터 교환 형식</h2>
+    <pre><code>// 학습자 데이터 교환 형식
+interface LearnerDataExchange {
+    format: 'WIA-AL-1.0';
+    exportedAt: string;
+
+    learner: {
+        id: string;
+        profile: LearnerProfile;
+    };
+
+    knowledge: {
+        concepts: Array&lt;{
+            id: string;
+            mastery: number;
+            lastUpdated: string;
+        }&gt;;
+    };
+
+    progress: {
+        completedActivities: string[];
+        currentPath: string;
+        totalTimeSpent: number;
+    };
+
+    preferences: {
+        learningStyle: LearningStyle;
+        contentFormats: string[];
+        pacingPreference: 'self' | 'guided';
+    };
+}</code></pre>
+</body>
+</html>

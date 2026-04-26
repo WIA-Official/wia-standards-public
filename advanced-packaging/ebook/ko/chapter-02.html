@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 패키지 아키텍처 | WIA-ADVANCED_PACKAGING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>2장: 패키지 아키텍처</h1>
+
+    <h2>2.1 2.5D 패키징</h2>
+    <p>2.5D 패키징은 실리콘 인터포저를 사용하여 여러 다이를 수평으로 연결하는 기술입니다. 다이들은 동일 평면에 위치하며 인터포저를 통해 고밀도 배선으로 연결됩니다.</p>
+
+    <h3>2.5.1 실리콘 인터포저</h3>
+    <pre><code>// 2.5D 인터포저 사양
+interface SiliconInterposer {
+    // 물리적 특성
+    thickness: number;     // µm (일반적으로 50-100)
+    size: { x: number; y: number };  // mm
+
+    // TSV 특성
+    tsv: {
+        diameter: number;   // µm (5-10)
+        pitch: number;      // µm (40-50)
+        density: number;    // TSV/mm²
+        depth: number;      // µm
+    };
+
+    // RDL 층
+    rdl: {
+        layers: number;     // 4-6
+        lineWidth: number;  // µm (0.4-2)
+        spacing: number;    // µm (0.4-2)
+        material: 'Cu';
+    };
+
+    // 다이 배치
+    dieSlots: DieSlot[];
+}
+
+// 대표적 2.5D 기술
+const technologies2_5D = {
+    CoWoS: {
+        vendor: 'TSMC',
+        interposerSize: '2500mm²',
+        maxDies: 6,
+        rdlLayers: 6
+    },
+    EMIB: {
+        vendor: 'Intel',
+        type: 'embedded bridge',
+        interposerSize: 'localized',
+        maxDies: 4
+    }
+};</code></pre>
+
+    <div class="highlight">
+        <strong>CoWoS의 장점:</strong> TSMC의 CoWoS(Chip-on-Wafer-on-Substrate)는 HBM과 GPU/CPU를 연결하는 대표적인 2.5D 플랫폼으로, TB/s 단위의 메모리 대역폭을 제공합니다.
+    </div>
+
+    <h2>2.2 3D 패키징</h2>
+    <p>3D 패키징은 다이를 수직으로 적층하여 최단 거리 연결과 최소 풋프린트를 달성합니다:</p>
+
+    <table>
+        <tr>
+            <th>기술</th>
+            <th>본딩 방식</th>
+            <th>피치</th>
+            <th>적용</th>
+        </tr>
+        <tr>
+            <td>마이크로범프</td>
+            <td>솔더</td>
+            <td>40-55µm</td>
+            <td>HBM, 로직</td>
+        </tr>
+        <tr>
+            <td>하이브리드 본딩</td>
+            <td>Cu-Cu 직접</td>
+            <td>9-10µm</td>
+            <td>이미지센서, SoIC</td>
+        </tr>
+        <tr>
+            <td>TCB</td>
+            <td>열압착</td>
+            <td>20-40µm</td>
+            <td>HBM</td>
+        </tr>
+    </table>
+
+    <pre><code>// 3D 패키지 스택 정의
+interface Stack3D {
+    layers: StackLayer[];
+    totalHeight: number;  // µm
+    interconnect: {
+        type: 'microbump' | 'hybrid_bonding' | 'tcb';
+        pitch: number;
+        density: number;  // connections/mm²
+    };
+    thermalPath: ThermalConfig;
+}
+
+interface StackLayer {
+    position: number;  // bottom = 0
+    die: Die;
+    thickness: number;  // µm
+    tsvPresent: boolean;
+    orientation: 'face-up' | 'face-down';
+}
+
+// HBM 스택 예시
+const hbmStack: Stack3D = {
+    layers: [
+        { position: 0, die: baseDie, thickness: 720, tsvPresent: true },
+        { position: 1, die: dramDie, thickness: 40, tsvPresent: true },
+        { position: 2, die: dramDie, thickness: 40, tsvPresent: true },
+        { position: 3, die: dramDie, thickness: 40, tsvPresent: true },
+        { position: 4, die: dramDie, thickness: 40, tsvPresent: false }
+    ],
+    totalHeight: 880,
+    interconnect: { type: 'microbump', pitch: 55, density: 330 }
+};</code></pre>
+
+    <h2>2.3 Fan-Out 패키징</h2>
+    <p>Fan-Out 패키징은 다이 크기보다 넓은 영역에 I/O를 분포시켜 더 많은 연결과 더 나은 전기적 특성을 제공합니다:</p>
+
+    <h3>2.3.1 FOWLP (Fan-Out Wafer Level Packaging)</h3>
+    <ul>
+        <li>웨이퍼 레벨에서 재성형(reconstitution)</li>
+        <li>에폭시 몰드 컴파운드로 다이 확장</li>
+        <li>RDL로 I/O 재배치</li>
+        <li>WLP 수준의 얇은 프로파일</li>
+    </ul>
+
+    <h3>2.3.2 FOPLP (Fan-Out Panel Level Packaging)</h3>
+    <ul>
+        <li>대형 패널(600x600mm)에서 처리</li>
+        <li>더 낮은 단위 비용</li>
+        <li>대량 생산에 유리</li>
+    </ul>
+
+    <h2>2.4 칩렛 아키텍처</h2>
+    <pre><code>// 칩렛 시스템 정의
+interface ChipletSystem {
+    chiplets: Chiplet[];
+    interposer?: Interposer;
+    substrate: Substrate;
+    dieTodie: D2DInterface;
+}
+
+interface Chiplet {
+    id: string;
+    function: 'compute' | 'io' | 'memory' | 'analog';
+    processNode: string;  // e.g., '5nm', '14nm'
+    size: { x: number; y: number };  // mm
+    tdp: number;  // W
+    interfaces: D2DPort[];
+}
+
+interface D2DPort {
+    type: 'UCIe' | 'BoW' | 'AIB';
+    bandwidth: number;  // GB/s
+    lanes: number;
+    direction: 'bidirectional' | 'tx' | 'rx';
+}
+
+// 예: AMD EPYC 칩렛 구성
+const epycChiplets = {
+    ccd: { count: 8, node: '7nm', function: 'compute' },
+    iod: { count: 1, node: '14nm', function: 'io' },
+    d2dInterface: 'Infinity Fabric',
+    totalCores: 64
+};</code></pre>
+
+    <div class="highlight">
+        <strong>칩렛의 경제성:</strong> 단일 모놀리식 다이 대신 작은 칩렛으로 분할하면 수율이 향상되고, 각 칩렛에 최적의 공정을 적용할 수 있어 총 비용이 절감됩니다.
+    </div>
+
+    <h2>2.5 SiP (System in Package)</h2>
+    <p>SiP는 다양한 부품(능동/수동)을 단일 패키지에 통합합니다:</p>
+
+    <ul>
+        <li>AP + 메모리 + PMIC 통합</li>
+        <li>RF 모듈 (안테나 포함)</li>
+        <li>센서 허브</li>
+        <li>IoT 솔루션</li>
+    </ul>
+
+    <h2>2.6 아키텍처 선택 가이드</h2>
+    <table>
+        <tr>
+            <th>요구사항</th>
+            <th>권장 아키텍처</th>
+        </tr>
+        <tr>
+            <td>최대 메모리 대역폭</td>
+            <td>2.5D + HBM</td>
+        </tr>
+        <tr>
+            <td>최소 폼팩터</td>
+            <td>3D 적층, FOWLP</td>
+        </tr>
+        <tr>
+            <td>이종 통합</td>
+            <td>칩렛 + 인터포저</td>
+        </tr>
+        <tr>
+            <td>저비용 대량 생산</td>
+            <td>FOPLP</td>
+        </tr>
+        <tr>
+            <td>RF/아날로그 통합</td>
+            <td>SiP, AiP</td>
+        </tr>
+    </table>
+
+    <h2>2.7 아키텍처 설계 고려사항</h2>
+    <p>첨단 패키지 아키텍처를 선택할 때는 다양한 기술적, 경제적 요소를 종합적으로 고려해야 합니다. 성능 요구사항, 비용 목표, 생산 수량, 열 관리 능력, 그리고 공급망 준비 상태가 모두 중요한 판단 기준이 됩니다.</p>
+
+    <div class="highlight">
+        <strong>설계 초기 결정의 중요성:</strong> 패키지 아키텍처 선택은 제품 개발 초기에 이루어져야 합니다. 이 결정은 다이 설계, 인터페이스 사양, 테스트 전략, 그리고 전체 시스템 아키텍처에 광범위한 영향을 미칩니다. 설계 변경 비용은 프로젝트가 진행될수록 기하급수적으로 증가하므로, 충분한 사전 검토와 시뮬레이션을 통해 최적의 아키텍처를 선택하는 것이 중요합니다.
+    </div>
+
+    <h3>2.7.1 성능 대 비용 트레이드오프</h3>
+    <ul>
+        <li>2.5D 인터포저: 높은 대역폭, 중간 비용, 검증된 기술</li>
+        <li>3D 적층: 최고 밀도, 높은 비용, 열 관리 도전</li>
+        <li>칩렛: 유연한 구성, 수율 이점, 에코시스템 의존</li>
+        <li>Fan-Out: 얇은 프로파일, 경쟁력 있는 비용, 제한된 I/O</li>
+    </ul>
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 신뢰성 및 테스트 | WIA-ADVANCED_PACKAGING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>5장: 신뢰성 및 테스트</h1>
+
+    <h2>5.1 첨단 패키징의 신뢰성 과제</h2>
+    <p>첨단 패키징은 전통적 패키징보다 복잡한 신뢰성 과제에 직면합니다. 미세 피치 연결, 다중 다이 적층, 이종 재료 결합은 새로운 고장 메커니즘을 야기합니다. 신뢰성 확보는 제품 성공의 필수 조건입니다.</p>
+
+    <div class="highlight">
+        <strong>Known Good Die (KGD):</strong> 칩렛 기반 설계에서 개별 다이의 품질 보증은 핵심입니다. 불량 다이가 포함된 패키지는 전체가 폐기되므로, 조립 전 철저한 KGD 테스트가 필수입니다.
+    </div>
+
+    <h2>5.2 고장 메커니즘</h2>
+    <table>
+        <tr>
+            <th>고장 유형</th>
+            <th>원인</th>
+            <th>영향</th>
+        </tr>
+        <tr>
+            <td>솔더 피로</td>
+            <td>열 사이클링, CTE 불일치</td>
+            <td>연결 단절</td>
+        </tr>
+        <tr>
+            <td>전자이동(EM)</td>
+            <td>고전류 밀도</td>
+            <td>배선 단선/단락</td>
+        </tr>
+        <tr>
+            <td>TSV 결함</td>
+            <td>보이드, 크랙</td>
+            <td>수직 연결 실패</td>
+        </tr>
+        <tr>
+            <td>언더필 박리</td>
+            <td>열-기계적 스트레스</td>
+            <td>범프 손상</td>
+        </tr>
+        <tr>
+            <td>BEOL 손상</td>
+            <td>본딩 프로세스 스트레스</td>
+            <td>칩 내부 배선 손상</td>
+        </tr>
+    </table>
+
+    <h2>5.3 신뢰성 테스트</h2>
+    <pre><code>// 신뢰성 테스트 사양 (JEDEC 기반)
+interface ReliabilityTestSpec {
+    // 온도 사이클링 테스트
+    temperatureCycling: {
+        standard: 'JESD22-A104';
+        range: { min: number; max: number };  // °C
+        dwellTime: number;      // minutes
+        rampRate: number;       // °C/min
+        cycles: number;         // 1000 typical
+    };
+
+    // 고온 수명 테스트
+    htol: {
+        standard: 'JESD22-A108';
+        temperature: number;    // °C (typically 125-150)
+        duration: number;       // hours (1000 typical)
+        voltage: string;        // max operating
+    };
+
+    // 습도 테스트
+    humidity: {
+        standard: 'JESD22-A101';
+        temperature: number;    // °C
+        humidity: number;       // %RH
+        voltage: string;
+        duration: number;       // hours
+    };
+
+    // 전자이동 테스트
+    electromigration: {
+        standard: 'JESD61';
+        currentDensity: number;  // MA/cm²
+        temperature: number;     // °C
+        duration: number;        // hours
+    };
+}
+
+// 자동차 등급 요구사항
+const automotiveReliability = {
+    grade: 'AEC-Q100 Grade 1',
+    tempRange: { min: -40, max: 125 },
+    missionProfile: 'Automotive',
+    targetLife: '15 years',
+    additionalTests: ['Power Cycling', 'Vibration', 'Mechanical Shock']
+};</code></pre>
+
+    <h2>5.4 테스트 방법론</h2>
+
+    <h3>5.4.1 웨이퍼 레벨 테스트</h3>
+    <ul>
+        <li>프로브 카드를 통한 전기적 테스트</li>
+        <li>다이 별 파라메트릭 테스트</li>
+        <li>결함 스크리닝</li>
+        <li>KGD 분류</li>
+    </ul>
+
+    <h3>5.4.2 패키지 레벨 테스트</h3>
+    <ul>
+        <li>기능 테스트</li>
+        <li>신호 무결성 테스트</li>
+        <li>고속 I/O 테스트</li>
+        <li>번인 테스트</li>
+    </ul>
+
+    <pre><code>// 테스트 플로우 정의
+interface TestFlow {
+    stages: TestStage[];
+    coverage: TestCoverage;
+    escapeRate: number;  // DPPM target
+}
+
+interface TestStage {
+    name: string;
+    level: 'wafer' | 'die' | 'package' | 'system';
+    tests: Test[];
+    temperature: string;  // 'hot', 'cold', 'room'
+    duration: number;     // seconds
+}
+
+const advancedPackageTestFlow: TestFlow = {
+    stages: [
+        {
+            name: 'Wafer Sort',
+            level: 'wafer',
+            tests: ['continuity', 'leakage', 'functional'],
+            temperature: 'room',
+            duration: 30
+        },
+        {
+            name: 'KGD Test',
+            level: 'die',
+            tests: ['full_functional', 'at-speed', 'BIST'],
+            temperature: 'multi',
+            duration: 120
+        },
+        {
+            name: 'Package Test',
+            level: 'package',
+            tests: ['D2D_link', 'memory_interface', 'full_system'],
+            temperature: 'multi',
+            duration: 300
+        },
+        {
+            name: 'Burn-in',
+            level: 'package',
+            tests: ['dynamic_burn_in'],
+            temperature: 'hot',
+            duration: 86400  // 24 hours
+        }
+    ],
+    coverage: { structural: 98, functional: 95 },
+    escapeRate: 10  // DPPM
+};</code></pre>
+
+    <h2>5.5 품질 지표</h2>
+    <table>
+        <tr>
+            <th>지표</th>
+            <th>정의</th>
+            <th>목표</th>
+        </tr>
+        <tr>
+            <td>DPPM</td>
+            <td>백만 개당 결함</td>
+            <td>< 10</td>
+        </tr>
+        <tr>
+            <td>수율</td>
+            <td>양품 비율</td>
+            <td>> 95%</td>
+        </tr>
+        <tr>
+            <td>FIT</td>
+            <td>10억 시간당 고장 수</td>
+            <td>< 10</td>
+        </tr>
+        <tr>
+            <td>MTBF</td>
+            <td>평균 고장 간격</td>
+            <td>> 100,000시간</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>설계를 위한 신뢰성(DfR):</strong> 신뢰성은 설계 단계에서부터 고려되어야 합니다. 시뮬레이션과 FMEA를 통해 잠재적 고장 모드를 사전에 식별하고 대응해야 합니다.
+    </div>
+
+    <h2>5.6 표준 및 규격</h2>
+    <ul>
+        <li><strong>JEDEC:</strong> 반도체 표준화 기구</li>
+        <li><strong>IPC:</strong> 전자 조립 표준</li>
+        <li><strong>AEC-Q:</strong> 자동차 전자 부품 인증</li>
+        <li><strong>MIL-STD:</strong> 군사 규격</li>
+    </ul>
+
+    <h2>5.7 신뢰성 향상 전략</h2>
+    <p>첨단 패키징의 신뢰성을 향상시키기 위해서는 설계, 재료, 프로세스 전반에 걸친 체계적인 접근이 필요합니다. 시뮬레이션 기반 설계, 재료 최적화, 프로세스 제어, 그리고 철저한 검증이 핵심 요소입니다.</p>
+
+    <div class="highlight">
+        <strong>신뢰성 예측 모델링:</strong> 물리 기반 신뢰성 모델과 통계적 수명 예측을 결합하여 제품 수명을 예측합니다. 가속 시험 데이터를 실제 사용 조건으로 외삽하여 현장 신뢰성을 추정합니다. 이러한 예측은 설계 검증, 보증 정책 수립, 그리고 지속적인 품질 개선의 기초가 됩니다.
+    </div>
+
+    <h3>5.7.1 재료 선택 가이드</h3>
+    <table>
+        <tr>
+            <th>구성요소</th>
+            <th>권장 재료</th>
+            <th>신뢰성 고려사항</th>
+        </tr>
+        <tr>
+            <td>솔더</td>
+            <td>SAC305, SnBi</td>
+            <td>피로 수명, 크립 저항</td>
+        </tr>
+        <tr>
+            <td>언더필</td>
+            <td>에폭시, 실리콘</td>
+            <td>CTE 매칭, 습기 저항</td>
+        </tr>
+        <tr>
+            <td>몰드 컴파운드</td>
+            <td>EMC, 액상 몰드</td>
+            <td>열전도율, 휨 제어</td>
+        </tr>
+    </table>
+</body>
+</html>

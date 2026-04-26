@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Platform Architecture | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: Platform Architecture</h1>
+
+    <div class="highlight">
+        <strong>Design Philosophy:</strong> WIA-CARBON_TRADING architecture prioritizes reliability, scalability, and auditability. Every transaction is traceable, every order is processed fairly, and the system can scale to handle global carbon market volumes.
+    </div>
+
+    <p>Building a carbon trading platform requires sophisticated engineering to handle the unique demands of emissions markets. This chapter explores the core architectural components that power WIA-CARBON_TRADING, from the exchange engine to settlement systems.</p>
+
+    <h2>System Overview</h2>
+
+    <p>The WIA-CARBON_TRADING platform consists of several interconnected subsystems, each responsible for specific functionality. These components work together to provide a complete trading ecosystem while maintaining loose coupling for reliability and maintainability.</p>
+
+    <pre><code>// High-Level Architecture Components
+interface PlatformArchitecture {
+    // Core Trading Systems
+    exchangeEngine: ExchangeEngine;
+    orderManagement: OrderManagementSystem;
+    matchingEngine: MatchingEngine;
+
+    // Settlement and Clearing
+    clearingHouse: ClearingHouse;
+    settlementEngine: SettlementEngine;
+
+    // Registry and Tracking
+    carbonRegistry: CarbonRegistry;
+    accountingSystem: AccountingSystem;
+
+    // Market Data
+    marketDataFeed: MarketDataService;
+    priceDiscovery: PriceDiscoveryEngine;
+
+    // Compliance and Security
+    complianceModule: ComplianceManager;
+    riskEngine: RiskManagementEngine;
+    auditSystem: AuditTrailService;
+
+    // External Interfaces
+    apiGateway: APIGateway;
+    regulatoryReporting: RegulatoryReportingService;
+}
+
+class CarbonTradingPlatform implements PlatformArchitecture {
+    // Component initialization
+    constructor(config: PlatformConfig) {
+        this.exchangeEngine = new ExchangeEngine(config.exchange);
+        this.matchingEngine = new MatchingEngine(config.matching);
+        this.clearingHouse = new ClearingHouse(config.clearing);
+        this.carbonRegistry = new CarbonRegistry(config.registry);
+        // ... initialize remaining components
+    }
+}</code></pre>
+
+    <h2>Exchange Engine Design</h2>
+
+    <p>The exchange engine is the heart of the trading platform, coordinating order flow, matching, and execution. It must handle high throughput while maintaining strict ordering guarantees and fair treatment of all market participants.</p>
+
+    <h3>Order Types and Lifecycle</h3>
+
+    <p>WIA-CARBON_TRADING supports a comprehensive set of order types to accommodate different trading strategies and risk management needs:</p>
+
+    <ul>
+        <li><strong>Market Orders:</strong> Execute immediately at best available price</li>
+        <li><strong>Limit Orders:</strong> Execute only at specified price or better</li>
+        <li><strong>Stop Orders:</strong> Trigger when price reaches specified level</li>
+        <li><strong>Iceberg Orders:</strong> Display only portion of total quantity</li>
+        <li><strong>Good-Till-Cancelled:</strong> Remain active until filled or cancelled</li>
+        <li><strong>Fill-or-Kill:</strong> Execute entirely immediately or cancel</li>
+        <li><strong>Auction Orders:</strong> Participate in scheduled auctions only</li>
+    </ul>
+
+    <pre><code>// Order Data Structure
+interface TradeOrder {
+    orderId: string;
+    participantId: string;
+    instrument: CarbonInstrument;
+    side: 'buy' | 'sell';
+    orderType: OrderType;
+    quantity: number;           // tonnes CO2e
+    price?: number;             // limit price if applicable
+    stopPrice?: number;         // trigger price for stop orders
+    displayQuantity?: number;   // visible quantity for iceberg
+    timeInForce: TimeInForce;
+    timestamp: Date;
+    status: OrderStatus;
+    filledQuantity: number;
+    remainingQuantity: number;
+    averagePrice: number;
+}
+
+type OrderType = 'market' | 'limit' | 'stop' | 'stop_limit' | 'iceberg';
+type TimeInForce = 'GTC' | 'IOC' | 'FOK' | 'GTD' | 'auction_only';
+type OrderStatus = 'pending' | 'active' | 'partial' | 'filled' | 'cancelled' | 'rejected';
+
+// Order Lifecycle Management
+class OrderManager {
+    private orders: Map&lt;string, TradeOrder&gt; = new Map();
+    private orderBook: OrderBook;
+
+    async submitOrder(order: TradeOrder): Promise&lt;OrderResult&gt; {
+        // Validate order parameters
+        const validation = this.validateOrder(order);
+        if (!validation.valid) {
+            return { status: 'rejected', reason: validation.reason };
+        }
+
+        // Pre-trade risk checks
+        const riskCheck = await this.riskEngine.checkOrder(order);
+        if (!riskCheck.approved) {
+            return { status: 'rejected', reason: riskCheck.reason };
+        }
+
+        // Submit to order book
+        order.status = 'active';
+        order.timestamp = new Date();
+        this.orders.set(order.orderId, order);
+
+        // Send to matching engine
+        const matchResult = await this.matchingEngine.processOrder(order);
+
+        return matchResult;
+    }
+}</code></pre>
+
+    <h2>Matching Engine Architecture</h2>
+
+    <p>The matching engine is responsible for pairing buy and sell orders according to price-time priority rules. Performance is critical, as matching latency directly impacts market fairness and efficiency.</p>
+
+    <div class="highlight">
+        <strong>Performance Target:</strong> WIA-CARBON_TRADING matching engine achieves sub-millisecond latency for order matching, processing over 100,000 orders per second during peak trading periods.
+    </div>
+
+    <h3>Price-Time Priority Algorithm</h3>
+
+    <p>The standard matching algorithm follows price-time priority: orders at the best price are matched first, with earlier orders at the same price taking precedence. This ensures fair and deterministic order execution.</p>
+
+    <pre><code>// Matching Engine Implementation
+class MatchingEngine {
+    private orderBooks: Map&lt;string, OrderBook&gt; = new Map();
+
+    processOrder(incomingOrder: TradeOrder): MatchResult {
+        const book = this.getOrderBook(incomingOrder.instrument);
+        const matches: Match[] = [];
+
+        if (incomingOrder.side === 'buy') {
+            return this.matchBuyOrder(incomingOrder, book, matches);
+        } else {
+            return this.matchSellOrder(incomingOrder, book, matches);
+        }
+    }
+
+    private matchBuyOrder(
+        buyOrder: TradeOrder,
+        book: OrderBook,
+        matches: Match[]
+    ): MatchResult {
+        let remainingQuantity = buyOrder.quantity;
+
+        // Iterate through sell orders at best prices
+        while (remainingQuantity > 0 && book.asks.length > 0) {
+            const bestAsk = book.asks[0];
+
+            // Check price compatibility
+            if (buyOrder.orderType === 'limit' && bestAsk.price > buyOrder.price) {
+                break; // No more matches possible
+            }
+
+            // Calculate match quantity
+            const matchQuantity = Math.min(remainingQuantity, bestAsk.remainingQuantity);
+
+            // Create match record
+            matches.push({
+                matchId: generateMatchId(),
+                buyOrderId: buyOrder.orderId,
+                sellOrderId: bestAsk.orderId,
+                quantity: matchQuantity,
+                price: bestAsk.price,
+                timestamp: new Date()
+            });
+
+            // Update quantities
+            remainingQuantity -= matchQuantity;
+            bestAsk.remainingQuantity -= matchQuantity;
+
+            // Remove filled orders
+            if (bestAsk.remainingQuantity === 0) {
+                book.asks.shift();
+                bestAsk.status = 'filled';
+            }
+        }
+
+        // Handle remaining quantity
+        if (remainingQuantity > 0) {
+            if (buyOrder.orderType === 'limit') {
+                buyOrder.remainingQuantity = remainingQuantity;
+                this.insertOrder(buyOrder, book.bids);
+            }
+        }
+
+        return {
+            status: matches.length > 0 ? 'matched' : 'pending',
+            matches,
+            remainingQuantity
+        };
+    }
+}</code></pre>
+
+    <h2>Settlement System</h2>
+
+    <p>Settlement is the process of transferring carbon credits from seller to buyer and funds from buyer to seller following a successful trade. WIA-CARBON_TRADING supports multiple settlement modes to accommodate different market requirements.</p>
+
+    <h3>Settlement Cycles</h3>
+
+    <table>
+        <tr>
+            <th>Settlement Mode</th>
+            <th>Timing</th>
+            <th>Use Case</th>
+        </tr>
+        <tr>
+            <td>T+0 (Same Day)</td>
+            <td>End of trading day</td>
+            <td>Spot market transactions</td>
+        </tr>
+        <tr>
+            <td>T+1</td>
+            <td>Next business day</td>
+            <td>Standard spot trades</td>
+        </tr>
+        <tr>
+            <td>T+2</td>
+            <td>Two business days</td>
+            <td>International transfers</td>
+        </tr>
+        <tr>
+            <td>Real-Time Gross</td>
+            <td>Immediate</td>
+            <td>Pre-funded accounts</td>
+        </tr>
+    </table>
+
+    <pre><code>// Settlement Engine
+class SettlementEngine {
+    private pendingSettlements: Settlement[] = [];
+    private registry: CarbonRegistry;
+    private paymentGateway: PaymentGateway;
+
+    async processSettlement(trade: Trade): Promise&lt;SettlementResult&gt; {
+        const settlement: Settlement = {
+            settlementId: generateSettlementId(),
+            tradeId: trade.tradeId,
+            buyer: trade.buyerParticipantId,
+            seller: trade.sellerParticipantId,
+            creditType: trade.instrument.creditType,
+            quantity: trade.quantity,
+            amount: trade.quantity * trade.price,
+            status: 'pending',
+            settlementDate: this.calculateSettlementDate(trade)
+        };
+
+        try {
+            // Step 1: Reserve credits in seller account
+            await this.registry.reserveCredits(
+                settlement.seller,
+                settlement.creditType,
+                settlement.quantity
+            );
+
+            // Step 2: Reserve funds in buyer account
+            await this.paymentGateway.reserveFunds(
+                settlement.buyer,
+                settlement.amount
+            );
+
+            // Step 3: Execute atomic transfer
+            await this.executeAtomicTransfer(settlement);
+
+            settlement.status = 'completed';
+            settlement.completedAt = new Date();
+
+            return { success: true, settlement };
+
+        } catch (error) {
+            // Rollback reservations
+            await this.rollbackSettlement(settlement);
+            settlement.status = 'failed';
+            settlement.failureReason = error.message;
+
+            return { success: false, settlement, error };
+        }
+    }
+
+    private async executeAtomicTransfer(settlement: Settlement): Promise&lt;void&gt; {
+        // Use distributed transaction for atomicity
+        const transaction = await this.beginTransaction();
+
+        try {
+            // Transfer credits
+            await this.registry.transferCredits(
+                settlement.seller,
+                settlement.buyer,
+                settlement.creditType,
+                settlement.quantity,
+                transaction
+            );
+
+            // Transfer funds
+            await this.paymentGateway.transferFunds(
+                settlement.buyer,
+                settlement.seller,
+                settlement.amount,
+                transaction
+            );
+
+            await transaction.commit();
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+    }
+}</code></pre>
+
+    <h2>Data Architecture</h2>
+
+    <p>The platform employs a multi-database architecture optimized for different data access patterns. Time-series data, transactional data, and reference data each have specialized storage solutions.</p>
+
+    <div class="highlight">
+        <strong>Data Integrity:</strong> All critical data is replicated across multiple availability zones with synchronous writes. Transaction logs enable point-in-time recovery and complete audit trail reconstruction.
+    </div>
+
+    <h3>Database Strategy</h3>
+
+    <pre><code>// Data Storage Configuration
+interface DataArchitecture {
+    // High-performance order book and matching
+    orderBookStore: {
+        type: 'in-memory',
+        technology: 'Redis Cluster',
+        replication: 'synchronous',
+        persistence: 'AOF'
+    };
+
+    // Transactional data
+    transactionStore: {
+        type: 'relational',
+        technology: 'PostgreSQL',
+        replication: 'streaming',
+        sharding: 'by_participant_id'
+    };
+
+    // Time-series market data
+    marketDataStore: {
+        type: 'time-series',
+        technology: 'TimescaleDB',
+        retention: '10_years',
+        compression: 'enabled'
+    };
+
+    // Document storage for reports
+    documentStore: {
+        type: 'document',
+        technology: 'MongoDB',
+        replication: 'replica_set'
+    };
+
+    // Event sourcing and audit
+    eventStore: {
+        type: 'event-log',
+        technology: 'Apache Kafka',
+        retention: 'indefinite',
+        partitions: 'by_instrument'
+    };
+}</code></pre>
+
+    <h2>Scalability and High Availability</h2>
+
+    <p>WIA-CARBON_TRADING is designed for horizontal scalability and high availability. The architecture supports geographic distribution for low-latency access from different regions while maintaining consistency.</p>
+
+    <h3>Deployment Architecture</h3>
+
+    <pre><code>// Kubernetes Deployment Configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matching-engine
+  namespace: carbon-trading
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: matching-engine
+  template:
+    metadata:
+      labels:
+        app: matching-engine
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - matching-engine
+            topologyKey: "topology.kubernetes.io/zone"
+      containers:
+      - name: matching-engine
+        image: wia/carbon-matching:v2.1.0
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "4"
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+        ports:
+        - containerPort: 8080
+        - containerPort: 9090  # metrics
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10</code></pre>
+
+    <p>This architectural foundation enables WIA-CARBON_TRADING to operate as a robust, scalable, and reliable carbon trading platform. The next chapter explores the specific trading instruments and mechanisms supported by this infrastructure.</p>
+</body>
+</html>

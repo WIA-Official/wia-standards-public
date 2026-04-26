@@ -106,9 +106,9 @@ WIA-ENE-034 표준은 다음을 목적으로 합니다:
 
 ### 3.2 가뭄 지수 기준
 
-- **선행 연구**: Standardized Precipitation Index (SPI)
+- **관련 분야 자료**: Standardized Precipitation Index (SPI)
 - **Palmer (1965)**: Palmer Drought Severity Index (PDSI)
-- **선행 연구**: SPEI
+- **관련 분야 자료**: SPEI
 - **Kogan (1995)**: Vegetation Health Index (VHI)
 
 ### 3.3 WIA 관련 표준

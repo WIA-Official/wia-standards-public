@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Eye Gaze Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Eye Gaze Tracking Standard</h1>
+        <p class="subtitle">Chapter 4: Protocol Specification</p>
+        <span class="version">Version 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>Chapter 4: Protocol Specification</h1>
+
+        <h2>4.1 Overview</h2>
+        <p>The WIA Eye Gaze standard supports multiple communication protocols optimized for different use cases: WebSocket for network communication, IPC for local ultra-low latency, and binary formats for high-frequency data transmission.</p>
+
+        <h2>4.2 WebSocket Protocol</h2>
+
+        <h3>Connection Establishment</h3>
+        <pre><code>// Client connects to WebSocket endpoint
+const ws = new WebSocket('ws://localhost:8080/stream');
+
+ws.onopen = () => {
+  // Send handshake
+  ws.send(JSON.stringify({
+    type: 'handshake',
+    version: '1.0.0',
+    clientId: 'aac-app-001',
+    capabilities: ['GAZE_POINT', 'EVENTS']
+  }));
+};</code></pre>
+
+        <h3>Server Handshake Response</h3>
+        <pre><code>{
+  "type": "handshake_ack",
+  "sessionId": "session_2025_001",
+  "protocolVersion": "1.0.0",
+  "serverCapabilities": [
+    "GAZE_POINT",
+    "BINOCULAR",
+    "EVENTS",
+    "BINARY_FORMAT"
+  ]
+}</code></pre>
+
+        <h3>Message Format</h3>
+        <p>All WebSocket messages follow this envelope format:</p>
+
+        <pre><code>{
+  "type": "message_type",     // Message type identifier
+  "timestamp": 1704067200000, // Server timestamp
+  "sequenceId": 12345,        // Sequence number
+  "data": { ... }             // Message payload
+}</code></pre>
+
+        <h3>Message Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Direction</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>handshake</td>
+                    <td>Client → Server</td>
+                    <td>Initial connection handshake</td>
+                </tr>
+                <tr>
+                    <td>handshake_ack</td>
+                    <td>Server → Client</td>
+                    <td>Handshake acknowledgment</td>
+                </tr>
+                <tr>
+                    <td>gaze_point</td>
+                    <td>Server → Client</td>
+                    <td>Single gaze data point</td>
+                </tr>
+                <tr>
+                    <td>gaze_batch</td>
+                    <td>Server → Client</td>
+                    <td>Multiple gaze points</td>
+                </tr>
+                <tr>
+                    <td>event</td>
+                    <td>Server → Client</td>
+                    <td>Gaze event notification</td>
+                </tr>
+                <tr>
+                    <td>command</td>
+                    <td>Client → Server</td>
+                    <td>Device control command</td>
+                </tr>
+                <tr>
+                    <td>heartbeat</td>
+                    <td>Bidirectional</td>
+                    <td>Keep-alive ping</td>
+                </tr>
+                <tr>
+                    <td>error</td>
+                    <td>Server → Client</td>
+                    <td>Error notification</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Heartbeat & Keep-Alive</h3>
+        <p>Clients must send heartbeat every 5 seconds:</p>
+
+        <pre><code>// Client heartbeat
+setInterval(() => {
+  ws.send(JSON.stringify({
+    type: 'heartbeat',
+    timestamp: Date.now()
+  }));
+}, 5000);
+
+// Server responds
+{
+  "type": "heartbeat_ack",
+  "timestamp": 1704067200000
+}</code></pre>
+
+        <div class="info-box warning">
+            <h4>Connection Timeout</h4>
+            <p>Server disconnects clients missing 3 consecutive heartbeats (15 seconds).</p>
+        </div>
+
+        <h2>4.3 Inter-Process Communication (IPC)</h2>
+        <p>For local applications requiring ultra-low latency (&lt;1ms), IPC provides direct shared memory access.</p>
+
+        <h3>Platform-Specific Transports</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Transport</th>
+                    <th>Path/Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Linux</td>
+                    <td>Unix Domain Socket</td>
+                    <td>/tmp/wia-eye-gaze.sock</td>
+                </tr>
+                <tr>
+                    <td>macOS</td>
+                    <td>Unix Domain Socket</td>
+                    <td>/tmp/wia-eye-gaze.sock</td>
+                </tr>
+                <tr>
+                    <td>Windows</td>
+                    <td>Named Pipe</td>
+                    <td>\\.\pipe\wia-eye-gaze</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>IPC Frame Structure</h3>
+        <pre><code>Frame Header (20 bytes):
+┌────────────────────────────────────────────────┐
+│ Magic (2)  │ Version(1) │ Type (1)  │ Flags(1)│
+│ 0x57 0x49  │ 0x01       │           │         │
+├────────────┴────────────┴───────────┴─────────┤
+│ Reserved (1)          │ Payload Length (2)    │
+├───────────────────────┴───────────────────────┤
+│ Timestamp (8 bytes) - microseconds            │
+├───────────────────────────────────────────────┤
+│ Sequence Number (4 bytes)                     │
+├───────────────────────────────────────────────┤
+│ Payload (variable)                            │
+└───────────────────────────────────────────────┘</code></pre>
+
+        <h3>IPC Message Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Code</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>GAZE_POINT</td>
+                    <td>0x01</td>
+                    <td>Single gaze point (21 bytes)</td>
+                </tr>
+                <tr>
+                    <td>GAZE_BATCH</td>
+                    <td>0x02</td>
+                    <td>Multiple gaze points</td>
+                </tr>
+                <tr>
+                    <td>GAZE_EVENT</td>
+                    <td>0x03</td>
+                    <td>Event notification</td>
+                </tr>
+                <tr>
+                    <td>CONTROL</td>
+                    <td>0x04</td>
+                    <td>Control command</td>
+                </tr>
+                <tr>
+                    <td>HANDSHAKE</td>
+                    <td>0x10</td>
+                    <td>Connection handshake</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Compact Binary GazePoint (21 bytes)</h3>
+        <pre><code>┌──────────────────────────────────────────────┐
+│ TimestampOffset(2) │ X(4)    │ Y(4)    │ Conf(2) │
+│ uint16 ms          │ float32 │ float32 │ uint16  │
+├────────────────────┴─────────┴─────────┴─────────┤
+│ Flags(1) │ LeftPupil(2) │ RightPupil(2)          │
+├──────────┴──────────────┴────────────────────────┤
+│ LeftOpen(1) │ RightOpen(1) │ FixationID(2)       │
+└─────────────┴──────────────┴─────────────────────┘
+
+Total: 21 bytes per sample</code></pre>
+
+        <h3>Performance Comparison</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Transport</th>
+                    <th>Latency (p50)</th>
+                    <th>Latency (p99)</th>
+                    <th>Throughput</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Shared Memory</td>
+                    <td>0.01ms</td>
+                    <td>0.05ms</td>
+                    <td>1M points/s</td>
+                </tr>
+                <tr>
+                    <td>Unix Socket</td>
+                    <td>0.3ms</td>
+                    <td>0.8ms</td>
+                    <td>100K msg/s</td>
+                </tr>
+                <tr>
+                    <td>Named Pipe</td>
+                    <td>0.4ms</td>
+                    <td>1.0ms</td>
+                    <td>80K msg/s</td>
+                </tr>
+                <tr>
+                    <td>WebSocket (local)</td>
+                    <td>2.0ms</td>
+                    <td>5.0ms</td>
+                    <td>20K msg/s</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.4 Binary Format Specification</h2>
+
+        <h3>When to Use Binary Format</h3>
+        <ul>
+            <li><strong>High Sampling Rates</strong>: 120Hz and above</li>
+            <li><strong>Bandwidth Constrained</strong>: Mobile or remote connections</li>
+            <li><strong>Storage</strong>: Long-term data recording</li>
+            <li><strong>Performance Critical</strong>: Real-time gaming or VR</li>
+        </ul>
+
+        <h3>Binary vs JSON Size</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Format</th>
+                    <th>Size per Point</th>
+                    <th>120Hz/second</th>
+                    <th>1 hour</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>JSON (pretty)</td>
+                    <td>~450 bytes</td>
+                    <td>54 KB</td>
+                    <td>194 MB</td>
+                </tr>
+                <tr>
+                    <td>JSON (compact)</td>
+                    <td>~180 bytes</td>
+                    <td>22 KB</td>
+                    <td>78 MB</td>
+                </tr>
+                <tr>
+                    <td>MessagePack</td>
+                    <td>~60 bytes</td>
+                    <td>7 KB</td>
+                    <td>26 MB</td>
+                </tr>
+                <tr>
+                    <td>WIA Binary</td>
+                    <td>21 bytes</td>
+                    <td>2.5 KB</td>
+                    <td>9 MB</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.5 Latency Requirements</h2>
+
+        <h3>End-to-End Latency Budget</h3>
+        <div class="info-box">
+            <h4>Latency Breakdown for AAC</h4>
+            <pre><code>Eye → Tracker Processing:     3-10ms
+Tracker → Computer Transfer:  1-3ms
+API Processing:               1-2ms
+Network/IPC:                  0.1-5ms
+Application Processing:       5-10ms
+Screen Rendering:            16ms (60Hz)
+─────────────────────────────────────
+Total AAC Latency:           26-46ms (acceptable)
+Gaming Target:               &lt;20ms total</code></pre>
+        </div>
+
+        <h3>Latency Optimization Techniques</h3>
+        <ul>
+            <li><strong>Use IPC</strong> for local applications instead of WebSocket</li>
+            <li><strong>Binary Format</strong> reduces serialization overhead</li>
+            <li><strong>Direct Rendering</strong> skip intermediate buffers</li>
+            <li><strong>Predictive Smoothing</strong> compensate for system latency</li>
+        </ul>
+
+        <h2>4.6 Data Quality & Error Handling</h2>
+
+        <h3>Quality Monitoring</h3>
+        <pre><code>{
+  "type": "quality_report",
+  "data": {
+    "timestamp": 1704067200000,
+    "trackingQuality": "good",
+    "dataLossRate": 0.02,      // 2% loss
+    "averageConfidence": 0.91,
+    "validSampleRate": 0.98,   // 98% valid
+    "recommendation": "continue"
+  }
+}</code></pre>
+
+        <h3>Quality States</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>State</th>
+                    <th>Confidence</th>
+                    <th>Valid Rate</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Excellent</td>
+                    <td>&gt; 0.9</td>
+                    <td>&gt; 95%</td>
+                    <td>Continue</td>
+                </tr>
+                <tr>
+                    <td>Good</td>
+                    <td>0.7 - 0.9</td>
+                    <td>85-95%</td>
+                    <td>Continue</td>
+                </tr>
+                <tr>
+                    <td>Fair</td>
+                    <td>0.5 - 0.7</td>
+                    <td>70-85%</td>
+                    <td>Monitor closely</td>
+                </tr>
+                <tr>
+                    <td>Poor</td>
+                    <td>&lt; 0.5</td>
+                    <td>&lt; 70%</td>
+                    <td>Recalibrate or adjust</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Error Recovery</h3>
+        <pre><code>// Automatic reconnection
+ws.onclose = (event) => {
+  if (!event.wasClean) {
+    console.log('Connection lost, reconnecting...');
+    setTimeout(() => {
+      reconnect();
+    }, Math.min(1000 * Math.pow(2, reconnectAttempts), 30000));
+  }
+};</code></pre>
+
+        <h2>4.7 Synchronization & Timestamping</h2>
+
+        <h3>Timestamp Types</h3>
+        <ul>
+            <li><strong>Device Timestamp</strong>: Hardware clock (microsecond precision)</li>
+            <li><strong>System Timestamp</strong>: OS clock (millisecond precision)</li>
+            <li><strong>Server Timestamp</strong>: API server clock</li>
+            <li><strong>Client Timestamp</strong>: Application receive time</li>
+        </ul>
+
+        <h3>Clock Synchronization</h3>
+        <pre><code>// NTP-style clock sync
+{
+  "type": "time_sync",
+  "clientSendTime": 1704067200000,
+  "serverReceiveTime": 1704067200002,
+  "serverSendTime": 1704067200003,
+  "clientReceiveTime": 1704067200005
+}
+
+// Calculate offset
+offset = ((serverReceiveTime - clientSendTime) +
+          (serverSendTime - clientReceiveTime)) / 2
+// Result: ~2ms offset</code></pre>
+
+        <h2>4.8 Bandwidth Optimization</h2>
+
+        <h3>Adaptive Sampling</h3>
+        <p>Dynamically adjust sampling rate based on gaze activity:</p>
+
+        <pre><code>{
+  "type": "config_update",
+  "adaptiveSampling": {
+    "enabled": true,
+    "fixationRate": 30,    // Hz during fixation
+    "saccadeRate": 120,    // Hz during saccade
+    "idleRate": 10         // Hz when no activity
+  }
+}</code></pre>
+
+        <h3>Delta Encoding</h3>
+        <p>Send only changes from previous sample:</p>
+
+        <pre><code>// Full sample
+{ "x": 0.5234, "y": 0.3891, "confidence": 0.95 }
+
+// Delta (only x changed)
+{ "dx": 0.0012 }  // 75% size reduction</code></pre>
+
+        <h3>Compression Support</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Compression</th>
+                    <th>Latency Impact</th>
+                    <th>CPU Usage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>None</td>
+                    <td>1.0x</td>
+                    <td>0ms</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>LZ4</td>
+                    <td>2-3x</td>
+                    <td>+0.5ms</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>Zstandard</td>
+                    <td>3-5x</td>
+                    <td>+1-2ms</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td>gzip</td>
+                    <td>4-6x</td>
+                    <td>+3-5ms</td>
+                    <td>High</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <h4>Compression Recommendation</h4>
+            <p>Use LZ4 for real-time AAC/gaming (best latency/compression tradeoff). Use Zstandard for data logging/recording.</p>
+        </div>
+
+        <h2>4.9 Security Considerations</h2>
+
+        <h3>TLS/SSL for WebSocket</h3>
+        <pre><code>// Secure WebSocket connection
+const ws = new WebSocket('wss://eye-tracker.local:8443/stream');
+
+// Certificate validation
+ws.addEventListener('error', (event) => {
+  if (event.message.includes('certificate')) {
+    console.error('Invalid server certificate');
+  }
+});</code></pre>
+
+        <h3>IPC Security</h3>
+        <ul>
+            <li><strong>File Permissions</strong>: Socket/pipe restricted to owner and group (0660)</li>
+            <li><strong>Process Validation</strong>: Verify connecting process identity</li>
+            <li><strong>Message Authentication</strong>: HMAC signatures for sensitive commands</li>
+        </ul>
+
+        <h3>Authentication</h3>
+        <pre><code>// Token-based authentication
+{
+  "type": "handshake",
+  "clientId": "aac-app-001",
+  "authToken": "eyJhbGciOiJIUzI1NiIs...",
+  "capabilities": ["GAZE_POINT"]
+}</code></pre>
+
+        </main>
+</body>
+</html>

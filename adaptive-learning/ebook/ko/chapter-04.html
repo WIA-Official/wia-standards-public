@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 콘텐츠 적응 | WIA-ADAPTIVE_LEARNING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>4장: 콘텐츠 적응</h1>
+
+    <h2>4.1 콘텐츠 적응의 목표</h2>
+    <p>콘텐츠 적응은 학습자에게 최적의 학습 자료를 적시에 제공하는 것을 목표로 합니다. 이는 학습자의 현재 지식 상태, 학습 목표, 선호하는 학습 방식을 고려하여 콘텐츠를 선택하고 제시합니다.</p>
+
+    <div class="highlight">
+        <strong>최적 난이도 원칙:</strong> 비고츠키의 근접발달영역(ZPD) 이론에 따르면, 학습은 학습자가 혼자서는 할 수 없지만 지원을 받으면 할 수 있는 영역에서 가장 효과적으로 일어납니다. 적응형 시스템은 각 학습자의 ZPD 내에 있는 콘텐츠를 제공합니다.
+    </div>
+
+    <h2>4.2 난이도 조절</h2>
+    <pre><code>// 동적 난이도 조절 시스템
+class DifficultyAdapter {
+    private targetSuccessRate = 0.7;  // 최적 성공률 70%
+    private windowSize = 10;          // 최근 10개 문제 기준
+
+    adjustDifficulty(learner: LearnerModel, concept: Concept): DifficultyLevel {
+        const recentPerformance = this.getRecentPerformance(learner, concept);
+        const successRate = recentPerformance.correct / recentPerformance.total;
+
+        if (successRate > 0.85) {
+            // 너무 쉬움 - 난이도 상향
+            return this.increaseDifficulty(learner.currentDifficulty);
+        } else if (successRate < 0.55) {
+            // 너무 어려움 - 난이도 하향
+            return this.decreaseDifficulty(learner.currentDifficulty);
+        } else {
+            // 최적 영역 - 유지
+            return learner.currentDifficulty;
+        }
+    }
+
+    // 점진적 난이도 조절
+    private increaseDifficulty(current: DifficultyLevel): DifficultyLevel {
+        const levels = ['beginner', 'elementary', 'intermediate', 'advanced', 'expert'];
+        const currentIndex = levels.indexOf(current);
+        return levels[Math.min(currentIndex + 1, levels.length - 1)] as DifficultyLevel;
+    }
+}</code></pre>
+
+    <h2>4.3 학습 경로 최적화</h2>
+    <p>학습 경로는 학습자가 목표에 도달하기 위해 거쳐야 하는 콘텐츠의 순서입니다:</p>
+
+    <h3>4.3.1 경로 계획 알고리즘</h3>
+    <pre><code>// 학습 경로 최적화
+class LearningPathOptimizer {
+    // 지식 그래프 기반 경로 생성
+    generatePath(
+        learner: LearnerModel,
+        targetConcepts: Concept[],
+        domainGraph: ConceptGraph
+    ): LearningPath {
+        // 1. 현재 숙달 상태 분석
+        const masteredConcepts = this.getMasteredConcepts(learner);
+
+        // 2. 필요한 선수 개념 식별
+        const prerequisites = this.findAllPrerequisites(targetConcepts, domainGraph);
+
+        // 3. 아직 미숙달인 개념 필터링
+        const toLearn = prerequisites.filter(c => !masteredConcepts.includes(c));
+
+        // 4. 위상 정렬로 학습 순서 결정
+        const orderedConcepts = this.topologicalSort(toLearn, domainGraph);
+
+        // 5. 각 개념에 대한 학습 활동 할당
+        const activities = orderedConcepts.map(c =>
+            this.selectActivities(c, learner)
+        );
+
+        return {
+            concepts: orderedConcepts,
+            activities: activities.flat(),
+            estimatedDuration: this.estimateDuration(activities),
+            checkpoints: this.insertCheckpoints(orderedConcepts)
+        };
+    }
+
+    // 경로 동적 조정
+    adaptPath(currentPath: LearningPath, event: LearningEvent): LearningPath {
+        if (event.type === 'mastery_achieved') {
+            // 이미 숙달한 개념 스킵
+            return this.skipMastered(currentPath, event.conceptId);
+        } else if (event.type === 'struggle_detected') {
+            // 추가 지원 삽입
+            return this.insertRemediation(currentPath, event.conceptId);
+        }
+        return currentPath;
+    }
+}</code></pre>
+
+    <h2>4.4 다중 표현 방식</h2>
+    <p>동일한 개념을 다양한 형태로 제시하여 학습 효과를 높입니다:</p>
+
+    <table>
+        <tr>
+            <th>표현 방식</th>
+            <th>적합한 학습자</th>
+            <th>예시</th>
+        </tr>
+        <tr>
+            <td>텍스트</td>
+            <td>읽기/쓰기 선호</td>
+            <td>설명문, 정의, 예제</td>
+        </tr>
+        <tr>
+            <td>비주얼</td>
+            <td>시각 학습자</td>
+            <td>다이어그램, 차트, 인포그래픽</td>
+        </tr>
+        <tr>
+            <td>비디오</td>
+            <td>시청각 학습자</td>
+            <td>강의 영상, 애니메이션</td>
+        </tr>
+        <tr>
+            <td>인터랙티브</td>
+            <td>운동감각 학습자</td>
+            <td>시뮬레이션, 드래그앤드롭</td>
+        </tr>
+        <tr>
+            <td>오디오</td>
+            <td>청각 학습자</td>
+            <td>팟캐스트, 오디오북</td>
+        </tr>
+    </table>
+
+    <pre><code>// 콘텐츠 형식 선택
+class ContentFormatSelector {
+    selectFormat(learner: LearnerModel, concept: Concept): ContentFormat {
+        const style = learner.characteristics.learningStyle;
+        const availability = concept.availableFormats;
+
+        // 1순위: 학습자 선호 형식
+        const preferred = this.getPreferredFormat(style);
+        if (availability.includes(preferred)) {
+            return preferred;
+        }
+
+        // 2순위: 개념에 최적화된 형식
+        const conceptOptimal = this.getOptimalForConcept(concept);
+        if (availability.includes(conceptOptimal)) {
+            return conceptOptimal;
+        }
+
+        // 기본값
+        return availability[0];
+    }
+}</code></pre>
+
+    <h2>4.5 스캐폴딩</h2>
+    <p>스캐폴딩은 학습자가 과제를 완수할 수 있도록 단계적 지원을 제공합니다:</p>
+
+    <pre><code>// 스캐폴딩 시스템
+interface ScaffoldingLevel {
+    level: 'full' | 'moderate' | 'minimal' | 'none';
+    supports: ScaffoldingSupport[];
+}
+
+class ScaffoldingManager {
+    // 학습자 상태에 따른 스캐폴딩 레벨 결정
+    determineLevel(learner: LearnerModel, task: Task): ScaffoldingLevel {
+        const mastery = learner.knowledge.concepts.get(task.conceptId);
+        const recentStruggles = this.countRecentStruggles(learner, task);
+
+        if (mastery < 0.3 || recentStruggles > 3) {
+            return {
+                level: 'full',
+                supports: ['worked-example', 'step-hints', 'formula-sheet', 'glossary']
+            };
+        } else if (mastery < 0.6) {
+            return {
+                level: 'moderate',
+                supports: ['hints-on-demand', 'partial-solution']
+            };
+        } else if (mastery < 0.85) {
+            return {
+                level: 'minimal',
+                supports: ['hints-on-demand']
+            };
+        } else {
+            return { level: 'none', supports: [] };
+        }
+    }
+
+    // 점진적 페이딩
+    fadeScaffolding(learner: LearnerModel, currentLevel: ScaffoldingLevel): ScaffoldingLevel {
+        const performance = this.getRecentPerformance(learner);
+
+        if (performance.successRate > 0.8 && performance.hintsUsed < 2) {
+            // 성공적이면 지원 축소
+            return this.reduceLevel(currentLevel);
+        }
+        return currentLevel;
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>페이딩 원칙:</strong> 스캐폴딩은 영구적이어서는 안 됩니다. 학습자가 역량을 갖추면 점진적으로 지원을 줄여 자립적 학습을 촉진해야 합니다.
+    </div>
+
+    <h2>4.6 피드백 적응</h2>
+    <pre><code>// 적응형 피드백 생성
+class AdaptiveFeedback {
+    generate(response: LearnerResponse, learner: LearnerModel): Feedback {
+        const isCorrect = response.correct;
+        const confidence = learner.affective.confidence;
+        const attempts = response.attemptCount;
+
+        if (isCorrect) {
+            return this.generatePositiveFeedback(confidence, attempts);
+        } else {
+            return this.generateCorrectiveFeedback(response, learner, attempts);
+        }
+    }
+
+    private generateCorrectiveFeedback(
+        response: LearnerResponse,
+        learner: LearnerModel,
+        attempts: number
+    ): Feedback {
+        // 오답 분석
+        const errorType = this.analyzeError(response);
+
+        // 시도 횟수에 따른 힌트 수준
+        let hintLevel: HintLevel;
+        if (attempts === 1) {
+            hintLevel = 'general';  // 일반적 방향 제시
+        } else if (attempts === 2) {
+            hintLevel = 'specific'; // 구체적 힌트
+        } else {
+            hintLevel = 'step-by-step'; // 단계별 안내
+        }
+
+        return {
+            message: this.craftMessage(errorType, hintLevel),
+            hint: this.getHint(response.problemId, hintLevel),
+            encouragement: learner.affective.frustration > 0.6
+                ? this.getEncouragement()
+                : null
+        };
+    }
+}</code></pre>
+
+    <h2>4.7 간격 반복</h2>
+    <p>최적의 시점에 복습을 제공하여 장기 기억을 강화합니다:</p>
+
+    <pre><code>// 간격 반복 스케줄러
+class SpacedRepetitionScheduler {
+    // SM-2 알고리즘 기반
+    scheduleReview(item: LearningItem, performance: ReviewPerformance): ReviewSchedule {
+        let { easeFactor, interval, repetitions } = item.schedule;
+
+        if (performance.quality >= 3) {
+            // 성공적인 복습
+            if (repetitions === 0) {
+                interval = 1;
+            } else if (repetitions === 1) {
+                interval = 6;
+            } else {
+                interval = Math.round(interval * easeFactor);
+            }
+            repetitions++;
+        } else {
+            // 실패 - 처음부터
+            repetitions = 0;
+            interval = 1;
+        }
+
+        // 용이도 계수 조정
+        easeFactor = Math.max(1.3,
+            easeFactor + (0.1 - (5 - performance.quality) * (0.08 + (5 - performance.quality) * 0.02))
+        );
+
+        return {
+            nextReview: this.addDays(new Date(), interval),
+            interval,
+            easeFactor,
+            repetitions
+        };
+    }
+}</code></pre>
+</body>
+</html>

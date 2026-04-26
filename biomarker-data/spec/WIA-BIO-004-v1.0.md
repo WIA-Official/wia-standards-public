@@ -864,7 +864,6 @@ De-identification methods:
 ### 10.1 Scientific Literature
 
 1. Pepe, M.S. (2003). "The Statistical Evaluation of Medical Tests for Classification and Prediction"
-2. 선행 연구. "Statistical Methods in Diagnostic Medicine"
 3. Zweig, M.H. & Campbell, G. (1993). "ROC plots: a fundamental evaluation tool in clinical medicine"
 4. DeLong, E.R. et al. (1988). "Comparing the areas under two or more correlated ROC curves"
 5. FDA-NIH BEST (2016). "Biomarkers, EndpointS, and other Tools"

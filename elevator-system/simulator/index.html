@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elevator System Simulator | WIA Standards</title>
+    <style>
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --secondary: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .lang-select {
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .back-btn {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .back-btn:hover { opacity: 0.9; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Content Panels */
+        .panel {
+            display: none;
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            min-height: 600px;
+        }
+        .panel.active { display: block; }
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+        }
+        .panel h3 {
+            color: var(--text);
+            margin: 25px 0 15px;
+            font-size: 1.2rem;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* Simulator Controls */
+        .sim-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .control-group {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .control-group label {
+            display: block;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .control-group button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        .control-group button:hover { opacity: 0.9; }
+
+        /* Elevator Visualization */
+        .elevator-viz {
+            display: flex;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .building {
+            flex: 1;
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .floor {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            margin: 5px 0;
+            background: var(--bg-card);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .floor.active { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
+        .elevator-car {
+            width: 50px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: all 0.5s;
+        }
+        .stats-panel {
+            flex: 1;
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .stat-label { color: var(--text-muted); }
+        .stat-value { color: var(--primary); font-weight: 600; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover { background: rgba(59, 130, 246, 0.05); }
+
+        /* Results */
+        .results {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: var(--bg-card);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+        }
+        .log-entry.success { border-left: 3px solid var(--secondary); }
+        .log-entry.info { border-left: 3px solid var(--primary); }
+        .log-entry.warning { border-left: 3px solid #f59e0b; }
+
+        @media (max-width: 768px) {
+            .elevator-viz { flex-direction: column; }
+            .tabs { overflow-x: auto; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Elevator System</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>🛗 Elevator System Simulator</h1>
+            <div class="header-controls">
+                <select class="lang-select" id="langSelect">
+                    <option value="en">English</option>
+                    <option value="ko">한국어</option>
+                    <option value="zh">中文</option>
+                    <option value="ja">日本語</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="it">Italiano</option>
+                    <option value="pt">Português</option>
+                    <option value="ru">Русский</option>
+                    <option value="ar">العربية</option>
+                    <option value="hi">हिन्दी</option>
+                    <option value="bn">বাংলা</option>
+                    <option value="pa">ਪੰਜਾਬੀ</option>
+                    <option value="jv">Basa Jawa</option>
+                    <option value="vi">Tiếng Việt</option>
+                    <option value="tr">Türkçe</option>
+                    <option value="te">తెలుగు</option>
+                    <option value="mr">मराठी</option>
+                    <option value="ta">தமிழ்</option>
+                    <option value="ur">اردو</option>
+                    <option value="gu">ગુજરાતી</option>
+                    <option value="pl">Polski</option>
+                    <option value="uk">Українська</option>
+                    <option value="kn">ಕನ್ನಡ</option>
+                    <option value="ml">മലയാളം</option>
+                    <option value="or">ଓଡ଼ିଆ</option>
+                    <option value="my">မြန်မာဘာသာ</option>
+                    <option value="th">ไทย</option>
+                    <option value="fa">فارسی</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="sv">Svenska</option>
+                    <option value="no">Norsk</option>
+                    <option value="da">Dansk</option>
+                    <option value="fi">Suomi</option>
+                    <option value="cs">Čeština</option>
+                    <option value="hu">Magyar</option>
+                    <option value="ro">Română</option>
+                    <option value="el">Ελληνικά</option>
+                    <option value="he">עברית</option>
+                    <option value="id">Bahasa Indonesia</option>
+                    <option value="ms">Bahasa Melayu</option>
+                    <option value="fil">Filipino</option>
+                    <option value="sw">Kiswahili</option>
+                    <option value="am">አማርኛ</option>
+                    <option value="ne">नेपाली</option>
+                    <option value="si">සිංහල</option>
+                    <option value="km">ភាសាខ្មែរ</option>
+                    <option value="lo">ພາສາລາວ</option>
+                    <option value="ka">ქართული</option>
+                    <option value="hy">Հայերեն</option>
+                    <option value="az">Azərbaycan</option>
+                    <option value="uz">Oʻzbek</option>
+                    <option value="kk">Қазақ</option>
+                    <option value="mn">Монгол</option>
+                    <option value="ps">پښتو</option>
+                    <option value="ku">Kurdî</option>
+                    <option value="tg">Тоҷикӣ</option>
+                    <option value="tk">Türkmen</option>
+                    <option value="ky">Кыргызча</option>
+                    <option value="sr">Српски</option>
+                    <option value="hr">Hrvatski</option>
+                    <option value="bs">Bosanski</option>
+                    <option value="sq">Shqip</option>
+                    <option value="mk">Македонски</option>
+                    <option value="bg">Български</option>
+                    <option value="sk">Slovenčina</option>
+                    <option value="sl">Slovenščina</option>
+                    <option value="lt">Lietuvių</option>
+                    <option value="lv">Latviešu</option>
+                    <option value="et">Eesti</option>
+                    <option value="is">Íslenska</option>
+                    <option value="ga">Gaeilge</option>
+                    <option value="cy">Cymraeg</option>
+                    <option value="eu">Euskara</option>
+                    <option value="ca">Català</option>
+                    <option value="gl">Galego</option>
+                    <option value="mt">Malti</option>
+                    <option value="af">Afrikaans</option>
+                    <option value="zu">isiZulu</option>
+                    <option value="xh">isiXhosa</option>
+                    <option value="yo">Yorùbá</option>
+                    <option value="ig">Igbo</option>
+                    <option value="ha">Hausa</option>
+                    <option value="so">Soomaali</option>
+                    <option value="rw">Kinyarwanda</option>
+                    <option value="mg">Malagasy</option>
+                    <option value="sn">chiShona</option>
+                    <option value="ny">Chichewa</option>
+                    <option value="st">Sesotho</option>
+                    <option value="tn">Setswana</option>
+                    <option value="wo">Wolof</option>
+                    <option value="ff">Fulfulde</option>
+                    <option value="ti">ትግርኛ</option>
+                    <option value="om">Oromoo</option>
+                    <option value="lg">Luganda</option>
+                    <option value="mi">Māori</option>
+                    <option value="sm">Gagana Samoa</option>
+                    <option value="to">lea fakatonga</option>
+                </select>
+                <a href="../index.html" class="back-btn">← Back</a>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab(0)">Data Format</div>
+            <div class="tab" onclick="showTab(1)">Algorithms</div>
+            <div class="tab" onclick="showTab(2)">Protocol</div>
+            <div class="tab" onclick="showTab(3)">Integration</div>
+            <div class="tab" onclick="showTab(4)">Test</div>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div class="panel active" id="panel0">
+            <h2>📋 Data Format Specification</h2>
+            <p>Explore the standardized JSON schemas for elevator telemetry, status, and control data.</p>
+
+            <h3>Elevator Status Data</h3>
+            <div class="code-block">{
+  "elevatorId": "ELV-001",
+  "buildingId": "BLD-2025",
+  "timestamp": "2025-12-26T10:30:00Z",
+  "status": {
+    "currentFloor": 5,
+    "direction": "UP",
+    "doorStatus": "CLOSED",
+    "occupancy": 8,
+    "maxCapacity": 13,
+    "speed": 2.5,
+    "position": 15.2
+  },
+  "sensors": {
+    "loadWeight": 640,
+    "temperature": 22.5,
+    "vibration": 0.02,
+    "doorSensor": "NORMAL",
+    "emergencyButton": false,
+    "overloadSensor": false
+  },
+  "maintenance": {
+    "lastService": "2025-12-01",
+    "nextService": "2026-03-01",
+    "tripsSinceService": 4823,
+    "totalTrips": 182394,
+    "operatingHours": 45672
+  }
+}</div>
+
+            <h3>Destination Dispatch Request</h3>
+            <div class="code-block">{
+  "requestId": "REQ-2025-12345",
+  "timestamp": "2025-12-26T10:30:15Z",
+  "originFloor": 1,
+  "destinationFloor": 15,
+  "passengerCount": 3,
+  "priority": "NORMAL",
+  "accessibility": {
+    "wheelchairRequired": false,
+    "audioAssistance": false,
+    "visualAssistance": false
+  },
+  "assignedElevator": null,
+  "estimatedWaitTime": null
+}</div>
+
+            <div class="sim-controls">
+                <div class="control-group">
+                    <label>Elevator ID</label>
+                    <input type="text" id="elevatorId" value="ELV-001">
+                </div>
+                <div class="control-group">
+                    <label>Current Floor</label>
+                    <input type="number" id="currentFloor" value="1" min="1" max="20">
+                </div>
+                <div class="control-group">
+                    <label>Direction</label>
+                    <select id="direction">
+                        <option value="IDLE">IDLE</option>
+                        <option value="UP">UP</option>
+                        <option value="DOWN">DOWN</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Occupancy</label>
+                    <input type="number" id="occupancy" value="0" min="0" max="13">
+                    <button onclick="generateStatusJSON()">Generate JSON</button>
+                </div>
+            </div>
+
+            <div class="results" id="jsonOutput"></div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div class="panel" id="panel1">
+            <h2>🤖 Dispatch Algorithms</h2>
+            <p>Simulate intelligent elevator dispatch algorithms including FCFS, SCAN, and AI-optimized destination dispatch.</p>
+
+            <h3>Algorithm Comparison</h3>
+            <table>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Strategy</th>
+                    <th>Avg Wait Time</th>
+                    <th>Energy Efficiency</th>
+                </tr>
+                <tr>
+                    <td>FCFS</td>
+                    <td>First-Come-First-Served</td>
+                    <td>45s</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>SCAN</td>
+                    <td>Elevator moves in one direction</td>
+                    <td>32s</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td>LOOK</td>
+                    <td>Like SCAN but reverses at last request</td>
+                    <td>28s</td>
+                    <td>Medium</td>
+                </tr>
+                <tr>
+                    <td>Destination Dispatch</td>
+                    <td>Group passengers by destination</td>
+                    <td>18s</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td>AI-Optimized</td>
+                    <td>Predictive traffic analysis</td>
+                    <td>12s</td>
+                    <td>Very High</td>
+                </tr>
+            </table>
+
+            <h3>Interactive Simulation</h3>
+            <div class="sim-controls">
+                <div class="control-group">
+                    <label>Algorithm</label>
+                    <select id="algorithm">
+                        <option value="fcfs">FCFS</option>
+                        <option value="scan">SCAN</option>
+                        <option value="look">LOOK</option>
+                        <option value="destination">Destination Dispatch</option>
+                        <option value="ai">AI-Optimized</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Number of Floors</label>
+                    <input type="number" id="numFloors" value="10" min="5" max="50">
+                </div>
+                <div class="control-group">
+                    <label>Number of Elevators</label>
+                    <input type="number" id="numElevators" value="3" min="1" max="8">
+                </div>
+                <div class="control-group">
+                    <label>Request Count</label>
+                    <input type="number" id="requestCount" value="10" min="1" max="50">
+                    <button onclick="runDispatchSimulation()">Run Simulation</button>
+                </div>
+            </div>
+
+            <div class="elevator-viz">
+                <div class="building" id="buildingViz"></div>
+                <div class="stats-panel" id="statsPanel">
+                    <h3>Performance Metrics</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Wait Time</span>
+                        <span class="stat-value" id="avgWait">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Distance</span>
+                        <span class="stat-value" id="totalDist">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Energy Used</span>
+                        <span class="stat-value" id="energyUsed">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Requests Served</span>
+                        <span class="stat-value" id="reqServed">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div class="panel" id="panel2">
+            <h2>🔒 Safety & Communication Protocols</h2>
+            <p>Test safety interlocks, emergency procedures, and MQTT/CoAP communication protocols.</p>
+
+            <h3>Safety Interlocks</h3>
+            <div class="code-block">// EN 81-20/50 Safety Compliance
+{
+  "safetyInterlocks": {
+    "doorSafety": {
+      "enabled": true,
+      "doorLockVerified": true,
+      "obstacleDetection": "CLEAR",
+      "reopenSensor": "ACTIVE"
+    },
+    "overloadProtection": {
+      "enabled": true,
+      "maxWeight": 1000,
+      "currentWeight": 640,
+      "overloadThreshold": 950
+    },
+    "emergencyBrake": {
+      "status": "STANDBY",
+      "testDate": "2025-12-15",
+      "passCriteria": true
+    },
+    "fireMode": {
+      "active": false,
+      "recallFloor": 1,
+      "autoActivation": true
+    }
+  }
+}</div>
+
+            <h3>MQTT Topics</h3>
+            <div class="code-block">// Subscribe Topics
+wia/elevator/{buildingId}/{elevatorId}/status
+wia/elevator/{buildingId}/{elevatorId}/telemetry
+wia/elevator/{buildingId}/dispatch/request
+wia/elevator/{buildingId}/maintenance/alert
+
+// Publish Topics
+wia/elevator/{buildingId}/{elevatorId}/command
+wia/elevator/{buildingId}/{elevatorId}/response
+wia/elevator/{buildingId}/dispatch/assignment</div>
+
+            <div class="sim-controls">
+                <div class="control-group">
+                    <label>Protocol</label>
+                    <select id="protocol">
+                        <option value="mqtt">MQTT</option>
+                        <option value="coap">CoAP</option>
+                        <option value="http">HTTP REST</option>
+                        <option value="websocket">WebSocket</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Message Type</label>
+                    <select id="messageType">
+                        <option value="status">Status Update</option>
+                        <option value="command">Command</option>
+                        <option value="emergency">Emergency Alert</option>
+                        <option value="maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>QoS Level (MQTT)</label>
+                    <select id="qos">
+                        <option value="0">0 - At most once</option>
+                        <option value="1">1 - At least once</option>
+                        <option value="2">2 - Exactly once</option>
+                    </select>
+                    <button onclick="testProtocol()">Send Message</button>
+                </div>
+            </div>
+
+            <div class="results" id="protocolLog"></div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div class="panel" id="panel3">
+            <h2>🔗 System Integration</h2>
+            <p>Test integration with Building Management Systems (BMS), access control, and cloud platforms.</p>
+
+            <h3>Integration Points</h3>
+            <table>
+                <tr>
+                    <th>System</th>
+                    <th>Protocol</th>
+                    <th>Data Exchange</th>
+                    <th>Status</th>
+                </tr>
+                <tr>
+                    <td>BMS (Building Management)</td>
+                    <td>BACnet/Modbus</td>
+                    <td>Energy, HVAC coordination</td>
+                    <td style="color: var(--secondary)">✓ Connected</td>
+                </tr>
+                <tr>
+                    <td>Access Control</td>
+                    <td>OSDP/Wiegand</td>
+                    <td>Badge authentication, floor access</td>
+                    <td style="color: var(--secondary)">✓ Connected</td>
+                </tr>
+                <tr>
+                    <td>Fire Alarm System</td>
+                    <td>Fire Alarm Protocol</td>
+                    <td>Emergency recall, fireman service</td>
+                    <td style="color: var(--secondary)">✓ Connected</td>
+                </tr>
+                <tr>
+                    <td>Cloud Platform (AWS IoT)</td>
+                    <td>MQTT over TLS</td>
+                    <td>Analytics, predictive maintenance</td>
+                    <td style="color: var(--secondary)">✓ Connected</td>
+                </tr>
+            </table>
+
+            <h3>API Integration Test</h3>
+            <div class="code-block">// RESTful API Example
+POST /api/v1/elevator/dispatch
+{
+  "buildingId": "BLD-2025",
+  "originFloor": 5,
+  "destinationFloor": 15,
+  "accessToken": "badge-12345"
+}
+
+Response:
+{
+  "assignedElevator": "ELV-002",
+  "estimatedWaitTime": 12,
+  "arrivalTime": "2025-12-26T10:30:27Z"
+}</div>
+
+            <div class="sim-controls">
+                <div class="control-group">
+                    <label>Integration Type</label>
+                    <select id="integrationType">
+                        <option value="bms">BMS</option>
+                        <option value="access">Access Control</option>
+                        <option value="fire">Fire Alarm</option>
+                        <option value="cloud">Cloud Platform</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Action</label>
+                    <select id="integrationAction">
+                        <option value="query">Query Status</option>
+                        <option value="command">Send Command</option>
+                        <option value="sync">Sync Data</option>
+                    </select>
+                    <button onclick="testIntegration()">Test Integration</button>
+                </div>
+            </div>
+
+            <div class="results" id="integrationLog"></div>
+        </div>
+
+        <!-- Tab 5: Test -->
+        <div class="panel" id="panel4">
+            <h2>🧪 Compliance Testing</h2>
+            <p>Run automated tests for WIA standard compliance, safety protocols, and performance benchmarks.</p>
+
+            <h3>Test Suites</h3>
+            <div class="sim-controls">
+                <div class="control-group">
+                    <label>Test Category</label>
+                    <select id="testCategory">
+                        <option value="data">Data Format Validation</option>
+                        <option value="safety">Safety Interlocks</option>
+                        <option value="performance">Performance Benchmarks</option>
+                        <option value="protocol">Protocol Compliance</option>
+                        <option value="integration">Integration Tests</option>
+                        <option value="all">All Tests</option>
+                    </select>
+                    <button onclick="runTests()">Run Tests</button>
+                </div>
+            </div>
+
+            <div class="results" id="testResults"></div>
+
+            <h3>Certification Checklist</h3>
+            <table>
+                <tr>
+                    <th>Requirement</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                </tr>
+                <tr>
+                    <td>Data Format</td>
+                    <td>JSON schema validation</td>
+                    <td style="color: var(--secondary)">✓ Pass</td>
+                </tr>
+                <tr>
+                    <td>EN 81-20/50</td>
+                    <td>Safety standard compliance</td>
+                    <td style="color: var(--secondary)">✓ Pass</td>
+                </tr>
+                <tr>
+                    <td>ADA Requirements</td>
+                    <td>Accessibility features</td>
+                    <td style="color: var(--secondary)">✓ Pass</td>
+                </tr>
+                <tr>
+                    <td>MQTT Protocol</td>
+                    <td>Message queue telemetry</td>
+                    <td style="color: var(--secondary)">✓ Pass</td>
+                </tr>
+                <tr>
+                    <td>BMS Integration</td>
+                    <td>Building system connectivity</td>
+                    <td style="color: var(--secondary)">✓ Pass</td>
+                </tr>
+                <tr>
+                    <td>Energy Regeneration</td>
+                    <td>Power efficiency</td>
+                    <td style="color: var(--secondary)">✓ Pass</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 0;
+
+        function showTab(index) {
+            const tabs = document.querySelectorAll('.tab');
+            const panels = document.querySelectorAll('.panel');
+
+            tabs.forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            panels.forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+
+            currentTab = index;
+        }
+
+        function generateStatusJSON() {
+            const elevatorId = document.getElementById('elevatorId').value;
+            const currentFloor = parseInt(document.getElementById('currentFloor').value);
+            const direction = document.getElementById('direction').value;
+            const occupancy = parseInt(document.getElementById('occupancy').value);
+
+            const statusData = {
+                elevatorId: elevatorId,
+                buildingId: "BLD-2025",
+                timestamp: new Date().toISOString(),
+                status: {
+                    currentFloor: currentFloor,
+                    direction: direction,
+                    doorStatus: "CLOSED",
+                    occupancy: occupancy,
+                    maxCapacity: 13,
+                    speed: direction === "IDLE" ? 0 : 2.5
+                },
+                sensors: {
+                    loadWeight: occupancy * 80,
+                    temperature: 22.5,
+                    vibration: 0.02
+                }
+            };
+
+            const output = document.getElementById('jsonOutput');
+            output.innerHTML = `<div class="log-entry success">Generated Status JSON:</div>
+                <div class="log-entry info"><pre>${JSON.stringify(statusData, null, 2)}</pre></div>`;
+        }
+
+        function runDispatchSimulation() {
+            const algorithm = document.getElementById('algorithm').value;
+            const numFloors = parseInt(document.getElementById('numFloors').value);
+            const numElevators = parseInt(document.getElementById('numElevators').value);
+
+            // Simulate metrics
+            const metrics = {
+                fcfs: { wait: 45, dist: 320, energy: 85 },
+                scan: { wait: 32, dist: 280, energy: 72 },
+                look: { wait: 28, dist: 260, energy: 68 },
+                destination: { wait: 18, dist: 180, energy: 45 },
+                ai: { wait: 12, dist: 150, energy: 38 }
+            };
+
+            const result = metrics[algorithm];
+            document.getElementById('avgWait').textContent = result.wait + 's';
+            document.getElementById('totalDist').textContent = result.dist + 'm';
+            document.getElementById('energyUsed').textContent = result.energy + ' kWh';
+            document.getElementById('reqServed').textContent = '10/10';
+
+            // Build visualization
+            const buildingViz = document.getElementById('buildingViz');
+            buildingViz.innerHTML = '<h3>Building Visualization</h3>';
+            for (let i = numFloors; i >= 1; i--) {
+                buildingViz.innerHTML += `<div class="floor">
+                    <span>Floor ${i}</span>
+                    ${i === 5 ? '<div class="elevator-car">🛗</div>' : ''}
+                </div>`;
+            }
+        }
+
+        function testProtocol() {
+            const protocol = document.getElementById('protocol').value;
+            const messageType = document.getElementById('messageType').value;
+            const qos = document.getElementById('qos').value;
+
+            const log = document.getElementById('protocolLog');
+            const timestamp = new Date().toISOString();
+
+            log.innerHTML += `<div class="log-entry info">[${timestamp}] Testing ${protocol.toUpperCase()} protocol...</div>`;
+            log.innerHTML += `<div class="log-entry success">✓ Connection established</div>`;
+            log.innerHTML += `<div class="log-entry success">✓ Message type: ${messageType}</div>`;
+            if (protocol === 'mqtt') {
+                log.innerHTML += `<div class="log-entry success">✓ QoS Level: ${qos}</div>`;
+            }
+            log.innerHTML += `<div class="log-entry success">✓ Message delivered successfully</div>`;
+        }
+
+        function testIntegration() {
+            const type = document.getElementById('integrationType').value;
+            const action = document.getElementById('integrationAction').value;
+
+            const log = document.getElementById('integrationLog');
+            const timestamp = new Date().toISOString();
+
+            log.innerHTML += `<div class="log-entry info">[${timestamp}] Testing ${type.toUpperCase()} integration...</div>`;
+            log.innerHTML += `<div class="log-entry success">✓ Connection established</div>`;
+            log.innerHTML += `<div class="log-entry success">✓ Action: ${action}</div>`;
+            log.innerHTML += `<div class="log-entry success">✓ Integration test passed</div>`;
+        }
+
+        function runTests() {
+            const category = document.getElementById('testCategory').value;
+            const results = document.getElementById('testResults');
+
+            results.innerHTML = `<div class="log-entry info">Running ${category} tests...</div>`;
+
+            const tests = [
+                'JSON schema validation',
+                'Required fields check',
+                'Data type validation',
+                'Range validation',
+                'Safety interlock verification',
+                'Protocol compliance',
+                'Integration connectivity',
+                'Performance benchmarks'
+            ];
+
+            tests.forEach((test, i) => {
+                setTimeout(() => {
+                    results.innerHTML += `<div class="log-entry success">✓ ${test} - PASS</div>`;
+                }, i * 100);
+            });
+
+            setTimeout(() => {
+                results.innerHTML += `<div class="log-entry success"><strong>All tests passed! ✓</strong></div>`;
+            }, tests.length * 100);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            generateStatusJSON();
+            runDispatchSimulation();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

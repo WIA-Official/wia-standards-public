@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Thermal Management and Power Delivery - WIA-ADVANCED_PACKAGING</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --accent: #60a5fa;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--accent);
+            font-size: 1.6rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--text);
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a365d);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-warning {
+            background: linear-gradient(135deg, #1e1a00, #2d2600);
+            border-left: 4px solid #eab308;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            background: linear-gradient(135deg, #001a0a, #002d12);
+            border-left: 4px solid #22c55e;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 4: Thermal Management and Power Delivery</h1>
+
+    <p>As semiconductor packages integrate more functionality at higher performance levels, thermal management and power delivery become critical design challenges. This chapter addresses the thermal and electrical design considerations essential for advanced packaging success, covering heat dissipation strategies, power delivery network design, and emerging cooling technologies.</p>
+
+    <h2>4.1 Thermal Challenges in Advanced Packaging</h2>
+
+    <p>Advanced packages present unique thermal challenges arising from increased power density, multi-die configurations, and complex heat flow paths. Understanding these challenges is essential for developing effective thermal solutions.</p>
+
+    <div class="highlight">
+        <strong>Critical Metric:</strong> Power density in modern processors exceeds 100 W/cm2 in hotspot regions, with some AI accelerators approaching 1000W total package power. Effective thermal management is essential to maintain junction temperatures below reliability limits.
+    </div>
+
+    <h3>Heat Generation Sources</h3>
+
+    <pre>
+Power Dissipation in Advanced Packages
+======================================
+
+Primary Heat Sources:
++------------------+-------------------+------------------+
+|    Die/Region    |  Power Density    |  Typical Power   |
++------------------+-------------------+------------------+
+| CPU Core         | 50-150 W/cm2      | 5-15W per core   |
+| GPU Core         | 30-80 W/cm2       | 200-400W total   |
+| HBM Stack        | 2-5 W/cm2         | 10-20W per stack |
+| Interposer       | 0.1-0.5 W/cm2     | 1-5W (I/O)       |
+| I/O PHY          | 20-50 W/cm2       | 5-20W per die    |
++------------------+-------------------+------------------+
+
+Secondary Sources:
+- Interconnect Joule heating (I2R losses)
+- Switching losses in drivers
+- ESD protection circuits
+- Substrate resistive losses
+    </pre>
+
+    <h2>4.2 Thermal Resistance Network Analysis</h2>
+
+    <p>Thermal design relies on understanding heat flow paths and resistances from the junction (heat source) to the ambient environment. The thermal resistance network model provides a framework for analysis and optimization.</p>
+
+    <pre>
+Thermal Resistance Network Model
+================================
+
+                    Junction (Tj)
+                         |
+            +------------+------------+
+            |            |            |
+      [Theta_jb]   [Theta_jc]   [Theta_jt]
+            |            |            |
+            v            v            v
+         Board       Case Top     Top Die
+            |            |      (3D stack)
+            |      +-----+-----+
+            |      |           |
+            | [Theta_cs]  [Theta_ct]
+            |      |           |
+            |   Heat Sink   TIM/IHS
+            |      |
+      [Theta_ba]  [Theta_sa]
+            |      |
+            v      v
+          Ambient (Ta)
+
+Key Resistance Values (Typical):
+- Theta_jc: 0.05-0.2 C/W (junction to case)
+- Theta_cs: 0.1-0.3 C/W (case to sink)
+- Theta_sa: 0.1-0.5 C/W (sink to ambient)
+- Theta_jb: 0.5-2.0 C/W (junction to board)
+    </pre>
+
+    <h3>Thermal Analysis Equations</h3>
+
+    <pre>
+Fundamental Thermal Equations
+=============================
+
+1. Junction Temperature:
+   Tj = Ta + P * Theta_ja
+   where:
+     Tj = junction temperature (C)
+     Ta = ambient temperature (C)
+     P = power dissipation (W)
+     Theta_ja = total thermal resistance (C/W)
+
+2. Heat Conduction (Fourier's Law):
+   Q = -k * A * (dT/dx)
+   where:
+     Q = heat flow (W)
+     k = thermal conductivity (W/m-K)
+     A = cross-sectional area (m2)
+     dT/dx = temperature gradient (K/m)
+
+3. Thermal Resistance (Planar):
+   R_th = t / (k * A)
+   where:
+     t = material thickness (m)
+
+4. 3D Stack Thermal (Simplified):
+   Tj_top = Ta + P_total * Theta_stack + P_top * Theta_local
+   (Each die adds to base temperature)
+
+Material Thermal Conductivities:
+--------------------------------
+Silicon:        148 W/m-K
+Copper:         398 W/m-K
+Solder (SnAg):  58 W/m-K
+Underfill:      0.5-2.5 W/m-K
+TIM (typical):  3-50 W/m-K
+Diamond:        2000 W/m-K
+    </pre>
+
+    <h2>4.3 Thermal Interface Materials (TIM)</h2>
+
+    <p>Thermal interface materials fill microscopic gaps between mating surfaces, dramatically reducing interface thermal resistance. TIM selection significantly impacts overall thermal performance.</p>
+
+    <table>
+        <tr>
+            <th>TIM Type</th>
+            <th>Thermal Conductivity</th>
+            <th>BLT</th>
+            <th>Application</th>
+        </tr>
+        <tr>
+            <td>Thermal Grease</td>
+            <td>3-8 W/m-K</td>
+            <td>25-50 um</td>
+            <td>General purpose, reworkable</td>
+        </tr>
+        <tr>
+            <td>Phase Change</td>
+            <td>3-5 W/m-K</td>
+            <td>15-25 um</td>
+            <td>Pre-applied, consumer</td>
+        </tr>
+        <tr>
+            <td>Thermal Pads</td>
+            <td>1-15 W/m-K</td>
+            <td>100-500 um</td>
+            <td>Gap filling, compliance</td>
+        </tr>
+        <tr>
+            <td>Liquid Metal</td>
+            <td>20-70 W/m-K</td>
+            <td>10-25 um</td>
+            <td>High performance</td>
+        </tr>
+        <tr>
+            <td>Solder TIM</td>
+            <td>50-80 W/m-K</td>
+            <td>10-50 um</td>
+            <td>HPC, permanent</td>
+        </tr>
+    </table>
+
+    <div class="highlight-warning">
+        <strong>Design Note:</strong> Bond Line Thickness (BLT) is often more critical than bulk thermal conductivity. A thin layer of moderate TIM outperforms a thick layer of high-conductivity TIM. Target BLT <50um for high-performance applications.
+    </div>
+
+    <h2>4.4 Advanced Cooling Solutions</h2>
+
+    <p>As power densities exceed the limits of conventional air cooling, advanced cooling technologies become necessary for high-performance packages.</p>
+
+    <h3>Heat Sink and Air Cooling</h3>
+
+    <pre>
+Heat Sink Design Parameters
+===========================
+
+Fin Array Optimization:
++----------------------------------+
+|  |||||||||||||||||||||||||||||||  |
+|  |||||||||||||||||||||||||||||||  |  <- Fins
+|  |||||||||||||||||||||||||||||||  |
++----------------------------------+
+|           Base Plate              |
++----------------------------------+
+
+Key Parameters:
+- Fin height: 20-60mm
+- Fin thickness: 0.5-2mm
+- Fin spacing: 1-3mm
+- Base thickness: 3-10mm
+
+Thermal Performance:
+R_sink = R_spread + R_conv + R_fin
+where:
+  R_spread = spreading resistance (base)
+  R_conv = convective resistance
+  R_fin = fin conduction resistance
+
+Forced Air Performance:
+- 0.2-0.5 C/W at 30-50 CFM
+- 0.1-0.2 C/W at 50-100 CFM
+    </pre>
+
+    <h3>Liquid Cooling Systems</h3>
+
+    <pre>
+Liquid Cooling Architecture
+===========================
+
+Direct Liquid Cooling (Cold Plate):
++----------------------------------+
+|         Heat Source (Die)        |
++----------------------------------+
+|              TIM                  |
++----------------------------------+
+|  +----------------------------+  |
+|  |  Microchannel Cold Plate   |  |
+|  |  ~~Coolant Flow~~~~>       |  |
+|  +----------------------------+  |
++----------------------------------+
+        |                |
+        v                ^
+    Inlet            Outlet
+        |                |
+        +---[Pump]---[Radiator]---+
+
+Performance Characteristics:
+- Thermal resistance: 0.02-0.1 C/W
+- Heat removal: 200-1000+ W
+- Coolant: Water, glycol mix, dielectric
+
+Microchannel Specifications:
+- Channel width: 50-500 um
+- Channel depth: 100-500 um
+- Flow rate: 0.5-2 L/min
+- Pressure drop: 10-50 kPa
+    </pre>
+
+    <h3>Immersion Cooling</h3>
+
+    <div class="highlight-success">
+        <strong>Emerging Technology:</strong> Two-phase immersion cooling using dielectric fluids can achieve thermal resistances below 0.01 C/W by leveraging phase change heat transfer, enabling ultra-high power density packages.
+    </div>
+
+    <h2>4.5 Power Delivery Network Design</h2>
+
+    <p>Power delivery networks (PDN) must provide stable, low-impedance power to high-current, fast-switching loads. PDN design directly impacts signal integrity, electromagnetic emissions, and system reliability.</p>
+
+    <pre>
+PDN Impedance Requirements
+==========================
+
+Target Impedance Calculation:
+Z_target = (V_dd * Ripple%) / (I_transient)
+
+Example (Modern GPU):
+- V_dd = 0.8V
+- Allowed ripple = 3% (24mV)
+- Transient current = 200A
+- Z_target = 0.024 / 200 = 0.12 mohm
+
+Impedance vs. Frequency Profile:
+         |
+Impedance|    Z_target = 0.12 mohm
+(log)    |    -----------------------
+         |   /                       \
+         |  /                         \
+         | /                           \
+         |/                             \
+         +--------------------------------
+              1MHz    100MHz    1GHz
+                    Frequency
+
+PDN Components:
+- VRM (Voltage Regulator Module): DC-1MHz
+- Bulk capacitors: 1kHz-10MHz
+- Ceramic capacitors: 1MHz-100MHz
+- On-die capacitance: 100MHz-1GHz+
+    </pre>
+
+    <h3>Package-Level PDN</h3>
+
+    <pre>
+Package PDN Structure
+=====================
+
+Die Cross-Section:
++------------------------------------------+
+|  On-die decoupling (MOS caps, MIM)       |
++------------------------------------------+
+|  Metal stack (power grid)                |
++------------------------------------------+
+|  Bumps / Microbumps                      |
++------------------------------------------+
+|  Interposer/Substrate power planes       |
++------------------------------------------+
+|  Package-level decoupling caps           |
++------------------------------------------+
+|  BGA balls (power/ground)                |
++------------------------------------------+
+
+Power Plane Design Rules:
+- Dedicated V_dd and V_ss planes
+- Maximum current density: 10-20 mA/um
+- Via current limit: 50-200 mA per via
+- Plane spacing: >100um (voltage dependent)
+
+IR Drop Budget:
+- On-die: 2-5% of V_dd
+- Package: 1-3% of V_dd
+- PCB: 1-2% of V_dd
+- Total: <10% for margin
+    </pre>
+
+    <h2>4.6 Thermal-Aware Floor Planning</h2>
+
+    <p>Effective thermal management begins at the floor planning stage. Strategic placement of hot and cold blocks, along with thermal-aware power delivery, can significantly reduce peak temperatures.</p>
+
+    <pre>
+Floor Plan Thermal Optimization
+===============================
+
+Before Optimization:
++----------------------------------+
+|  [HOT]  [HOT]  [HOT]  [HOT]      |
+|  [CPU]  [CPU]  [CPU]  [CPU]      |  <- Thermal hotspot
++----------------------------------+
+|  [I/O]  [I/O]  [I/O]  [I/O]      |
++----------------------------------+
+
+After Optimization:
++----------------------------------+
+|  [CPU]  [I/O]  [CPU]  [I/O]      |
+|                                  |  <- Distributed heat
+|  [I/O]  [CPU]  [I/O]  [CPU]      |
++----------------------------------+
+
+Multi-Die Floor Plan (2.5D):
++----------------------------------+
+|  +------+  +------+  +------+    |
+|  | HBM  |  | SoC  |  | HBM  |    |
+|  | 15W  |  | 300W |  | 15W  |    |
+|  +------+  +------+  +------+    |
+|                                  |
+|  +------+          +------+      |
+|  | HBM  |          | HBM  |      |
+|  | 15W  |          | 15W  |      |
+|  +------+          +------+      |
++----------------------------------+
+
+Guidelines:
+- Distribute high-power blocks
+- Place hot blocks near heat sink center
+- Use HBM/memory as thermal buffers
+- Consider airflow direction
+    </pre>
+
+    <h2>4.7 3D Stacking Thermal Considerations</h2>
+
+    <p>3D stacking presents unique thermal challenges as heat must pass through intervening die layers. Careful thermal design prevents excessive temperatures in buried dies.</p>
+
+    <div class="highlight-warning">
+        <strong>Critical Challenge:</strong> In 3D stacks, the bottom die (nearest the heat sink) runs coolest, while top dies can be 10-30C hotter due to thermal resistance through the stack. This thermal gradient must be managed through design.
+    </div>
+
+    <pre>
+3D Stack Thermal Analysis
+=========================
+
+HBM-like 8-Die Stack:
+                     +------+
+                     | Die 8| Tj = Ta + 45C  (hottest)
+                     +------+
+                       |
+TSV Thermal Path ->    | Rth = 0.5 C/W per layer
+                       |
+                     +------+
+                     | Die 1| Tj = Ta + 10C  (coolest)
+                     +------+
+                       |
+                     [TIM]
+                       |
+                   [Heat Sink]
+                       |
+                    Ambient
+
+Mitigation Strategies:
+1. Reduce per-die power in upper layers
+2. TSV thermal vias (Cu-filled thermal paths)
+3. Microfluidic cooling between layers
+4. Silicon bridges for lateral heat spreading
+5. Power gating based on thermal feedback
+    </pre>
+
+    <p>Thermal management and power delivery design are interrelated disciplines that must be co-optimized for successful advanced packaging implementation. The strategies presented in this chapter provide the foundation for achieving reliable, high-performance operation.</p>
+
+</body>
+</html>

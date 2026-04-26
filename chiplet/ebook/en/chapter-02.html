@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Architecture | WIA-CHIPLET</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: Chiplet Architecture and Interconnects</h1>
+
+    <p>This chapter explores the architectural foundations of chiplet systems, focusing on interconnect standards that enable die-to-die communication. We examine UCIe (Universal Chiplet Interconnect Express), Bunch of Wires (BoW), and other protocols, along with 2.5D and 3D packaging architectures that make multi-die integration possible.</p>
+
+    <div class="highlight">
+        <strong>The Interconnect Challenge</strong>
+        <p>Die-to-die interconnects must achieve near on-die performance while crossing package boundaries. The industry has converged on several standards to enable chiplet interoperability.</p>
+    </div>
+
+    <h2>UCIe: Universal Chiplet Interconnect Express</h2>
+
+    <p>UCIe represents the industry's effort to create a universal standard for chiplet interconnection. Backed by major semiconductor companies including Intel, AMD, ARM, TSMC, Samsung, and many others, UCIe aims to enable an open chiplet ecosystem.</p>
+
+    <h3>UCIe Architecture Layers</h3>
+
+    <pre><code>// UCIe Protocol Stack Definition
+interface UCIeStack {
+    // Physical Layer (PHY)
+    physical: {
+        // Standard Package
+        standardPackage: {
+            bumpPitch: "100-130 μm";
+            dataRate: "4-32 GT/s";
+            efficiency: "0.5-2 pJ/bit";
+        };
+        // Advanced Package
+        advancedPackage: {
+            bumpPitch: "25-55 μm";
+            dataRate: "4-32 GT/s";
+            efficiency: "0.25-0.5 pJ/bit";
+        };
+        // Encoding
+        encoding: "64b/68b" | "Raw";
+    };
+
+    // Die-to-Die Adapter Layer (D2D)
+    d2dAdapter: {
+        protocol: "UCIe Streaming" | "CXL" | "PCIe";
+        flowControl: "Credit-based";
+        retryMechanism: boolean;
+        crcProtection: boolean;
+    };
+
+    // Protocol Layer
+    protocol: {
+        baseProtocol: "Streaming";
+        optionalProtocols: ["CXL.io", "CXL.cache", "CXL.mem", "PCIe"];
+    };
+}
+
+// UCIe Module Configuration
+interface UCIeModule {
+    lanes: 16 | 32 | 64;
+    speedGrade: "4GT/s" | "8GT/s" | "16GT/s" | "32GT/s";
+}</code></pre>
+
+    <h3>UCIe Physical Layer Specifications</h3>
+
+    <table>
+        <tr>
+            <th>Parameter</th>
+            <th>Standard Package</th>
+            <th>Advanced Package</th>
+        </tr>
+        <tr>
+            <td>Bump Pitch</td>
+            <td>100-130 μm</td>
+            <td>25-55 μm</td>
+        </tr>
+        <tr>
+            <td>Data Rate</td>
+            <td>4-32 GT/s</td>
+            <td>4-32 GT/s</td>
+        </tr>
+        <tr>
+            <td>Channel Reach</td>
+            <td>Up to 25mm</td>
+            <td>Up to 10mm</td>
+        </tr>
+        <tr>
+            <td>Module Width</td>
+            <td>16 lanes</td>
+            <td>16 lanes</td>
+        </tr>
+        <tr>
+            <td>Bandwidth (16 lanes)</td>
+            <td>32-256 GB/s</td>
+            <td>32-256 GB/s</td>
+        </tr>
+        <tr>
+            <td>Energy Efficiency</td>
+            <td>0.5-2.0 pJ/bit</td>
+            <td>0.25-0.5 pJ/bit</td>
+        </tr>
+    </table>
+
+    <pre><code>// UCIe Implementation Example
+class UCIeController {
+    private modules: UCIeModule[];
+    private linkStatus: Map&lt;string, LinkState&gt;;
+
+    constructor(config: UCIeConfig) {
+        this.modules = config.modules.map(m => new UCIeModule(m));
+        this.linkStatus = new Map();
+    }
+
+    // Link Training and Initialization
+    async initializeLink(targetChiplet: string): Promise&lt;LinkResult&gt; {
+        // Phase 1: Reset and detect
+        await this.performReset();
+        const detected = await this.detectPartner(targetChiplet);
+
+        // Phase 2: Parameter exchange
+        const params = await this.exchangeParameters(detected);
+
+        // Phase 3: Speed training
+        const trainedSpeed = await this.trainSpeed(params);
+
+        // Phase 4: Link ready
+        this.linkStatus.set(targetChiplet, {
+            state: 'L0',  // Active state
+            speed: trainedSpeed,
+            width: params.negotiatedWidth
+        });
+
+        return {
+            success: true,
+            bandwidth: this.calculateBandwidth(trainedSpeed, params.negotiatedWidth)
+        };
+    }
+
+    // Data Transfer with Flow Control
+    async sendData(packet: UCIePacket): Promise&lt;void&gt; {
+        // Credit-based flow control
+        await this.waitForCredits(packet.size);
+
+        // Apply CRC
+        packet.crc = this.calculateCRC(packet.data);
+
+        // Transmit
+        await this.transmit(packet);
+
+        // Wait for ACK or handle retry
+        const ack = await this.waitForAck(packet.sequenceNumber);
+        if (!ack.success) {
+            await this.handleRetry(packet);
+        }
+    }
+}</code></pre>
+
+    <h2>Bunch of Wires (BoW) Protocol</h2>
+
+    <div class="highlight">
+        <strong>BoW Philosophy</strong>
+        <p>BoW minimizes protocol overhead by extending the on-die interconnect across the die boundary. Ideal when chiplets are designed together and maximum bandwidth efficiency is required.</p>
+    </div>
+
+    <pre><code>// Bunch of Wires Interface Definition
+interface BoWInterface {
+    // Physical Configuration
+    physical: {
+        wireCount: number;      // Total wires in bundle
+        dataWires: number;      // Data-carrying wires
+        controlWires: number;   // Clock, valid, credit signals
+        bumpPitch: "25-55 μm";  // Typically advanced packaging
+    };
+
+    // Signaling
+    signaling: {
+        type: "Single-ended" | "Differential";
+        dataRate: string;       // e.g., "2-8 Gbps"
+        clockScheme: "Forwarded" | "Embedded";
+    };
+
+    // Flow Control (minimal)
+    flowControl: {
+        type: "Credit" | "Ready/Valid" | "None";
+        credits: number;
+        latency: "Minimal";     // Typically 1-2 cycles
+    };
+}
+
+// BoW Implementation
+class BoWLink {
+    private config: BoWInterface;
+
+    constructor(config: BoWInterface) {
+        this.config = config;
+    }
+
+    // Direct wire mapping
+    mapSignals(): SignalMapping {
+        return {
+            txData: range(0, this.config.physical.dataWires),
+            txClock: this.config.physical.dataWires,
+            txValid: this.config.physical.dataWires + 1,
+            txCredit: this.config.physical.dataWires + 2,
+            // Reverse direction
+            rxData: range(0, this.config.physical.dataWires),
+            rxClock: this.config.physical.dataWires,
+            rxValid: this.config.physical.dataWires + 1,
+            rxCredit: this.config.physical.dataWires + 2
+        };
+    }
+
+    // Calculate raw bandwidth
+    getBandwidth(): number {
+        const dataWires = this.config.physical.dataWires;
+        const dataRate = parseFloat(this.config.signaling.dataRate);
+        return dataWires * dataRate / 8;  // GB/s
+    }
+}</code></pre>
+
+    <h2>2.5D Packaging Architecture</h2>
+
+    <h3>Silicon Interposer Technology</h3>
+
+    <pre><code>// Silicon Interposer Specification
+interface SiliconInterposer {
+    // Physical Dimensions
+    dimensions: {
+        size: number;           // mm² (typically 800-2500)
+        thickness: number;      // μm (typically 100-150)
+        metalLayers: number;    // 4-8 layers typical
+    };
+
+    // TSV (Through-Silicon Via) Configuration
+    tsv: {
+        diameter: number;       // μm (typically 5-10)
+        pitch: number;          // μm (typically 40-100)
+        density: number;        // TSVs per mm²
+        resistance: number;     // mΩ per TSV
+    };
+
+    // Routing Capabilities
+    routing: {
+        minLineWidth: number;   // nm (typically 400-2000)
+        minSpacing: number;     // nm
+        redistribution: boolean;
+    };
+
+    // Chiplet Interface
+    chipletInterface: {
+        microBumpPitch: number; // μm (25-55 typical)
+        maxChiplets: number;
+        totalIOCount: number;
+    };
+}
+
+// TSMC CoWoS Configuration Example
+const CoWoS_S_Config: SiliconInterposer = {
+    dimensions: {
+        size: 2500,      // 2500 mm² max
+        thickness: 100,
+        metalLayers: 6
+    },
+    tsv: {
+        diameter: 6,
+        pitch: 50,
+        density: 400,
+        resistance: 20
+    },
+    routing: {
+        minLineWidth: 400,
+        minSpacing: 400,
+        redistribution: true
+    },
+    chipletInterface: {
+        microBumpPitch: 45,
+        maxChiplets: 8,
+        totalIOCount: 100000
+    }
+};</code></pre>
+
+    <h3>EMIB (Embedded Multi-die Interconnect Bridge)</h3>
+
+    <pre><code>// Intel EMIB Technology
+interface EMIBConfiguration {
+    // Bridge Characteristics
+    bridge: {
+        size: "Small";          // Localized bridges
+        placement: "Embedded";  // In organic substrate
+        metalLayers: 4;
+    };
+
+    // Interconnect Density
+    interconnect: {
+        bumpPitch: "55 μm";
+        wiresPerMm: 200;
+        bandwidth: "High";
+    };
+
+    // Advantages
+    advantages: [
+        "Lower cost than full interposer",
+        "Scalable to large packages",
+        "Localized high-density routing",
+        "Compatible with standard packaging"
+    ];
+}
+
+// EMIB System Design
+class EMIBSystem {
+    private bridges: EMIBBridge[];
+    private chiplets: Chiplet[];
+
+    placeChiplets(chiplets: Chiplet[]): PlacementResult {
+        // Identify communication-intensive pairs
+        const pairs = this.identifyHighBandwidthPairs(chiplets);
+
+        // Place bridges between pairs
+        const bridgePlacements = pairs.map(pair => ({
+            bridge: new EMIBBridge(),
+            chipletA: pair[0],
+            chipletB: pair[1],
+            bandwidth: this.calculateBandwidth(pair)
+        }));
+
+        return {
+            chipletPositions: this.optimizePositions(chiplets, bridgePlacements),
+            bridges: bridgePlacements
+        };
+    }
+}</code></pre>
+
+    <h2>3D Packaging Architecture</h2>
+
+    <div class="highlight">
+        <strong>3D Integration Benefits</strong>
+        <p>Vertical stacking achieves interconnect densities 10-100x greater than 2.5D, enabling memory-on-logic configurations with TB/s bandwidth.</p>
+    </div>
+
+    <pre><code>// 3D Stacking Architecture
+interface Stack3DConfiguration {
+    // Stack Composition
+    layers: StackLayer[];
+    bondingTechnology: "MicroBump" | "HybridBond" | "Cu-Cu";
+
+    // Thermal Design
+    thermal: {
+        totalTDP: number;           // Watts
+        perLayerBudget: number[];   // Watts per layer
+        coolingMethod: "TopSide" | "TSV_HeatPath" | "Microfluidic";
+    };
+
+    // Interconnect Density
+    interconnect: {
+        bondPitch: number;          // μm (0.5-10 typical)
+        connectionsPerMm2: number;
+        verticalBandwidth: number;  // TB/s
+    };
+}
+
+interface StackLayer {
+    chiplet: Chiplet;
+    position: "Bottom" | "Middle" | "Top";
+    thinning: number;               // μm (typically 10-50)
+    hasTSV: boolean;
+}
+
+// Hybrid Bonding Technology
+const hybridBondingSpec = {
+    technology: "Cu-Cu Direct Bond",
+    pitch: {
+        current: "1-10 μm",
+        roadmap: "<1 μm"
+    },
+    density: ">1 million bonds/mm²",
+    advantages: [
+        "Extremely high density",
+        "Low resistance",
+        "Minimal latency",
+        "No solder required"
+    ],
+    challenges: [
+        "Surface preparation critical",
+        "Alignment precision",
+        "Thermal mismatch",
+        "Testing complexity"
+    ]
+};</code></pre>
+
+    <h3>3D Memory Integration (HBM)</h3>
+
+    <pre><code>// HBM (High Bandwidth Memory) Configuration
+interface HBMStack {
+    generation: "HBM2" | "HBM2E" | "HBM3" | "HBM3E";
+    stackHeight: number;        // DRAM dies (4, 8, 12)
+    capacityPerStack: number;   // GB
+
+    interface: {
+        channelWidth: 128;      // bits per channel
+        channels: number;       // 8 or 16
+        dataRate: number;       // Gbps
+    };
+
+    // Performance
+    getBandwidth(): number {
+        return this.interface.channelWidth *
+               this.interface.channels *
+               this.interface.dataRate / 8 / 1000; // TB/s
+    }
+}
+
+// HBM Specifications Comparison
+const hbmGenerations = {
+    HBM2: {
+        bandwidth: "256 GB/s per stack",
+        capacity: "4-8 GB per stack",
+        dataRate: "2.0 Gbps"
+    },
+    HBM2E: {
+        bandwidth: "460 GB/s per stack",
+        capacity: "8-16 GB per stack",
+        dataRate: "3.6 Gbps"
+    },
+    HBM3: {
+        bandwidth: "665 GB/s per stack",
+        capacity: "16-24 GB per stack",
+        dataRate: "6.4 Gbps"
+    },
+    HBM3E: {
+        bandwidth: "1.15 TB/s per stack",
+        capacity: "24-36 GB per stack",
+        dataRate: "9.6 Gbps"
+    }
+};</code></pre>
+
+    <h2>Topology Design Patterns</h2>
+
+    <pre><code>// Chiplet Topology Patterns
+enum ChipletTopology {
+    MESH = "mesh",           // Grid connectivity
+    RING = "ring",           // Circular connectivity
+    STAR = "star",           // Central hub
+    HIERARCHICAL = "hier",   // Tree-like structure
+    CUSTOM = "custom"        // Application-specific
+}
+
+interface TopologyAnalysis {
+    topology: ChipletTopology;
+    chipletCount: number;
+
+    analyze(): TopologyMetrics {
+        switch(this.topology) {
+            case ChipletTopology.MESH:
+                return {
+                    bisectionBandwidth: "High",
+                    averageHops: Math.sqrt(this.chipletCount),
+                    scalability: "Excellent",
+                    wiringComplexity: "High"
+                };
+            case ChipletTopology.RING:
+                return {
+                    bisectionBandwidth: "Low",
+                    averageHops: this.chipletCount / 4,
+                    scalability: "Good",
+                    wiringComplexity: "Low"
+                };
+            case ChipletTopology.STAR:
+                return {
+                    bisectionBandwidth: "Medium",
+                    averageHops: 2,  // Through central hub
+                    scalability: "Limited by hub",
+                    wiringComplexity: "Medium"
+                };
+        }
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary</strong>
+        <p>Chiplet architecture success depends on choosing appropriate interconnect standards and packaging technologies. UCIe provides industry-standard interoperability, while BoW offers maximum efficiency for custom designs. 2.5D packaging balances performance and manufacturability, while 3D stacking enables the highest integration density. Understanding these options enables optimal chiplet system design.</p>
+    </div>
+</body>
+</html>

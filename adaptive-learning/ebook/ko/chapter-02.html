@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 시스템 아키텍처 | WIA-ADAPTIVE_LEARNING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>2장: 시스템 아키텍처</h1>
+
+    <h2>2.1 적응형 학습 시스템의 구성요소</h2>
+    <p>WIA-ADAPTIVE_LEARNING 표준에 따른 적응형 학습 시스템은 네 가지 핵심 모델과 이를 조율하는 적응 엔진으로 구성됩니다. 각 구성요소는 명확히 정의된 인터페이스를 통해 상호작용하며, 모듈식 설계로 유연한 구현과 확장이 가능합니다.</p>
+
+    <div class="highlight">
+        <strong>아키텍처 원칙:</strong> 느슨한 결합, 높은 응집도를 유지합니다. 각 구성요소는 독립적으로 개발, 테스트, 업그레이드할 수 있어야 합니다. 표준 인터페이스를 통해 다양한 구현체의 교체가 가능해야 합니다.
+    </div>
+
+    <h2>2.2 학습자 모델</h2>
+    <p>학습자 모델은 개별 학습자의 상태를 표현하는 핵심 구성요소입니다:</p>
+
+    <pre><code>// 학습자 모델 인터페이스
+interface LearnerModel {
+    // 기본 정보
+    learnerId: string;
+    profile: LearnerProfile;
+
+    // 지식 상태
+    knowledge: KnowledgeState;
+
+    // 학습 특성
+    characteristics: {
+        learningStyle: LearningStyle;
+        cognitiveProfile: CognitiveProfile;
+        preferences: LearnerPreferences;
+        goals: LearningGoal[];
+    };
+
+    // 정서적 상태
+    affective: {
+        currentMood: Mood;
+        engagement: EngagementLevel;
+        motivation: MotivationLevel;
+        frustration: FrustrationLevel;
+    };
+
+    // 학습 이력
+    history: LearningHistory;
+}
+
+interface KnowledgeState {
+    concepts: Map&lt;ConceptId, MasteryLevel&gt;;
+    skills: Map&lt;SkillId, ProficiencyLevel&gt;;
+    misconceptions: Misconception[];
+    lastUpdated: Date;
+}
+
+interface LearningHistory {
+    sessions: LearningSession[];
+    interactions: Interaction[];
+    assessments: AssessmentResult[];
+    achievements: Achievement[];
+}</code></pre>
+
+    <h2>2.3 도메인 모델</h2>
+    <p>도메인 모델은 학습 영역의 지식 구조를 표현합니다:</p>
+
+    <pre><code>// 도메인 모델 인터페이스
+interface DomainModel {
+    // 개념 네트워크
+    concepts: ConceptGraph;
+
+    // 학습 객체
+    learningObjects: LearningObjectRepository;
+
+    // 평가 항목
+    assessmentItems: AssessmentItemBank;
+
+    // 학습 경로 템플릿
+    learningPaths: LearningPathTemplate[];
+}
+
+interface ConceptGraph {
+    nodes: Concept[];
+    edges: ConceptRelation[];
+
+    // 관계 유형
+    getPrerequisites(conceptId: string): Concept[];
+    getSuccessors(conceptId: string): Concept[];
+    getRelated(conceptId: string): Concept[];
+}
+
+interface Concept {
+    id: string;
+    name: string;
+    description: string;
+    difficulty: DifficultyLevel;
+    estimatedTime: number;
+    learningObjectives: LearningObjective[];
+    prerequisites: string[];
+    tags: string[];
+}</code></pre>
+
+    <h2>2.4 교수 모델</h2>
+    <p>교수 모델은 교육 전략과 결정 규칙을 정의합니다:</p>
+
+    <table>
+        <tr>
+            <th>구성요소</th>
+            <th>역할</th>
+        </tr>
+        <tr>
+            <td>교수 전략</td>
+            <td>학습 콘텐츠 제시 방법 결정</td>
+        </tr>
+        <tr>
+            <td>피드백 규칙</td>
+            <td>학습자 응답에 대한 피드백 생성</td>
+        </tr>
+        <tr>
+            <td>힌트 시스템</td>
+            <td>단계적 도움 제공 전략</td>
+        </tr>
+        <tr>
+            <td>평가 전략</td>
+            <td>지식 확인 시점과 방법</td>
+        </tr>
+        <tr>
+            <td>동기부여 전략</td>
+            <td>학습 참여 유지 기법</td>
+        </tr>
+    </table>
+
+    <pre><code>// 교수 모델 인터페이스
+interface PedagogicalModel {
+    // 전략 선택
+    selectStrategy(learner: LearnerModel, context: LearningContext): Strategy;
+
+    // 피드백 생성
+    generateFeedback(response: LearnerResponse): Feedback;
+
+    // 힌트 제공
+    provideHint(problem: Problem, attemptCount: number): Hint;
+
+    // 다음 단계 결정
+    determineNextStep(learner: LearnerModel, current: LearningObject): NextStep;
+}
+
+interface Strategy {
+    type: 'mastery' | 'spiral' | 'discovery' | 'direct';
+    scaffolding: ScaffoldingConfig;
+    pacing: PacingConfig;
+    presentation: PresentationMode;
+}</code></pre>
+
+    <h2>2.5 적응 엔진</h2>
+    <p>적응 엔진은 모든 모델의 정보를 통합하여 실시간 적응 결정을 내립니다:</p>
+
+    <pre><code>// 적응 엔진 핵심 로직
+class AdaptationEngine {
+    private learnerModel: LearnerModel;
+    private domainModel: DomainModel;
+    private pedagogicalModel: PedagogicalModel;
+
+    async adapt(event: LearningEvent): Promise&lt;AdaptationDecision&gt; {
+        // 1. 학습자 모델 업데이트
+        await this.updateLearnerModel(event);
+
+        // 2. 현재 상태 분석
+        const analysis = this.analyzeCurrentState();
+
+        // 3. 교수 전략 결정
+        const strategy = this.pedagogicalModel.selectStrategy(
+            this.learnerModel,
+            analysis.context
+        );
+
+        // 4. 적응 결정 생성
+        const decision = this.generateDecision(analysis, strategy);
+
+        // 5. 결정 기록 및 반환
+        await this.logDecision(decision);
+        return decision;
+    }
+
+    private analyzeCurrentState(): StateAnalysis {
+        return {
+            knowledgeGaps: this.identifyGaps(),
+            strugglePoints: this.detectStruggles(),
+            engagement: this.assessEngagement(),
+            optimalZone: this.findZPD(),
+            context: this.getCurrentContext()
+        };
+    }
+
+    private generateDecision(analysis: StateAnalysis, strategy: Strategy): AdaptationDecision {
+        return {
+            contentSelection: this.selectContent(analysis, strategy),
+            difficultyAdjustment: this.adjustDifficulty(analysis),
+            pathModification: this.modifyPath(analysis),
+            scaffoldingLevel: this.determineScaffolding(analysis),
+            feedbackType: this.selectFeedbackType(analysis)
+        };
+    }
+}</code></pre>
+
+    <h2>2.6 데이터 흐름</h2>
+    <div class="highlight">
+        <strong>실시간 적응 사이클:</strong> 학습자 상호작용 → 이벤트 수집 → 학습자 모델 업데이트 → 상태 분석 → 적응 결정 → 콘텐츠/경로 조정 → 학습자에게 제시. 이 사이클은 밀리초 단위로 실행됩니다.
+    </div>
+
+    <h2>2.7 확장성 고려사항</h2>
+    <ul>
+        <li><strong>수평적 확장:</strong> 마이크로서비스 아키텍처로 컴포넌트별 독립 확장</li>
+        <li><strong>실시간 처리:</strong> 이벤트 스트리밍을 통한 대규모 동시 사용자 지원</li>
+        <li><strong>캐싱 전략:</strong> 학습자 모델, 콘텐츠 캐싱으로 응답 시간 최적화</li>
+        <li><strong>비동기 처리:</strong> 복잡한 분석은 백그라운드에서 처리</li>
+    </ul>
+
+    <pre><code>// 확장 가능한 아키텍처 예시
+const scalableArchitecture = {
+    services: {
+        learnerService: {
+            replicas: 'auto-scale',
+            cache: 'redis-cluster',
+            db: 'mongodb-sharded'
+        },
+        adaptationService: {
+            replicas: 'auto-scale',
+            messageQueue: 'kafka',
+            realtime: 'websocket-cluster'
+        },
+        contentService: {
+            cdn: 'global-distribution',
+            storage: 'object-storage',
+            cache: 'edge-caching'
+        }
+    }
+};</code></pre>
+</body>
+</html>

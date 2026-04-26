@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Smart Contract Protocol | WIA-LEG-006</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(139, 92, 246, 0.2); padding: 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 800px; margin: 0 auto; }
+        .logo { font-size: 2rem; margin-bottom: 0.5rem; }
+        h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+        h2 { color: #8B5CF6; font-size: 1.75rem; margin: 2rem 0 1rem; }
+        h3 { color: #A78BFA; font-size: 1.5rem; margin: 1.5rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1rem; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; padding: 1rem; margin: 1.5rem 0; border-radius: 4px; }
+        ul, ol { color: #cbd5e1; margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: rgba(30, 41, 59, 0.5); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+        th { background: rgba(139, 92, 246, 0.2); color: #8B5CF6; font-weight: 600; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(139, 92, 246, 0.2); }
+        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #8B5CF6; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .btn:hover { background: #7C3AED; }
+        .btn-secondary { background: transparent; border: 2px solid #8B5CF6; color: #8B5CF6; }
+        code { background: rgba(139, 92, 246, 0.1); color: #A78BFA; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        pre { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .key-takeaways { background: rgba(139, 92, 246, 0.1); border: 2px solid #8B5CF6; border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">💎 Chapter 6</div>
+            <h1>Phase 3: Smart Contract Protocol</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Introduction to Smart Contract Inheritance</h2>
+        <p>Phase 3 brings digital asset inheritance on-chain through audited smart contracts that automate execution while maintaining security, transparency, and legal compliance. Smart contracts eliminate the need for trusted intermediaries by encoding inheritance rules in immutable code that executes exactly as programmed. This chapter explores multi-signature schemes, dead man's switch implementations, oracle integration, and cross-chain protocols that form the backbone of automated digital inheritance.</p>
+
+        <h2>Multi-Signature Inheritance Wallets</h2>
+        <h3>2-of-3 Multi-Sig Standard Pattern</h3>
+        <p>The most common WIA-LEG-006 multi-sig configuration uses 2-of-3 signatures for optimal balance between security and accessibility:</p>
+        <pre><code>contract InheritanceMultiSig {
+    address public owner;
+    address public executor;
+    address public custodian;
+    uint256 public lastActivityTimestamp;
+    uint256 public inactivityThreshold = 365 days;
+
+    mapping(address => bool) public beneficiaries;
+    mapping(bytes32 => uint256) public approvalCount;
+
+    modifier requiresTwo() {
+        require(approvalCount[msg.sig] >= 2, "Needs 2 signatures");
+        _;
+    }
+
+    function transferInheritance(address beneficiary, uint256 amount)
+        external requiresTwo {
+        require(block.timestamp > lastActivityTimestamp + inactivityThreshold,
+                "Inactivity period not met");
+        require(beneficiaries[beneficiary], "Not authorized beneficiary");
+
+        payable(beneficiary).transfer(amount);
+        emit InheritanceTransferred(beneficiary, amount);
+    }
+}</code></pre>
+
+        <h3>Time-Locked Multi-Sig</h3>
+        <p>Adds time delays between approval and execution to prevent hasty decisions:</p>
+        <ul>
+            <li><strong>Approval Phase:</strong> 2-of-3 signers approve transaction, enters time-lock queue</li>
+            <li><strong>Time-Lock Period:</strong> 7-14 days delay before execution, allows owner to cancel if still alive</li>
+            <li><strong>Execution Phase:</strong> After time-lock, any authorized party can execute</li>
+            <li><strong>Emergency Cancel:</strong> Owner can cancel with single signature during time-lock</li>
+        </ul>
+
+        <h2>Dead Man's Switch Implementation</h2>
+        <h3>Heartbeat Mechanism</h3>
+        <p>The dead man's switch requires periodic owner check-ins to prevent inheritance trigger:</p>
+        <pre><code>contract DeadManSwitch {
+    address public owner;
+    address[] public beneficiaries;
+    uint256[] public shares; // Percentage * 100 (e.g., 5000 = 50%)
+
+    uint256 public lastCheckIn;
+    uint256 public checkInInterval = 90 days;
+    uint256 public gracePeriod = 30 days;
+    uint256 public warningPeriod = 14 days;
+
+    enum State { Active, Warning, Grace, Triggered }
+    State public currentState;
+
+    event CheckInRecorded(uint256 timestamp);
+    event WarningIssued(uint256 deadline);
+    event InheritanceTriggered(uint256 timestamp);
+
+    function checkIn(bytes memory biometricProof) external {
+        require(msg.sender == owner, "Only owner");
+        require(verifyBiometric(biometricProof), "Invalid biometric");
+
+        lastCheckIn = block.timestamp;
+        currentState = State.Active;
+        emit CheckInRecorded(block.timestamp);
+    }
+
+    function updateState() public {
+        uint256 timeSinceCheckIn = block.timestamp - lastCheckIn;
+
+        if (timeSinceCheckIn > checkInInterval + gracePeriod) {
+            currentState = State.Triggered;
+            emit InheritanceTriggered(block.timestamp);
+        } else if (timeSinceCheckIn > checkInInterval) {
+            currentState = State.Grace;
+        } else if (timeSinceCheckIn > checkInInterval - warningPeriod) {
+            currentState = State.Warning;
+            emit WarningIssued(lastCheckIn + checkInInterval);
+        }
+    }
+
+    function executeInheritance() external {
+        updateState();
+        require(currentState == State.Triggered, "Not triggered yet");
+
+        uint256 balance = address(this).balance;
+        for (uint i = 0; i < beneficiaries.length; i++) {
+            uint256 amount = (balance * shares[i]) / 10000;
+            payable(beneficiaries[i]).transfer(amount);
+        }
+    }
+}</code></pre>
+
+        <h3>Progressive Warning System</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Days Since Check-In</th>
+                    <th>State</th>
+                    <th>Actions</th>
+                    <th>Recipients</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0-76</td>
+                    <td>Active</td>
+                    <td>None</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>77-90</td>
+                    <td>Warning</td>
+                    <td>Email + SMS notifications</td>
+                    <td>Owner only</td>
+                </tr>
+                <tr>
+                    <td>91-120</td>
+                    <td>Grace</td>
+                    <td>Daily notifications + executor alert</td>
+                    <td>Owner + Executor</td>
+                </tr>
+                <tr>
+                    <td>120+</td>
+                    <td>Triggered</td>
+                    <td>Inheritance execution enabled</td>
+                    <td>All parties</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Oracle Integration</h2>
+        <h3>Death Certificate Oracle</h3>
+        <p>Verifiable proof of death from government vital statistics systems:</p>
+        <pre><code>contract OracleInheritance {
+    address public owner;
+    address public oracleAddress;
+    bytes32 public ownerSSNHash; // Hashed for privacy
+
+    bool public deathVerified;
+    uint256 public deathTimestamp;
+    uint256 public requiredConfirmations = 3;
+    mapping(bytes32 => uint256) public confirmations;
+
+    event DeathReported(bytes32 indexed ssnHash, uint256 timestamp, address oracle);
+    event DeathConfirmed(uint256 confirmationCount);
+
+    function reportDeath(
+        bytes32 ssnHash,
+        uint256 timestamp,
+        bytes memory oracleSignature,
+        bytes32[] memory proof
+    ) external {
+        require(ssnHash == ownerSSNHash, "SSN mismatch");
+        require(verifyOracleSignature(oracleSignature), "Invalid oracle");
+        require(verifyMerkleProof(proof), "Invalid proof");
+
+        bytes32 reportHash = keccak256(abi.encodePacked(ssnHash, timestamp));
+        confirmations[reportHash]++;
+
+        emit DeathReported(ssnHash, timestamp, msg.sender);
+
+        if (confirmations[reportHash] >= requiredConfirmations && !deathVerified) {
+            deathVerified = true;
+            deathTimestamp = timestamp;
+            emit DeathConfirmed(confirmations[reportHash]);
+        }
+    }
+
+    function executeWithOracleProof() external {
+        require(deathVerified, "Death not verified");
+        require(block.timestamp > deathTimestamp + 30 days, "Contest period active");
+
+        // Execute inheritance distribution
+        distributeAssets();
+    }
+}</code></pre>
+
+        <h3>Multi-Oracle Consensus</h3>
+        <p>Requiring confirmations from multiple independent oracles prevents single points of failure and fraudulent triggers:</p>
+        <ul>
+            <li><strong>Government Oracles:</strong> Vital statistics offices from multiple jurisdictions</li>
+            <li><strong>Medical Oracles:</strong> Hospital systems and medical examiners</li>
+            <li><strong>Legal Oracles:</strong> Probate court systems and estate registries</li>
+            <li><strong>Consensus Threshold:</strong> Typically 3 of 5 oracles must agree</li>
+            <li><strong>Time Window:</strong> All confirmations must occur within reasonable timeframe</li>
+        </ul>
+
+        <h2>Conditional Inheritance Logic</h2>
+        <h3>Age-Based Distribution</h3>
+        <p>Smart contracts can enforce age requirements and staged distributions:</p>
+        <pre><code>contract ConditionalInheritance {
+    struct Beneficiary {
+        address wallet;
+        uint256 dateOfBirth;
+        uint256 allocation;
+        DistributionSchedule[] schedule;
+    }
+
+    struct DistributionSchedule {
+        uint256 ageRequired;
+        uint256 percentage; // Of beneficiary's total allocation
+    }
+
+    mapping(address => Beneficiary) public beneficiaries;
+
+    function claimInheritance(address beneficiary) external {
+        Beneficiary storage ben = beneficiaries[beneficiary];
+        require(ben.wallet != address(0), "Not a beneficiary");
+
+        uint256 age = (block.timestamp - ben.dateOfBirth) / 365 days;
+        uint256 claimableAmount = 0;
+
+        for (uint i = 0; i < ben.schedule.length; i++) {
+            if (age >= ben.schedule[i].ageRequired) {
+                uint256 portionAmount = (ben.allocation * ben.schedule[i].percentage) / 10000;
+                claimableAmount += portionAmount;
+            }
+        }
+
+        require(claimableAmount > 0, "No claimable amount yet");
+        payable(ben.wallet).transfer(claimableAmount);
+    }
+}</code></pre>
+
+        <h3>Educational Milestone Triggers</h3>
+        <p>Distributions contingent on completing education or other achievements:</p>
+        <ul>
+            <li><strong>Credential Verification:</strong> Integration with verifiable credential systems</li>
+            <li><strong>Educational Oracles:</strong> Universities issue on-chain degree confirmations</li>
+            <li><strong>Professional Certifications:</strong> Licensed professions verified through licensing boards</li>
+            <li><strong>Flexible Milestones:</strong> Owner can specify alternative qualifying achievements</li>
+        </ul>
+
+        <h2>Cross-Chain Inheritance Protocol</h2>
+        <h3>Coordinated Multi-Chain Execution</h3>
+        <p>Assets on multiple blockchains must be coordinated for simultaneous inheritance:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Challenge</th>
+                    <th>WIA-LEG-006 Solution</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Different trigger mechanisms</td>
+                    <td>Unified trigger oracle</td>
+                    <td>Cross-chain oracle network broadcasts trigger to all chains</td>
+                </tr>
+                <tr>
+                    <td>Timing synchronization</td>
+                    <td>Coordinated time-locks</td>
+                    <td>All chains use same trigger timestamp + buffer period</td>
+                </tr>
+                <tr>
+                    <td>Atomic execution</td>
+                    <td>Two-phase commit</td>
+                    <td>Prepare phase on all chains, then execute phase</td>
+                </tr>
+                <tr>
+                    <td>Failed execution recovery</td>
+                    <td>Rollback mechanisms</td>
+                    <td>If any chain fails, all chains can rollback to pre-execution state</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Bridge-Based Asset Transfer</h3>
+        <p>For assets that need to move between chains during inheritance:</p>
+        <ul>
+            <li><strong>Lock-and-Mint Bridges:</strong> Lock on source chain, mint equivalent on destination</li>
+            <li><strong>Burn-and-Mint Bridges:</strong> Burn wrapped assets, mint native on destination</li>
+            <li><strong>Atomic Swaps:</strong> Trustless exchange between chains using hash time-locked contracts</li>
+            <li><strong>Optimistic Bridges:</strong> Fast transfers with fraud proofs for security</li>
+        </ul>
+
+        <h2>Security Considerations</h2>
+        <h3>Formal Verification</h3>
+        <p>All WIA-LEG-006 standard smart contracts undergo formal mathematical verification:</p>
+        <ul>
+            <li><strong>Theorem Proving:</strong> Mathematical proof that contract behaves exactly as specified</li>
+            <li><strong>Model Checking:</strong> Exhaustive state space analysis to find potential vulnerabilities</li>
+            <li><strong>Symbolic Execution:</strong> Analysis of all possible execution paths</li>
+            <li><strong>Property Testing:</strong> Verification that critical properties (e.g., "only beneficiaries can receive funds") always hold</li>
+        </ul>
+
+        <h3>Audit Requirements</h3>
+        <p>Third-party security audits are mandatory before certification:</p>
+        <ul>
+            <li><strong>Tier 1 Auditors:</strong> Trail of Bits, ConsenSys Diligence, OpenZeppelin</li>
+            <li><strong>Multiple Audits:</strong> Minimum two independent audits from different firms</li>
+            <li><strong>Public Audit Reports:</strong> All findings and remediations published publicly</li>
+            <li><strong>Bug Bounty Programs:</strong> Ongoing rewards for discovering vulnerabilities</li>
+            <li><strong>Continuous Monitoring:</strong> Real-time analysis of deployed contracts</li>
+        </ul>
+
+        <h3>Emergency Mechanisms</h3>
+        <p>Safeguards for discovered vulnerabilities or emergency situations:</p>
+        <pre><code>contract EmergencyControls {
+    address public emergencyMultiSig;
+    bool public paused;
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract paused");
+        _;
+    }
+
+    function emergencyPause() external {
+        require(msg.sender == emergencyMultiSig, "Only emergency multisig");
+        paused = true;
+        emit EmergencyPause(block.timestamp);
+    }
+
+    function emergencyUnpause() external {
+        require(msg.sender == emergencyMultiSig, "Only emergency multisig");
+        require(block.timestamp > pauseTimestamp + 7 days, "Wait period");
+        paused = false;
+        emit EmergencyUnpause(block.timestamp);
+    }
+}</code></pre>
+
+        <h2>Gas Optimization</h2>
+        <p>Inheritance contracts are optimized to minimize transaction costs:</p>
+        <ul>
+            <li><strong>Batch Operations:</strong> Distribute to multiple beneficiaries in single transaction</li>
+            <li><strong>Storage Optimization:</strong> Pack related data into single storage slots</li>
+            <li><strong>Event Emission:</strong> Use indexed events for cheap off-chain data storage</li>
+            <li><strong>Computation Off-Chain:</strong> Complex calculations done off-chain, verified on-chain</li>
+            <li><strong>Layer 2 Deployment:</strong> Option to deploy on L2 networks for lower costs</li>
+        </ul>
+
+        <div class="key-takeaways">
+            <h3>Chapter Summary: Key Takeaways</h3>
+            <ol>
+                <li><strong>Multi-Sig Flexibility:</strong> 2-of-3 multi-signature wallets balance security with practical accessibility for inheritance scenarios.</li>
+                <li><strong>Dead Man's Switch Automation:</strong> Progressive warning systems and configurable inactivity periods enable trustless inheritance triggering.</li>
+                <li><strong>Oracle Integration:</strong> Multi-oracle consensus brings real-world events (death certificates, court orders) onto the blockchain verifiably.</li>
+                <li><strong>Conditional Logic:</strong> Smart contracts enforce age requirements, educational milestones, and complex distribution schedules automatically.</li>
+                <li><strong>Cross-Chain Coordination:</strong> Standardized protocols enable synchronized inheritance execution across multiple blockchain networks.</li>
+                <li><strong>Security First:</strong> Formal verification, multiple audits, emergency controls, and gas optimization ensure contracts are safe, reliable, and affordable.</li>
+            </ol>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain how a 2-of-3 multi-signature wallet works and why this configuration is optimal for most inheritance scenarios.</li>
+                <li>Describe the four states (Active, Warning, Grace, Triggered) of the dead man's switch implementation and what happens in each state.</li>
+                <li>Why is multi-oracle consensus important for death verification, and how does the system prevent fraudulent trigger attempts?</li>
+                <li>How do age-based distribution schedules work in smart contracts, and what challenges arise from on-chain age calculations?</li>
+                <li>What is the purpose of formal verification, and how does it differ from traditional smart contract auditing?</li>
+                <li>Explain the cross-chain coordination challenge and how WIA-LEG-006's two-phase commit protocol addresses it.</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <strong>Looking Ahead:</strong> Chapter 7 explores Phase 4: WIA Ecosystem Integration, examining how digital asset inheritance connects to other WIA standards for identity, legal documentation, notarization, and compliance. We'll see how the complete WIA ecosystem creates a comprehensive digital estate planning solution that bridges blockchain and traditional legal systems.
+        </div>
+
+        </div>
+</body>
+</html>

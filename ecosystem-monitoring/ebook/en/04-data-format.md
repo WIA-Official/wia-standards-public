@@ -561,8 +561,7 @@ Every dataset (collection of observations) MUST include comprehensive metadata:
 
   "access": {
     "license": "CC BY 4.0",
-    "restrictions": "Sensitive species locations (eagles, bats) obscured to 1km precision",
-    "citation": "선행 연구. Green River Watershed Biodiversity Monitoring 2020-2025. doi:10.1234/example"
+    "restrictions": "Sensitive species locations (eagles, bats) obscured to 1km precision"
   },
 
   "related_resources": {

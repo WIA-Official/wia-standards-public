@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol | WIA-ACS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #EF4444; --text: #f1f5f9; --text-secondary: #cbd5e1; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: var(--primary); text-decoration: none; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 6px; }
+        h1 { font-size: 2.5rem; color: var(--primary); margin: 2rem 0 1rem; }
+        h2 { font-size: 1.8rem; color: var(--primary); margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--bg-tertiary); }
+        h3 { font-size: 1.4rem; color: var(--text); margin: 1.5rem 0 1rem; }
+        p { margin: 1rem 0; color: var(--text-secondary); }
+        strong { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg-secondary); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--bg-tertiary); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: 600; }
+        .code-block { background: var(--bg-secondary); border: 1px solid var(--bg-tertiary); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        pre { font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text); }
+        .info-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .summary { background: var(--bg-secondary); border: 2px solid var(--primary); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: var(--text-secondary); }
+        li { margin: 0.5rem 0; }
+        .questions { background: var(--bg-secondary); padding: 2rem; border-radius: 8px; margin: 2rem 0; }
+        .questions h2 { border: none; margin-top: 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .questions li { margin: 1rem 0; color: var(--text); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Phase 3 - Protocol</h1>
+
+        <p>
+            Phase 3 of WIA-ACS establishes secure communication protocols ensuring end-to-end encryption,
+            authentication, and integrity for all access control operations. This chapter covers TLS 1.3 for
+            transport security, OAuth 2.0 and OpenID Connect for authorization and authentication, SAML 2.0
+            for enterprise single sign-on, and certificate management practices. These protocols form the
+            security backbone of WIA-ACS deployments.
+        </p>
+
+        <h2>Transport Layer Security (TLS 1.3)</h2>
+
+        <p>
+            All WIA-ACS communications must use TLS 1.3 or later for encryption and integrity. TLS 1.3 provides
+            significant security and performance improvements over earlier versions:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>TLS 1.2</th>
+                    <th>TLS 1.3</th>
+                    <th>Benefit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Handshake Round Trips</td>
+                    <td>2-RTT</td>
+                    <td>1-RTT (0-RTT resume)</td>
+                    <td>Faster connection establishment</td>
+                </tr>
+                <tr>
+                    <td>Cipher Suites</td>
+                    <td>37 options</td>
+                    <td>5 strong options</td>
+                    <td>Eliminate weak ciphers</td>
+                </tr>
+                <tr>
+                    <td>Perfect Forward Secrecy</td>
+                    <td>Optional</td>
+                    <td>Mandatory</td>
+                    <td>Past sessions remain secure if key compromised</td>
+                </tr>
+                <tr>
+                    <td>Encrypted Handshake</td>
+                    <td>Partial</td>
+                    <td>Complete</td>
+                    <td>Prevent metadata leakage</td>
+                </tr>
+                <tr>
+                    <td>Removed Features</td>
+                    <td>N/A</td>
+                    <td>RSA key exchange, SHA-1, MD5</td>
+                    <td>Eliminate known vulnerabilities</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Required Cipher Suites</h3>
+        <div class="code-block">
+            <pre>
+WIA-ACS Mandatory Cipher Suites (in order of preference):
+
+1. TLS_AES_256_GCM_SHA384
+   - AES-256 encryption with GCM mode
+   - SHA-384 for HMAC
+   - Strong security for highly sensitive data
+
+2. TLS_CHACHA20_POLY1305_SHA256
+   - ChaCha20 stream cipher
+   - Poly1305 authenticator
+   - Faster on mobile/embedded devices
+
+3. TLS_AES_128_GCM_SHA256
+   - AES-128 encryption with GCM
+   - SHA-256 for HMAC
+   - Good performance/security balance
+
+TLS Configuration:
+server {
+    listen 443 ssl http2;
+    ssl_protocols TLSv1.3;
+    ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256';
+    ssl_prefer_server_ciphers on;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+}
+            </pre>
+        </div>
+
+        <h3>Certificate Requirements</h3>
+        <ul>
+            <li><strong>Algorithm:</strong> RSA 4096-bit minimum, or ECDSA P-384/P-521</li>
+            <li><strong>Signature:</strong> SHA-256 or stronger (SHA-384, SHA-512)</li>
+            <li><strong>Validity:</strong> Maximum 397 days (13 months)</li>
+            <li><strong>Key Usage:</strong> Digital Signature, Key Encipherment</li>
+            <li><strong>Extended Key Usage:</strong> Server Authentication, Client Authentication</li>
+            <li><strong>Subject Alternative Names:</strong> All DNS names and IPs covered</li>
+            <li><strong>Certificate Transparency:</strong> SCT (Signed Certificate Timestamp) required</li>
+        </ul>
+
+        <h2>OAuth 2.0 Authorization Framework</h2>
+
+        <p>
+            WIA-ACS uses OAuth 2.0 for API authorization, enabling secure delegated access without sharing credentials.
+        </p>
+
+        <h3>Grant Types</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Grant Type</th>
+                    <th>Use Case</th>
+                    <th>Flow</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Authorization Code</td>
+                    <td>Web applications with server backend</td>
+                    <td>User redirects, exchanges code for token</td>
+                </tr>
+                <tr>
+                    <td>PKCE Extension</td>
+                    <td>Mobile apps, SPAs, public clients</td>
+                    <td>Authorization code + code verifier</td>
+                </tr>
+                <tr>
+                    <td>Client Credentials</td>
+                    <td>Server-to-server, batch jobs</td>
+                    <td>Client ID + secret → token</td>
+                </tr>
+                <tr>
+                    <td>Device Code</td>
+                    <td>Smart TVs, IoT devices, kiosks</td>
+                    <td>User authorizes on separate device</td>
+                </tr>
+                <tr>
+                    <td>Refresh Token</td>
+                    <td>Long-lived sessions</td>
+                    <td>Exchange refresh token for new access token</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Authorization Code Flow with PKCE</h3>
+        <div class="code-block">
+            <pre>
+1. Client generates code verifier and challenge
+   code_verifier = BASE64URL(RANDOM(32 bytes))
+   code_challenge = BASE64URL(SHA256(code_verifier))
+
+2. Authorization request
+   GET /oauth/authorize
+     ?response_type=code
+     &client_id=wia-acs-app-001
+     &redirect_uri=https://app.example.com/callback
+     &scope=read:credentials+write:credentials
+     &state=random_state_xyz123
+     &code_challenge=CHALLENGE_FROM_STEP1
+     &code_challenge_method=S256
+
+3. User authenticates and authorizes
+   → Returns authorization code
+
+4. Token exchange
+   POST /oauth/token
+   Content-Type: application/x-www-form-urlencoded
+
+   grant_type=authorization_code
+   &code=AUTH_CODE_FROM_STEP3
+   &redirect_uri=https://app.example.com/callback
+   &client_id=wia-acs-app-001
+   &code_verifier=VERIFIER_FROM_STEP1
+
+5. Response
+   {
+     "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+     "token_type": "Bearer",
+     "expires_in": 3600,
+     "refresh_token": "rt_abc123xyz789",
+     "scope": "read:credentials write:credentials"
+   }
+            </pre>
+        </div>
+
+        <h3>JWT Access Token Structure</h3>
+        <div class="code-block">
+            <pre>
+Header:
+{
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "wia-acs-key-2025-001"
+}
+
+Payload:
+{
+  "iss": "https://auth.example.com",
+  "sub": "usr-20251226-abc123",
+  "aud": ["https://api.example.com"],
+  "exp": 1735228800,
+  "iat": 1735225200,
+  "nbf": 1735225200,
+  "jti": "jwt-20251226-143217-xyz",
+  "scope": "read:credentials write:credentials",
+  "client_id": "wia-acs-app-001",
+  "roles": ["role-employee", "role-building-access"],
+  "clearance_level": 3
+}
+
+Signature:
+RS256(base64UrlEncode(header) + "." + base64UrlEncode(payload), privateKey)
+
+Token Validation:
+1. Verify signature using public key
+2. Check expiration (exp claim)
+3. Validate issuer (iss claim)
+4. Verify audience (aud claim)
+5. Check not-before time (nbf claim)
+6. Validate scopes match request
+            </pre>
+        </div>
+
+        <h2>OpenID Connect (OIDC)</h2>
+
+        <p>
+            OpenID Connect extends OAuth 2.0 to add authentication, providing standardized user identity information.
+        </p>
+
+        <h3>OIDC Authentication Flow</h3>
+        <div class="code-block">
+            <pre>
+1. Authorization request (adds openid scope)
+   GET /oauth/authorize
+     ?response_type=code
+     &client_id=wia-acs-app-001
+     &redirect_uri=https://app.example.com/callback
+     &scope=openid+profile+email
+     &state=xyz123
+     &nonce=abc789
+
+2. Token response (includes ID token)
+   {
+     "access_token": "...",
+     "token_type": "Bearer",
+     "expires_in": 3600,
+     "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+     "refresh_token": "..."
+   }
+
+3. ID Token Payload
+   {
+     "iss": "https://auth.example.com",
+     "sub": "usr-20251226-abc123",
+     "aud": "wia-acs-app-001",
+     "exp": 1735228800,
+     "iat": 1735225200,
+     "nonce": "abc789",
+     "auth_time": 1735225150,
+     "acr": "urn:mace:incommon:iap:silver",
+     "amr": ["pwd", "otp"],
+     "azp": "wia-acs-app-001",
+     "name": "John Doe",
+     "given_name": "John",
+     "family_name": "Doe",
+     "email": "john.doe@example.com",
+     "email_verified": true
+   }
+
+4. UserInfo endpoint (optional, for additional claims)
+   GET /oauth/userinfo
+   Authorization: Bearer ACCESS_TOKEN
+
+   Response:
+   {
+     "sub": "usr-20251226-abc123",
+     "name": "John Doe",
+     "email": "john.doe@example.com",
+     "department": "Engineering",
+     "title": "Senior Software Engineer"
+   }
+            </pre>
+        </div>
+
+        <h2>SAML 2.0 for Enterprise SSO</h2>
+
+        <p>
+            SAML (Security Assertion Markup Language) enables single sign-on across enterprise applications,
+            particularly for organizations using Active Directory, Okta, Azure AD, or other identity providers.
+        </p>
+
+        <h3>SAML Authentication Flow</h3>
+        <div class="code-block">
+            <pre>
+Service Provider (SP) Initiated Flow:
+
+1. User accesses WIA-ACS application
+   GET https://acs.example.com/secure-area
+
+2. SP generates SAML AuthnRequest
+   &lt;samlp:AuthnRequest
+       xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+       ID="id-abc123"
+       Version="2.0"
+       IssueInstant="2025-12-26T14:32:17Z"
+       Destination="https://idp.example.com/saml/sso"
+       AssertionConsumerServiceURL="https://acs.example.com/saml/acs"&gt;
+       &lt;saml:Issuer&gt;https://acs.example.com&lt;/saml:Issuer&gt;
+       &lt;samlp:NameIDPolicy
+           Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+           AllowCreate="true"/&gt;
+       &lt;samlp:RequestedAuthnContext Comparison="exact"&gt;
+           &lt;saml:AuthnContextClassRef&gt;
+               urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport
+           &lt;/saml:AuthnContextClassRef&gt;
+       &lt;/samlp:RequestedAuthnContext&gt;
+   &lt;/samlp:AuthnRequest&gt;
+
+3. Browser redirects to IdP
+   HTTP 302 https://idp.example.com/saml/sso
+   ?SAMLRequest=BASE64(DEFLATE(AuthnRequest))
+   &RelayState=original-url-state
+
+4. User authenticates at IdP
+   (Username/password, MFA, etc.)
+
+5. IdP generates SAML Response with assertion
+   &lt;samlp:Response
+       xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+       ID="response-xyz789"
+       IssueInstant="2025-12-26T14:33:00Z"
+       Destination="https://acs.example.com/saml/acs"&gt;
+       &lt;saml:Issuer&gt;https://idp.example.com&lt;/saml:Issuer&gt;
+       &lt;samlp:Status&gt;
+           &lt;samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/&gt;
+       &lt;/samlp:Status&gt;
+       &lt;saml:Assertion ID="assertion-123" IssueInstant="2025-12-26T14:33:00Z"&gt;
+           &lt;saml:Subject&gt;
+               &lt;saml:NameID&gt;john.doe@example.com&lt;/saml:NameID&gt;
+               &lt;saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"&gt;
+                   &lt;saml:SubjectConfirmationData
+                       NotOnOrAfter="2025-12-26T14:38:00Z"
+                       Recipient="https://acs.example.com/saml/acs"/&gt;
+               &lt;/saml:SubjectConfirmation&gt;
+           &lt;/saml:Subject&gt;
+           &lt;saml:AttributeStatement&gt;
+               &lt;saml:Attribute Name="email"&gt;
+                   &lt;saml:AttributeValue&gt;john.doe@example.com&lt;/saml:AttributeValue&gt;
+               &lt;/saml:Attribute&gt;
+               &lt;saml:Attribute Name="department"&gt;
+                   &lt;saml:AttributeValue&gt;Engineering&lt;/saml:AttributeValue&gt;
+               &lt;/saml:Attribute&gt;
+               &lt;saml:Attribute Name="role"&gt;
+                   &lt;saml:AttributeValue&gt;employee&lt;/saml:AttributeValue&gt;
+                   &lt;saml:AttributeValue&gt;engineer&lt;/saml:AttributeValue&gt;
+               &lt;/saml:Attribute&gt;
+           &lt;/saml:AttributeStatement&gt;
+       &lt;/saml:Assertion&gt;
+   &lt;/samlp:Response&gt;
+
+6. SP validates assertion signature and creates session
+7. User redirected to original URL (RelayState)
+            </pre>
+        </div>
+
+        <h3>SAML Security Requirements</h3>
+        <ul>
+            <li><strong>Signature validation:</strong> All assertions must be signed with RSA-SHA256 or stronger</li>
+            <li><strong>Certificate verification:</strong> Validate IdP certificate chain and expiration</li>
+            <li><strong>Timestamp validation:</strong> Check NotBefore, NotOnOrAfter, IssueInstant</li>
+            <li><strong>Audience restriction:</strong> Verify assertion intended for this SP</li>
+            <li><strong>Replay prevention:</strong> Track assertion IDs to prevent replay attacks</li>
+            <li><strong>Encrypted assertions:</strong> Optional but recommended for sensitive data</li>
+        </ul>
+
+        <h2>Certificate Management</h2>
+
+        <p>
+            Proper certificate lifecycle management is critical for WIA-ACS security:
+        </p>
+
+        <h3>Certificate Hierarchy</h3>
+        <div class="code-block">
+            <pre>
+WIA-ACS PKI Structure:
+
+Root CA (Offline, air-gapped storage)
+├── Validity: 20 years
+├── Key Size: RSA 4096 or ECDSA P-521
+└── Purpose: Signs intermediate CAs only
+
+    └── Intermediate CA (Online, HSM-protected)
+        ├── Validity: 10 years
+        ├── Key Size: RSA 4096 or ECDSA P-384
+        └── Purpose: Signs end-entity certificates
+
+            ├── TLS Server Certificates
+            │   ├── Validity: 397 days (13 months)
+            │   ├── Auto-renewal: 30 days before expiry
+            │   └── Usage: API servers, web portals
+
+            ├── TLS Client Certificates
+            │   ├── Validity: 2 years
+            │   ├── User-specific or device-specific
+            │   └── Usage: Mutual TLS authentication
+
+            ├── Code Signing Certificates
+            │   ├── Validity: 3 years
+            │   ├── EV (Extended Validation) recommended
+            │   └── Usage: Firmware, software updates
+
+            └── Smart Card Certificates
+                ├── Validity: 3 years
+                ├── Stored on PIV/CAC cards
+                └── Usage: Physical + logical access
+            </pre>
+        </div>
+
+        <h3>Automated Certificate Renewal</h3>
+        <div class="code-block">
+            <pre>
+ACME Protocol (Let's Encrypt compatible):
+
+1. Certificate request
+   POST /acme/new-order
+   {
+     "identifiers": [
+       {"type": "dns", "value": "api.example.com"},
+       {"type": "dns", "value": "acs.example.com"}
+     ]
+   }
+
+2. Challenge authorization
+   DNS-01: Set TXT record _acme-challenge.example.com
+   HTTP-01: Serve file at /.well-known/acme-challenge/TOKEN
+   TLS-ALPN-01: Serve self-signed cert with challenge
+
+3. CSR submission
+   POST /acme/finalize/{orderId}
+   {
+     "csr": "BASE64(DER-encoded CSR)"
+   }
+
+4. Certificate issuance
+   Download from /acme/cert/{certId}
+
+Renewal Workflow:
+┌─────────────────────────────────────────────┐
+│ Certificate Lifecycle Automation            │
+├─────────────────────────────────────────────┤
+│ 90 days:  Certificate issued               │
+│ 60 days:  Renewal notification             │
+│ 30 days:  Automatic renewal triggered      │
+│ 29 days:  New certificate issued           │
+│ 28 days:  Gradual rollout to servers       │
+│  7 days:  Old certificate deprecated       │
+│  0 days:  Old certificate expired          │
+└─────────────────────────────────────────────┘
+            </pre>
+        </div>
+
+        <h2>Protocol Security Best Practices</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Security Control</th>
+                    <th>Implementation</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>HSTS</td>
+                    <td>Strict-Transport-Security: max-age=31536000; includeSubDomains</td>
+                    <td>Force HTTPS, prevent downgrade attacks</td>
+                </tr>
+                <tr>
+                    <td>Certificate Pinning</td>
+                    <td>Public-Key-Pins: pin-sha256="..."; max-age=5184000</td>
+                    <td>Prevent MITM with rogue certificates</td>
+                </tr>
+                <tr>
+                    <td>CAA Records</td>
+                    <td>example.com. CAA 0 issue "letsencrypt.org"</td>
+                    <td>Restrict which CAs can issue certificates</td>
+                </tr>
+                <tr>
+                    <td>OCSP Stapling</td>
+                    <td>Server provides fresh OCSP response</td>
+                    <td>Faster cert validation, privacy preservation</td>
+                </tr>
+                <tr>
+                    <td>Token Binding</td>
+                    <td>Bind tokens to TLS channel</td>
+                    <td>Prevent token theft and replay</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p>
+                This chapter covered Phase 3 of WIA-ACS: secure communication protocols. We explored TLS 1.3 for
+                transport security, OAuth 2.0 for authorization, OpenID Connect for authentication, SAML 2.0 for
+                enterprise SSO, and comprehensive certificate management practices. These protocols ensure all
+                WIA-ACS communications are encrypted, authenticated, and integrity-protected.
+            </p>
+
+            <h3>Key Takeaways</h3>
+            <ol>
+                <li>TLS 1.3 is mandatory for all WIA-ACS communications, providing encryption, perfect forward secrecy, and reduced latency</li>
+                <li>OAuth 2.0 with PKCE enables secure API authorization for web, mobile, and server applications</li>
+                <li>OpenID Connect extends OAuth 2.0 to provide standardized user authentication and identity claims</li>
+                <li>SAML 2.0 enables enterprise single sign-on integration with existing identity providers</li>
+                <li>Automated certificate management using ACME protocol prevents expiration-related outages</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the key improvements of TLS 1.3 over TLS 1.2? Why is perfect forward secrecy important?</li>
+                <li>Explain the OAuth 2.0 authorization code flow with PKCE. Why is PKCE critical for mobile applications?</li>
+                <li>What is the difference between an OAuth 2.0 access token and an OpenID Connect ID token?</li>
+                <li>Describe the SAML 2.0 authentication flow. How does the service provider validate the assertion's authenticity?</li>
+                <li>Design a certificate hierarchy for a global enterprise with 50 locations. What validity periods would you use?</li>
+                <li>Why is automated certificate renewal important? What problems does it solve?</li>
+            </ol>
+        </div>
+
+        <div class="info-box">
+            <h3>Looking Ahead</h3>
+            <p>
+                With secure protocols established, Chapter 7 examines Phase 4: Integration with existing systems.
+                We'll explore adapters for LDAP, Active Directory, PACS systems, biometric devices, and IoT hardware,
+                enabling WIA-ACS to work seamlessly with current infrastructure.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

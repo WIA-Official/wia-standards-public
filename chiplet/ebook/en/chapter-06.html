@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Integration and Verification | WIA-CHIPLET</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: Integration and Verification</h1>
+
+    <p>This chapter covers the critical EDA tools, design flows, and verification methodologies required for successful chiplet system development. Integration and verification of multi-die systems present unique challenges that require specialized approaches beyond traditional monolithic chip development.</p>
+
+    <h2>EDA Tool Ecosystem for Chiplets</h2>
+
+    <p>Chiplet design requires an extended EDA tool ecosystem that handles multi-die design, advanced packaging, and system-level integration. The traditional single-die tool flow must be augmented with specialized capabilities.</p>
+
+    <div class="highlight">
+        <strong>Tool Chain Evolution</strong>
+        <p>EDA vendors have significantly expanded their offerings to support chiplet design. New tools address multi-die planning, interposer design, 3D-IC assembly, and system-level verification that spans multiple chiplets from potentially different design sources.</p>
+    </div>
+
+    <h3>Chiplet Design Tool Flow</h3>
+
+    <pre><code>// Chiplet EDA Tool Flow
+interface ChipletEDAFlow {
+    // System-Level Design
+    systemLevel: {
+        tools: [
+            "System architecture exploration",
+            "Chiplet partitioning analysis",
+            "Interconnect planning",
+            "Power/thermal budgeting"
+        ];
+        inputs: ["System requirements", "IP catalog"];
+        outputs: ["Chiplet specifications", "Interface definitions"];
+    };
+
+    // Individual Chiplet Design
+    chipletDesign: {
+        rtlDesign: {
+            tools: ["HDL editors", "Synthesis", "Linting"];
+            standard: "Existing single-die flow";
+        };
+        physicalDesign: {
+            tools: ["Place & Route", "DRC/LVS", "Extraction"];
+            additions: ["D2D interface placement", "PHY integration"];
+        };
+        signoff: {
+            tools: ["Timing", "Power", "EM/IR", "SI"];
+            additions: ["D2D timing constraints", "Package-aware analysis"];
+        };
+    };
+
+    // Package Design
+    packageDesign: {
+        tools: [
+            "Interposer/substrate design",
+            "Bump/via planning",
+            "Signal routing",
+            "Power distribution network",
+            "Thermal analysis"
+        ];
+        integration: {
+            importChipletAbstracts: boolean;
+            coDesign: boolean;
+        };
+    };
+
+    // System Integration
+    systemIntegration: {
+        tools: [
+            "Multi-die assembly",
+            "System-level timing",
+            "Power integrity",
+            "Thermal co-simulation",
+            "Signal integrity"
+        ];
+        verification: SystemVerificationTools;
+    };
+}
+
+// Tool Interoperability Standards
+const toolInterop = {
+    dataFormats: {
+        design: ["LEF/DEF", "OpenAccess", "GDSII", "OASIS"],
+        timing: ["Liberty", "SDF", "SPEF"],
+        package: ["APD", "ODB++", "Gerber"],
+        verification: ["UPF", "CPF", "IBIS-AMI"]
+    },
+    exchangeFormats: {
+        chipletAbstract: "3D-IC Exchange Format",
+        systemModel: "SystemVerilog + IP-XACT"
+    }
+};</code></pre>
+
+    <h2>Multi-Die Physical Design</h2>
+
+    <p>Physical design for chiplet systems extends traditional single-die methodology to address die-to-die interfaces, package constraints, and system-level optimization.</p>
+
+    <h3>Die-to-Die Interface Physical Design</h3>
+
+    <pre><code>// D2D PHY Physical Implementation
+interface D2DPhysicalDesign {
+    // Bump Planning
+    bumpPlan: {
+        pitch: number;            // μm (25-130 typical)
+        diameter: number;         // μm
+        arrangement: "Array" | "Peripheral" | "Mixed";
+        signalAssignment: SignalToBumpMap;
+        powerGroundRatio: number; // P/G bumps per signal
+    };
+
+    // PHY Placement
+    phyPlacement: {
+        location: "Die edge" | "Distributed";
+        orientation: "Horizontal" | "Vertical";
+        abutmentRules: AbutmentSpec;
+        keepouts: KeepoutZone[];
+    };
+
+    // Routing Constraints
+    routing: {
+        matchedLengths: SignalGroup[];
+        impedanceTargets: ImpedanceSpec[];
+        shielding: ShieldingRequirements;
+        crosstalkLimits: CrosstalkSpec;
+    };
+
+    // Power Delivery
+    powerDelivery: {
+        dedicatedPGBumps: number;
+        onDieDecap: CapacitorSpec;
+        irDropBudget: number;      // mV
+    };
+}
+
+// PHY-Aware Floorplanning
+class ChipletFloorplanner {
+    planFloorplan(chiplet: ChipletSpec, d2dInterface: D2DSpec): Floorplan {
+        // Reserve area for D2D PHY
+        const phyArea = this.calculatePHYArea(d2dInterface);
+
+        // Place PHY at die edge
+        const phyPlacement = this.placePHY(d2dInterface, phyArea);
+
+        // Plan signal routes from core to PHY
+        const routeEstimates = this.estimateRouting(phyPlacement);
+
+        // Optimize core placement considering PHY access
+        const corePlacement = this.optimizeCoreForPHY(phyPlacement);
+
+        return {
+            phyRegion: phyPlacement,
+            coreRegion: corePlacement,
+            routingChannels: routeEstimates,
+            powerGrid: this.planPowerGrid(phyPlacement)
+        };
+    }
+}</code></pre>
+
+    <h3>Interposer and Package Design</h3>
+
+    <table>
+        <tr>
+            <th>Design Aspect</th>
+            <th>Silicon Interposer</th>
+            <th>Organic Substrate</th>
+            <th>Glass Interposer</th>
+        </tr>
+        <tr>
+            <td>Min Line/Space</td>
+            <td>0.4/0.4 μm</td>
+            <td>5/5 μm</td>
+            <td>2/2 μm</td>
+        </tr>
+        <tr>
+            <td>Via Pitch</td>
+            <td>40-100 μm (TSV)</td>
+            <td>200+ μm</td>
+            <td>50-100 μm (TGV)</td>
+        </tr>
+        <tr>
+            <td>Metal Layers</td>
+            <td>4-8</td>
+            <td>8-20</td>
+            <td>4-6</td>
+        </tr>
+        <tr>
+            <td>Bandwidth Density</td>
+            <td>Very High</td>
+            <td>Low-Medium</td>
+            <td>High</td>
+        </tr>
+        <tr>
+            <td>Cost</td>
+            <td>High</td>
+            <td>Low</td>
+            <td>Medium</td>
+        </tr>
+    </table>
+
+    <pre><code>// Interposer Design Flow
+interface InterposerDesignFlow {
+    // Input: Chiplet placements and I/O locations
+    inputs: {
+        chipletAbstracts: ChipletAbstract[];
+        placementConstraints: PlacementConstraint[];
+        bandwidthRequirements: BandwidthMap;
+    };
+
+    // Chiplet Placement Optimization
+    placement: {
+        objectives: [
+            "Minimize total wirelength",
+            "Meet thermal constraints",
+            "Optimize for assembly yield",
+            "Balance routing density"
+        ];
+        constraints: [
+            "Minimum die spacing",
+            "Edge alignment for testing",
+            "HBM placement requirements"
+        ];
+    };
+
+    // Routing
+    routing: {
+        signalRouting: {
+            layers: number;
+            strategy: "River routing" | "Area routing";
+            matchingGroups: SignalMatchGroup[];
+        };
+        powerRouting: {
+            planes: number;
+            currentDensity: number;      // A/mm²
+            irDropLimit: number;         // mV
+        };
+    };
+
+    // Verification
+    verification: {
+        drc: DesignRuleCheck;
+        si: SignalIntegrityAnalysis;
+        pi: PowerIntegrityAnalysis;
+        thermal: ThermalAnalysis;
+    };
+}</code></pre>
+
+    <h2>Verification Methodology</h2>
+
+    <p>Chiplet verification spans multiple levels, from individual chiplet functionality to complete system integration. A comprehensive verification strategy must address challenges unique to multi-die systems.</p>
+
+    <div class="highlight">
+        <strong>Verification Complexity</strong>
+        <p>Chiplet systems can exceed the simulation capacity of traditional approaches. A 4-chiplet system might have 100 billion transistors, far beyond practical full-system simulation. Verification strategies must employ hierarchical methods, abstraction, and emulation.</p>
+    </div>
+
+    <h3>Multi-Level Verification Strategy</h3>
+
+    <pre><code>// Chiplet Verification Hierarchy
+interface VerificationStrategy {
+    // Level 1: Individual Chiplet Verification
+    chipletLevel: {
+        approach: "Full UVM environment per chiplet";
+        scope: "Complete functionality within chiplet";
+        coverage: {
+            functional: "100% plan coverage",
+            code: ">95% line, branch, toggle",
+            assertions: ">98% pass rate"
+        };
+        methods: ["Simulation", "Formal", "Emulation"];
+    };
+
+    // Level 2: D2D Interface Verification
+    interfaceLevel: {
+        approach: "Protocol-aware verification";
+        scope: "D2D protocol compliance and interoperability";
+        components: {
+            protocolVIP: "UCIe/BoW VIP",
+            complianceTests: "Standard compliance suite",
+            stressTests: "Corner cases and error injection"
+        };
+        methods: ["VIP-based simulation", "Formal protocol checking"];
+    };
+
+    // Level 3: System Integration Verification
+    systemLevel: {
+        approach: "Virtual platform and emulation";
+        scope: "Multi-chiplet interaction, system behavior";
+        abstraction: {
+            transactionLevel: "TLM 2.0 models",
+            cyclAccurate: "RTL + abstract models",
+            fullRTL: "FPGA/emulation only"
+        };
+        methods: ["Virtual platform", "FPGA prototyping", "Emulation"];
+    };
+
+    // Level 4: Silicon Validation
+    siliconLevel: {
+        approach: "Production-like testing";
+        scope: "Full system in silicon";
+        methods: ["ATE testing", "System-level testing", "Characterization"];
+    };
+}
+
+// D2D Interface VIP
+class UCIeVIP {
+    // Protocol checking
+    checkProtocolCompliance(transaction: UCIeTransaction): CheckResult {
+        return {
+            formatValid: this.checkFormat(transaction),
+            timingValid: this.checkTiming(transaction),
+            flowControlValid: this.checkFlowControl(transaction),
+            errorHandlingValid: this.checkErrorHandling(transaction)
+        };
+    }
+
+    // Coverage collection
+    collectCoverage(transaction: UCIeTransaction): void {
+        this.coverTransactionType(transaction.type);
+        this.coverLaneWidth(transaction.width);
+        this.coverSpeed(transaction.speed);
+        this.coverErrorCases(transaction.errors);
+    }
+
+    // Stimulus generation
+    generateStimulus(scenario: TestScenario): UCIeTransaction[] {
+        return this.scenarioToTransactions(scenario);
+    }
+}</code></pre>
+
+    <h3>Virtual Platform for System Verification</h3>
+
+    <pre><code>// Virtual Platform Architecture
+interface VirtualPlatform {
+    // Platform Components
+    components: {
+        chipletModels: Map&lt;ChipletId, ChipletModel&gt;;
+        interconnectModel: D2DInterconnectModel;
+        memoryModels: MemorySubsystem;
+        peripheralModels: PeripheralSubsystem;
+    };
+
+    // Model Abstraction Levels
+    abstraction: {
+        functional: {
+            speed: "1M+ cycles/second";
+            accuracy: "Functional only";
+            useCase: "Software development";
+        };
+        approximately_timed: {
+            speed: "100K cycles/second";
+            accuracy: "~10% timing accuracy";
+            useCase: "Performance estimation";
+        };
+        cycle_accurate: {
+            speed: "1K cycles/second";
+            accuracy: "Cycle accurate";
+            useCase: "Hardware verification";
+        };
+    };
+
+    // Verification Capabilities
+    verification: {
+        assertion_checking: boolean;
+        coverage_collection: boolean;
+        debug_access: boolean;
+        checkpoint_restore: boolean;
+    };
+}
+
+// TLM Model for Chiplet
+class ChipletTLMModel {
+    // Transaction-level interface
+    async initiatorSocket(trans: TLMTransaction): Promise&lt;TLMResponse&gt; {
+        // Process transaction at appropriate abstraction
+        if (trans.type === 'READ') {
+            return await this.handleRead(trans);
+        } else {
+            return await this.handleWrite(trans);
+        }
+    }
+
+    // D2D Interface Model
+    d2dInterface: {
+        sendTransaction(trans: D2DTransaction): void;
+        receiveTransaction(): D2DTransaction;
+        modelLatency: number;  // Approximate cycles
+        modelBandwidth: number;  // Approximate rate
+    };
+}</code></pre>
+
+    <h2>Design for Test (DFT)</h2>
+
+    <p>Chiplet systems require sophisticated DFT strategies that address individual chiplet testing, D2D interface testing, and system-level test access.</p>
+
+    <pre><code>// Chiplet DFT Architecture
+interface ChipletDFTArchitecture {
+    // Per-Chiplet DFT
+    chipletDFT: {
+        scanChains: ScanChainConfig;
+        bist: {
+            logicBIST: LBISTConfig;
+            memoryBIST: MBISTConfig;
+            serdsBIST: SerDesBISTConfig;
+        };
+        compression: CompressionConfig;
+        testAccess: TAP_IEEE1149_1;
+    };
+
+    // D2D Interface Testing
+    d2dTesting: {
+        loopbackModes: [
+            "Near-end loopback",
+            "Far-end loopback",
+            "Through-interposer loopback"
+        ];
+        bist: D2D_BISTConfig;
+        eyeDiagram: boolean;
+        marginTest: boolean;
+    };
+
+    // System-Level Test Access
+    systemTestAccess: {
+        testArchitecture: "IEEE 1838" | "Custom";
+        multiDieJTAG: {
+            topology: "Daisy chain" | "Star";
+            dieBridging: boolean;
+        };
+        externalAccess: TestAccessPort;
+    };
+}
+
+// IEEE 1838 3D-IC Test Standard
+interface IEEE1838TestArch {
+    // Die Wrapper
+    dieWrapper: {
+        wrapperCells: WrapperCell[];
+        wrapperInstructionReg: WIR;
+        serialDataPath: boolean;
+        parallelDataPath: boolean;
+    };
+
+    // Multi-Die Test Access
+    multiDieAccess: {
+        testAccessPort: TAP;
+        dieBridge: DieBridgeConfig;
+        throughDieTest: boolean;
+    };
+
+    // Test Scheduling
+    testScheduling: {
+        concurrent: boolean;      // Test multiple dies
+        sequentialOrder: DieId[];
+        resourceSharing: boolean;
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary</strong>
+        <p>Integration and verification of chiplet systems require extended EDA tool capabilities, multi-level verification strategies, and sophisticated DFT architectures. Success depends on proper tool flows, verification IP for D2D protocols, virtual platform development, and testability planning from the earliest design stages.</p>
+    </div>
+</body>
+</html>

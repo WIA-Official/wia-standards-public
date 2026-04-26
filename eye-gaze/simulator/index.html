@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Eye Gaze - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        .gaze-canvas-container { position: relative; margin: 20px auto; }
+        .gaze-canvas { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; display: block; margin: 0 auto; cursor: none; }
+        .gaze-cursor { position: absolute; width: 40px; height: 40px; border: 3px solid var(--primary); border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); transition: all 0.05s; box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
+        .gaze-cursor::after { content: ''; position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; transform: translate(-50%, -50%); }
+
+        .eye-display { display: flex; justify-content: center; gap: 50px; margin: 20px 0; }
+        .eye-box { text-align: center; }
+        .eye-visual { width: 80px; height: 80px; border: 3px solid var(--border); border-radius: 50%; background: var(--bg); position: relative; margin: 0 auto 10px; }
+        .eye-pupil { width: 30px; height: 30px; background: var(--primary); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: all 0.1s; }
+        .eye-label { font-size: 0.85rem; color: var(--text-muted); }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-item .value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .stat-item .label { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+        .calibration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 400px; height: 300px; margin: 20px auto; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 30px; }
+        .calib-point { width: 30px; height: 30px; border-radius: 50%; background: var(--border); cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; margin: auto; }
+        .calib-point:hover { background: var(--primary); transform: scale(1.2); }
+        .calib-point.active { background: var(--warning); animation: pulse 1s infinite; }
+        .calib-point.done { background: var(--secondary); }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+
+        .fixation-heatmap { width: 100%; height: 250px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; position: relative; overflow: hidden; }
+        .heat-point { position: absolute; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle, rgba(139, 92, 246, 0.8) 0%, rgba(139, 92, 246, 0) 70%); transform: translate(-50%, -50%); }
+
+        .control-demo { display: flex; gap: 20px; margin: 20px 0; }
+        .control-area { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-height: 200px; }
+        .control-btn { width: 100%; padding: 20px; margin: 10px 0; background: var(--bg-card); border: 2px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; cursor: pointer; transition: all 0.3s; }
+        .control-btn:hover { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .control-btn.dwelling { border-color: var(--warning); background: rgba(245, 158, 11, 0.2); }
+        .control-btn.activated { border-color: var(--secondary); background: rgba(16, 185, 129, 0.2); }
+
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0; }
+        .device-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .device-card:hover { border-color: var(--primary); }
+        .device-card.selected { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .device-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .device-card .name { font-weight: 600; margin-bottom: 5px; }
+        .device-card .specs { font-size: 0.8rem; color: var(--text-muted); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .calibration-grid { width: 300px; height: 220px; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Eye Gaze</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">👁️ WIA Eye Gaze</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Eye Tracking Interoperability" data-ko="시선 추적 상호운용성">Eye Tracking Interoperability</h1>
+            <p data-en="Universal gaze data format for assistive technology" data-ko="보조 기술을 위한 범용 시선 데이터 형식">Universal gaze data format for assistive technology</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="👁️ Gaze" data-ko="👁️ 시선">👁️ Gaze</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🎯 Fixation" data-ko="🎯 응시">🎯 Fixation</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📐 Calibration" data-ko="📐 보정">📐 Calibration</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🖱️ Control" data-ko="🖱️ 제어">🖱️ Control</div>
+            <div class="tab" onclick="showPanel(4)" data-en="⚙️ Device" data-ko="⚙️ 기기">⚙️ Device</div>
+        </div>
+
+        <!-- Panel 0: Gaze -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="👁️ Real-time Gaze Tracking" data-ko="👁️ 실시간 시선 추적">👁️ Real-time Gaze Tracking</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Move your mouse to simulate eye tracking" data-ko="마우스를 움직여 시선 추적을 시뮬레이션하세요">Move your mouse to simulate</p>
+
+            <div class="gaze-canvas-container">
+                <canvas id="gazeCanvas" class="gaze-canvas" width="600" height="400"></canvas>
+                <div class="gaze-cursor" id="gazeCursor"></div>
+            </div>
+
+            <div class="eye-display">
+                <div class="eye-box">
+                    <div class="eye-visual">
+                        <div class="eye-pupil" id="leftPupil"></div>
+                    </div>
+                    <div class="eye-label" data-en="Left Eye" data-ko="왼쪽 눈">Left Eye</div>
+                </div>
+                <div class="eye-box">
+                    <div class="eye-visual">
+                        <div class="eye-pupil" id="rightPupil"></div>
+                    </div>
+                    <div class="eye-label" data-en="Right Eye" data-ko="오른쪽 눈">Right Eye</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="gazeX">0.50</div>
+                    <div class="label">X (normalized)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="gazeY">0.50</div>
+                    <div class="label">Y (normalized)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="confidence">0.95</div>
+                    <div class="label" data-en="Confidence" data-ko="신뢰도">Confidence</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="sampleRate">60</div>
+                    <div class="label" data-en="Hz" data-ko="Hz">Hz</div>
+                </div>
+            </div>
+
+            <div class="output" id="gazeOutput"></div>
+        </div>
+
+        <!-- Panel 1: Fixation -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🎯 Fixation Detection" data-ko="🎯 응시점 감지">🎯 Fixation Detection</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Detect when gaze stays in one location" data-ko="시선이 한 위치에 머무는 것을 감지">Detect fixation points</p>
+
+            <div class="sub-section">
+                <h4 data-en="Fixation Heatmap" data-ko="응시점 히트맵">Fixation Heatmap</h4>
+                <div class="fixation-heatmap" id="heatmap"></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="fixCount">0</div>
+                    <div class="label" data-en="Fixations" data-ko="응시 횟수">Fixations</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="avgDwell">0</div>
+                    <div class="label" data-en="Avg Dwell (ms)" data-ko="평균 응시시간">Avg Dwell (ms)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="saccadeCount">0</div>
+                    <div class="label" data-en="Saccades" data-ko="도약운동">Saccades</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="blinkCount">0</div>
+                    <div class="label" data-en="Blinks" data-ko="눈깜빡임">Blinks</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="addFixation()" data-en="➕ Add Fixation" data-ko="➕ 응시점 추가">➕ Add Fixation</button>
+                <button class="btn btn-secondary" onclick="clearHeatmap()" data-en="🗑️ Clear" data-ko="🗑️ 초기화">🗑️ Clear</button>
+            </div>
+            <div class="output" id="fixationOutput"></div>
+        </div>
+
+        <!-- Panel 2: Calibration -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📐 Calibration" data-ko="📐 캘리브레이션">📐 Calibration</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="9-point calibration for accurate tracking" data-ko="정확한 추적을 위한 9점 보정">9-point calibration</p>
+
+            <div class="sub-section">
+                <h4 data-en="Look at each point" data-ko="각 점을 바라보세요">Look at each point</h4>
+                <div class="calibration-grid" id="calibGrid"></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="calibProgress">0/9</div>
+                    <div class="label" data-en="Progress" data-ko="진행률">Progress</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="calibAccuracy">--</div>
+                    <div class="label" data-en="Accuracy (°)" data-ko="정확도 (°)">Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="calibStatus">Ready</div>
+                    <div class="label" data-en="Status" data-ko="상태">Status</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startCalibration()" data-en="▶️ Start Calibration" data-ko="▶️ 보정 시작">▶️ Start Calibration</button>
+                <button class="btn btn-secondary" onclick="resetCalibration()" data-en="🔄 Reset" data-ko="🔄 초기화">🔄 Reset</button>
+            </div>
+            <div class="output" id="calibOutput"></div>
+        </div>
+
+        <!-- Panel 3: Control -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🖱️ Gaze Control" data-ko="🖱️ 시선 제어">🖱️ Gaze Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Control interface with dwell-click" data-ko="응시 클릭으로 인터페이스 제어">Control with dwell-click</p>
+
+            <div class="control-demo">
+                <div class="control-area">
+                    <h4 style="color: var(--primary); margin-bottom: 15px;" data-en="Dwell Click Buttons" data-ko="응시 클릭 버튼">Dwell Click Buttons</h4>
+                    <button class="control-btn" id="ctrlBtn1" onmouseenter="startDwell(1)" onmouseleave="stopDwell(1)" data-en="📧 Open Email" data-ko="📧 이메일 열기">📧 Open Email</button>
+                    <button class="control-btn" id="ctrlBtn2" onmouseenter="startDwell(2)" onmouseleave="stopDwell(2)" data-en="🌐 Browse Web" data-ko="🌐 웹 브라우저">🌐 Browse Web</button>
+                    <button class="control-btn" id="ctrlBtn3" onmouseenter="startDwell(3)" onmouseleave="stopDwell(3)" data-en="📝 Text Editor" data-ko="📝 텍스트 편집">📝 Text Editor</button>
+                </div>
+                <div class="control-area">
+                    <h4 style="color: var(--primary); margin-bottom: 15px;" data-en="Settings" data-ko="설정">Settings</h4>
+                    <div style="margin: 15px 0;">
+                        <label style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span data-en="Dwell Time" data-ko="응시 시간">Dwell Time</span><span id="dwellVal">800ms</span></label>
+                        <input type="range" id="dwellTime" min="300" max="2000" value="800" style="width: 100%;" oninput="document.getElementById('dwellVal').textContent=this.value+'ms'">
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <label style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span data-en="Cursor Size" data-ko="커서 크기">Cursor Size</span><span id="cursorVal">40px</span></label>
+                        <input type="range" id="cursorSize" min="20" max="80" value="40" style="width: 100%;" oninput="updateCursorSize()">
+                    </div>
+                </div>
+            </div>
+            <div class="output" id="controlOutput"></div>
+        </div>
+
+        <!-- Panel 4: Device -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="⚙️ Device Configuration" data-ko="⚙️ 기기 설정">⚙️ Device Configuration</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select and configure eye tracker" data-ko="아이 트래커 선택 및 설정">Configure eye tracker</p>
+
+            <div class="device-grid">
+                <div class="device-card selected" onclick="selectDevice(this, 'tobii')">
+                    <div class="icon">👁️</div>
+                    <div class="name">Tobii Eye Tracker 5</div>
+                    <div class="specs">133Hz | 0.2° accuracy</div>
+                </div>
+                <div class="device-card" onclick="selectDevice(this, 'gazepoint')">
+                    <div class="icon">🎯</div>
+                    <div class="name">Gazepoint GP3</div>
+                    <div class="specs">60Hz | 0.5° accuracy</div>
+                </div>
+                <div class="device-card" onclick="selectDevice(this, 'eyetech')">
+                    <div class="icon">💎</div>
+                    <div class="name">EyeTech TM5</div>
+                    <div class="specs">50Hz | 0.4° accuracy</div>
+                </div>
+                <div class="device-card" onclick="selectDevice(this, 'webcam')">
+                    <div class="icon">📷</div>
+                    <div class="name">WebGazer (Webcam)</div>
+                    <div class="specs">30Hz | ~1.0° accuracy</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">✅</div>
+                    <div class="label" data-en="Connected" data-ko="연결됨">Connected</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="deviceHz">133</div>
+                    <div class="label" data-en="Sample Rate" data-ko="샘플링 레이트">Sample Rate</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="deviceAcc">0.2°</div>
+                    <div class="label" data-en="Accuracy" data-ko="정확도">Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">Good</div>
+                    <div class="label" data-en="Signal" data-ko="신호">Signal</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="connectDevice()" data-en="🔗 Connect" data-ko="🔗 연결">🔗 Connect</button>
+                <button class="btn btn-secondary" onclick="testDevice()" data-en="🔍 Test" data-ko="🔍 테스트">🔍 Test</button>
+            </div>
+            <div class="output" id="deviceOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Eye Gaze: See the world, control the world" data-ko="WIA Eye Gaze: 세상을 보고, 세상을 제어하다">WIA Eye Gaze: See & Control</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let calibPoints = 0;
+        let fixations = [];
+        let dwellTimers = {};
+        let selectedDevice = 'tobii';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            if (index === 2) initCalibration();
+        }
+
+        // Gaze tracking simulation
+        const canvas = document.getElementById('gazeCanvas');
+        const ctx = canvas.getContext('2d');
+        const cursor = document.getElementById('gazeCursor');
+
+        canvas.addEventListener('mousemove', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / canvas.width;
+            const y = (e.clientY - rect.top) / canvas.height;
+
+            // Update cursor
+            cursor.style.left = e.clientX - rect.left + 'px';
+            cursor.style.top = e.clientY - rect.top + 'px';
+
+            // Update stats
+            document.getElementById('gazeX').textContent = x.toFixed(3);
+            document.getElementById('gazeY').textContent = y.toFixed(3);
+            document.getElementById('confidence').textContent = (0.9 + Math.random() * 0.1).toFixed(2);
+
+            // Update eye pupils
+            const pupilOffset = 15;
+            document.getElementById('leftPupil').style.transform = `translate(calc(-50% + ${(x-0.5)*pupilOffset}px), calc(-50% + ${(y-0.5)*pupilOffset}px))`;
+            document.getElementById('rightPupil').style.transform = `translate(calc(-50% + ${(x-0.5)*pupilOffset}px), calc(-50% + ${(y-0.5)*pupilOffset}px))`;
+
+            // Update output
+            document.getElementById('gazeOutput').textContent = JSON.stringify({
+                timestamp: Date.now(),
+                gaze: { x: parseFloat(x.toFixed(3)), y: parseFloat(y.toFixed(3)) },
+                confidence: parseFloat((0.9 + Math.random() * 0.1).toFixed(2)),
+                valid: true,
+                leftEye: { x: x - 0.02, y: y },
+                rightEye: { x: x + 0.02, y: y }
+            }, null, 2);
+        });
+
+        // Draw canvas background
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#334155';
+        for (let i = 0; i < canvas.width; i += 50) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, canvas.height);
+            ctx.stroke();
+        }
+        for (let i = 0; i < canvas.height; i += 50) {
+            ctx.beginPath();
+            ctx.moveTo(0, i);
+            ctx.lineTo(canvas.width, i);
+            ctx.stroke();
+        }
+
+        // Fixation
+        function addFixation() {
+            const heatmap = document.getElementById('heatmap');
+            const x = Math.random() * 100;
+            const y = Math.random() * 100;
+            const point = document.createElement('div');
+            point.className = 'heat-point';
+            point.style.left = x + '%';
+            point.style.top = y + '%';
+            heatmap.appendChild(point);
+
+            fixations.push({ x, y, duration: Math.random() * 500 + 200 });
+            document.getElementById('fixCount').textContent = fixations.length;
+            const avgDwell = fixations.reduce((a, b) => a + b.duration, 0) / fixations.length;
+            document.getElementById('avgDwell').textContent = Math.round(avgDwell);
+            document.getElementById('saccadeCount').textContent = Math.max(0, fixations.length - 1);
+
+            document.getElementById('fixationOutput').textContent = JSON.stringify({
+                fixation: { x: x.toFixed(1) + '%', y: y.toFixed(1) + '%' },
+                duration: Math.round(fixations[fixations.length-1].duration) + 'ms',
+                totalFixations: fixations.length,
+                message: currentLang === 'ko' ? '응시점 추가됨' : 'Fixation added'
+            }, null, 2);
+        }
+
+        function clearHeatmap() {
+            document.getElementById('heatmap').innerHTML = '';
+            fixations = [];
+            document.getElementById('fixCount').textContent = '0';
+            document.getElementById('avgDwell').textContent = '0';
+            document.getElementById('saccadeCount').textContent = '0';
+        }
+
+        // Calibration
+        function initCalibration() {
+            const grid = document.getElementById('calibGrid');
+            grid.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const point = document.createElement('div');
+                point.className = 'calib-point';
+                point.onclick = () => calibratePoint(i, point);
+                grid.appendChild(point);
+            }
+        }
+
+        function calibratePoint(idx, el) {
+            if (el.classList.contains('done')) return;
+            el.classList.add('active');
+            setTimeout(() => {
+                el.classList.remove('active');
+                el.classList.add('done');
+                calibPoints++;
+                document.getElementById('calibProgress').textContent = calibPoints + '/9';
+                if (calibPoints >= 9) {
+                    document.getElementById('calibStatus').textContent = 'Complete';
+                    document.getElementById('calibAccuracy').textContent = '0.3°';
+                    document.getElementById('calibOutput').textContent = JSON.stringify({
+                        status: '✅ Calibration Complete',
+                        accuracy: '0.3°',
+                        points: 9,
+                        message: currentLang === 'ko' ? '캘리브레이션 완료' : 'Calibration complete'
+                    }, null, 2);
+                }
+            }, 1000);
+        }
+
+        function startCalibration() {
+            resetCalibration();
+            const points = document.querySelectorAll('.calib-point');
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i < 9) {
+                    calibratePoint(i, points[i]);
+                    i++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 1500);
+        }
+
+        function resetCalibration() {
+            calibPoints = 0;
+            document.getElementById('calibProgress').textContent = '0/9';
+            document.getElementById('calibStatus').textContent = 'Ready';
+            document.getElementById('calibAccuracy').textContent = '--';
+            initCalibration();
+        }
+
+        // Dwell Control
+        function startDwell(btnId) {
+            const btn = document.getElementById('ctrlBtn' + btnId);
+            btn.classList.add('dwelling');
+            const dwellTime = document.getElementById('dwellTime').value;
+            
+            dwellTimers[btnId] = setTimeout(() => {
+                btn.classList.remove('dwelling');
+                btn.classList.add('activated');
+                document.getElementById('controlOutput').textContent = JSON.stringify({
+                    action: 'Dwell Click Activated',
+                    button: btn.textContent,
+                    dwellTime: dwellTime + 'ms',
+                    message: currentLang === 'ko' ? '응시 클릭 활성화' : 'Dwell click activated'
+                }, null, 2);
+                setTimeout(() => btn.classList.remove('activated'), 500);
+            }, dwellTime);
+        }
+
+        function stopDwell(btnId) {
+            clearTimeout(dwellTimers[btnId]);
+            document.getElementById('ctrlBtn' + btnId).classList.remove('dwelling');
+        }
+
+        function updateCursorSize() {
+            const size = document.getElementById('cursorSize').value;
+            document.getElementById('cursorVal').textContent = size + 'px';
+            cursor.style.width = size + 'px';
+            cursor.style.height = size + 'px';
+        }
+
+        // Device
+        function selectDevice(el, device) {
+            document.querySelectorAll('.device-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedDevice = device;
+            
+            const specs = {
+                tobii: { hz: 133, acc: '0.2°' },
+                gazepoint: { hz: 60, acc: '0.5°' },
+                eyetech: { hz: 50, acc: '0.4°' },
+                webcam: { hz: 30, acc: '~1.0°' }
+            };
+            document.getElementById('deviceHz').textContent = specs[device].hz;
+            document.getElementById('deviceAcc').textContent = specs[device].acc;
+            document.getElementById('sampleRate').textContent = specs[device].hz;
+        }
+
+        function connectDevice() {
+            document.getElementById('deviceOutput').textContent = JSON.stringify({
+                status: '✅ Device Connected',
+                device: selectedDevice,
+                sampleRate: document.getElementById('deviceHz').textContent + 'Hz',
+                accuracy: document.getElementById('deviceAcc').textContent,
+                message: currentLang === 'ko' ? '기기 연결됨' : 'Device connected'
+            }, null, 2);
+        }
+
+        function testDevice() {
+            document.getElementById('deviceOutput').textContent = JSON.stringify({
+                status: '🔍 Device Test',
+                tracking: 'Active',
+                eyesDetected: 2,
+                signalQuality: 'Good',
+                message: currentLang === 'ko' ? '기기 테스트 완료' : 'Device test complete'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+            initCalibration();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

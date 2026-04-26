@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 4: Backtesting & Validation | WIA-FIN-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(34, 197, 94, 0.2); padding: 1.5rem 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 2rem; }
+        .nav-links a { color: #22c55e; text-decoration: none; padding: 0.5rem 1rem; }
+        .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        h1 { font-size: 3rem; background: linear-gradient(135deg, #22c55e 0%, #10b981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; text-align: center; }
+        h2 { color: #22c55e; font-size: 2rem; margin: 3rem 0 1.5rem; }
+        h3 { color: #22c55e; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1.5rem; font-size: 1.1rem; }
+        .content-box { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .highlight { background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 1.5rem; margin: 2rem 0; border-radius: 8px; }
+        ul { color: #cbd5e1; margin-left: 2rem; margin-bottom: 1.5rem; }
+        li { margin-bottom: 0.75rem; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        .code-block pre { color: #22c55e; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 4rem; }
+        .btn { padding: 1rem 2rem; background: linear-gradient(135deg, #22c55e 0%, #10b981 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        .btn-secondary { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(34, 197, 94, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">📈</div>
+            <div class="nav-links"><a href="index.html">Contents</a></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Backtesting & Validation</h1>
+
+        <div class="content-box">
+            <h2>Why Backtesting Matters</h2>
+            <p>Backtesting is the process of testing a trading strategy on historical data to evaluate its performance. It's the most critical step before risking real capital.</p>
+
+            <div class="highlight">
+                <strong>Key Principle:</strong> Past performance does not guarantee future results, but strategies that fail on historical data will almost certainly fail in live trading.
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Common Backtesting Pitfalls</h2>
+
+            <h3>1. Look-Ahead Bias</h3>
+            <p>Using information that wouldn't have been available at the time</p>
+            <ul>
+                <li>Using adjusted prices with hindsight (splits, dividends)</li>
+                <li>Including same-day news that came after trading decisions</li>
+                <li>Training on future data accidentally</li>
+            </ul>
+
+            <h3>2. Survivorship Bias</h3>
+            <p>Testing only on stocks that survived to today</p>
+            <ul>
+                <li>Excluding delisted/bankrupt companies inflates returns</li>
+                <li>Use survivorship-bias-free datasets</li>
+                <li>Include all stocks that existed at each point in time</li>
+            </ul>
+
+            <h3>3. Data Snooping</h3>
+            <p>Testing multiple strategies on same data and cherry-picking winners</p>
+            <ul>
+                <li>The more strategies tested, the higher chance of false positives</li>
+                <li>Apply multiple testing corrections (Bonferroni, etc.)</li>
+                <li>Use separate out-of-sample test set</li>
+            </ul>
+
+            <h3>4. Overfitting</h3>
+            <p>Strategy performs well in-sample but fails out-of-sample</p>
+            <ul>
+                <li>Too many parameters relative to data</li>
+                <li>Optimizing on noise rather than signal</li>
+                <li>Use cross-validation and walk-forward analysis</li>
+            </ul>
+        </div>
+
+        <div class="content-box">
+            <h2>Backtesting Framework</h2>
+            <div class="code-block">
+<pre>
+import pandas as pd
+import numpy as np
+
+class Backtester:
+    def __init__(self, initial_capital=100000,
+                 commission=0.001, slippage=0.0005):
+        self.initial_capital = initial_capital
+        self.commission = commission  # 0.1% per trade
+        self.slippage = slippage      # 0.05% slippage
+
+    def run(self, strategy, data):
+        """Run backtest simulation"""
+        portfolio_value = [self.initial_capital]
+        positions = {}
+        cash = self.initial_capital
+        equity_curve = []
+
+        for timestamp, row in data.iterrows():
+            # Generate signals
+            signals = strategy.generate_signals(row)
+
+            # Execute trades
+            for asset, target in signals.items():
+                current = positions.get(asset, 0)
+
+                if target != current:
+                    # Calculate trade cost
+                    price = row[f'{asset}_price']
+                    quantity = target - current
+                    slippage_cost = abs(quantity) * price * self.slippage
+                    commission_cost = abs(quantity) * price * self.commission
+                    total_cost = abs(quantity) * price + slippage_cost + commission_cost
+
+                    # Execute trade
+                    if quantity > 0:  # Buy
+                        if cash >= total_cost:
+                            cash -= total_cost
+                            positions[asset] = target
+                    else:  # Sell
+                        cash += abs(quantity) * price - slippage_cost - commission_cost
+                        positions[asset] = target
+
+            # Calculate portfolio value
+            equity = sum(pos * row[f'{asset}_price']
+                        for asset, pos in positions.items())
+            total_value = cash + equity
+            equity_curve.append({
+                'timestamp': timestamp,
+                'value': total_value,
+                'cash': cash,
+                'equity': equity
+            })
+
+        return pd.DataFrame(equity_curve)
+</pre>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Performance Metrics</h2>
+
+            <h3>Return Metrics</h3>
+            <ul>
+                <li><strong>Total Return:</strong> (Final Value - Initial Value) / Initial Value</li>
+                <li><strong>CAGR:</strong> Compound Annual Growth Rate</li>
+                <li><strong>Monthly/Daily Returns:</strong> Period-over-period returns</li>
+            </ul>
+
+            <h3>Risk Metrics</h3>
+            <ul>
+                <li><strong>Volatility:</strong> Standard deviation of returns (annualized)</li>
+                <li><strong>Maximum Drawdown:</strong> Peak-to-trough decline</li>
+                <li><strong>VaR (Value at Risk):</strong> Maximum expected loss at confidence level</li>
+                <li><strong>CVaR (Conditional VaR):</strong> Expected loss beyond VaR threshold</li>
+            </ul>
+
+            <h3>Risk-Adjusted Returns</h3>
+            <ul>
+                <li><strong>Sharpe Ratio:</strong> (Return - Risk-Free) / Volatility</li>
+                <li><strong>Sortino Ratio:</strong> Like Sharpe but only downside volatility</li>
+                <li><strong>Calmar Ratio:</strong> CAGR / Maximum Drawdown</li>
+                <li><strong>Information Ratio:</strong> Active return / Tracking error</li>
+            </ul>
+
+            <div class="code-block">
+<pre>
+def calculate_metrics(returns, risk_free_rate=0.02):
+    """Calculate comprehensive performance metrics"""
+
+    # Return metrics
+    total_return = (1 + returns).prod() - 1
+    cagr = (1 + total_return) ** (252 / len(returns)) - 1
+
+    # Risk metrics
+    volatility = returns.std() * np.sqrt(252)
+    cumulative = (1 + returns).cumprod()
+    running_max = cumulative.expanding().max()
+    drawdown = (cumulative - running_max) / running_max
+    max_drawdown = drawdown.min()
+
+    # Risk-adjusted returns
+    excess_returns = returns - risk_free_rate / 252
+    sharpe = excess_returns.mean() / returns.std() * np.sqrt(252)
+
+    downside_returns = returns[returns < 0]
+    sortino = excess_returns.mean() / downside_returns.std() * np.sqrt(252)
+
+    calmar = cagr / abs(max_drawdown) if max_drawdown != 0 else 0
+
+    return {
+        'Total Return': f'{total_return:.2%}',
+        'CAGR': f'{cagr:.2%}',
+        'Volatility': f'{volatility:.2%}',
+        'Max Drawdown': f'{max_drawdown:.2%}',
+        'Sharpe Ratio': f'{sharpe:.2f}',
+        'Sortino Ratio': f'{sortino:.2f}',
+        'Calmar Ratio': f'{calmar:.2f}'
+    }
+</pre>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Walk-Forward Analysis</h2>
+            <p>The gold standard for validating trading strategies</p>
+
+            <ol>
+                <li><strong>In-Sample Optimization:</strong> Train and optimize on Period 1</li>
+                <li><strong>Out-of-Sample Testing:</strong> Test on Period 2 (no changes allowed)</li>
+                <li><strong>Roll Forward:</strong> Move to next period, repeat</li>
+                <li><strong>Aggregate Results:</strong> Combine all out-of-sample periods</li>
+            </ol>
+
+            <div class="code-block">
+<pre>
+def walk_forward_analysis(data, strategy, train_period=252,
+                         test_period=63, step=63):
+    """Walk-forward optimization and testing"""
+
+    results = []
+    start = 0
+
+    while start + train_period + test_period <= len(data):
+        # In-sample period
+        train_data = data.iloc[start:start + train_period]
+
+        # Optimize strategy parameters
+        optimized_params = optimize_strategy(strategy, train_data)
+
+        # Out-of-sample period
+        test_data = data.iloc[start + train_period:
+                             start + train_period + test_period]
+
+        # Test with optimized parameters
+        strategy.set_params(optimized_params)
+        oos_returns = backtest(strategy, test_data)
+
+        results.append({
+            'period': start,
+            'returns': oos_returns,
+            'params': optimized_params
+        })
+
+        start += step
+
+    return pd.DataFrame(results)
+</pre>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Monte Carlo Simulation</h2>
+            <p>Assess robustness by simulating multiple scenarios</p>
+
+            <ul>
+                <li>Randomly shuffle historical returns</li>
+                <li>Bootstrap sampling of trades</li>
+                <li>Generate synthetic price paths</li>
+                <li>Analyze distribution of outcomes</li>
+            </ul>
+
+            <div class="code-block">
+<pre>
+def monte_carlo_backtest(returns, n_simulations=10000):
+    """Monte Carlo simulation of strategy returns"""
+
+    initial_capital = 100000
+    final_values = []
+
+    for _ in range(n_simulations):
+        # Randomly shuffle returns (preserves distribution)
+        shuffled_returns = returns.sample(frac=1, replace=True)
+
+        # Calculate final portfolio value
+        final_value = initial_capital * (1 + shuffled_returns).prod()
+        final_values.append(final_value)
+
+    final_values = np.array(final_values)
+
+    return {
+        'Mean': final_values.mean(),
+        'Median': np.median(final_values),
+        'Std': final_values.std(),
+        '5th Percentile': np.percentile(final_values, 5),
+        '95th Percentile': np.percentile(final_values, 95),
+        'Prob of Loss': (final_values < initial_capital).mean()
+    }
+</pre>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Transaction Cost Modeling</h2>
+            <p>Realistic transaction costs are essential for accurate backtesting</p>
+
+            <h3>Commission Models</h3>
+            <ul>
+                <li><strong>Fixed:</strong> $1 per trade (retail brokers)</li>
+                <li><strong>Percentage:</strong> 0.1% of trade value</li>
+                <li><strong>Tiered:</strong> Lower rates for higher volume</li>
+                <li><strong>Per-Share:</strong> $0.005 per share (institutions)</li>
+            </ul>
+
+            <h3>Slippage Models</h3>
+            <ul>
+                <li><strong>Fixed:</strong> 0.05% of price</li>
+                <li><strong>Volume-Based:</strong> Higher slippage for larger orders</li>
+                <li><strong>Volatility-Based:</strong> Higher slippage in volatile markets</li>
+                <li><strong>Market Impact:</strong> Price impact proportional to order size</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>Reality Check:</strong> High-frequency strategies can become unprofitable after realistic transaction costs. Always test with conservative cost estimates.
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

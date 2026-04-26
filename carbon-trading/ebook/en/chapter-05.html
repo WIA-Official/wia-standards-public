@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Security and Compliance | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Security and Compliance</h1>
+
+    <div class="highlight">
+        <strong>Trust Foundation:</strong> Carbon markets handle billions of dollars in transactions and the environmental integrity of climate commitments worldwide. Robust security and compliance frameworks are non-negotiable requirements for maintaining market confidence and regulatory approval.
+    </div>
+
+    <p>Security in carbon trading extends beyond traditional cybersecurity to encompass market manipulation prevention, comprehensive audit capabilities, and compliance with financial regulations. This chapter explores the multi-layered security architecture of WIA-CARBON_TRADING.</p>
+
+    <h2>Market Manipulation Prevention</h2>
+
+    <p>Carbon markets are susceptible to various forms of manipulation that can distort prices and undermine market integrity. WIA-CARBON_TRADING employs sophisticated surveillance systems to detect and prevent market abuse.</p>
+
+    <h3>Types of Market Manipulation</h3>
+
+    <table>
+        <tr>
+            <th>Manipulation Type</th>
+            <th>Description</th>
+            <th>Detection Method</th>
+        </tr>
+        <tr>
+            <td>Wash Trading</td>
+            <td>Trading with oneself to create false volume</td>
+            <td>Account linkage analysis, pattern detection</td>
+        </tr>
+        <tr>
+            <td>Spoofing</td>
+            <td>Placing orders intended to be cancelled</td>
+            <td>Order lifecycle analysis, cancellation ratios</td>
+        </tr>
+        <tr>
+            <td>Layering</td>
+            <td>Multiple orders at different levels to move price</td>
+            <td>Order book reconstruction, timing analysis</td>
+        </tr>
+        <tr>
+            <td>Cornering</td>
+            <td>Accumulating dominant position to control price</td>
+            <td>Position monitoring, concentration alerts</td>
+        </tr>
+        <tr>
+            <td>Front Running</td>
+            <td>Trading ahead of known large orders</td>
+            <td>Timing correlation, information barrier monitoring</td>
+        </tr>
+    </table>
+
+    <pre><code>// Market Surveillance System
+class MarketSurveillanceEngine {
+    private alertRules: AlertRule[] = [];
+    private mlModels: Map&lt;string, ManipulationDetector&gt; = new Map();
+
+    async analyzeActivity(activity: TradingActivity): Promise&lt;SurveillanceResult&gt; {
+        const alerts: SurveillanceAlert[] = [];
+        // Rule-based detection
+        for (const rule of this.alertRules) {
+            const result = await rule.evaluate(activity);
+            if (result.triggered) alerts.push({ type: rule.alertType, severity: rule.severity });
+        }
+        // ML-based anomaly detection
+        for (const [modelName, detector] of this.mlModels) {
+            const score = await detector.scoreActivity(activity);
+            if (score > detector.threshold) alerts.push({ type: 'ML_ANOMALY', modelName, score });
+        }
+        return { activityId: activity.id, alertsGenerated: alerts, requiresReview: alerts.some(a => a.severity === 'high') };
+    }
+
+    detectWashTrading(trades: Trade[]): WashTradingAlert[] {
+        const windows = this.groupByTimeWindow(trades, 60000);
+        return windows.flatMap(window => {
+            const cycles = this.detectCycles(this.buildTradeGraph(window));
+            return cycles.length > 0 ? [{ type: 'WASH_TRADING', participants: this.extractParticipants(cycles) }] : [];
+        });
+    }
+
+    detectSpoofing(orderHistory: OrderEvent[]): SpoofingAlert[] {
+        return [...this.groupByParticipant(orderHistory)]
+            .filter(([_, orders]) => {
+                const total = orders.filter(o => o.type === 'new').length;
+                const cancelled = orders.filter(o => o.type === 'cancel').length;
+                return cancelled / total > 0.9 && total > 100;
+            })
+            .map(([participant]) => ({ type: 'SPOOFING', participant, severity: 'high' }));
+    }
+}</code></pre>
+
+    <h2>Comprehensive Audit Trails</h2>
+
+    <p>Every action in WIA-CARBON_TRADING is logged in immutable audit trails that support forensic investigation, regulatory reporting, and dispute resolution. The audit system captures who did what, when, and why.</p>
+
+    <div class="highlight">
+        <strong>Immutability Guarantee:</strong> Audit logs are cryptographically signed and stored with append-only semantics. Once written, entries cannot be modified or deleted, ensuring complete historical accuracy for regulatory and legal purposes.
+    </div>
+
+    <pre><code>// Audit Trail System
+interface AuditEntry {
+    entryId: string;
+    timestamp: Date;
+    eventType: AuditEventType;
+    actor: { userId: string; organizationId: string; role: string; };
+    action: { type: string; target: string; details: Record&lt;string, any&gt;; };
+    outcome: 'success' | 'failure';
+    previousHash: string;
+    hash: string;
+    signature: string;
+}
+
+class AuditTrailService {
+    private storage: ImmutableLogStore;
+    private signer: CryptoSigner;
+
+    async logEvent(event: AuditEvent): Promise&lt;string&gt; {
+        const previousEntry = await this.storage.getLatestEntry();
+        const entry: AuditEntry = {
+            entryId: generateAuditId(),
+            timestamp: new Date(),
+            eventType: event.type,
+            actor: await this.resolveActor(event.actorId),
+            action: { type: event.actionType, target: event.targetResource, details: event.details },
+            outcome: event.outcome,
+            previousHash: previousEntry?.hash || 'GENESIS',
+            hash: '', signature: ''
+        };
+        entry.hash = this.calculateHash(entry);
+        entry.signature = await this.signer.sign(entry.hash);
+        await this.storage.append(entry);
+        return entry.entryId;
+    }
+
+    async verifyChainIntegrity(entries: AuditEntry[]): Promise&lt;IntegrityCheckResult&gt; {
+        for (let i = 1; i < entries.length; i++) {
+            if (entries[i].previousHash !== entries[i - 1].hash) {
+                return { valid: false, breakPoint: i, error: 'Hash chain broken' };
+            }
+            if (!await this.signer.verify(entries[i].hash, entries[i].signature)) {
+                return { valid: false, breakPoint: i, error: 'Invalid signature' };
+            }
+        }
+        return { valid: true };
+    }
+}</code></pre>
+
+    <h2>KYC/AML Compliance</h2>
+
+    <p>Know Your Customer (KYC) and Anti-Money Laundering (AML) compliance are fundamental requirements for carbon trading platforms. WIA-CARBON_TRADING implements comprehensive identity verification and transaction monitoring.</p>
+
+    <h3>KYC Process Flow</h3>
+
+    <pre><code>// KYC Verification System
+class KYCVerificationService {
+    async processApplication(application: KYCApplication): Promise&lt;KYCResult&gt; {
+        // Step 1: Document Verification
+        const docResults = await this.verifyDocuments(application.documents);
+        if (!docResults.allValid) return this.requestAdditionalDocuments(application, docResults);
+
+        // Step 2: Identity Verification
+        const identityResult = await this.verifyIdentity(application);
+        if (!identityResult.verified) return this.escalateForManualReview(application, identityResult);
+
+        // Step 3: Sanctions Screening
+        const sanctionsResult = await this.sanctionsChecker.screen(application.applicantData);
+        if (sanctionsResult.matchFound) return this.handleSanctionsMatch(application, sanctionsResult);
+
+        // Step 4: Risk Scoring and Approval Decision
+        const riskScore = await this.riskScorer.calculateScore(application.applicantData);
+        application.riskScore = riskScore;
+        if (riskScore <= 30) return this.autoApprove(application);
+        if (riskScore <= 70) return this.standardReview(application);
+        return this.enhancedDueDiligence(application);
+    }
+}</code></pre>
+
+    <h3>AML Transaction Monitoring</h3>
+
+    <pre><code>// AML Monitoring System
+class AMLMonitoringService {
+    private rules: AMLRule[] = [];
+    private mlDetector: MLAnomalyDetector;
+
+    async monitorTransaction(transaction: Transaction): Promise&lt;AMLScreeningResult&gt; {
+        const alerts: AMLAlert[] = [];
+        // Rule-based checks
+        for (const rule of this.rules) {
+            const result = await rule.evaluate(transaction);
+            if (result.triggered) alerts.push({ ruleId: rule.id, severity: rule.severity });
+        }
+        // Pattern-based detection
+        const history = await this.getTransactionHistory(transaction.participantId, 90);
+        if (this.detectStructuring(transaction, history)) {
+            alerts.push({ type: 'STRUCTURING', severity: 'high' });
+        }
+        // ML anomaly detection
+        const anomalyScore = await this.mlDetector.score(transaction);
+        if (anomalyScore > 0.8) alerts.push({ type: 'ML_ANOMALY', severity: 'medium' });
+        // Determine action
+        if (alerts.some(a => a.severity === 'critical')) await this.blockTransaction(transaction);
+        else if (alerts.some(a => a.severity === 'high')) await this.holdForReview(transaction, alerts);
+        return { transactionId: transaction.id, screeningPassed: !alerts.some(a => a.severity === 'critical' || a.severity === 'high'), alerts };
+    }
+}</code></pre>
+
+    <h2>Data Protection and Privacy</h2>
+
+    <p>WIA-CARBON_TRADING implements comprehensive data protection measures compliant with GDPR, CCPA, and other privacy regulations. Personal data is encrypted, access-controlled, and subject to data minimization principles.</p>
+
+    <div class="highlight">
+        <strong>Privacy by Design:</strong> Data protection is built into the platform architecture from the ground up, not added as an afterthought. Every data flow is assessed for privacy implications and appropriate safeguards are implemented.
+    </div>
+
+    <pre><code>// Data Protection Configuration
+interface DataProtectionPolicy {
+    dataClassification: {
+        public: DataHandlingRules;
+        internal: DataHandlingRules;
+        confidential: DataHandlingRules;
+        restricted: DataHandlingRules;
+    };
+    encryption: {
+        atRest: EncryptionConfig;
+        inTransit: EncryptionConfig;
+    };
+    retention: {
+        transactionData: '7_years';
+        auditLogs: '10_years';
+        personalData: 'as_required';
+        marketData: '25_years';
+    };
+    accessControl: {
+        model: 'RBAC';
+        mfaRequired: true;
+        sessionTimeout: 3600;
+    };
+}</code></pre>
+
+    <p>Security and compliance are ongoing responsibilities that require continuous monitoring, regular assessments, and adaptation to evolving threats and regulations. The next chapter explores how WIA-CARBON_TRADING integrates with external systems.</p>
+</body>
+</html>

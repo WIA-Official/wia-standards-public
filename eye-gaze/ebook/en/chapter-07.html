@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Eye Gaze Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Eye Gaze Tracking Standard</h1>
+        <p class="subtitle">Chapter 7: Implementation Examples</p>
+        <span class="version">Version 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>Chapter 7: Implementation Examples</h1>
+
+        <h2>7.1 Python Implementation</h2>
+
+        <h3>Basic Gaze Stream Client</h3>
+        <pre><code>import asyncio
+import websockets
+import json
+from dataclasses import dataclass
+from typing import Optional, Callable
+
+@dataclass
+class GazePoint:
+    timestamp: int
+    x: float
+    y: float
+    confidence: float
+    valid: bool
+    fixation: Optional[bool] = None
+    fixation_id: Optional[str] = None
+
+class WIAGazeClient:
+    def __init__(self, device_url: str = "ws://localhost:8080/stream"):
+        self.device_url = device_url
+        self.websocket = None
+        self.callbacks = {}
+
+    async def connect(self, client_id: str, client_name: str):
+        """Connect to the WIA eye tracker."""
+        self.websocket = await websockets.connect(self.device_url)
+
+        # Send handshake
+        handshake = {
+            "type": "handshake",
+            "clientId": client_id,
+            "clientName": client_name,
+            "capabilities": ["GAZE_POINT", "EVENTS"]
+        }
+        await self.websocket.send(json.dumps(handshake))
+
+        # Wait for handshake acknowledgment
+        response = await self.websocket.recv()
+        ack = json.loads(response)
+
+        if ack.get("type") != "handshake_ack":
+            raise Exception("Handshake failed")
+
+        print(f"Connected to WIA device. Session: {ack.get('sessionId')}")
+
+    async def start_stream(self, frequency: int = 60):
+        """Start gaze data stream."""
+        command = {
+            "type": "command",
+            "action": "start_stream",
+            "params": {
+                "frequency": frequency,
+                "includeEyeData": True,
+                "includeEvents": True
+            }
+        }
+        await self.websocket.send(json.dumps(command))
+
+    def on_gaze_point(self, callback: Callable[[GazePoint], None]):
+        """Register callback for gaze point data."""
+        self.callbacks['gaze_point'] = callback
+
+    def on_event(self, callback: Callable[[dict], None]):
+        """Register callback for gaze events."""
+        self.callbacks['event'] = callback
+
+    async def listen(self):
+        """Listen for incoming gaze data."""
+        async for message in self.websocket:
+            data = json.loads(message)
+            msg_type = data.get('type')
+
+            if msg_type == 'gaze_point':
+                point = GazePoint(**data.get('data', {}))
+                if 'gaze_point' in self.callbacks:
+                    self.callbacks['gaze_point'](point)
+
+            elif msg_type == 'event':
+                if 'event' in self.callbacks:
+                    self.callbacks['event'](data.get('event', {}))
+
+    async def disconnect(self):
+        """Disconnect from device."""
+        if self.websocket:
+            await self.websocket.close()
+
+# Usage example
+async def main():
+    client = WIAGazeClient()
+
+    # Connect to device
+    await client.connect("my-app-001", "My AAC Application")
+
+    # Register callbacks
+    def on_gaze(point: GazePoint):
+        if point.valid:
+            print(f"Gaze at ({point.x:.3f}, {point.y:.3f}) "
+                  f"confidence: {point.confidence:.2f}")
+
+    def on_event(event: dict):
+        print(f"Event: {event.get('type')} at {event.get('timestamp')}")
+
+    client.on_gaze_point(on_gaze)
+    client.on_event(on_event)
+
+    # Start streaming
+    await client.start_stream(frequency=60)
+
+    # Listen for data
+    try:
+        await client.listen()
+    except KeyboardInterrupt:
+        await client.disconnect()
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+
+        <h3>Fixation Detector</h3>
+        <pre><code>from typing import List
+from dataclasses import dataclass
+import time
+
+@dataclass
+class Fixation:
+    start_time: int
+    end_time: int
+    centroid_x: float
+    centroid_y: float
+    duration: int
+    points: List[GazePoint]
+
+class FixationDetector:
+    def __init__(self,
+                 min_duration: int = 100,
+                 max_dispersion: float = 0.02):
+        self.min_duration = min_duration  # milliseconds
+        self.max_dispersion = max_dispersion  # normalized coords
+        self.current_points: List[GazePoint] = []
+        self.fixations: List[Fixation] = []
+
+    def add_point(self, point: GazePoint) -> Optional[Fixation]:
+        """Add a gaze point and check if it extends or ends a fixation."""
+        if not point.valid:
+            return self._end_current_fixation()
+
+        self.current_points.append(point)
+
+        # Check if points form a fixation
+        if self._is_fixation(self.current_points):
+            return None  # Fixation continues
+        else:
+            # Dispersion exceeded, end current fixation
+            return self._end_current_fixation()
+
+    def _is_fixation(self, points: List[GazePoint]) -> bool:
+        """Check if points meet fixation criteria."""
+        if len(points) < 2:
+            return True
+
+        # Calculate dispersion (max distance from centroid)
+        centroid_x = sum(p.x for p in points) / len(points)
+        centroid_y = sum(p.y for p in points) / len(points)
+
+        max_dist = 0
+        for point in points:
+            dist = ((point.x - centroid_x)**2 +
+                    (point.y - centroid_y)**2) ** 0.5
+            max_dist = max(max_dist, dist)
+
+        return max_dist <= self.max_dispersion
+
+    def _end_current_fixation(self) -> Optional[Fixation]:
+        """End current fixation and return it if valid."""
+        if len(self.current_points) < 2:
+            self.current_points = []
+            return None
+
+        # Check duration
+        duration = (self.current_points[-1].timestamp -
+                   self.current_points[0].timestamp)
+
+        if duration < self.min_duration:
+            self.current_points = []
+            return None
+
+        # Calculate centroid
+        centroid_x = sum(p.x for p in self.current_points) / len(self.current_points)
+        centroid_y = sum(p.y for p in self.current_points) / len(self.current_points)
+
+        fixation = Fixation(
+            start_time=self.current_points[0].timestamp,
+            end_time=self.current_points[-1].timestamp,
+            centroid_x=centroid_x,
+            centroid_y=centroid_y,
+            duration=duration,
+            points=self.current_points.copy()
+        )
+
+        self.fixations.append(fixation)
+        self.current_points = []
+
+        return fixation
+
+# Usage
+detector = FixationDetector(min_duration=100, max_dispersion=0.02)
+
+def on_gaze(point: GazePoint):
+    fixation = detector.add_point(point)
+    if fixation:
+        print(f"Fixation detected: {fixation.duration}ms "
+              f"at ({fixation.centroid_x:.3f}, {fixation.centroid_y:.3f})")</code></pre>
+
+        <h2>7.2 TypeScript/JavaScript Implementation</h2>
+
+        <h3>React Hook for Eye Gaze</h3>
+        <pre><code>import { useEffect, useState, useCallback } from 'react';
+
+interface GazePoint {
+  timestamp: number;
+  x: number;
+  y: number;
+  confidence: number;
+  valid: boolean;
+}
+
+interface UseGazeOptions {
+  deviceUrl?: string;
+  frequency?: number;
+  onError?: (error: Error) => void;
+}
+
+export function useGaze(options: UseGazeOptions = {}) {
+  const {
+    deviceUrl = 'ws://localhost:8080/stream',
+    frequency = 60,
+    onError
+  } = options;
+
+  const [gazePoint, setGazePoint] = useState&lt;GazePoint | null&gt;(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [ws, setWs] = useState&lt;WebSocket | null&gt;(null);
+
+  useEffect(() => {
+    const websocket = new WebSocket(deviceUrl);
+
+    websocket.onopen = () => {
+      // Send handshake
+      websocket.send(JSON.stringify({
+        type: 'handshake',
+        clientId: 'react-app-001',
+        clientName: 'React AAC App',
+        capabilities: ['GAZE_POINT']
+      }));
+    };
+
+    websocket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+
+      if (message.type === 'handshake_ack') {
+        setIsConnected(true);
+
+        // Start gaze stream
+        websocket.send(JSON.stringify({
+          type: 'command',
+          action: 'start_stream',
+          params: { frequency }
+        }));
+      }
+      else if (message.type === 'gaze_point') {
+        setGazePoint(message.data);
+      }
+    };
+
+    websocket.onerror = (error) => {
+      if (onError) {
+        onError(new Error('WebSocket error'));
+      }
+    };
+
+    websocket.onclose = () => {
+      setIsConnected(false);
+    };
+
+    setWs(websocket);
+
+    return () => {
+      websocket.close();
+    };
+  }, [deviceUrl, frequency, onError]);
+
+  return { gazePoint, isConnected };
+}
+
+// Usage in React component
+function AAC Communication() {
+  const { gazePoint, isConnected } = useGaze({
+    frequency: 60
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;AAC Communication Board&lt;/h1&gt;
+      {isConnected && gazePoint && (
+        &lt;div&gt;
+          Gaze: ({gazePoint.x.toFixed(3)}, {gazePoint.y.toFixed(3)})
+        &lt;/div&gt;
+      )}
+      {/* Communication board UI */}
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+        <h3>Dwell Button Component</h3>
+        <pre><code>import React, { useEffect, useState, useRef } from 'react';
+
+interface DwellButtonProps {
+  onSelect: () => void;
+  dwellTime?: number;
+  children: React.ReactNode;
+  gazePoint: GazePoint | null;
+}
+
+export function DwellButton({
+  onSelect,
+  dwellTime = 800,
+  children,
+  gazePoint
+}: DwellButtonProps) {
+  const [progress, setProgress] = useState(0);
+  const [isDwelling, setIsDwelling] = useState(false);
+  const buttonRef = useRef&lt;HTMLButtonElement&gt;(null);
+  const dwellStartRef = useRef&lt;number | null&gt;(null);
+
+  useEffect(() => {
+    if (!gazePoint || !buttonRef.current) {
+      return;
+    }
+
+    // Check if gaze is over button
+    const rect = buttonRef.current.getBoundingClientRect();
+    const screenX = gazePoint.x * window.innerWidth;
+    const screenY = gazePoint.y * window.innerHeight;
+
+    const isOver = (
+      screenX >= rect.left &&
+      screenX <= rect.right &&
+      screenY >= rect.top &&
+      screenY <= rect.bottom
+    );
+
+    if (isOver) {
+      if (!isDwelling) {
+        // Start dwell
+        setIsDwelling(true);
+        dwellStartRef.current = Date.now();
+      } else {
+        // Update progress
+        const elapsed = Date.now() - (dwellStartRef.current || 0);
+        const newProgress = Math.min(elapsed / dwellTime, 1.0);
+        setProgress(newProgress);
+
+        if (newProgress >= 1.0) {
+          // Dwell complete
+          onSelect();
+          setIsDwelling(false);
+          setProgress(0);
+          dwellStartRef.current = null;
+        }
+      }
+    } else {
+      // Gaze left button
+      setIsDwelling(false);
+      setProgress(0);
+      dwellStartRef.current = null;
+    }
+  }, [gazePoint, isDwelling, dwellTime, onSelect]);
+
+  return (
+    &lt;button
+      ref={buttonRef}
+      className="dwell-button"
+      style={{
+        '--dwell-progress': progress
+      } as React.CSSProperties}
+    &gt;
+      {children}
+      {isDwelling && (
+        &lt;div className="dwell-indicator"
+             style={{ width: `${progress * 100}%` }} /&gt;
+      )}
+    &lt;/button&gt;
+  );
+}</code></pre>
+
+        <h2>7.3 Bash Scripting Examples</h2>
+
+        <h3>Device Discovery Script</h3>
+        <pre><code>#!/bin/bash
+# discover_eye_trackers.sh - Find WIA-compliant eye trackers
+
+API_BASE="http://localhost:8080/api/v1"
+
+echo "Discovering WIA eye tracking devices..."
+
+# Query devices endpoint
+response=$(curl -s "${API_BASE}/devices")
+
+# Parse and display devices
+echo "$response" | jq -r '.devices[] |
+  "Device: \(.model) (\(.vendor))
+   ID: \(.deviceId)
+   Status: \(.status)
+   Sampling Rate: \(.capabilities.samplingRate | join(\", \")) Hz
+   Accuracy: \(.capabilities.accuracy)°
+   Binocular: \(.capabilities.binocular)
+   ---"'</code></pre>
+
+        <h3>Calibration Script</h3>
+        <pre><code>#!/bin/bash
+# calibrate_device.sh - Run eye tracker calibration
+
+DEVICE_ID="${1:-tobii-001}"
+API_BASE="http://localhost:8080/api/v1"
+
+echo "Starting calibration for device: $DEVICE_ID"
+
+# Start calibration
+cal_response=$(curl -s -X POST \
+  "${API_BASE}/devices/${DEVICE_ID}/calibration/start" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "accessibility",
+    "pointCount": 5,
+    "screenInfo": {
+      "width": 1920,
+      "height": 1080
+    }
+  }')
+
+CAL_ID=$(echo "$cal_response" | jq -r '.calibrationId')
+echo "Calibration ID: $CAL_ID"
+
+# Get calibration points
+points=$(echo "$cal_response" | jq -r '.points')
+point_count=$(echo "$points" | jq 'length')
+
+echo "Calibration points: $point_count"
+
+# Collect each point
+for i in $(seq 0 $(($point_count - 1))); do
+  x=$(echo "$points" | jq -r ".[$i].x")
+  y=$(echo "$points" | jq -r ".[$i].y")
+
+  echo "Point $((i+1))/$point_count at ($x, $y)"
+  echo "Please look at the point and press Enter..."
+  read
+
+  # Collect point
+  curl -s -X POST \
+    "${API_BASE}/devices/${DEVICE_ID}/calibration/${CAL_ID}/collect" \
+    -H "Content-Type: application/json" \
+    -d "{\"pointIndex\": $i, \"position\": {\"x\": $x, \"y\": $y}}" \
+    > /dev/null
+
+  echo "Point collected."
+done
+
+# Compute calibration
+echo "Computing calibration..."
+result=$(curl -s -X POST \
+  "${API_BASE}/devices/${DEVICE_ID}/calibration/${CAL_ID}/compute")
+
+success=$(echo "$result" | jq -r '.result.success')
+accuracy=$(echo "$result" | jq -r '.result.averageAccuracy')
+
+if [ "$success" = "true" ]; then
+  echo "✓ Calibration successful!"
+  echo "  Average accuracy: ${accuracy}°"
+else
+  echo "✗ Calibration failed"
+fi</code></pre>
+
+        <h3>Data Export Script</h3>
+        <pre><code>#!/bin/bash
+# export_gaze_data.sh - Export session data
+
+SESSION_ID="${1:-session_001}"
+OUTPUT_FILE="${2:-gaze_data.csv}"
+API_BASE="http://localhost:8080/api/v1"
+
+echo "Exporting session: $SESSION_ID"
+
+# Request export
+export_response=$(curl -s -X POST \
+  "${API_BASE}/sessions/${SESSION_ID}/export" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "format": "csv",
+    "includeEvents": true,
+    "includeRawData": false
+  }')
+
+DOWNLOAD_URL=$(echo "$export_response" | jq -r '.downloadUrl')
+FILE_SIZE=$(echo "$export_response" | jq -r '.fileSize')
+RECORD_COUNT=$(echo "$export_response" | jq -r '.recordCount')
+
+echo "Export ready:"
+echo "  Records: $RECORD_COUNT"
+echo "  Size: $((FILE_SIZE / 1024)) KB"
+
+# Download file
+curl -s "${API_BASE}${DOWNLOAD_URL}" -o "$OUTPUT_FILE"
+
+echo "✓ Data exported to: $OUTPUT_FILE"</code></pre>
+
+        <h2>7.4 Complete AAC Application Example</h2>
+
+        <h3>Simple AAC Communication Board</h3>
+        <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;Simple AAC Board&lt;/title&gt;
+  &lt;style&gt;
+    .communication-board {
+      display: grid;
+      grid-template-columns: repeat(4, 200px);
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .aac-button {
+      width: 200px;
+      height: 200px;
+      font-size: 24px;
+      background: #3B82F6;
+      color: white;
+      border: 3px solid transparent;
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .aac-button.dwelling {
+      border-color: #F59E0B;
+    }
+
+    .dwell-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 8px;
+      background: #F59E0B;
+      transition: width 0.1s linear;
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div id="output"&gt;&lt;/div&gt;
+  &lt;div class="communication-board" id="board"&gt;&lt;/div&gt;
+
+  &lt;script&gt;
+    const phrases = [
+      "Yes", "No", "Thank you", "Please",
+      "I'm hungry", "I'm thirsty", "I need help", "I'm tired",
+      "Hello", "Goodbye", "I love you", "I'm happy"
+    ];
+
+    const dwellTime = 1000; // ms
+    let currentDwell = null;
+
+    // Create buttons
+    const board = document.getElementById('board');
+    phrases.forEach(phrase => {
+      const button = document.createElement('button');
+      button.className = 'aac-button';
+      button.textContent = phrase;
+      button.dataset.phrase = phrase;
+
+      const progress = document.createElement('div');
+      progress.className = 'dwell-progress';
+      progress.style.width = '0%';
+      button.appendChild(progress);
+
+      board.appendChild(button);
+    });
+
+    // Connect to eye tracker
+    const ws = new WebSocket('ws://localhost:8080/stream');
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: 'handshake',
+        clientId: 'simple-aac',
+        clientName: 'Simple AAC Board'
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+
+      if (message.type === 'handshake_ack') {
+        ws.send(JSON.stringify({
+          type: 'command',
+          action: 'start_stream',
+          params: { frequency: 30 }
+        }));
+      }
+      else if (message.type === 'gaze_point') {
+        handleGaze(message.data);
+      }
+    };
+
+    function handleGaze(point) {
+      if (!point.valid) return;
+
+      const screenX = point.x * window.innerWidth;
+      const screenY = point.y * window.innerHeight;
+
+      // Find button under gaze
+      const buttons = document.querySelectorAll('.aac-button');
+      let gazedButton = null;
+
+      for (const button of buttons) {
+        const rect = button.getBoundingClientRect();
+        if (screenX >= rect.left && screenX <= rect.right &&
+            screenY >= rect.top && screenY <= rect.bottom) {
+          gazedButton = button;
+          break;
+        }
+      }
+
+      if (gazedButton) {
+        if (!currentDwell || currentDwell.button !== gazedButton) {
+          // Start new dwell
+          startDwell(gazedButton);
+        } else {
+          // Update existing dwell
+          updateDwell();
+        }
+      } else {
+        // No button gazed, cancel dwell
+        cancelDwell();
+      }
+    }
+
+    function startDwell(button) {
+      cancelDwell();
+      currentDwell = {
+        button: button,
+        startTime: Date.now()
+      };
+      button.classList.add('dwelling');
+    }
+
+    function updateDwell() {
+      if (!currentDwell) return;
+
+      const elapsed = Date.now() - currentDwell.startTime;
+      const progress = Math.min(elapsed / dwellTime, 1.0);
+
+      const progressBar = currentDwell.button.querySelector('.dwell-progress');
+      progressBar.style.width = `${progress * 100}%`;
+
+      if (progress >= 1.0) {
+        selectButton(currentDwell.button);
+        cancelDwell();
+      }
+    }
+
+    function cancelDwell() {
+      if (currentDwell) {
+        currentDwell.button.classList.remove('dwelling');
+        const progressBar = currentDwell.button.querySelector('.dwell-progress');
+        progressBar.style.width = '0%';
+        currentDwell = null;
+      }
+    }
+
+    function selectButton(button) {
+      const phrase = button.dataset.phrase;
+      const output = document.getElementById('output');
+      output.textContent += phrase + ' ';
+
+      // Speak phrase (if available)
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(phrase);
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    // Update dwell progress continuously
+    setInterval(() => {
+      if (currentDwell) {
+        updateDwell();
+      }
+    }, 50);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+        </main>
+</body>
+</html>

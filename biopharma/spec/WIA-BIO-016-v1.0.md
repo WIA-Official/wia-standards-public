@@ -687,7 +687,6 @@ Typical mAb specifications:
 
 ### 10.2 Scientific Literature
 
-1. 선행 연구. "Strategies and challenges for the next generation of antibody-drug conjugates" Nature Reviews Drug Discovery
 2. Liu, J.K.H. (2014). "The history of monoclonal antibody development - Progress, remaining challenges and future innovations" Annals of Medicine and Surgery
 3. Walsh, G. (2018). "Biopharmaceutical benchmarks 2018" Nature Biotechnology
 4. Carter, P.J. & Lazar, G.A. (2018). "Next generation antibody drugs" Nature Reviews Drug Discovery

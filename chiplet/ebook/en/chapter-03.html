@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Chiplet Design Methodology | WIA-CHIPLET</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Chiplet Design Methodology</h1>
+
+    <p>This chapter delves into the methodologies for designing chiplets as reusable IP blocks. We explore interface standardization, design partitioning strategies, IP integration approaches, and best practices for creating chiplets that can be effectively combined into complex systems.</p>
+
+    <h2>Design Partitioning Strategies</h2>
+
+    <p>The first critical decision in chiplet design is determining how to partition functionality across multiple dies. This partitioning must balance technical requirements with economic considerations and future reusability goals.</p>
+
+    <div class="highlight">
+        <strong>Partitioning Principles</strong>
+        <p>Effective partitioning minimizes cross-chiplet bandwidth requirements while maximizing the reusability of individual chiplets. The boundaries should align with natural functional divisions and process node optimization opportunities.</p>
+    </div>
+
+    <h3>Functional Decomposition Analysis</h3>
+
+    <pre><code>// Chiplet Partitioning Framework
+interface PartitioningAnalysis {
+    // Input: Monolithic Design Specification
+    monolithicSpec: {
+        totalArea: number;
+        functionalBlocks: FunctionalBlock[];
+        interconnectGraph: InterconnectGraph;
+        powerBudget: number;
+    };
+
+    // Analysis Methods
+    analyzePartitionOptions(): PartitionOption[] {
+        const options: PartitionOption[] = [];
+
+        // Option 1: Compute/IO Split
+        options.push(this.analyzeComputeIOSplit());
+
+        // Option 2: Homogeneous Tiling
+        options.push(this.analyzeHomogeneousTiling());
+
+        // Option 3: Functional Domain Split
+        options.push(this.analyzeFunctionalDomains());
+
+        return this.rankOptions(options);
+    }
+
+    // Evaluate bandwidth requirements across partition boundary
+    evaluateBoundary(partition: Partition): BoundaryMetrics {
+        return {
+            crossBandwidth: this.calculateCrossBandwidth(partition),
+            latencySensitivity: this.assessLatencySensitivity(partition),
+            coherencyRequirements: this.checkCoherency(partition),
+            powerOverhead: this.estimatePowerOverhead(partition)
+        };
+    }
+}
+
+// Partition Evaluation Criteria
+interface PartitionOption {
+    name: string;
+    chiplets: ChipletSpec[];
+
+    metrics: {
+        yieldImprovement: number;     // % improvement over monolithic
+        interconnectBandwidth: number; // GB/s required
+        reusabilityScore: number;      // 0-100
+        designComplexity: number;      // Relative complexity
+        totalCost: number;             // Estimated unit cost
+    };
+}</code></pre>
+
+    <h3>Common Partitioning Patterns</h3>
+
+    <table>
+        <tr>
+            <th>Pattern</th>
+            <th>Description</th>
+            <th>Bandwidth Need</th>
+            <th>Use Case</th>
+        </tr>
+        <tr>
+            <td>Compute/IO Split</td>
+            <td>Separate compute cores from I/O controllers</td>
+            <td>High (500+ GB/s)</td>
+            <td>Server CPUs, APUs</td>
+        </tr>
+        <tr>
+            <td>Homogeneous Scaling</td>
+            <td>Multiple identical compute chiplets</td>
+            <td>Moderate (100-500 GB/s)</td>
+            <td>Scalable processors</td>
+        </tr>
+        <tr>
+            <td>Function Specific</td>
+            <td>Dedicated chiplets per function (CPU, GPU, NPU)</td>
+            <td>Variable</td>
+            <td>AI accelerators</td>
+        </tr>
+        <tr>
+            <td>Memory Disaggregation</td>
+            <td>Separate high-bandwidth memory</td>
+            <td>Very High (1+ TB/s)</td>
+            <td>HPC, AI training</td>
+        </tr>
+    </table>
+
+    <h2>Interface Standardization</h2>
+
+    <p>Creating reusable chiplets requires well-defined, standardized interfaces. The WIA-CHIPLET standard specifies interface requirements for interoperable chiplet design.</p>
+
+    <pre><code>// WIA-CHIPLET Interface Standard
+interface WIAChipletInterface {
+    // Electrical Specification
+    electrical: {
+        signalType: "Single-ended" | "Differential";
+        voltage: {
+            nominal: number;      // V (typically 0.8-1.2)
+            tolerance: number;    // +/- percentage
+        };
+        impedance: {
+            target: number;       // Ohms
+            matching: "Series" | "Parallel" | "AC";
+        };
+        timing: {
+            dataRate: number;     // GT/s
+            clockScheme: "Forwarded" | "Embedded" | "PLL";
+            jitter: {
+                tj: number;       // Total jitter ps
+                rj: number;       // Random jitter ps RMS
+            };
+        };
+    };
+
+    // Protocol Specification
+    protocol: {
+        baseProtocol: "UCIe" | "BoW" | "Custom";
+        flowControl: FlowControlSpec;
+        errorHandling: ErrorHandlingSpec;
+        powerManagement: PowerManagementSpec;
+    };
+
+    // Physical Layout
+    physical: {
+        bumpPitchRange: [number, number];  // μm
+        bumpDiameter: number;              // μm
+        keepoutZones: KeepoutSpec[];
+        signalAssignment: SignalMap;
+    };
+}
+
+// Interface Compliance Checker
+class InterfaceComplianceChecker {
+    checkCompliance(chiplet: Chiplet, standard: WIAChipletInterface): ComplianceReport {
+        const checks = [
+            this.checkElectrical(chiplet, standard.electrical),
+            this.checkProtocol(chiplet, standard.protocol),
+            this.checkPhysical(chiplet, standard.physical)
+        ];
+
+        return {
+            compliant: checks.every(c => c.passed),
+            details: checks,
+            certificationLevel: this.determineCertLevel(checks)
+        };
+    }
+}</code></pre>
+
+    <h2>IP Block Integration</h2>
+
+    <p>Chiplet design often involves integrating multiple IP blocks into a cohesive die. This integration requires careful planning for interconnect, clock distribution, power delivery, and verification.</p>
+
+    <h3>IP Integration Architecture</h3>
+
+    <pre><code>// IP Block Integration Framework
+interface IPIntegrationPlan {
+    // IP Inventory
+    ipBlocks: IPBlock[];
+
+    // Integration Bus/NoC
+    interconnect: {
+        type: "Bus" | "Crossbar" | "NoC" | "Hybrid";
+        topology: NetworkTopology;
+        protocol: "AXI" | "CHI" | "Custom";
+        bandwidth: number;
+    };
+
+    // Clock Domain Management
+    clockDomains: {
+        domains: ClockDomain[];
+        crossings: ClockCrossing[];
+        synchronization: SyncStrategy;
+    };
+
+    // Power Domain Management
+    powerDomains: {
+        domains: PowerDomain[];
+        isolation: IsolationStrategy;
+        sequencing: PowerSequence;
+    };
+}
+
+// IP Block Definition
+interface IPBlock {
+    name: string;
+    vendor: string;
+    version: string;
+
+    // Interface Definitions
+    interfaces: {
+        primary: InterfacePort[];
+        sideband: InterfacePort[];
+        debug: InterfacePort[];
+    };
+
+    // Resource Requirements
+    resources: {
+        area: number;           // mm²
+        gates: number;          // Gate count
+        memory: number;         // KB of SRAM
+        peakPower: number;      // mW
+        typicalPower: number;   // mW
+    };
+
+    // Integration Requirements
+    requirements: {
+        minClockFreq: number;
+        maxClockFreq: number;
+        voltageRange: [number, number];
+        processNodes: string[];
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>NoC Design for Chiplets</strong>
+        <p>Network-on-Chip (NoC) architectures are essential for chiplet designs with multiple IP blocks. The NoC must efficiently route traffic between on-die components and provide access to the die-to-die interface with minimal latency overhead.</p>
+    </div>
+
+    <h3>On-Chip Network Design</h3>
+
+    <pre><code>// Network-on-Chip Configuration
+interface NoCConfiguration {
+    topology: "Mesh" | "Ring" | "Tree" | "Butterfly";
+
+    routers: {
+        count: number;
+        portsPerRouter: number;
+        bufferDepth: number;
+        routingAlgorithm: "XY" | "WestFirst" | "Adaptive";
+    };
+
+    links: {
+        width: number;          // bits
+        frequency: number;      // GHz
+        pipelining: number;     // stages
+    };
+
+    qualityOfService: {
+        virtualChannels: number;
+        priorityLevels: number;
+        flowControl: "Wormhole" | "VirtualCutThrough";
+    };
+
+    // D2D Gateway Integration
+    d2dGateway: {
+        position: RouterPosition[];
+        protocolBridge: "UCIe" | "Custom";
+        bufferingDepth: number;
+    };
+}
+
+// NoC Performance Model
+class NoCPerformanceModel {
+    constructor(private config: NoCConfiguration) {}
+
+    estimateLatency(source: NodeId, dest: NodeId): number {
+        const hops = this.calculateHops(source, dest);
+        const routerLatency = 2;  // cycles per router
+        const linkLatency = this.config.links.pipelining;
+        return hops * (routerLatency + linkLatency);
+    }
+
+    estimateBandwidth(): number {
+        const linkBW = this.config.links.width * this.config.links.frequency / 8;
+        const numLinks = this.config.routers.count * this.config.routers.portsPerRouter / 2;
+        return linkBW * numLinks * this.congestionFactor;
+    }
+}</code></pre>
+
+    <h2>Design for Reusability</h2>
+
+    <p>Maximizing chiplet value requires designing for reuse across multiple products. This section covers principles and practices for creating highly reusable chiplet designs.</p>
+
+    <pre><code>// Reusability Design Principles
+interface ReusabilityGuidelines {
+    // Interface Abstraction
+    interfaceDesign: {
+        principle: "Hide implementation details behind standard interfaces";
+        practices: [
+            "Use industry-standard protocols (UCIe, AXI, PCIe)",
+            "Parameterize interface width and speed",
+            "Include protocol bridges for flexibility",
+            "Document interface timing completely"
+        ];
+    };
+
+    // Configurability
+    configuration: {
+        principle: "Enable runtime and compile-time configuration";
+        practices: [
+            "Use fuses or configuration registers",
+            "Support multiple performance points",
+            "Enable/disable features based on SKU",
+            "Allow voltage/frequency scaling"
+        ];
+    };
+
+    // Process Portability
+    portability: {
+        principle: "Minimize process-specific dependencies";
+        practices: [
+            "Use standard cell libraries where possible",
+            "Abstract analog/custom blocks",
+            "Document process assumptions",
+            "Maintain technology-independent RTL"
+        ];
+    };
+}
+
+// Reusability Assessment
+class ReusabilityAssessment {
+    evaluate(chiplet: ChipletDesign): ReusabilityScore {
+        return {
+            interfaceStandardization: this.assessInterfaces(chiplet),
+            configurationFlexibility: this.assessConfiguration(chiplet),
+            processPortability: this.assessPortability(chiplet),
+            documentationQuality: this.assessDocumentation(chiplet),
+            verificationCompleteness: this.assessVerification(chiplet),
+            overallScore: this.calculateOverall(chiplet)
+        };
+    }
+}</code></pre>
+
+    <h3>Configuration and Parameterization</h3>
+
+    <pre><code>// Parameterized Chiplet Design Example
+interface ParameterizedChiplet {
+    // Design Parameters (compile-time)
+    designParams: {
+        NUM_CORES: number;          // 4, 8, 16
+        CACHE_SIZE_KB: number;      // 512, 1024, 2048
+        INTERFACE_WIDTH: number;    // 64, 128, 256
+        MAX_FREQUENCY_GHZ: number;  // 3.0, 3.5, 4.0
+    };
+
+    // Runtime Configuration
+    runtimeConfig: {
+        activeCores: number;
+        cachePartitioning: CacheConfig;
+        powerState: PowerState;
+        clockFrequency: number;
+    };
+
+    // Fuse Configuration (one-time)
+    fuseConfig: {
+        skuIdentifier: string;
+        enabledFeatures: FeatureFlags;
+        voltageTrims: VoltageTrim[];
+        performanceLimits: PerfLimits;
+    };
+}
+
+// RTL Parameter Example
+const cpuChipletRTL = `
+module cpu_chiplet #(
+    parameter NUM_CORES = 8,
+    parameter L2_SIZE_KB = 1024,
+    parameter L3_SIZE_MB = 16,
+    parameter DDI_WIDTH = 128,
+    parameter DDI_SPEED = 16  // GT/s
+) (
+    input  wire                     clk,
+    input  wire                     rst_n,
+    // Die-to-Die Interface
+    output wire [DDI_WIDTH-1:0]     ddi_tx_data,
+    input  wire [DDI_WIDTH-1:0]     ddi_rx_data,
+    output wire                     ddi_tx_valid,
+    input  wire                     ddi_rx_valid,
+    // Configuration
+    input  wire [31:0]              config_data,
+    input  wire                     config_valid
+);
+    // Parameterized core instantiation
+    genvar i;
+    generate
+        for (i = 0; i < NUM_CORES; i = i + 1) begin : cores
+            cpu_core core_inst (
+                .clk(clk),
+                .rst_n(rst_n),
+                .core_id(i),
+                // ...
+            );
+        end
+    endgenerate
+endmodule
+`;</code></pre>
+
+    <h2>Chiplet Design Verification Strategy</h2>
+
+    <p>Verification of chiplet designs requires strategies that address both standalone chiplet functionality and system-level integration scenarios.</p>
+
+    <table>
+        <tr>
+            <th>Verification Level</th>
+            <th>Focus</th>
+            <th>Methods</th>
+        </tr>
+        <tr>
+            <td>IP Block Level</td>
+            <td>Individual IP functionality</td>
+            <td>UVM, Formal, Simulation</td>
+        </tr>
+        <tr>
+            <td>Chiplet Level</td>
+            <td>Integrated chiplet function</td>
+            <td>System UVM, Emulation</td>
+        </tr>
+        <tr>
+            <td>Interface Level</td>
+            <td>D2D protocol compliance</td>
+            <td>Protocol VIP, Formal</td>
+        </tr>
+        <tr>
+            <td>System Level</td>
+            <td>Multi-chiplet integration</td>
+            <td>Virtual Platform, FPGA</td>
+        </tr>
+    </table>
+
+    <pre><code>// Verification Methodology Framework
+interface ChipletVerificationPlan {
+    // Block-Level Verification
+    blockVerification: {
+        coverage: CoverageTargets;
+        assertions: AssertionSuite;
+        testbenches: TestbenchConfig[];
+    };
+
+    // Interface Verification
+    interfaceVerification: {
+        protocolChecks: ProtocolChecker[];
+        timingVerification: TimingAnalysis;
+        signalIntegrity: SISimulation;
+    };
+
+    // System-Level Verification
+    systemVerification: {
+        virtualPlatform: VirtualPlatformConfig;
+        multiChipletTests: SystemTest[];
+        performanceValidation: PerfTargets;
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary</strong>
+        <p>Successful chiplet design methodology requires thoughtful partitioning, standardized interfaces, careful IP integration, and design for reusability. By following these principles, chiplet designers can create modular silicon building blocks that deliver value across multiple products while reducing development time and cost.</p>
+    </div>
+</body>
+</html>

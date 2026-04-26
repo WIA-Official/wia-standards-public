@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: System Architecture | WIA-CARBON_CAPTURE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 2: System Architecture and Design</h1>
+
+    <div class="highlight">
+        <strong>Learning Objectives:</strong> Master carbon capture plant design principles, understand process flow diagrams, learn equipment specifications, and comprehend integration patterns with existing industrial infrastructure.
+    </div>
+
+    <h2>Carbon Capture Plant Overview</h2>
+
+    <p>A carbon capture plant is a complex industrial facility that integrates multiple unit operations to efficiently separate CO2 from flue gas streams. The design must balance capture efficiency, energy consumption, capital cost, and operational reliability. Modern capture plants typically process millions of cubic meters of flue gas per day while achieving capture rates of 90% or higher.</p>
+
+    <pre><code>// Carbon Capture Plant Configuration
+interface CaptureCapture {
+    plantId: string;
+    capacity: {
+        flueGasFlow: number;      // Nm³/hour
+        CO2CaptureRate: number;   // tonnes/day
+        captureEfficiency: number; // percent
+    };
+
+    mainUnits: {
+        pretreatment: PretreatmentUnit;
+        absorber: AbsorberColumn;
+        stripper: StripperColumn;
+        compression: CompressionTrain;
+        utilities: UtilitySystem;
+    };
+
+    performance: {
+        energyConsumption: number;  // GJ/tonne CO2
+        waterConsumption: number;   // m³/tonne CO2
+        solventLoss: number;        // kg/tonne CO2
+        availability: number;       // percent
+    };
+}</code></pre>
+
+    <h2>Process Flow Architecture</h2>
+
+    <p>The standard amine-based capture process follows a well-established flow pattern. Understanding this architecture is essential for proper design and operation of capture facilities.</p>
+
+    <pre><code>// Process Flow Diagram - Amine Capture System
+/*
+                                    CONDENSER
+                                        |
+    FLUE GAS ──► PRETREAT ──► ABSORBER ──► CLEAN GAS
+                               |    ↑
+                          Rich │    │ Lean
+                         Amine │    │ Amine
+                               ↓    │
+                            HEAT EXCHANGER
+                               |    ↑
+                               ↓    │
+                            STRIPPER ──► CO2 PRODUCT
+                               |
+                            REBOILER
+                               ↑
+                            STEAM
+*/
+
+const processFlow = {
+    stage1_pretreatment: {
+        equipment: ["Direct Contact Cooler", "Particulate Filter", "SO2 Scrubber"],
+        purpose: "Condition flue gas for absorption",
+        outputTemp: 40,  // °C
+        outputCondition: "Saturated, cleaned"
+    },
+
+    stage2_absorption: {
+        equipment: ["Absorber Column", "Wash Section", "Demister"],
+        purpose: "Capture CO2 with lean amine",
+        keyMetrics: {
+            L_G_ratio: 2.5,          // liquid/gas mass ratio
+            contactTime: 8,           // seconds
+            captureEfficiency: 90     // percent
+        }
+    },
+
+    stage3_solventRegeneration: {
+        equipment: ["Lean/Rich Heat Exchanger", "Stripper Column", "Reboiler"],
+        purpose: "Release CO2 and regenerate solvent",
+        keyMetrics: {
+            reboilerDuty: 3.5,       // GJ/tonne CO2
+            stripperPressure: 1.8,   // bar
+            regenerationTemp: 120     // °C
+        }
+    },
+
+    stage4_compression: {
+        equipment: ["Knockout Drums", "Compressors", "Intercoolers", "Dehydration"],
+        purpose: "Compress CO2 to transport pressure",
+        outputPressure: 150,  // bar
+        outputPurity: 99.9    // percent
+    }
+};</code></pre>
+
+    <h2>Absorber Column Design</h2>
+
+    <p>The absorber column is the primary mass transfer equipment where CO2 is captured from the flue gas. Proper design ensures high capture efficiency while minimizing pressure drop and solvent losses.</p>
+
+    <pre><code>// Absorber Column Design Specifications
+interface AbsorberDesign {
+    geometry: {
+        internalDiameter: number;  // meters
+        totalHeight: number;       // meters
+        packingHeight: number;     // meters
+        numberOfBeds: number;
+        bedHeight: number;         // meters per bed
+    };
+
+    packing: {
+        type: "structured" | "random";
+        material: string;
+        specificArea: number;      // m²/m³
+        voidFraction: number;      // dimensionless
+        pressureDrop: number;      // mbar/m
+    };
+
+    internals: {
+        liquidDistributors: number;
+        redistributors: number;
+        supportPlates: number;
+        holdDownPlates: number;
+    };
+
+    operatingLimits: {
+        maxGasVelocity: number;    // m/s
+        minLiquidRate: number;     // m³/m²/h
+        floodingMargin: number;    // percent below flooding
+    };
+}
+
+// Example: 500 MW Power Plant Absorber
+const absorberSpec: AbsorberDesign = {
+    geometry: {
+        internalDiameter: 15.5,
+        totalHeight: 45,
+        packingHeight: 24,
+        numberOfBeds: 4,
+        bedHeight: 6
+    },
+    packing: {
+        type: "structured",
+        material: "Stainless Steel 316L",
+        specificArea: 250,
+        voidFraction: 0.97,
+        pressureDrop: 25
+    },
+    internals: {
+        liquidDistributors: 5,
+        redistributors: 3,
+        supportPlates: 4,
+        holdDownPlates: 4
+    },
+    operatingLimits: {
+        maxGasVelocity: 2.8,
+        minLiquidRate: 15,
+        floodingMargin: 30
+    }
+};</code></pre>
+
+    <h2>Stripper Column and Reboiler System</h2>
+
+    <p>The stripper column regenerates the rich amine solution by driving off the absorbed CO2 using heat supplied by the reboiler. This unit represents the largest energy consumer in the capture plant.</p>
+
+    <div class="highlight">
+        <strong>Energy Optimization:</strong> The reboiler duty typically accounts for 60-70% of the total energy consumption of a capture plant. Reducing reboiler duty through advanced solvents, process modifications, and heat integration is the primary pathway to reducing capture costs.
+    </div>
+
+    <pre><code>// Stripper and Reboiler Specifications
+interface StripperSystem {
+    column: {
+        diameter: number;           // meters
+        height: number;             // meters
+        packingHeight: number;      // meters
+        operatingPressure: number;  // bar
+        topTemperature: number;     // °C
+        bottomTemperature: number;  // °C
+    };
+
+    reboiler: {
+        type: "kettle" | "thermosiphon" | "forcedCirculation";
+        duty: number;               // MW
+        steamPressure: number;      // bar
+        steamTemperature: number;   // °C
+        heatTransferArea: number;   // m²
+        U_coefficient: number;      // W/m²/K
+    };
+
+    condenser: {
+        duty: number;               // MW
+        coolingMedium: string;
+        coolantTemperature: number; // °C
+        refluxRatio: number;        // dimensionless
+    };
+}
+
+// Calculate Reboiler Duty
+function calculateReboilerDuty(
+    CO2CaptureRate: number,      // tonnes/hour
+    specificDuty: number,        // GJ/tonne CO2
+    heatExchangerEfficiency: number  // fraction
+): number {
+    const grossDuty = CO2CaptureRate * specificDuty * 1000 / 3600;  // MW
+    const netDuty = grossDuty / heatExchangerEfficiency;
+    return netDuty;  // MW
+}</code></pre>
+
+    <h2>Compression Train Design</h2>
+
+    <p>The CO2 compression train raises the pressure of the captured CO2 from near-atmospheric to pipeline transport pressure (typically 100-150 bar). Multi-stage compression with intercooling is used to minimize energy consumption.</p>
+
+    <pre><code>// CO2 Compression Train Configuration
+interface CompressionTrain {
+    stages: CompressionStage[];
+    totalPower: number;          // MW
+    overallEfficiency: number;   // percent
+    coolingDuty: number;         // MW
+}
+
+interface CompressionStage {
+    stageNumber: number;
+    compressorType: "centrifugal" | "reciprocating" | "integrallygeared";
+    inletPressure: number;       // bar
+    outletPressure: number;      // bar
+    compressionRatio: number;    // dimensionless
+    polytropicEfficiency: number; // percent
+    power: number;               // MW
+    intercooler: {
+        outletTemperature: number;  // °C
+        duty: number;               // MW
+    };
+}
+
+// Example 4-Stage Compression Train
+const compressionTrain: CompressionTrain = {
+    stages: [
+        { stageNumber: 1, compressorType: "centrifugal", inletPressure: 1.5,
+          outletPressure: 5, compressionRatio: 3.33, polytropicEfficiency: 82,
+          power: 4.5, intercooler: { outletTemperature: 35, duty: 3.8 }},
+        { stageNumber: 2, compressorType: "centrifugal", inletPressure: 5,
+          outletPressure: 15, compressionRatio: 3.0, polytropicEfficiency: 84,
+          power: 3.8, intercooler: { outletTemperature: 35, duty: 3.2 }},
+        { stageNumber: 3, compressorType: "centrifugal", inletPressure: 15,
+          outletPressure: 45, compressionRatio: 3.0, polytropicEfficiency: 85,
+          power: 3.2, intercooler: { outletTemperature: 35, duty: 2.8 }},
+        { stageNumber: 4, compressorType: "centrifugal", inletPressure: 45,
+          outletPressure: 150, compressionRatio: 3.33, polytropicEfficiency: 85,
+          power: 3.5, intercooler: { outletTemperature: 35, duty: 0 }}
+    ],
+    totalPower: 15,
+    overallEfficiency: 84,
+    coolingDuty: 9.8
+};</code></pre>
+
+    <h2>Heat Integration Strategies</h2>
+
+    <p>Effective heat integration can significantly reduce the energy penalty of carbon capture. By recovering heat from various process streams and integrating with the host plant's thermal cycles, overall efficiency can be improved substantially.</p>
+
+    <table>
+        <tr>
+            <th>Heat Source</th>
+            <th>Temperature (°C)</th>
+            <th>Potential Use</th>
+            <th>Energy Saving</th>
+        </tr>
+        <tr>
+            <td>Lean Amine Cooler</td>
+            <td>50-80</td>
+            <td>Rich Amine Preheat</td>
+            <td>5-10%</td>
+        </tr>
+        <tr>
+            <td>CO2 Compressor Intercoolers</td>
+            <td>80-150</td>
+            <td>Feedwater Heating</td>
+            <td>3-5%</td>
+        </tr>
+        <tr>
+            <td>Stripper Overhead Condenser</td>
+            <td>80-100</td>
+            <td>Rich Amine Preheat</td>
+            <td>8-12%</td>
+        </tr>
+        <tr>
+            <td>Flue Gas (pre-capture)</td>
+            <td>120-180</td>
+            <td>Solvent Regeneration</td>
+            <td>10-15%</td>
+        </tr>
+    </table>
+
+    <pre><code>// Heat Integration Network Optimization
+interface HeatExchangerNetwork {
+    exchangers: HeatExchanger[];
+    totalHeatRecovery: number;    // MW
+    minimumApproach: number;      // °C
+    annualEnergySaving: number;   // GJ/year
+}
+
+interface HeatExchanger {
+    id: string;
+    hotStream: string;
+    coldStream: string;
+    duty: number;                 // MW
+    LMTD: number;                 // °C
+    area: number;                 // m²
+    U_coefficient: number;        // W/m²/K
+}
+
+// Calculate Heat Exchanger Area
+function calculateHeatExchangerArea(
+    duty: number,         // MW
+    U: number,            // W/m²/K
+    LMTD: number          // °C
+): number {
+    return (duty * 1e6) / (U * LMTD);  // m²
+}</code></pre>
+
+    <h2>Instrumentation and Control Architecture</h2>
+
+    <p>Modern carbon capture plants employ sophisticated distributed control systems (DCS) to maintain optimal operation and ensure safety. The control architecture manages hundreds of control loops and interfaces with plant-wide systems.</p>
+
+    <div class="highlight">
+        <strong>Control Philosophy:</strong> Carbon capture plants typically use a hierarchical control structure with base-layer regulatory control, supervisory advanced process control (APC), and real-time optimization (RTO) layers to maximize efficiency while maintaining safe operation.
+    </div>
+
+    <pre><code>// Control System Architecture
+interface ControlArchitecture {
+    dcs: {
+        vendor: string;
+        redundancy: "dual" | "triple";
+        scanRate: number;           // milliseconds
+        ioCount: number;
+    };
+
+    controlLoops: {
+        flow: number;
+        pressure: number;
+        temperature: number;
+        level: number;
+        analytical: number;
+        total: number;
+    };
+
+    apc: {
+        enabled: boolean;
+        vendor: string;
+        controlledVariables: number;
+        manipulatedVariables: number;
+        updateRate: number;         // seconds
+    };
+
+    rto: {
+        enabled: boolean;
+        optimizationInterval: number;  // minutes
+        objectiveFunction: string;
+    };
+
+    safetySystem: {
+        silLevel: 1 | 2 | 3;
+        tripPoints: number;
+        emergencyShutdowns: number;
+    };
+}</code></pre>
+
+    <h2>Summary</h2>
+
+    <p>This chapter has covered the comprehensive architecture of carbon capture systems, from process flow design through equipment specifications to control systems and site layout. The integration of these components into a cohesive, efficient facility requires careful engineering and attention to the interfaces between systems.</p>
+
+</body>
+</html>

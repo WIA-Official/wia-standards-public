@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1장: 기초 | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>1장: 탄소 거래 기초</h1>
+
+    <div class="highlight">
+        <strong>핵심 개념:</strong> 탄소 거래는 온실가스 배출에 가격을 설정하여 배출 감소에 대한 경제적 인센티브를 만들어, 시장의 힘이 산업과 지역을 넘어 비용 효율적인 기후 행동을 이끌 수 있게 합니다.
+    </div>
+
+    <p>탄소 거래의 기초를 이해하는 것은 탄소 시장에 참여하는 모든 사람에게 필수적입니다. 이 장에서는 현대 배출권 거래 시스템을 뒷받침하는 이론적 토대, 역사적 발전 및 경제 원리를 탐구합니다.</p>
+
+    <h2>외부효과의 경제학</h2>
+
+    <p>기후 변화는 인류 역사상 가장 큰 시장 실패를 나타냅니다. 기업과 개인이 온실가스를 배출할 때, 시장 가격에 반영되지 않는 비용을 사회에 부과합니다. 이러한 외부 비용에는 해수면 상승, 극단적인 기상 현상, 농업 중단 및 공중 보건 영향이 포함됩니다. 탄소 거래는 배출에 가격을 매김으로써 이러한 외부효과를 내부화합니다.</p>
+
+    <p>외부효과 가격 책정의 개념은 1920년대 경제학자 아서 피구의 연구로 거슬러 올라갑니다. 피구는 오염자가 그들의 활동에 대한 사회적 비용을 지불하게 함으로써 세금이 시장 실패를 교정할 수 있다고 제안했습니다. 탄소 시장은 배출에 대한 시장 가격을 설정하는 거래 가능한 허가권을 만들어 이 원칙을 확장합니다.</p>
+
+    <h3>한계저감비용</h3>
+
+    <p>한계저감비용(MAC)은 추가로 한 단위의 배출을 줄이는 비용을 나타냅니다. 다른 배출자들은 기술, 프로세스 및 대안에 따라 매우 다른 MAC에 직면합니다. 탄소 거래는 저MAC 배출자가 배출을 줄이고 고MAC 배출자에게 허가권을 판매하여 배출 목표 달성의 총 비용을 최소화함으로써 이러한 차이를 활용합니다.</p>
+
+    <pre><code>// 한계저감비용 계산기
+interface AbatementOption {
+    technology: string;
+    reductionPotential: number;  // 톤 CO2e
+    costPerTonne: number;        // USD
+    implementationTime: number;  // 개월
+    cobenefits: string[];
+}
+
+class MACCalculator {
+    private options: AbatementOption[] = [];
+
+    addOption(option: AbatementOption): void {
+        this.options.push(option);
+    }
+
+    buildCurve(): AbatementCurve {
+        // 비용 오름차순 정렬
+        const sorted = [...this.options].sort(
+            (a, b) => a.costPerTonne - b.costPerTonne
+        );
+
+        let cumulativeReduction = 0;
+        const curve: CurvePoint[] = [];
+
+        for (const option of sorted) {
+            curve.push({
+                technology: option.technology,
+                marginalCost: option.costPerTonne,
+                cumulativeReduction: cumulativeReduction,
+                nextReduction: cumulativeReduction + option.reductionPotential
+            });
+            cumulativeReduction += option.reductionPotential;
+        }
+
+        return { points: curve, totalPotential: cumulativeReduction };
+    }
+
+    findOptimalAbatement(targetReduction: number, carbonPrice: number): AbatementPlan {
+        const curve = this.buildCurve();
+        const selectedOptions: AbatementOption[] = [];
+
+        for (const option of this.options) {
+            if (option.costPerTonne <= carbonPrice) {
+                selectedOptions.push(option);
+            }
+        }
+
+        return {
+            options: selectedOptions,
+            totalReduction: selectedOptions.reduce((sum, o) => sum + o.reductionPotential, 0),
+            totalCost: selectedOptions.reduce((sum, o) => sum + o.costPerTonne * o.reductionPotential, 0)
+        };
+    }
+}</code></pre>
+
+    <h2>탄소 시장의 역사</h2>
+
+    <p>현대 탄소 시장은 1990년대 미국이 산성비 문제를 해결하기 위해 총량제한 거래제를 성공적으로 사용한 것에 기원을 두고 있습니다. 청정대기법에 따른 산성비 프로그램은 시장 메커니즘이 전통적인 명령 및 통제 규제보다 더 비용 효율적으로 환경 목표를 달성할 수 있음을 보여주었습니다.</p>
+
+    <h3>교토의정서 시대 (1997-2020)</h3>
+
+    <p>1997년에 채택된 교토의정서는 세 가지 유연한 메커니즘을 통해 탄소 거래를 위한 최초의 국제 프레임워크를 수립했습니다:</p>
+
+    <ul>
+        <li><strong>국제 배출권 거래(IET):</strong> 국가 간 배출 허용량 거래 허용</li>
+        <li><strong>청정개발체제(CDM):</strong> 개발도상국의 배출 감소 프로젝트에서 크레딧 생성</li>
+        <li><strong>공동이행(JI):</strong> 선진국 간 프로젝트 크레딧 인정</li>
+    </ul>
+
+    <p>CDM만으로도 8,000개 이상의 등록된 프로젝트에서 20억 개 이상의 인증배출감축량(CER)을 생성했지만, 추가성 우려와 프로젝트의 불균등한 지리적 분포에 대한 비판을 받았습니다.</p>
+
+    <h3>파리협정 시대 (2015-현재)</h3>
+
+    <p>파리협정은 국제 기후 체제를 하향식 접근에서 국가결정기여(NDC)의 상향식 시스템으로 전환했습니다. 파리협정 제6조는 국제 탄소 시장 협력을 위한 새로운 메커니즘을 수립합니다:</p>
+
+    <div class="highlight">
+        <strong>제6.2조:</strong> 국제이전감축성과(ITMO)를 통한 국가 간 협력적 접근을 가능하게 하며, 이중 계산을 방지하기 위한 상응조정을 포함합니다.
+    </div>
+
+    <div class="highlight">
+        <strong>제6.4조:</strong> UN 기구가 감독하는 새로운 크레딧 메커니즘을 만들어 환경적 무결성과 지속 가능한 개발을 위한 강화된 안전장치로 CDM을 대체합니다.
+    </div>
+
+    <pre><code>// 파리협정 제6조 구현
+interface ITMO {
+    id: string;
+    originCountry: string;
+    destinationCountry: string;
+    vintageYear: number;
+    quantity: number;          // 톤 CO2e
+    correspondingAdjustment: boolean;
+    authorizationCode: string;
+    projectType: string;
+}
+
+class Article6Registry {
+    private itmos: Map&lt;string, ITMO&gt; = new Map();
+
+    async transferITMO(
+        itmoId: string,
+        fromCountry: string,
+        toCountry: string
+    ): Promise&lt;TransferResult&gt; {
+        const itmo = this.itmos.get(itmoId);
+
+        if (!itmo) {
+            throw new Error('ITMO를 찾을 수 없음');
+        }
+
+        // 상응조정 승인 확인
+        if (!itmo.correspondingAdjustment) {
+            throw new Error('상응조정이 승인되지 않음');
+        }
+
+        // 양국 레지스트리에 이전 기록
+        await this.recordInOriginRegistry(fromCountry, itmo, 'export');
+        await this.recordInDestinationRegistry(toCountry, itmo, 'import');
+
+        // ITMO 소유권 업데이트
+        itmo.destinationCountry = toCountry;
+
+        return {
+            success: true,
+            transferId: generateTransferId(),
+            timestamp: new Date()
+        };
+    }
+}</code></pre>
+
+    <h2>전 세계 배출권 거래제</h2>
+
+    <p>오늘날 배출권 거래제는 전 세계 온실가스 배출량의 약 17%를 포함합니다. 이러한 시스템은 설계, 범위 및 엄격성에서 상당히 다릅니다.</p>
+
+    <h3>유럽연합 ETS</h3>
+
+    <p>2005년에 시작된 EU ETS는 세계 최대의 탄소 시장입니다. 발전 부문과 에너지 집약적 산업의 약 10,000개 시설을 대상으로 하며, EU 온실가스 배출량의 약 40%를 차지합니다. 이 시스템은 점진적으로 감소하는 총량과 함께 거래 기간을 통해 운영됩니다.</p>
+
+    <table>
+        <tr>
+            <th>단계</th>
+            <th>기간</th>
+            <th>연간 총량 감소</th>
+            <th>주요 특징</th>
+        </tr>
+        <tr>
+            <td>1단계</td>
+            <td>2005-2007</td>
+            <td>해당없음 (시범)</td>
+            <td>학습 단계, 과잉 할당</td>
+        </tr>
+        <tr>
+            <td>2단계</td>
+            <td>2008-2012</td>
+            <td>1.74%</td>
+            <td>교토 의무 기간</td>
+        </tr>
+        <tr>
+            <td>3단계</td>
+            <td>2013-2020</td>
+            <td>1.74%</td>
+            <td>EU 전체 총량, 경매</td>
+        </tr>
+        <tr>
+            <td>4단계</td>
+            <td>2021-2030</td>
+            <td>4.2% (증가)</td>
+            <td>Fit for 55, MSR 개혁</td>
+        </tr>
+    </table>
+
+    <h3>중국 국가 ETS</h3>
+
+    <p>2021년에 시작된 중국 국가 ETS는 현재 적용 배출량 기준 세계 최대 규모로, 연간 약 45억 톤의 CO2를 책임지는 2,200개 이상의 발전 부문 기업을 포함합니다. 이 시스템은 절대적 총량 대신 강도 기반 벤치마크를 사용하며, 시간이 지남에 따라 점진적으로 강화됩니다.</p>
+
+    <h3>캘리포니아 총량제한 거래제</h3>
+
+    <p>2013년에 시작된 캘리포니아 프로그램은 주 온실가스 배출량의 약 80%를 포함합니다. 퀘벡 시스템과 연결되어 있으며, 가격 하한선, 가격 상한선 및 준수 의무의 최대 8%까지 상쇄 크레딧으로 충족할 수 있는 상쇄 조항을 특징으로 합니다.</p>
+
+    <h2>탄소 크레딧 유형 및 표준</h2>
+
+    <p>탄소 크레딧은 검증된 배출 감소 또는 제거를 나타냅니다. 다양한 표준과 방법론이 이러한 크레딧의 생성, 검증 및 인증 방법을 규정합니다.</p>
+
+    <h3>의무 시장 vs 자발적 시장</h3>
+
+    <p>의무 시장은 기업이 배출량과 동일한 허용량 또는 크레딧을 제출해야 하는 의무적 규정에 의해 만들어집니다. 자발적 시장은 조직이 기업 지속가능성 목표, 이해관계자 압력 및 기후 약속에 의해 구동되어 규제 요건을 초과하는 배출을 상쇄하기 위해 크레딧을 구매할 수 있게 합니다.</p>
+
+    <div class="highlight">
+        <strong>시장 규모:</strong> 의무 시장은 2022년에 약 8,500억 달러를 거래했으며, 자발적 탄소 시장은 20억 달러에 도달했습니다. 전 세계적으로 기후 야심이 증가함에 따라 두 부문 모두 크게 성장할 것으로 예상됩니다.
+    </div>
+
+    <h3>크레딧 품질 기준</h3>
+
+    <p>고품질 탄소 크레딧은 몇 가지 핵심 기준을 충족해야 합니다:</p>
+
+    <ul>
+        <li><strong>추가성:</strong> 탄소 금융 없이는 배출 감소가 발생하지 않았을 것</li>
+        <li><strong>영구성:</strong> 감소가 오래 지속되고 쉽게 되돌릴 수 없음</li>
+        <li><strong>누출:</strong> 감소가 다른 곳의 증가로 상쇄되지 않음</li>
+        <li><strong>검증:</strong> 독립적인 제3자의 주장 검증</li>
+        <li><strong>이중 계산 방지:</strong> 크레딧이 어떤 목표에 대해서도 한 번만 계산됨</li>
+    </ul>
+
+    <p>이러한 기초를 이해하면 탄소 시장에 효과적으로 참여할 수 있는 토대가 마련됩니다. 다음 장에서는 현대 탄소 거래 플랫폼을 가능하게 하는 기술 아키텍처를 탐구합니다.</p>
+</body>
+</html>

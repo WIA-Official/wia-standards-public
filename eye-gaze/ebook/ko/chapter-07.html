@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 구현 예제 - WIA 시선 추적 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 시선 추적 표준</h1>
+        <p class="subtitle">제7장: 구현 예제</p>
+        <span class="version">버전 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>제7장: 구현 예제</h1>
+
+        <h2>7.1 Python 구현</h2>
+        <p>Python에서 시선 추적 클라이언트를 구현하는 완전한 예제입니다.</p>
+
+        <h3>기본 클라이언트</h3>
+        <pre><code>import asyncio
+import websockets
+import json
+
+class EyeGazeClient:
+    def __init__(self, url):
+        self.url = url
+        self.ws = None
+
+    async def connect(self):
+        self.ws = await websockets.connect(self.url)
+        await self.handshake()
+
+    async def handshake(self):
+        handshake = {
+            "type": "handshake",
+            "version": "1.0.0",
+            "clientId": "python-client-001",
+            "capabilities": ["GAZE_POINT", "EVENTS"]
+        }
+        await self.ws.send(json.dumps(handshake))
+        response = await self.ws.recv()
+        return json.loads(response)
+
+    async def stream_gaze_data(self):
+        async for message in self.ws:
+            data = json.loads(message)
+            if data["type"] == "gaze_point":
+                self.on_gaze_point(data["data"])
+            elif data["type"] == "event":
+                self.on_event(data["event"])
+
+    def on_gaze_point(self, point):
+        print(f"Gaze at ({point['x']:.3f}, {point['y']:.3f})")
+
+    def on_event(self, event):
+        print(f"Event: {event['type']}")
+
+# 사용 예제
+async def main():
+    client = EyeGazeClient("ws://localhost:8080/stream")
+    await client.connect()
+    await client.stream_gaze_data()
+
+asyncio.run(main())</code></pre>
+
+        <h3>응시 감지기</h3>
+        <pre><code>class DwellDetector:
+    def __init__(self, threshold_ms=800, radius=0.05):
+        self.threshold = threshold_ms / 1000.0
+        self.radius = radius
+        self.dwell_start = None
+        self.dwell_position = None
+
+    def process_gaze_point(self, point, timestamp):
+        if not point['valid']:
+            self.reset()
+            return None
+
+        if self.dwell_position is None:
+            self.dwell_position = (point['x'], point['y'])
+            self.dwell_start = timestamp
+            return None
+
+        # 거리 계산
+        dx = point['x'] - self.dwell_position[0]
+        dy = point['y'] - self.dwell_position[1]
+        distance = (dx**2 + dy**2)**0.5
+
+        if distance > self.radius:
+            self.reset()
+            self.dwell_position = (point['x'], point['y'])
+            self.dwell_start = timestamp
+            return None
+
+        # 응시 시간 확인
+        elapsed = timestamp - self.dwell_start
+        if elapsed >= self.threshold:
+            result = self.dwell_position
+            self.reset()
+            return result
+
+        return None
+
+    def reset(self):
+        self.dwell_start = None
+        self.dwell_position = None</code></pre>
+
+        <h2>7.2 TypeScript 구현</h2>
+        <p>TypeScript/JavaScript에서의 시선 추적 통합.</p>
+
+        <h3>React 컴포넌트</h3>
+        <pre><code>import { useEffect, useState } from 'react';
+
+interface GazePoint {
+  x: number;
+  y: number;
+  confidence: number;
+  valid: boolean;
+}
+
+export function useEyeGaze(url: string) {
+  const [gazePoint, setGazePoint] = useState&lt;GazePoint | null&gt;(null);
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: 'handshake',
+        version: '1.0.0',
+        clientId: 'react-app-001',
+        capabilities: ['GAZE_POINT']
+      }));
+      setConnected(true);
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'gaze_point') {
+        setGazePoint(data.data);
+      }
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+    };
+
+    return () => ws.close();
+  }, [url]);
+
+  return { gazePoint, connected };
+}</code></pre>
+
+        <h3>시선 커서 컴포넌트</h3>
+        <pre><code>export function GazeCursor() {
+  const { gazePoint } = useEyeGaze('ws://localhost:8080/stream');
+
+  if (!gazePoint || !gazePoint.valid) {
+    return null;
+  }
+
+  const style = {
+    position: 'fixed' as const,
+    left: `${gazePoint.x * 100}%`,
+    top: `${gazePoint.y * 100}%`,
+    width: '20px',
+    height: '20px',
+    borderRadius: '50%',
+    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+    transform: 'translate(-50%, -50%)',
+    pointerEvents: 'none' as const,
+    zIndex: 9999
+  };
+
+  return &lt;div style={style} /&gt;;
+}</code></pre>
+
+        <h2>7.3 Bash 스크립트</h2>
+        <p>명령줄 도구 및 스크립팅.</p>
+
+        <h3>장치 상태 모니터</h3>
+        <pre><code>#!/bin/bash
+
+# 시선 추적 장치 상태 확인
+check_device_status() {
+    curl -s http://localhost:8080/api/v1/devices \
+        | jq -r '.devices[] | "\(.deviceId): \(.status)"'
+}
+
+# 보정 시작
+start_calibration() {
+    local device_id=$1
+    curl -X POST \
+        -H "Content-Type: application/json" \
+        -d '{
+            "type": "accessibility",
+            "pointCount": 5
+        }' \
+        http://localhost:8080/api/v1/devices/${device_id}/calibration/start
+}
+
+# 시선 데이터 스트림 (WebSocket을 위해 wscat 사용)
+stream_gaze_data() {
+    local device_id=$1
+    wscat -c ws://localhost:8080/stream \
+        | jq -r 'select(.type == "gaze_point") |
+                 "Gaze: \(.data.x), \(.data.y)"'
+}
+
+# 사용 예제
+check_device_status
+start_calibration "tobii-pro-fusion-001"</code></pre>
+
+        <h2>7.4 AAC 응용 프로그램 예제</h2>
+
+        <h3>간단한 AAC 키보드</h3>
+        <pre><code>class AACKeyboard {
+  constructor(container, eyeGazeClient) {
+    this.container = container;
+    this.client = eyeGazeClient;
+    this.dwellDetector = new DwellDetector(800);
+    this.keys = this.createKeys();
+    this.setupEventHandlers();
+  }
+
+  createKeys() {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const keys = [];
+
+    letters.forEach((letter, index) => {
+      const key = document.createElement('button');
+      key.textContent = letter;
+      key.className = 'aac-key';
+      key.dataset.letter = letter;
+
+      const x = (index % 6) / 6;
+      const y = Math.floor(index / 6) / 5;
+      key.dataset.x = x;
+      key.dataset.y = y;
+
+      this.container.appendChild(key);
+      keys.push(key);
+    });
+
+    return keys;
+  }
+
+  setupEventHandlers() {
+    this.client.on('gaze_point', (point) => {
+      const key = this.findKeyAtPosition(point.x, point.y);
+      if (key) {
+        this.highlightKey(key);
+        const dwellResult = this.dwellDetector.process(
+          point, Date.now()
+        );
+        if (dwellResult) {
+          this.selectKey(key);
+        }
+      }
+    });
+  }
+
+  selectKey(key) {
+    const letter = key.dataset.letter;
+    document.getElementById('output').textContent += letter;
+    this.playFeedback();
+  }
+}</code></pre>
+
+        <h2>7.5 디버깅 도구</h2>
+
+        <h3>시선 데이터 시각화 도구</h3>
+        <pre><code>class GazeVisualizer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.points = [];
+    this.maxPoints = 100;
+  }
+
+  addPoint(point) {
+    this.points.push({
+      x: point.x * this.canvas.width,
+      y: point.y * this.canvas.height,
+      timestamp: Date.now(),
+      confidence: point.confidence
+    });
+
+    if (this.points.length > this.maxPoints) {
+      this.points.shift();
+    }
+
+    this.draw();
+  }
+
+  draw() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // 시선 경로 그리기
+    this.ctx.beginPath();
+    this.points.forEach((point, i) => {
+      const opacity = i / this.points.length;
+      this.ctx.globalAlpha = opacity;
+      this.ctx.fillStyle = '#3B82F6';
+      this.ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+
+    // 열 지도 그리기
+    this.drawHeatmap();
+  }
+}</code></pre>
+
+        <div class="info-box success">
+            <h4>코드 예제 저장소</h4>
+            <p>모든 예제의 완전한 구현은 WIA GitHub 저장소에서 확인할 수 있습니다: github.com/WIA-Official/eye-gaze-examples</p>
+        </div>
+
+        </main>
+</body>
+</html>

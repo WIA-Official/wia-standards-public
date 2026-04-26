@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍽️ WIA Food Safety Simulator</title>
+    <style>
+        :root {
+            --primary: #84CC16;
+            --primary-dark: #65A30D;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2rem; }
+
+        /* Language Switch */
+        .lang-switch {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+            z-index: 100;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .tab:hover { border-color: var(--primary); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Panels */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .card {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .card h2 { margin-bottom: 20px; color: var(--primary); }
+
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        textarea { min-height: 100px; font-family: monospace; }
+
+        .btn-center {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(132, 204, 22, 0.3); }
+
+        .result {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-top: 20px;
+            min-height: 100px;
+        }
+        pre {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+        .metric-card {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+        .metric-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid;
+        }
+        .alert-safe { background: #10b98120; border-color: #10b981; }
+        .alert-warning { background: #f59e0b20; border-color: #f59e0b; }
+        .alert-danger { background: #ef444420; border-color: #ef4444; }
+
+        footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer p { color: var(--text-muted); margin: 5px 0; }
+
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; align-items: center; }
+            .tab { width: 100%; text-align: center; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Food Safety</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" onclick="setLang('ko')">KO</button>
+        </div>
+
+        <h1>🍽️ <span data-en="WIA Food Safety Simulator" data-ko="WIA 식품 안전 시뮬레이터">WIA Food Safety Simulator</span></h1>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Data Format" data-ko="📊 데이터 형식">📊 Data Format</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🔢 Algorithms" data-ko="🔢 알고리즘">🔢 Algorithms</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📡 Protocol" data-ko="📡 프로토콜">📡 Protocol</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🔗 Integration" data-ko="🔗 통합">🔗 Integration</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📱 QR & VC" data-ko="📱 QR & VC">📱 QR & VC</div>
+        </div>
+
+        <!-- Panel 1: Data Format -->
+        <div class="panel active" id="panel-0">
+            <div class="card">
+                <h2 data-en="📊 Food Safety Data Generator" data-ko="📊 식품 안전 데이터 생성기">📊 Food Safety Data Generator</h2>
+
+                <label data-en="Product Name" data-ko="제품명">Product Name</label>
+                <input type="text" id="productName" placeholder="e.g., Fresh Strawberries">
+
+                <label data-en="Product Category" data-ko="제품 카테고리">Product Category</label>
+                <select id="productCategory">
+                    <option value="fresh-produce">Fresh Produce</option>
+                    <option value="dairy">Dairy Products</option>
+                    <option value="meat">Meat & Poultry</option>
+                    <option value="seafood">Seafood</option>
+                    <option value="processed">Processed Foods</option>
+                    <option value="beverages">Beverages</option>
+                </select>
+
+                <label data-en="Storage Temperature (°C)" data-ko="보관 온도 (°C)">Storage Temperature (°C)</label>
+                <input type="number" id="storageTemp" value="4" step="0.1">
+
+                <label data-en="Batch Number" data-ko="배치 번호">Batch Number</label>
+                <input type="text" id="batchNumber" placeholder="e.g., 2025-01-15-001">
+
+                <div class="btn-center">
+                    <button onclick="generateFoodSafetyData()">
+                        <span data-en="Generate Data" data-ko="데이터 생성">Generate Data</span>
+                    </button>
+                </div>
+
+                <div id="result1" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 2: Algorithms -->
+        <div class="panel" id="panel-1">
+            <div class="card">
+                <h2 data-en="🔢 HACCP Risk Calculator" data-ko="🔢 HACCP 위험도 계산기">🔢 HACCP Risk Calculator</h2>
+
+                <label data-en="Critical Control Point" data-ko="중점관리점 (CCP)">Critical Control Point</label>
+                <select id="ccpType">
+                    <option value="temperature">Temperature Control</option>
+                    <option value="ph">pH Level</option>
+                    <option value="moisture">Moisture Content</option>
+                    <option value="contamination">Contamination Risk</option>
+                </select>
+
+                <label data-en="Measured Value" data-ko="측정값">Measured Value</label>
+                <input type="number" id="measuredValue" step="0.1">
+
+                <label data-en="Critical Limit" data-ko="한계기준">Critical Limit</label>
+                <input type="number" id="criticalLimit" step="0.1">
+
+                <label data-en="Severity (1-5)" data-ko="심각도 (1-5)">Severity (1-5)</label>
+                <input type="number" id="severity" min="1" max="5" value="3">
+
+                <div class="btn-center">
+                    <button onclick="calculateHACCPRisk()">
+                        <span data-en="Calculate Risk" data-ko="위험도 계산">Calculate Risk</span>
+                    </button>
+                </div>
+
+                <div id="result2" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Protocol -->
+        <div class="panel" id="panel-2">
+            <div class="card">
+                <h2 data-en="📡 Safety Alert Broadcasting" data-ko="📡 안전 경보 방송">📡 Safety Alert Broadcasting</h2>
+
+                <label data-en="Alert Type" data-ko="경보 유형">Alert Type</label>
+                <select id="alertType">
+                    <option value="contamination">Contamination Detected</option>
+                    <option value="recall">Product Recall</option>
+                    <option value="temperature">Temperature Deviation</option>
+                    <option value="allergen">Allergen Alert</option>
+                    <option value="expiry">Expiry Date Warning</option>
+                </select>
+
+                <label data-en="Severity Level" data-ko="심각도 수준">Severity Level</label>
+                <select id="alertSeverity">
+                    <option value="low">Low - Monitor</option>
+                    <option value="medium">Medium - Action Required</option>
+                    <option value="high">High - Immediate Action</option>
+                    <option value="critical">Critical - Emergency</option>
+                </select>
+
+                <label data-en="Affected Products" data-ko="영향 제품">Affected Products</label>
+                <input type="text" id="affectedProducts" placeholder="e.g., Batch 2025-01-15-001">
+
+                <label data-en="Alert Message" data-ko="경보 메시지">Alert Message</label>
+                <textarea id="alertMessage" placeholder="Describe the safety issue..."></textarea>
+
+                <div class="btn-center">
+                    <button onclick="broadcastAlert()">
+                        <span data-en="Broadcast Alert" data-ko="경보 발송">Broadcast Alert</span>
+                    </button>
+                </div>
+
+                <div id="result3" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 4: Integration -->
+        <div class="panel" id="panel-3">
+            <div class="card">
+                <h2 data-en="🔗 Regulatory & Supply Chain Integration" data-ko="🔗 규제기관 및 공급망 통합">🔗 Regulatory & Supply Chain Integration</h2>
+
+                <div class="grid">
+                    <div class="metric-card">
+                        <div class="metric-label" data-en="FDA Integrated" data-ko="FDA 연동">FDA Integrated</div>
+                        <div class="metric-value">✓</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label" data-en="USDA Integrated" data-ko="USDA 연동">USDA Integrated</div>
+                        <div class="metric-value">✓</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label" data-en="MFDS (식약처)" data-ko="식품의약품안전처">MFDS (식약처)</div>
+                        <div class="metric-value">✓</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label" data-en="Testing Labs" data-ko="검사기관">Testing Labs</div>
+                        <div class="metric-value">42</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label" data-en="Retailers" data-ko="유통업체">Retailers</div>
+                        <div class="metric-value">1,247</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label" data-en="Suppliers" data-ko="공급업체">Suppliers</div>
+                        <div class="metric-value">8,532</div>
+                    </div>
+                </div>
+
+                <label data-en="Integration Endpoint" data-ko="통합 엔드포인트">Integration Endpoint</label>
+                <select id="integrationEndpoint">
+                    <option value="fda">FDA FSMA Reporting</option>
+                    <option value="usda">USDA FSIS Database</option>
+                    <option value="mfds">MFDS (Korea Food & Drug Safety)</option>
+                    <option value="lab">Laboratory Testing System</option>
+                    <option value="retailer">Retailer Inventory System</option>
+                    <option value="blockchain">Blockchain Traceability</option>
+                </select>
+
+                <label data-en="Data Payload" data-ko="전송 데이터">Data Payload</label>
+                <textarea id="integrationPayload" placeholder='{"productId": "...", "testResults": "..."}'></textarea>
+
+                <div class="btn-center">
+                    <button onclick="testIntegration()">
+                        <span data-en="Test Integration" data-ko="통합 테스트">Test Integration</span>
+                    </button>
+                </div>
+
+                <div id="result4" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Panel 5: QR & VC -->
+        <div class="panel" id="panel-4">
+            <div class="card">
+                <h2 data-en="📱 Food Safety Certification QR Code" data-ko="📱 식품 안전 인증 QR 코드">📱 Food Safety Certification QR Code</h2>
+
+                <label data-en="Product ID" data-ko="제품 ID">Product ID</label>
+                <input type="text" id="vcProductId" placeholder="e.g., FS-2025-001">
+
+                <label data-en="HACCP Certification" data-ko="HACCP 인증">HACCP Certification</label>
+                <select id="haccpCert">
+                    <option value="certified">Certified</option>
+                    <option value="pending">Pending</option>
+                    <option value="expired">Expired</option>
+                </select>
+
+                <label data-en="Lab Test Results" data-ko="검사 결과">Lab Test Results</label>
+                <select id="labResults">
+                    <option value="pass">Pass - All Clear</option>
+                    <option value="warning">Warning - Monitor</option>
+                    <option value="fail">Fail - Not Safe</option>
+                </select>
+
+                <label data-en="Expiry Date" data-ko="유통기한">Expiry Date</label>
+                <input type="date" id="expiryDate">
+
+                <label data-en="Allergen Information" data-ko="알레르기 정보">Allergen Information</label>
+                <input type="text" id="allergens" placeholder="e.g., Contains: Milk, Eggs">
+
+                <div class="btn-center">
+                    <button onclick="generateQRCode()">
+                        <span data-en="Generate QR Code" data-ko="QR 코드 생성">Generate QR Code</span>
+                    </button>
+                </div>
+
+                <div id="result5" class="result"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p>WIA - World Certification Industry Association</p>
+            <p>© 2025 MIT License</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang);
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = text;
+                } else {
+                    el.textContent = text;
+                }
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => {
+                p.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+        }
+
+        // Panel 1: Generate Food Safety Data
+        function generateFoodSafetyData() {
+            const name = document.getElementById('productName').value || 'Sample Product';
+            const category = document.getElementById('productCategory').value;
+            const temp = document.getElementById('storageTemp').value;
+            const batch = document.getElementById('batchNumber').value || '2025-01-15-001';
+
+            const data = {
+                "wia_standard": "WIA-AGRI-015",
+                "standard_name": "Food Safety",
+                "version": "1.0.0",
+                "timestamp": new Date().toISOString(),
+                "product": {
+                    "id": `FS-${Date.now()}`,
+                    "name": name,
+                    "category": category,
+                    "batch_number": batch,
+                    "production_date": new Date().toISOString().split('T')[0],
+                    "expiry_date": new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0]
+                },
+                "safety_data": {
+                    "storage_temperature_celsius": parseFloat(temp),
+                    "storage_humidity_percent": Math.random() * 20 + 60,
+                    "haccp_status": "certified",
+                    "last_inspection": new Date().toISOString(),
+                    "contamination_risk": Math.random() < 0.9 ? "low" : "medium"
+                },
+                "traceability": {
+                    "origin": "Farm A, Region X",
+                    "transport_conditions": "refrigerated",
+                    "chain_of_custody": ["Producer", "Processor", "Distributor", "Retailer"]
+                },
+                "certifications": ["HACCP", "ISO 22000", "GMP"]
+            };
+
+            document.getElementById('result1').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        // Panel 2: HACCP Risk Calculator
+        function calculateHACCPRisk() {
+            const ccpType = document.getElementById('ccpType').value;
+            const measured = parseFloat(document.getElementById('measuredValue').value);
+            const limit = parseFloat(document.getElementById('criticalLimit').value);
+            const severity = parseInt(document.getElementById('severity').value);
+
+            const deviation = Math.abs(measured - limit);
+            const deviationPercent = (deviation / limit * 100).toFixed(2);
+
+            let riskLevel = 'Low';
+            let riskScore = deviation * severity;
+            let alertClass = 'alert-safe';
+
+            if (riskScore > 15) {
+                riskLevel = 'Critical';
+                alertClass = 'alert-danger';
+            } else if (riskScore > 8) {
+                riskLevel = 'High';
+                alertClass = 'alert-danger';
+            } else if (riskScore > 4) {
+                riskLevel = 'Medium';
+                alertClass = 'alert-warning';
+            }
+
+            const result = `
+                <div class="${alertClass} alert">
+                    <h3>Risk Assessment Results</h3>
+                    <p><strong>CCP Type:</strong> ${ccpType}</p>
+                    <p><strong>Measured Value:</strong> ${measured}</p>
+                    <p><strong>Critical Limit:</strong> ${limit}</p>
+                    <p><strong>Deviation:</strong> ${deviation.toFixed(2)} (${deviationPercent}%)</p>
+                    <p><strong>Severity:</strong> ${severity}/5</p>
+                    <p><strong>Risk Score:</strong> ${riskScore.toFixed(2)}</p>
+                    <p><strong>Risk Level:</strong> ${riskLevel}</p>
+                    ${riskLevel === 'Critical' || riskLevel === 'High' ? '<p><strong>⚠️ Immediate corrective action required!</strong></p>' : ''}
+                </div>
+            `;
+
+            document.getElementById('result2').innerHTML = result;
+        }
+
+        // Panel 3: Broadcast Alert
+        function broadcastAlert() {
+            const type = document.getElementById('alertType').value;
+            const severity = document.getElementById('alertSeverity').value;
+            const products = document.getElementById('affectedProducts').value;
+            const message = document.getElementById('alertMessage').value;
+
+            const alert = {
+                "alert_id": `ALERT-${Date.now()}`,
+                "timestamp": new Date().toISOString(),
+                "type": type,
+                "severity": severity,
+                "affected_products": products,
+                "message": message,
+                "broadcast_channels": ["FDA", "MFDS", "Retailers", "Consumers", "Media"],
+                "status": "broadcasting",
+                "recipients": {
+                    "regulatory_agencies": 3,
+                    "retailers": 247,
+                    "consumers": 15432,
+                    "media_outlets": 12
+                }
+            };
+
+            const alertClass = severity === 'critical' || severity === 'high' ? 'alert-danger' :
+                               severity === 'medium' ? 'alert-warning' : 'alert-safe';
+
+            document.getElementById('result3').innerHTML = `
+                <div class="${alertClass} alert">
+                    <h3>🚨 Alert Broadcast Initiated</h3>
+                    <p>Alert is being sent to all stakeholders in the food safety network.</p>
+                </div>
+                <pre>${JSON.stringify(alert, null, 2)}</pre>
+            `;
+        }
+
+        // Panel 4: Test Integration
+        function testIntegration() {
+            const endpoint = document.getElementById('integrationEndpoint').value;
+            const payload = document.getElementById('integrationPayload').value || '{"test": "data"}';
+
+            const response = {
+                "integration_test": {
+                    "endpoint": endpoint,
+                    "status": "success",
+                    "response_time_ms": Math.floor(Math.random() * 200 + 50),
+                    "timestamp": new Date().toISOString(),
+                    "data_transmitted": JSON.parse(payload),
+                    "confirmation": `Data successfully transmitted to ${endpoint}`,
+                    "next_sync": new Date(Date.now() + 3600000).toISOString()
+                }
+            };
+
+            document.getElementById('result4').innerHTML = `
+                <div class="alert alert-safe">
+                    <h3>✅ Integration Test Successful</h3>
+                    <p>Successfully connected to ${endpoint}</p>
+                </div>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            `;
+        }
+
+        // Panel 5: Generate QR Code
+        function generateQRCode() {
+            const productId = document.getElementById('vcProductId').value || 'FS-2025-001';
+            const haccp = document.getElementById('haccpCert').value;
+            const labResults = document.getElementById('labResults').value;
+            const expiry = document.getElementById('expiryDate').value;
+            const allergens = document.getElementById('allergens').value;
+
+            const credential = {
+                "@context": ["https://www.w3.org/2018/credentials/v1", "https://wia.org/food-safety/v1"],
+                "type": ["VerifiableCredential", "FoodSafetyCertificate"],
+                "issuer": "did:wia:food-safety-authority",
+                "issuanceDate": new Date().toISOString(),
+                "credentialSubject": {
+                    "id": `did:wia:product:${productId}`,
+                    "productId": productId,
+                    "haccpCertification": haccp,
+                    "labTestResults": labResults,
+                    "expiryDate": expiry,
+                    "allergenInfo": allergens,
+                    "safetyScore": labResults === 'pass' ? 95 : labResults === 'warning' ? 75 : 45,
+                    "qrCodeUrl": `https://wia.org/verify/${productId}`
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": new Date().toISOString(),
+                    "proofPurpose": "assertionMethod",
+                    "verificationMethod": "did:wia:food-safety#key-1"
+                }
+            };
+
+            const qrData = `WIA-FOOD-SAFETY:${productId}`;
+            const qrSize = 200;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(qrData)}`;
+
+            document.getElementById('result5').innerHTML = `
+                <div style="text-align: center; margin: 20px 0;">
+                    <img src="${qrUrl}" alt="Food Safety QR Code" style="border: 2px solid var(--border); border-radius: 8px;">
+                    <p style="margin-top: 15px; color: var(--text-muted);">Scan to verify food safety certification</p>
+                </div>
+                <pre>${JSON.stringify(credential, null, 2)}</pre>
+            `;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

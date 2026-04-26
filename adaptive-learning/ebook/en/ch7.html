@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Integration Patterns | WIA-EDU-003</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 2px solid #8B5CF6; padding: 2rem 0; margin-bottom: 3rem; }
+        h1 { color: #8B5CF6; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .chapter-meta { color: #94a3b8; font-size: 0.9rem; }
+        h2 { color: #a78bfa; margin: 2rem 0 1rem 0; font-size: 1.8rem; border-left: 4px solid #8B5CF6; padding-left: 1rem; }
+        h3 { color: #c4b5fd; margin: 1.5rem 0 0.75rem 0; font-size: 1.3rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .info-box { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .navigation { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .nav-btn { padding: 0.75rem 1.5rem; background: #8B5CF6; color: white; text-decoration: none; border-radius: 6px; transition: all 0.3s; }
+        .nav-btn:hover { background: #7c3aed; transform: translateY(-2px); }
+        code { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; color: #a78bfa; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: transparent; padding: 0; }
+        footer { text-align: center; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #334155; color: #64748b; }
+        .korean { color: #8B5CF6; font-size: 1.2rem; margin: 0.5rem 0; }
+        .pattern { background: #1e293b; border-left: 3px solid #8B5CF6; padding: 1.5rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🎯 Chapter 7: Integration Patterns</h1>
+            <p class="chapter-meta">WIA-EDU-003 | Adaptive Learning Standard | English Edition</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="highlight">
+            <strong style="color: #8B5CF6; font-size: 1.1rem;">Chapter Overview</strong>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                This chapter explores practical patterns for integrating WIA-EDU-003 compliant adaptive learning systems
+                with existing educational technology infrastructure. We'll cover LMS integration, SIS connectivity,
+                content repositories, authentication systems, and strategies for creating cohesive learning ecosystems.
+            </p>
+        </div>
+
+        <h2>7.1 LMS Integration with LTI</h2>
+
+        <h3>Learning Tools Interoperability (LTI) Overview</h3>
+
+        <p>
+            LTI is the standard protocol for integrating learning tools with Learning Management Systems like Canvas,
+            Moodle, Blackboard, and D2L. WIA-EDU-003 systems should support LTI 1.3 (the latest version) for seamless
+            integration.
+        </p>
+
+        <div class="pattern">
+            <h4 style="color: #a78bfa;">LTI Integration Pattern</h4>
+            <p><strong>Scenario:</strong> Instructor wants to embed adaptive learning modules within their LMS course</p>
+
+            <p style="margin-top: 1rem;"><strong>Implementation:</strong></p>
+            <ol>
+                <li>Register adaptive learning tool in LMS as external tool</li>
+                <li>Configure tool placement (assignment, module, navigation)</li>
+                <li>Student clicks tool link in LMS</li>
+                <li>LMS sends signed LTI launch request to adaptive system</li>
+                <li>Adaptive system validates signature and creates session</li>
+                <li>Student interacts with adaptive content in iframe or new window</li>
+                <li>Adaptive system sends grade back to LMS via LTI Advantage services</li>
+            </ol>
+        </div>
+
+        <h3>LTI 1.3 Implementation</h3>
+
+        <pre><code>// LTI 1.3 Launch Handler (Node.js/Express)
+
+const lti = require('ltijs').Provider;
+
+// Initialize LTI provider
+lti.setup(
+  process.env.LTI_KEY,
+  {
+    url: process.env.DATABASE_URL,
+    connection: { database: 'lti_database' }
+  },
+  {
+    appRoute: '/',
+    loginRoute: '/login',
+    keysetRoute: '/keys',
+    cookies: {
+      secure: true,
+      sameSite: 'None'
+    }
+  }
+);
+
+// Handle LTI launch
+lti.onConnect(async (token, req, res) => {
+  // Extract user and context information
+  const userId = token.user;
+  const courseId = token.platformContext.context.id;
+  const roles = token.userInfo.roles;
+
+  // Create or retrieve learner profile
+  const learner = await getLearnerProfile(userId);
+
+  // Get course-specific content and progress
+  const courseProgress = await getCourseProgress(userId, courseId);
+
+  // Render adaptive learning interface
+  return res.send(renderAdaptiveInterface(learner, courseProgress));
+});
+
+// Send grade back to LMS
+async function sendGrade(userId, courseId, score) {
+  const gradeService = lti.Grade;
+  await gradeService.ScorePublish(
+    res.locals.token,
+    {
+      userId: userId,
+      scoreGiven: score,
+      scoreMaximum: 100,
+      comment: 'Adaptive learning progress',
+      timestamp: new Date().toISOString()
+    }
+  );
+}
+
+lti.deploy({ port: 3000 });</code></pre>
+
+        <h3>Deep Linking</h3>
+
+        <p>
+            LTI Deep Linking allows instructors to search and select specific adaptive learning modules directly from
+            their LMS interface.
+        </p>
+
+        <pre><code>// Deep Linking Implementation
+
+lti.onDeepLinking(async (token, req, res) => {
+  // Get available adaptive modules
+  const modules = await getAvailableModules();
+
+  // Render selection interface
+  return res.send(renderModuleSelector(modules));
+});
+
+// Handle module selection
+app.post('/select-module', async (req, res) => {
+  const selectedModule = req.body.moduleId;
+
+  // Create LTI Resource Link
+  const resource = {
+    type: 'ltiResourceLink',
+    title: selectedModule.title,
+    url: `${process.env.BASE_URL}/module/${selectedModule.id}`,
+    custom: {
+      moduleId: selectedModule.id,
+      difficulty: selectedModule.defaultDifficulty
+    }
+  };
+
+  // Send resource back to LMS
+  const form = await lti.DeepLinking.createDeepLinkingForm(
+    res.locals.token,
+    [resource],
+    { message: 'Module added successfully' }
+  );
+
+  return res.send(form);
+});</code></pre>
+
+        <h2>7.2 Student Information System (SIS) Integration</h2>
+
+        <h3>Roster Synchronization</h3>
+
+        <p>
+            Automate the process of enrolling students and updating course rosters by integrating with the
+            institution's SIS.
+        </p>
+
+        <div class="pattern">
+            <h4 style="color: #a78bfa;">SIS Integration Pattern</h4>
+
+            <p><strong>Common Integration Methods:</strong></p>
+            <ul>
+                <li><strong>OneRoster API:</strong> Standard REST API for roster and grade exchange</li>
+                <li><strong>CSV Import/Export:</strong> Scheduled file-based synchronization</li>
+                <li><strong>SFTP:</strong> Secure file transfer for batch updates</li>
+                <li><strong>Direct Database:</strong> Read-only connection to SIS database (less common)</li>
+            </ul>
+        </div>
+
+        <h3>OneRoster Implementation</h3>
+
+        <pre><code>// OneRoster API Client
+
+class OneRosterClient {
+  constructor(baseUrl, clientId, clientSecret) {
+    this.baseUrl = baseUrl;
+    this.auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  }
+
+  async getOrgs() {
+    return this.request('/orgs');
+  }
+
+  async getCourses() {
+    return this.request('/classes');
+  }
+
+  async getEnrollments(courseId) {
+    return this.request(`/classes/${courseId}/enrollments`);
+  }
+
+  async getUsers() {
+    return this.request('/users');
+  }
+
+  async request(endpoint) {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      headers: {
+        'Authorization': `Basic ${this.auth}`,
+        'Accept': 'application/json'
+      }
+    });
+    return response.json();
+  }
+}
+
+// Sync enrollments
+async function syncEnrollments() {
+  const oneRoster = new OneRosterClient(
+    process.env.ONEROSTER_URL,
+    process.env.ONEROSTER_CLIENT_ID,
+    process.env.ONEROSTER_SECRET
+  );
+
+  // Fetch current courses
+  const courses = await oneRoster.getCourses();
+
+  for (const course of courses.classes) {
+    // Get enrollments for each course
+    const enrollments = await oneRoster.getEnrollments(course.sourcedId);
+
+    // Update local database
+    await updateCourseEnrollments(course.sourcedId, enrollments.enrollments);
+  }
+
+  console.log('Enrollment sync completed');
+}</code></pre>
+
+        <h2>7.3 Content Repository Integration</h2>
+
+        <h3>External Content Sources</h3>
+
+        <p>
+            Integrate adaptive learning systems with external content repositories to expand available learning
+            materials without duplicating storage.
+        </p>
+
+        <div class="info-box">
+            <h4 style="color: #8B5CF6;">Common Content Repository Standards</h4>
+            <ul>
+                <li><strong>OAI-PMH:</strong> Open Archives Initiative Protocol for Metadata Harvesting</li>
+                <li><strong>SRU/SRW:</strong> Search/Retrieve via URL/Web Service</li>
+                <li><strong>LOR APIs:</strong> Learning Object Repository custom APIs</li>
+                <li><strong>YouTube/Vimeo:</strong> Video content integration</li>
+                <li><strong>Khan Academy:</strong> Educational content API</li>
+            </ul>
+        </div>
+
+        <h3>OAI-PMH Harvester</h3>
+
+        <pre><code># Python OAI-PMH Harvester
+
+from sickle import Sickle
+
+class ContentHarvester:
+    def __init__(self, repository_url):
+        self.sickle = Sickle(repository_url)
+
+    def harvest_content(self, metadata_prefix='oai_dc', from_date=None):
+        """Harvest learning objects from OAI-PMH repository"""
+        records = self.sickle.ListRecords(
+            metadataPrefix=metadata_prefix,
+            from_=from_date
+        )
+
+        for record in records:
+            learning_object = self.parse_record(record)
+            self.store_learning_object(learning_object)
+
+    def parse_record(self, record):
+        """Extract learning object metadata"""
+        metadata = record.metadata
+
+        return {
+            'id': record.header.identifier,
+            'title': metadata.get('title', [''])[0],
+            'description': metadata.get('description', [''])[0],
+            'subject': metadata.get('subject', []),
+            'type': metadata.get('type', [''])[0],
+            'format': metadata.get('format', [''])[0],
+            'url': metadata.get('identifier', [''])[0],
+            'language': metadata.get('language', ['en'])[0],
+            'lastModified': record.header.datestamp
+        }
+
+    def store_learning_object(self, obj):
+        """Store in local content database"""
+        # Tag for adaptive system
+        obj['difficulty'] = self.estimate_difficulty(obj)
+        obj['prerequisites'] = self.identify_prerequisites(obj)
+
+        # Save to database
+        db.learning_objects.insert(obj)</code></pre>
+
+        <h2>7.4 Authentication and SSO</h2>
+
+        <h3>SAML 2.0 Integration</h3>
+
+        <p>
+            Enable Single Sign-On (SSO) for institutional deployments using SAML 2.0, allowing users to access the
+            adaptive learning system with their existing institutional credentials.
+        </p>
+
+        <pre><code>// SAML 2.0 Service Provider (passport-saml)
+
+const passport = require('passport');
+const SamlStrategy = require('passport-saml').Strategy;
+
+passport.use(new SamlStrategy({
+    callbackUrl: process.env.SAML_CALLBACK_URL,
+    entryPoint: process.env.IDP_ENTRY_POINT,
+    issuer: process.env.SAML_ISSUER,
+    cert: process.env.IDP_CERT,
+    acceptedClockSkewMs: -1,
+    identifierFormat: null
+  },
+  async (profile, done) => {
+    // Extract user information from SAML assertion
+    const user = {
+      id: profile.nameID,
+      email: profile.email,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      roles: profile.roles || ['learner']
+    };
+
+    // Create or update user in local database
+    const localUser = await findOrCreateUser(user);
+
+    return done(null, localUser);
+  }
+));
+
+// SSO login route
+app.get('/login/sso',
+  passport.authenticate('saml', { failureRedirect: '/login/fail' })
+);
+
+// SSO callback route
+app.post('/login/callback',
+  passport.authenticate('saml', { failureRedirect: '/login/fail' }),
+  (req, res) => {
+    res.redirect('/dashboard');
+  }
+);</code></pre>
+
+        <h3>OAuth 2.0 for API Access</h3>
+
+        <p>
+            Implement OAuth 2.0 to allow third-party applications to access learner data with explicit consent.
+        </p>
+
+        <pre><code>// OAuth 2.0 Authorization Server
+
+const oauth2orize = require('oauth2orize');
+const server = oauth2orize.createServer();
+
+// Authorization endpoint
+server.grant(oauth2orize.grant.code(async (client, redirectUri, user, ares, done) => {
+  // Generate authorization code
+  const code = await generateAuthCode(client.id, redirectUri, user.id);
+  done(null, code);
+}));
+
+// Token endpoint
+server.exchange(oauth2orize.exchange.code(async (client, code, redirectUri, done) => {
+  // Validate authorization code
+  const authCode = await validateAuthCode(code, client.id, redirectUri);
+  if (!authCode) {
+    return done(null, false);
+  }
+
+  // Generate access token
+  const accessToken = await generateAccessToken(authCode.userId, client.id);
+  const refreshToken = await generateRefreshToken(authCode.userId, client.id);
+
+  done(null, accessToken, refreshToken, { expires_in: 3600 });
+}));</code></pre>
+
+        <h2>7.5 Analytics Integration</h2>
+
+        <h3>xAPI Statement Forwarding</h3>
+
+        <p>
+            Forward learning activity statements to institutional Learning Record Stores for centralized analytics.
+        </p>
+
+        <pre><code>// xAPI Statement Forwarder
+
+class XAPIForwarder {
+  constructor(lrsEndpoint, auth) {
+    this.endpoint = lrsEndpoint;
+    this.auth = auth;
+  }
+
+  async sendStatement(statement) {
+    // Validate statement format
+    if (!this.validateStatement(statement)) {
+      throw new Error('Invalid xAPI statement');
+    }
+
+    // Add system context
+    statement.context = {
+      ...statement.context,
+      platform: 'WIA-EDU-003 Adaptive Learning',
+      extensions: {
+        'http://wia.org/extensions/standard': 'WIA-EDU-003',
+        'http://wia.org/extensions/version': '1.0.0'
+      }
+    };
+
+    // Send to LRS
+    const response = await fetch(`${this.endpoint}/statements`, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.auth,
+        'Content-Type': 'application/json',
+        'X-Experience-API-Version': '1.0.3'
+      },
+      body: JSON.stringify(statement)
+    });
+
+    return response.json();
+  }
+
+  validateStatement(statement) {
+    return (
+      statement.actor &&
+      statement.verb &&
+      statement.object &&
+      statement.timestamp
+    );
+  }
+}
+
+// Usage
+const forwarder = new XAPIForwarder(
+  process.env.LRS_ENDPOINT,
+  process.env.LRS_AUTH
+);
+
+// Track learning event
+await forwarder.sendStatement({
+  actor: {
+    mbox: 'mailto:learner@example.com',
+    name: 'John Doe'
+  },
+  verb: {
+    id: 'http://adlnet.gov/expapi/verbs/completed',
+    display: { 'en-US': 'completed' }
+  },
+  object: {
+    id: 'http://example.com/activity/module-123',
+    definition: {
+      name: { 'en-US': 'Algebra Module 1' },
+      type: 'http://adlnet.gov/expapi/activities/module'
+    }
+  },
+  result: {
+    score: { scaled: 0.85 },
+    success: true,
+    duration: 'PT45M'
+  },
+  timestamp: new Date().toISOString()
+});</code></pre>
+
+        <h3>Caliper Analytics</h3>
+
+        <p>
+            Implement IMS Caliper for standardized learning analytics that can be consumed by institutional
+            analytics platforms.
+        </p>
+
+        <pre><code># Python Caliper Event Sender
+
+from caliper import sensor, events, entities
+
+# Initialize sensor
+sensor_config = {
+    'id': 'https://example.com/sensors/adaptive-learning',
+    'endpoint': 'https://analytics.example.com/caliper'
+}
+
+sensor = sensor.Sensor(sensor_config['id'])
+sensor.registerClient('default', sensor_config)
+
+# Send navigation event
+def track_navigation(user_id, from_url, to_url):
+    event = events.NavigationEvent(
+        actor=entities.Person(id=f'https://example.com/users/{user_id}'),
+        action=events.Action.NAVIGATED_TO,
+        object=entities.WebPage(id=to_url),
+        target=None,
+        generated=None,
+        eventTime=datetime.utcnow().isoformat() + 'Z',
+        edApp=entities.SoftwareApplication(id='https://example.com/adaptive-learning'),
+        referrer=entities.WebPage(id=from_url)
+    )
+
+    sensor.send(event)
+
+# Send assessment event
+def track_assessment_submission(user_id, assessment_id, score):
+    event = events.AssessmentEvent(
+        actor=entities.Person(id=f'https://example.com/users/{user_id}'),
+        action=events.Action.SUBMITTED,
+        object=entities.Assessment(id=f'https://example.com/assessments/{assessment_id}'),
+        generated=entities.Score(
+            id=f'https://example.com/scores/{uuid.uuid4()}',
+            attempt=entities.Attempt(id=f'https://example.com/attempts/{uuid.uuid4()}'),
+            scoreGiven=score,
+            scoreMaximum=100.0
+        ),
+        eventTime=datetime.utcnow().isoformat() + 'Z'
+    )
+
+    sensor.send(event)</code></pre>
+
+        <h2>7.6 Microservices Architecture</h2>
+
+        <h3>API Gateway Pattern</h3>
+
+        <p>
+            Use an API gateway to manage communication between adaptive learning system and external integrations.
+        </p>
+
+        <div class="pattern">
+            <h4 style="color: #a78bfa;">API Gateway Benefits</h4>
+            <ul>
+                <li><strong>Single Entry Point:</strong> Simplifies client integration</li>
+                <li><strong>Authentication/Authorization:</strong> Centralized security</li>
+                <li><strong>Rate Limiting:</strong> Protect backend services</li>
+                <li><strong>Request Routing:</strong> Direct requests to appropriate microservices</li>
+                <li><strong>Response Aggregation:</strong> Combine multiple service responses</li>
+                <li><strong>Protocol Translation:</strong> Support multiple protocols (REST, GraphQL, gRPC)</li>
+            </ul>
+        </div>
+
+        <h3>Event-Driven Integration</h3>
+
+        <p>
+            Use message queues and event streaming for asynchronous integration that scales well.
+        </p>
+
+        <pre><code>// Event-Driven Integration with Kafka
+
+const { Kafka } = require('kafkajs');
+
+const kafka = new Kafka({
+  clientId: 'adaptive-learning',
+  brokers: [process.env.KAFKA_BROKER]
+});
+
+const producer = kafka.producer();
+const consumer = kafka.consumer({ groupId: 'integration-group' });
+
+// Publish events
+async function publishLearningEvent(event) {
+  await producer.connect();
+  await producer.send({
+    topic: 'learning-events',
+    messages: [{
+      key: event.learnerId,
+      value: JSON.stringify(event),
+      headers: {
+        'event-type': event.type,
+        'timestamp': Date.now().toString()
+      }
+    }]
+  });
+}
+
+// Subscribe to events from integrated systems
+async function subscribeToExternalEvents() {
+  await consumer.connect();
+  await consumer.subscribe({ topic: 'external-events' });
+
+  await consumer.run({
+    eachMessage: async ({ topic, partition, message }) => {
+      const event = JSON.parse(message.value.toString());
+
+      switch (event.type) {
+        case 'enrollment':
+          await handleEnrollment(event);
+          break;
+        case 'grade-update':
+          await handleGradeUpdate(event);
+          break;
+        case 'content-update':
+          await handleContentUpdate(event);
+          break;
+      }
+    }
+  });
+}</code></pre>
+
+        <h2>7.7 Mobile App Integration</h2>
+
+        <h3>Native SDK</h3>
+
+        <p>
+            Provide native SDKs for iOS and Android to enable mobile app integration.
+        </p>
+
+        <pre><code>// React Native SDK Example
+
+import AdaptiveLearning from '@wia/adaptive-learning-sdk';
+
+class LearningScreen extends React.Component {
+  async componentDidMount() {
+    // Initialize SDK
+    await AdaptiveLearning.initialize({
+      apiKey: 'your-api-key',
+      baseUrl: 'https://api.example.com',
+      userId: this.props.userId
+    });
+
+    // Get recommended content
+    const recommendations = await AdaptiveLearning.getRecommendations();
+    this.setState({ recommendations });
+  }
+
+  async onContentComplete(contentId, score) {
+    // Track completion
+    await AdaptiveLearning.trackCompletion({
+      contentId,
+      score,
+      duration: this.state.timeSpent
+    });
+
+    // Get next recommendation
+    const next = await AdaptiveLearning.getNext();
+    this.loadContent(next);
+  }
+
+  render() {
+    return (
+      <AdaptiveLearningView
+        recommendations={this.state.recommendations}
+        onComplete={this.onContentComplete}
+      />
+    );
+  }
+}</code></pre>
+
+        <div class="highlight">
+            <strong style="color: #8B5CF6;">Key Takeaways</strong>
+            <ul style="margin-top: 0.5rem;">
+                <li>Use LTI 1.3 for seamless integration with major Learning Management Systems</li>
+                <li>Implement OneRoster API for automated roster synchronization with SIS</li>
+                <li>Harvest content from external repositories using OAI-PMH and other standards</li>
+                <li>Support SAML 2.0 and OAuth 2.0 for enterprise authentication and authorization</li>
+                <li>Forward xAPI and Caliper events to institutional analytics platforms</li>
+                <li>Use API gateway pattern to manage external integrations</li>
+                <li>Implement event-driven architecture for scalable asynchronous integration</li>
+                <li>Provide native SDKs for mobile app integration</li>
+            </ul>
+        </div>
+
+        <div class="navigation">
+            <a href="ch6.html" class="nav-btn">← Previous: Security & Compliance</a>
+            <a href="ch8.html" class="nav-btn">Next: Future Roadmap →</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5: Phase 2 - API Interface & Integration</title>
+    <style>
+        :root { --primary: #10B981; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--bg-card); padding: 60px; border-radius: 12px; border: 1px solid var(--border); }
+        .chapter-nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .chapter-nav a { color: var(--primary); text-decoration: none; font-weight: 600; }
+        h1 { font-size: 2.8rem; margin-bottom: 30px; background: linear-gradient(135deg, var(--primary), #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        h2 { color: var(--primary); font-size: 1.8rem; margin: 40px 0 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border); }
+        h3 { color: var(--primary); font-size: 1.4rem; margin: 30px 0 15px; }
+        p { margin: 15px 0; color: var(--text-muted); font-size: 1.05rem; }
+        ul, ol { margin: 20px 0; padding-left: 30px; color: var(--text-muted); }
+        li { margin: 10px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; background: var(--bg); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; font-weight: 600; }
+        .summary-box { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%); padding: 30px; border-radius: 8px; margin: 40px 0; border: 2px solid var(--primary); }
+        footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--border); color: var(--text-muted); }
+        .philosophy { color: var(--primary); font-weight: 600; }
+        code { background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--primary); font-family: 'Courier New', monospace; }
+        pre { background: var(--bg); padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Phase 2 - API Interface & Integration</h1>
+
+        <h2>5.1 RESTful API Architecture</h2>
+        <p>Phase 2 defines a comprehensive REST API for accessing digital textbook content, managing user data, and integrating with learning management systems. The API follows REST principles and uses JSON for all data exchange.</p>
+
+        <h3>Core API Endpoints</h3>
+        <table>
+            <thead>
+                <tr><th>Endpoint</th><th>Method</th><th>Purpose</th><th>Auth Required</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>/api/v1/textbooks</td><td>GET</td><td>List available textbooks</td><td>Yes</td></tr>
+                <tr><td>/api/v1/textbooks/{id}</td><td>GET</td><td>Get textbook metadata</td><td>Yes</td></tr>
+                <tr><td>/api/v1/textbooks/{id}/download</td><td>GET</td><td>Download EPUB file</td><td>Yes</td></tr>
+                <tr><td>/api/v1/textbooks/{id}/toc</td><td>GET</td><td>Get table of contents</td><td>Yes</td></tr>
+                <tr><td>/api/v1/textbooks/{id}/chapters/{num}</td><td>GET</td><td>Get chapter content</td><td>Yes</td></tr>
+                <tr><td>/api/v1/annotations</td><td>GET/POST/PUT/DELETE</td><td>Manage annotations</td><td>Yes</td></tr>
+                <tr><td>/api/v1/progress</td><td>GET/POST</td><td>Reading progress</td><td>Yes</td></tr>
+                <tr><td>/api/v1/analytics</td><td>GET</td><td>Learning analytics</td><td>Yes</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.2 Authentication and Authorization</h2>
+        <p>The API supports OAuth 2.0, OpenID Connect, and LTI 1.3 for authentication.</p>
+
+        <h3>OAuth 2.0 Flow</h3>
+        <pre><code>// Step 1: Request authorization
+GET https://auth.textbook.com/oauth/authorize?
+  response_type=code&
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=https://yourapp.com/callback&
+  scope=read:textbooks write:annotations&
+  state=xyz123
+
+// Step 2: Exchange code for token
+POST https://auth.textbook.com/oauth/token
+Content-Type: application/json
+
+{
+  "grant_type": "authorization_code",
+  "code": "AUTH_CODE",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_SECRET"
+}
+
+// Response
+{
+  "access_token": "eyJhbGc...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "def50200..."
+}</code></pre>
+
+        <h2>5.3 Content Delivery</h2>
+        <p>The API supports both full EPUB downloads and chapter-by-chapter streaming for bandwidth efficiency.</p>
+
+        <h3>Get Textbook Metadata</h3>
+        <pre><code>GET /api/v1/textbooks/978-3-16-148410-0
+Authorization: Bearer eyJhbGc...
+
+Response:
+{
+  "id": "978-3-16-148410-0",
+  "title": "Introduction to Physics",
+  "authors": ["Dr. Jane Smith", "Dr. John Doe"],
+  "publisher": "Academic Press",
+  "publicationDate": "2025-01-15",
+  "edition": "3rd",
+  "language": "en",
+  "pageCount": 456,
+  "fileSize": 127834289,
+  "format": "EPUB3",
+  "wiaCompliant": true,
+  "wcagLevel": "AA",
+  "downloadUrl": "/api/v1/textbooks/978-3-16-148410-0/download",
+  "chapters": 15,
+  "hasVideo": true,
+  "hasInteractive": true
+}</code></pre>
+
+        <h2>5.4 Annotation Management</h2>
+        <p>The API allows full CRUD operations on user annotations with support for highlights, notes, and bookmarks.</p>
+
+        <h3>Create Annotation</h3>
+        <pre><code>POST /api/v1/annotations
+Authorization: Bearer eyJhbGc...
+Content-Type: application/json
+
+{
+  "textbookId": "978-3-16-148410-0",
+  "chapterId": "chapter05",
+  "type": "highlight",
+  "selector": {
+    "type": "TextPositionSelector",
+    "start": 1234,
+    "end": 1456
+  },
+  "color": "#FFFF00",
+  "note": "Important formula for exam",
+  "tags": ["exam", "formulas"]
+}
+
+Response:
+{
+  "id": "anno-12345",
+  "created": "2025-12-25T10:30:00Z",
+  "modified": "2025-12-25T10:30:00Z",
+  "syncStatus": "synced"
+}</code></pre>
+
+        <h2>5.5 Learning Analytics</h2>
+        <p>The API provides standardized learning analytics following the xAPI (Experience API) specification.</p>
+
+        <h3>Get Reading Analytics</h3>
+        <pre><code>GET /api/v1/analytics/reading?textbookId=978-3-16-148410-0&period=week
+
+Response:
+{
+  "userId": "user123",
+  "textbookId": "978-3-16-148410-0",
+  "period": "2025-12-18 to 2025-12-25",
+  "totalReadingTime": 7200,
+  "chaptersRead": [1, 2, 3, 4],
+  "averageSpeed": 245,
+  "comprehensionScore": 0.85,
+  "annotationsCreated": 23,
+  "quizzesCompleted": 4,
+  "quizAverageScore": 0.87
+}</code></pre>
+
+        <h2>5.6 LMS Integration</h2>
+        <p>The API supports LTI (Learning Tools Interoperability) 1.3 for seamless integration with Canvas, Moodle, Blackboard, and other learning management systems.</p>
+
+        <h3>Grade Passback</h3>
+        <pre><code>// Automatic grade synchronization
+POST /api/v1/lms/grades
+Authorization: Bearer eyJhbGc...
+
+{
+  "lmsType": "canvas",
+  "courseId": "PHYS101",
+  "assignmentId": "quiz-ch5",
+  "userId": "user123",
+  "score": 0.92,
+  "maxScore": 1.0,
+  "timestamp": "2025-12-25T11:45:00Z"
+}</code></pre>
+
+        <h2>5.7 Search and Discovery</h2>
+        <p>Full-text search capabilities across textbook content with support for filters and facets.</p>
+
+        <h3>Search Example</h3>
+        <pre><code>GET /api/v1/search?q=photosynthesis&textbookId=978-3-16-148410-0&filters=type:image
+
+Response:
+{
+  "query": "photosynthesis",
+  "totalResults": 47,
+  "results": [
+    {
+      "chapterId": "chapter08",
+      "sectionId": "sec-8.2",
+      "type": "text",
+      "snippet": "...process of photosynthesis converts light energy...",
+      "relevance": 0.95
+    },
+    {
+      "chapterId": "chapter08",
+      "type": "image",
+      "imageUrl": "/images/photosynthesis-diagram.svg",
+      "altText": "Diagram showing the light and dark reactions of photosynthesis",
+      "relevance": 0.88
+    }
+  ]
+}</code></pre>
+
+        <h2>5.8 Offline Synchronization API</h2>
+        <p>APIs for managing offline content and synchronizing changes when connectivity is restored.</p>
+
+        <h3>Request Offline Package</h3>
+        <pre><code>POST /api/v1/offline/prepare
+{
+  "textbookId": "978-3-16-148410-0",
+  "chapters": [1, 2, 3, 4, 5],
+  "includeVideos": false,
+  "quality": "standard"
+}
+
+Response:
+{
+  "packageId": "offline-pkg-789",
+  "status": "preparing",
+  "estimatedSize": 25600000,
+  "downloadUrl": "/api/v1/offline/download/offline-pkg-789",
+  "expiresAt": "2025-12-26T10:30:00Z"
+}</code></pre>
+
+        <div class="summary-box">
+            <h3>📚 Chapter Summary</h3>
+            <p><strong>Key Takeaways:</strong></p>
+            <ul>
+                <li>REST API provides comprehensive access to textbook content and user data</li>
+                <li>OAuth 2.0, OpenID Connect, and LTI 1.3 support flexible authentication</li>
+                <li>APIs support both full downloads and streaming for bandwidth efficiency</li>
+                <li>Standardized annotation format enables cross-platform compatibility</li>
+                <li>xAPI-compliant learning analytics provide actionable insights</li>
+                <li>LTI integration enables seamless LMS connectivity with grade passback</li>
+                <li>Full-text search enhances content discoverability</li>
+                <li>Offline APIs support disconnected learning scenarios</li>
+            </ul>
+        </div>
+
+        <h2>Review Questions</h2>
+        <ol>
+            <li>What are the eight core API endpoints defined in Phase 2?</li>
+            <li>Describe the OAuth 2.0 authentication flow.</li>
+            <li>What data is included in the textbook metadata response?</li>
+            <li>How are annotations structured in the API?</li>
+            <li>What learning analytics are provided by the analytics endpoint?</li>
+            <li>How does LTI integration enable grade passback to LMS platforms?</li>
+        </ol>
+
+        <h2>Looking Ahead</h2>
+        <p>In Chapter 6, we'll explore Phase 3: Protocol & Synchronization, covering multi-device sync, conflict resolution, and offline-first architecture.</p>
+
+        </div>
+</body>
+</html>

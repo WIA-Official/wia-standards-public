@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 프로토콜 명세 - WIA AI 사후 윤리</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>4장: 프로토콜 명세</h1>
+
+        <section>
+            <h2>4.1 의식 전송 프로토콜 (CTP)</h2>
+            <p>의식 전송 프로토콜은 무결성과 진정성을 유지하면서 디지털 의식 데이터가 시스템 간에 안전하게 전송되는 방법을 정의합니다.</p>
+
+            <div class="alert alert-warning">
+                <strong>중요:</strong> 모든 의식 전송은 윤리 준수를 위해 인증, 암호화 및 로깅되어야 합니다.
+            </div>
+
+            <h3>프로토콜 계층</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>계층</th>
+                        <th>기능</th>
+                        <th>프로토콜</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>애플리케이션</strong></td>
+                        <td>의식 데이터 형식</td>
+                        <td>WIA-CDF (의식 데이터 형식)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>검증</strong></td>
+                        <td>신원 및 동의 검증</td>
+                        <td>WIA-ICV (신원 동의 검증)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>보안</strong></td>
+                        <td>암호화 및 서명</td>
+                        <td>TLS 1.3 + 양자 내성</td>
+                    </tr>
+                    <tr>
+                        <td><strong>전송</strong></td>
+                        <td>신뢰성 있는 전달</td>
+                        <td>gRPC / WebSocket</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4.2 메시지 형식</h2>
+            <div class="code-header">Protocol Buffer - CTP 메시지</div>
+            <pre><code>syntax = "proto3";
+
+package wia.afterlife.ctp;
+
+message ConsciousnessTransfer {
+  // 헤더
+  string transfer_id = 1;
+  string source_system = 2;
+  string destination_system = 3;
+  int64 timestamp = 4;
+
+  // 검증
+  ConsentProof consent_proof = 5;
+  IdentityAttestation identity = 6;
+
+  // 페이로드
+  ConsciousnessPayload payload = 7;
+
+  // 무결성
+  bytes signature = 8;
+  string hash_algorithm = 9;
+  bytes payload_hash = 10;
+}
+
+message ConsentProof {
+  string consent_id = 1;
+  string consent_type = 2;
+  bytes consent_signature = 3;
+  repeated string witness_keys = 4;
+  int64 expiry_timestamp = 5;
+}
+
+enum ConsciousnessLevel {
+  STATIC_MEMORIAL = 0;
+  INTERACTIVE_BOT = 1;
+  DIGITAL_AVATAR = 2;
+  CONSCIOUSNESS_TRANSFER = 3;
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>4.3 전송 상태 머신</h2>
+            <div class="code-header">상태 전이</div>
+            <pre><code>전송_상태:
+  ┌─────────────┐
+  │   대기 중    │
+  └──────┬──────┘
+         │ 동의_확인됨
+         ▼
+  ┌─────────────┐
+  │   확인됨    │
+  └──────┬──────┘
+         │ 전송_시작됨
+         ▼
+  ┌─────────────┐
+  │   전송 중   │──────┐
+  └──────┬──────┘      │ 오류
+         │ 완료        ▼
+         ▼        ┌─────────┐
+  ┌─────────────┐ │  실패   │
+  │   검증 중   │ └─────────┘
+  └──────┬──────┘
+         │ 검증됨
+         ▼
+  ┌─────────────┐
+  │   완료      │
+  └─────────────┘
+
+롤백_트리거:
+  - consent_revoked → 즉시_종료
+  - integrity_failure → 소스로_롤백
+  - timeout (30분) → 재시도_또는_실패</code></pre>
+        </section>
+
+        <section>
+            <h2>4.4 무결성 보장</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>검사 유형</th>
+                        <th>방법</th>
+                        <th>빈도</th>
+                        <th>임계값</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>성격 드리프트</strong></td>
+                        <td>코사인 유사도</td>
+                        <td>모든 상호작용</td>
+                        <td>&lt; 5% 편차</td>
+                    </tr>
+                    <tr>
+                        <td><strong>기억 일관성</strong></td>
+                        <td>해시 검증</td>
+                        <td>일간</td>
+                        <td>100% 일치</td>
+                    </tr>
+                    <tr>
+                        <td><strong>행동 진정성</strong></td>
+                        <td>패턴 분석</td>
+                        <td>주간</td>
+                        <td>&gt; 95% 일치</td>
+                    </tr>
+                    <tr>
+                        <td><strong>가치 정렬</strong></td>
+                        <td>의미론적 비교</td>
+                        <td>월간</td>
+                        <td>&gt; 90% 정렬</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        </main>
+</body>
+</html>

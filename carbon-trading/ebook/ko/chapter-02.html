@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 플랫폼 아키텍처 | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>2장: 플랫폼 아키텍처</h1>
+
+    <div class="highlight">
+        <strong>설계 철학:</strong> WIA-CARBON_TRADING 아키텍처는 신뢰성, 확장성 및 감사 가능성을 우선시합니다. 모든 거래는 추적 가능하고, 모든 주문은 공정하게 처리되며, 시스템은 글로벌 탄소 시장 거래량을 처리할 수 있도록 확장됩니다.
+    </div>
+
+    <p>탄소 거래 플랫폼을 구축하려면 배출 시장의 고유한 요구 사항을 처리하기 위한 정교한 엔지니어링이 필요합니다. 이 장에서는 거래소 엔진부터 결제 시스템까지 WIA-CARBON_TRADING을 구동하는 핵심 아키텍처 구성 요소를 탐구합니다.</p>
+
+    <h2>시스템 개요</h2>
+
+    <p>WIA-CARBON_TRADING 플랫폼은 특정 기능을 담당하는 여러 상호 연결된 서브시스템으로 구성됩니다. 이러한 구성 요소는 신뢰성과 유지보수성을 위한 느슨한 결합을 유지하면서 완전한 거래 생태계를 제공하기 위해 함께 작동합니다.</p>
+
+    <pre><code>// 고수준 아키텍처 구성 요소
+interface PlatformArchitecture {
+    // 핵심 거래 시스템
+    exchangeEngine: ExchangeEngine;
+    orderManagement: OrderManagementSystem;
+    matchingEngine: MatchingEngine;
+
+    // 결제 및 청산
+    clearingHouse: ClearingHouse;
+    settlementEngine: SettlementEngine;
+
+    // 레지스트리 및 추적
+    carbonRegistry: CarbonRegistry;
+    accountingSystem: AccountingSystem;
+
+    // 시장 데이터
+    marketDataFeed: MarketDataService;
+    priceDiscovery: PriceDiscoveryEngine;
+
+    // 규정 준수 및 보안
+    complianceModule: ComplianceManager;
+    riskEngine: RiskManagementEngine;
+    auditSystem: AuditTrailService;
+
+    // 외부 인터페이스
+    apiGateway: APIGateway;
+    regulatoryReporting: RegulatoryReportingService;
+}
+
+class CarbonTradingPlatform implements PlatformArchitecture {
+    // 구성 요소 초기화
+    constructor(config: PlatformConfig) {
+        this.exchangeEngine = new ExchangeEngine(config.exchange);
+        this.matchingEngine = new MatchingEngine(config.matching);
+        this.clearingHouse = new ClearingHouse(config.clearing);
+        this.carbonRegistry = new CarbonRegistry(config.registry);
+        // ... 나머지 구성 요소 초기화
+    }
+}</code></pre>
+
+    <h2>거래소 엔진 설계</h2>
+
+    <p>거래소 엔진은 거래 플랫폼의 핵심으로, 주문 흐름, 매칭 및 실행을 조정합니다. 엄격한 순서 보장과 모든 시장 참가자의 공정한 처리를 유지하면서 높은 처리량을 처리해야 합니다.</p>
+
+    <h3>주문 유형 및 수명 주기</h3>
+
+    <p>WIA-CARBON_TRADING은 다양한 거래 전략과 위험 관리 요구를 수용하기 위한 포괄적인 주문 유형 세트를 지원합니다:</p>
+
+    <ul>
+        <li><strong>시장가 주문:</strong> 최상의 가용 가격으로 즉시 실행</li>
+        <li><strong>지정가 주문:</strong> 지정된 가격 또는 그보다 유리한 가격에서만 실행</li>
+        <li><strong>스톱 주문:</strong> 가격이 지정된 수준에 도달하면 트리거</li>
+        <li><strong>아이스버그 주문:</strong> 총 수량의 일부만 표시</li>
+        <li><strong>취소시까지 유효(GTC):</strong> 체결 또는 취소될 때까지 활성 유지</li>
+        <li><strong>전량체결취소(FOK):</strong> 전체를 즉시 실행하거나 취소</li>
+        <li><strong>경매 주문:</strong> 예정된 경매에만 참여</li>
+    </ul>
+
+    <pre><code>// 주문 데이터 구조
+interface TradeOrder {
+    orderId: string;
+    participantId: string;
+    instrument: CarbonInstrument;
+    side: 'buy' | 'sell';
+    orderType: OrderType;
+    quantity: number;           // 톤 CO2e
+    price?: number;             // 해당시 지정가
+    stopPrice?: number;         // 스톱 주문의 트리거 가격
+    displayQuantity?: number;   // 아이스버그의 표시 수량
+    timeInForce: TimeInForce;
+    timestamp: Date;
+    status: OrderStatus;
+    filledQuantity: number;
+    remainingQuantity: number;
+    averagePrice: number;
+}
+
+type OrderType = 'market' | 'limit' | 'stop' | 'stop_limit' | 'iceberg';
+type TimeInForce = 'GTC' | 'IOC' | 'FOK' | 'GTD' | 'auction_only';
+type OrderStatus = 'pending' | 'active' | 'partial' | 'filled' | 'cancelled' | 'rejected';
+
+// 주문 수명 주기 관리
+class OrderManager {
+    private orders: Map&lt;string, TradeOrder&gt; = new Map();
+    private orderBook: OrderBook;
+
+    async submitOrder(order: TradeOrder): Promise&lt;OrderResult&gt; {
+        // 주문 매개변수 검증
+        const validation = this.validateOrder(order);
+        if (!validation.valid) {
+            return { status: 'rejected', reason: validation.reason };
+        }
+
+        // 사전 거래 위험 검사
+        const riskCheck = await this.riskEngine.checkOrder(order);
+        if (!riskCheck.approved) {
+            return { status: 'rejected', reason: riskCheck.reason };
+        }
+
+        // 주문장에 제출
+        order.status = 'active';
+        order.timestamp = new Date();
+        this.orders.set(order.orderId, order);
+
+        // 매칭 엔진으로 전송
+        const matchResult = await this.matchingEngine.processOrder(order);
+
+        return matchResult;
+    }
+}</code></pre>
+
+    <h2>매칭 엔진 아키텍처</h2>
+
+    <p>매칭 엔진은 가격-시간 우선순위 규칙에 따라 매수 및 매도 주문을 짝짓는 역할을 합니다. 매칭 지연은 시장 공정성과 효율성에 직접적인 영향을 미치므로 성능이 중요합니다.</p>
+
+    <div class="highlight">
+        <strong>성능 목표:</strong> WIA-CARBON_TRADING 매칭 엔진은 주문 매칭에 밀리초 이하의 지연을 달성하며, 피크 거래 기간 동안 초당 100,000개 이상의 주문을 처리합니다.
+    </div>
+
+    <h3>가격-시간 우선순위 알고리즘</h3>
+
+    <p>표준 매칭 알고리즘은 가격-시간 우선순위를 따릅니다: 최상의 가격의 주문이 먼저 매칭되고, 동일한 가격에서는 이전 주문이 우선합니다. 이는 공정하고 결정적인 주문 실행을 보장합니다.</p>
+
+    <pre><code>// 매칭 엔진 구현
+class MatchingEngine {
+    private orderBooks: Map&lt;string, OrderBook&gt; = new Map();
+
+    processOrder(incomingOrder: TradeOrder): MatchResult {
+        const book = this.getOrderBook(incomingOrder.instrument);
+        const matches: Match[] = [];
+
+        if (incomingOrder.side === 'buy') {
+            return this.matchBuyOrder(incomingOrder, book, matches);
+        } else {
+            return this.matchSellOrder(incomingOrder, book, matches);
+        }
+    }
+
+    private matchBuyOrder(
+        buyOrder: TradeOrder,
+        book: OrderBook,
+        matches: Match[]
+    ): MatchResult {
+        let remainingQuantity = buyOrder.quantity;
+
+        // 최상의 가격에서 매도 주문 순회
+        while (remainingQuantity > 0 && book.asks.length > 0) {
+            const bestAsk = book.asks[0];
+
+            // 가격 호환성 확인
+            if (buyOrder.orderType === 'limit' && bestAsk.price > buyOrder.price) {
+                break; // 더 이상 매칭 불가
+            }
+
+            // 매칭 수량 계산
+            const matchQuantity = Math.min(remainingQuantity, bestAsk.remainingQuantity);
+
+            // 매칭 기록 생성
+            matches.push({
+                matchId: generateMatchId(),
+                buyOrderId: buyOrder.orderId,
+                sellOrderId: bestAsk.orderId,
+                quantity: matchQuantity,
+                price: bestAsk.price,
+                timestamp: new Date()
+            });
+
+            // 수량 업데이트
+            remainingQuantity -= matchQuantity;
+            bestAsk.remainingQuantity -= matchQuantity;
+
+            // 체결된 주문 제거
+            if (bestAsk.remainingQuantity === 0) {
+                book.asks.shift();
+                bestAsk.status = 'filled';
+            }
+        }
+
+        // 잔여 수량 처리
+        if (remainingQuantity > 0) {
+            if (buyOrder.orderType === 'limit') {
+                buyOrder.remainingQuantity = remainingQuantity;
+                this.insertOrder(buyOrder, book.bids);
+            }
+        }
+
+        return {
+            status: matches.length > 0 ? 'matched' : 'pending',
+            matches,
+            remainingQuantity
+        };
+    }
+}</code></pre>
+
+    <h2>결제 시스템</h2>
+
+    <p>결제는 성공적인 거래 후 판매자에서 구매자로 탄소 크레딧을 이전하고 구매자에서 판매자로 자금을 이전하는 프로세스입니다. WIA-CARBON_TRADING은 다양한 시장 요구 사항을 수용하기 위해 여러 결제 모드를 지원합니다.</p>
+
+    <h3>결제 주기</h3>
+
+    <table>
+        <tr>
+            <th>결제 모드</th>
+            <th>타이밍</th>
+            <th>사용 사례</th>
+        </tr>
+        <tr>
+            <td>T+0 (당일)</td>
+            <td>거래일 종료</td>
+            <td>현물 시장 거래</td>
+        </tr>
+        <tr>
+            <td>T+1</td>
+            <td>다음 영업일</td>
+            <td>표준 현물 거래</td>
+        </tr>
+        <tr>
+            <td>T+2</td>
+            <td>영업일 2일 후</td>
+            <td>국제 이전</td>
+        </tr>
+        <tr>
+            <td>실시간 총액</td>
+            <td>즉시</td>
+            <td>사전 자금 조달 계정</td>
+        </tr>
+    </table>
+
+    <pre><code>// 결제 엔진
+class SettlementEngine {
+    private pendingSettlements: Settlement[] = [];
+    private registry: CarbonRegistry;
+    private paymentGateway: PaymentGateway;
+
+    async processSettlement(trade: Trade): Promise&lt;SettlementResult&gt; {
+        const settlement: Settlement = {
+            settlementId: generateSettlementId(),
+            tradeId: trade.tradeId,
+            buyer: trade.buyerParticipantId,
+            seller: trade.sellerParticipantId,
+            creditType: trade.instrument.creditType,
+            quantity: trade.quantity,
+            amount: trade.quantity * trade.price,
+            status: 'pending',
+            settlementDate: this.calculateSettlementDate(trade)
+        };
+
+        try {
+            // 1단계: 판매자 계정에서 크레딧 예약
+            await this.registry.reserveCredits(
+                settlement.seller,
+                settlement.creditType,
+                settlement.quantity
+            );
+
+            // 2단계: 구매자 계정에서 자금 예약
+            await this.paymentGateway.reserveFunds(
+                settlement.buyer,
+                settlement.amount
+            );
+
+            // 3단계: 원자적 이전 실행
+            await this.executeAtomicTransfer(settlement);
+
+            settlement.status = 'completed';
+            settlement.completedAt = new Date();
+
+            return { success: true, settlement };
+
+        } catch (error) {
+            // 예약 롤백
+            await this.rollbackSettlement(settlement);
+            settlement.status = 'failed';
+            settlement.failureReason = error.message;
+
+            return { success: false, settlement, error };
+        }
+    }
+}</code></pre>
+
+    <h2>데이터 아키텍처</h2>
+
+    <p>플랫폼은 다양한 데이터 액세스 패턴에 최적화된 다중 데이터베이스 아키텍처를 사용합니다. 시계열 데이터, 트랜잭션 데이터 및 참조 데이터 각각에 특화된 스토리지 솔루션이 있습니다.</p>
+
+    <div class="highlight">
+        <strong>데이터 무결성:</strong> 모든 중요 데이터는 동기식 쓰기로 여러 가용 영역에 복제됩니다. 트랜잭션 로그는 특정 시점 복구 및 완전한 감사 추적 재구성을 가능하게 합니다.
+    </div>
+
+    <h3>데이터베이스 전략</h3>
+
+    <pre><code>// 데이터 스토리지 구성
+interface DataArchitecture {
+    // 고성능 주문장 및 매칭
+    orderBookStore: {
+        type: 'in-memory',
+        technology: 'Redis Cluster',
+        replication: 'synchronous',
+        persistence: 'AOF'
+    };
+
+    // 트랜잭션 데이터
+    transactionStore: {
+        type: 'relational',
+        technology: 'PostgreSQL',
+        replication: 'streaming',
+        sharding: 'by_participant_id'
+    };
+
+    // 시계열 시장 데이터
+    marketDataStore: {
+        type: 'time-series',
+        technology: 'TimescaleDB',
+        retention: '10_years',
+        compression: 'enabled'
+    };
+
+    // 보고서용 문서 저장소
+    documentStore: {
+        type: 'document',
+        technology: 'MongoDB',
+        replication: 'replica_set'
+    };
+
+    // 이벤트 소싱 및 감사
+    eventStore: {
+        type: 'event-log',
+        technology: 'Apache Kafka',
+        retention: 'indefinite',
+        partitions: 'by_instrument'
+    };
+}</code></pre>
+
+    <h2>확장성 및 고가용성</h2>
+
+    <p>WIA-CARBON_TRADING은 수평 확장성과 고가용성을 위해 설계되었습니다. 아키텍처는 일관성을 유지하면서 다양한 지역에서 낮은 지연 시간 액세스를 위한 지리적 분산을 지원합니다.</p>
+
+    <p>이 아키텍처 기반을 통해 WIA-CARBON_TRADING은 견고하고 확장 가능하며 신뢰할 수 있는 탄소 거래 플랫폼으로 운영됩니다. 다음 장에서는 이 인프라가 지원하는 특정 거래 상품과 메커니즘을 탐구합니다.</p>
+</body>
+</html>

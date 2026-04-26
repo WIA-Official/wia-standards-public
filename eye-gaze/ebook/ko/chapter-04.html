@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 프로토콜 사양 - WIA 시선 추적 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 시선 추적 표준</h1>
+        <p class="subtitle">제4장: 프로토콜 사양</p>
+        <span class="version">버전 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>제4장: 프로토콜 사양</h1>
+
+        <h2>4.1 개요</h2>
+        <p>WIA 시선 추적 표준은 다양한 사용 사례에 최적화된 여러 통신 프로토콜을 지원합니다: 네트워크 통신을 위한 WebSocket, 로컬 초저지연을 위한 IPC, 고주파수 데이터 전송을 위한 바이너리 형식.</p>
+
+        <h2>4.2 WebSocket 프로토콜</h2>
+
+        <h3>연결 설정</h3>
+        <pre><code>// 클라이언트가 WebSocket 엔드포인트에 연결
+const ws = new WebSocket('ws://localhost:8080/stream');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'handshake',
+    version: '1.0.0',
+    clientId: 'aac-app-001',
+    capabilities: ['GAZE_POINT', 'EVENTS']
+  }));
+};</code></pre>
+
+        <h3>메시지 유형</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>유형</th>
+                    <th>방향</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>handshake</td>
+                    <td>클라이언트 → 서버</td>
+                    <td>초기 연결 핸드셰이크</td>
+                </tr>
+                <tr>
+                    <td>gaze_point</td>
+                    <td>서버 → 클라이언트</td>
+                    <td>단일 시선 데이터 포인트</td>
+                </tr>
+                <tr>
+                    <td>event</td>
+                    <td>서버 → 클라이언트</td>
+                    <td>시선 이벤트 알림</td>
+                </tr>
+                <tr>
+                    <td>heartbeat</td>
+                    <td>양방향</td>
+                    <td>연결 유지 핑</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box warning">
+            <h4>연결 시간 초과</h4>
+            <p>서버는 연속 3회 하트비트를 놓친 클라이언트를 연결 해제합니다 (15초).</p>
+        </div>
+
+        <h2>4.3 프로세스 간 통신 (IPC)</h2>
+        <p>초저지연(&lt;1ms)이 필요한 로컬 응용 프로그램의 경우 IPC는 직접 공유 메모리 액세스를 제공합니다.</p>
+
+        <h3>플랫폼별 전송</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>플랫폼</th>
+                    <th>전송</th>
+                    <th>경로/이름</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Linux</td>
+                    <td>Unix 도메인 소켓</td>
+                    <td>/tmp/wia-eye-gaze.sock</td>
+                </tr>
+                <tr>
+                    <td>macOS</td>
+                    <td>Unix 도메인 소켓</td>
+                    <td>/tmp/wia-eye-gaze.sock</td>
+                </tr>
+                <tr>
+                    <td>Windows</td>
+                    <td>명명된 파이프</td>
+                    <td>\\.\pipe\wia-eye-gaze</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>성능 비교</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>전송</th>
+                    <th>지연 시간 (p50)</th>
+                    <th>지연 시간 (p99)</th>
+                    <th>처리량</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>공유 메모리</td>
+                    <td>0.01ms</td>
+                    <td>0.05ms</td>
+                    <td>1M points/s</td>
+                </tr>
+                <tr>
+                    <td>Unix 소켓</td>
+                    <td>0.3ms</td>
+                    <td>0.8ms</td>
+                    <td>100K msg/s</td>
+                </tr>
+                <tr>
+                    <td>WebSocket (로컬)</td>
+                    <td>2.0ms</td>
+                    <td>5.0ms</td>
+                    <td>20K msg/s</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.4 바이너리 형식 사양</h2>
+
+        <h3>바이너리 형식 사용 시기</h3>
+        <ul>
+            <li><strong>높은 샘플링 속도</strong>: 120Hz 이상</li>
+            <li><strong>대역폭 제한</strong>: 모바일 또는 원격 연결</li>
+            <li><strong>저장</strong>: 장기 데이터 기록</li>
+            <li><strong>성능 중요</strong>: 실시간 게임 또는 VR</li>
+        </ul>
+
+        <h3>바이너리 vs JSON 크기</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>형식</th>
+                    <th>포인트당 크기</th>
+                    <th>120Hz/초</th>
+                    <th>1시간</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>JSON (정돈)</td>
+                    <td>~450 bytes</td>
+                    <td>54 KB</td>
+                    <td>194 MB</td>
+                </tr>
+                <tr>
+                    <td>JSON (압축)</td>
+                    <td>~180 bytes</td>
+                    <td>22 KB</td>
+                    <td>78 MB</td>
+                </tr>
+                <tr>
+                    <td>WIA 바이너리</td>
+                    <td>21 bytes</td>
+                    <td>2.5 KB</td>
+                    <td>9 MB</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.5 지연 시간 요구사항</h2>
+
+        <div class="info-box">
+            <h4>AAC의 지연 시간 분석</h4>
+            <pre><code>눈 → 추적기 처리:        3-10ms
+추적기 → 컴퓨터 전송:    1-3ms
+API 처리:               1-2ms
+네트워크/IPC:            0.1-5ms
+응용 프로그램 처리:      5-10ms
+화면 렌더링:            16ms (60Hz)
+─────────────────────────────────────
+총 AAC 지연 시간:       26-46ms (허용 가능)
+게임 목표:              &lt;20ms 총</code></pre>
+        </div>
+
+        <h2>4.6 동기화 및 타임스탬프</h2>
+
+        <h3>타임스탬프 유형</h3>
+        <ul>
+            <li><strong>장치 타임스탬프</strong>: 하드웨어 클록 (마이크로초 정밀도)</li>
+            <li><strong>시스템 타임스탬프</strong>: OS 클록 (밀리초 정밀도)</li>
+            <li><strong>서버 타임스탬프</strong>: API 서버 클록</li>
+            <li><strong>클라이언트 타임스탬프</strong>: 응용 프로그램 수신 시간</li>
+        </ul>
+
+        <h2>4.7 보안 고려사항</h2>
+
+        <h3>WebSocket용 TLS/SSL</h3>
+        <pre><code>// 보안 WebSocket 연결
+const ws = new WebSocket('wss://eye-tracker.local:8443/stream');</code></pre>
+
+        <h3>IPC 보안</h3>
+        <ul>
+            <li><strong>파일 권한</strong>: 소유자 및 그룹으로 제한된 소켓/파이프 (0660)</li>
+            <li><strong>프로세스 검증</strong>: 연결 프로세스 신원 확인</li>
+            <li><strong>메시지 인증</strong>: 민감한 명령에 대한 HMAC 서명</li>
+        </ul>
+
+        </main>
+</body>
+</html>

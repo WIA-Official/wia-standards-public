@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 데이터 스키마 - WIA 시선 추적 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 시선 추적 표준</h1>
+        <p class="subtitle">제2장: 데이터 스키마</p>
+        <span class="version">버전 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>제2장: 데이터 스키마</h1>
+
+        <h2>2.1 개요</h2>
+        <p>WIA 시선 추적 데이터 스키마는 시선 추적 데이터를 표현하기 위한 표준화된 구조를 정의하여 모든 장치와 응용 프로그램 간의 상호운용성을 보장합니다. 이 장에서는 핵심 데이터 유형, 좌표 시스템 및 이벤트 구조를 다룹니다.</p>
+
+        <h2>2.2 기본 타입</h2>
+
+        <h3>Vector2D</h3>
+        <p>정규화된 또는 픽셀 공간의 2D 좌표를 나타냅니다.</p>
+        <pre><code>interface Vector2D {
+  x: number;  // X 좌표
+  y: number;  // Y 좌표
+}</code></pre>
+
+        <h3>Vector3D</h3>
+        <p>공간 시선 추적을 위한 3D 좌표를 나타냅니다.</p>
+        <pre><code>interface Vector3D {
+  x: number;  // X 좌표 (mm)
+  y: number;  // Y 좌표 (mm)
+  z: number;  // Z 좌표 (mm, 장치로부터의 거리)
+}</code></pre>
+
+        <h3>BoundingBox</h3>
+        <p>화면의 직사각형 영역을 정의합니다.</p>
+        <pre><code>interface BoundingBox {
+  x: number;       // 왼쪽 상단 X (정규화됨)
+  y: number;       // 왼쪽 상단 Y (정규화됨)
+  width: number;   // 너비 (정규화됨)
+  height: number;  // 높이 (정규화됨)
+}</code></pre>
+
+        <h2>2.3 GazePoint - 핵심 데이터 구조</h2>
+        <p>GazePoint는 시선 추적 데이터의 기본 단위로, 특정 순간에 사용자가 어디를 보고 있는지를 나타냅니다.</p>
+
+        <h3>완전한 GazePoint 구조</h3>
+        <pre><code>interface GazePoint {
+  // === 필수 필드 ===
+
+  /** 밀리초 단위의 Unix 타임스탬프 */
+  timestamp: number;
+
+  /** 화면 X 좌표 (0.0 = 왼쪽, 1.0 = 오른쪽) */
+  x: number;
+
+  /** 화면 Y 좌표 (0.0 = 위, 1.0 = 아래) */
+  y: number;
+
+  /** 데이터 신뢰도 (0.0 - 1.0) */
+  confidence: number;
+
+  /** 데이터 유효성 플래그 */
+  valid: boolean;
+
+  // === 선택적 필드 ===
+
+  /** 왼쪽 눈 데이터 */
+  leftEye?: EyeData;
+
+  /** 오른쪽 눈 데이터 */
+  rightEye?: EyeData;
+
+  /** 현재 고정 중인지 여부 */
+  fixation?: boolean;
+
+  /** 현재 단속적 안구 운동 중인지 여부 */
+  saccade?: boolean;
+
+  /** 고정 ID (고정 포인트 그룹화) */
+  fixationId?: string;
+
+  /** 장치별 타임스탬프 */
+  deviceTimestamp?: number;
+
+  /** 추가 메타데이터 */
+  metadata?: Record&lt;string, unknown&gt;;
+}</code></pre>
+
+        <h3>GazePoint 예제</h3>
+        <pre><code>{
+  "timestamp": 1704067200000,
+  "x": 0.5234,
+  "y": 0.3891,
+  "confidence": 0.95,
+  "valid": true,
+  "leftEye": {
+    "gaze": { "x": 0.5198, "y": 0.3876 },
+    "valid": true,
+    "pupilDiameter": 4.2,
+    "eyeOpenness": 0.92
+  },
+  "rightEye": {
+    "gaze": { "x": 0.5270, "y": 0.3906 },
+    "valid": true,
+    "pupilDiameter": 4.1,
+    "eyeOpenness": 0.91
+  },
+  "fixation": true,
+  "fixationId": "fix_001"
+}</code></pre>
+
+        <h2>2.4 EyeData - 개별 눈 정보</h2>
+        <p>왼쪽 및 오른쪽 눈에 대한 개별 상세 데이터입니다.</p>
+
+        <pre><code>interface EyeData {
+  // === 기본 시선 데이터 ===
+
+  /** 이 눈의 시선 좌표 */
+  gaze: Vector2D;
+
+  /** 데이터 유효성 */
+  valid: boolean;
+
+  // === 동공 데이터 ===
+
+  /** 밀리미터 단위의 동공 지름 */
+  pupilDiameter?: number;
+
+  /** 카메라 이미지에서의 동공 중심 (정규화됨) */
+  pupilCenter?: Vector2D;
+
+  // === 3D 데이터 ===
+
+  /** 3D 공간에서의 눈 위치 (추적기로부터 mm) */
+  gazeOrigin?: Vector3D;
+
+  /** 단위 벡터로 표현된 시선 방향 */
+  gazeDirection?: Vector3D;
+
+  // === 눈 상태 ===
+
+  /** 눈의 열림 정도 (0.0 = 닫힘, 1.0 = 완전히 열림) */
+  eyeOpenness?: number;
+
+  /** 밀리미터 단위의 눈 열림 */
+  eyeOpennessMm?: number;
+}</code></pre>
+
+        <div class="info-box">
+            <h4>동공 지름의 응용</h4>
+            <p>동공 지름은 다음과 같은 용도로 유용합니다:</p>
+            <ul>
+                <li><strong>인지 부하</strong> - 더 큰 동공은 더 높은 정신적 노력을 나타냄</li>
+                <li><strong>감정 반응</strong> - 동공 변화는 각성 및 관심과 상관관계</li>
+                <li><strong>조명 적응</strong> - 밝기 변화에 대한 동공 반응 추적</li>
+                <li><strong>피로 감지</strong> - 피로와 함께 동공 동역학이 변화</li>
+            </ul>
+        </div>
+
+        <h2>2.5 좌표 시스템</h2>
+
+        <h3>화면 좌표 (정규화됨)</h3>
+        <p>모든 시선 좌표는 0.0에서 1.0까지의 정규화된 값을 사용합니다:</p>
+
+        <pre><code>화면 레이아웃:
+
+(0.0, 0.0) ──────────────────────► X (1.0, 0.0)
+     │
+     │     ┌─────────────────────┐
+     │     │                     │
+     │     │       화면          │
+     │     │                     │
+     │     │   (0.5, 0.5)        │
+     │     │      중심           │
+     │     │                     │
+     │     └─────────────────────┘
+     │
+     ▼
+Y (0.0, 1.0)                    (1.0, 1.0)</code></pre>
+
+        <h3>좌표 변환</h3>
+        <p>정규화된 좌표와 픽셀 좌표 간 변환:</p>
+
+        <pre><code>// 정규화됨에서 픽셀로
+function toPixelCoordinates(
+  normalizedPoint: Vector2D,
+  screenWidth: number,
+  screenHeight: number
+): { px: number; py: number } {
+  return {
+    px: Math.round(normalizedPoint.x * screenWidth),
+    py: Math.round(normalizedPoint.y * screenHeight)
+  };
+}
+
+// 예: 1920x1080 화면
+// (0.5, 0.5) → (960, 540)
+
+// 픽셀에서 정규화됨으로
+function toNormalizedCoordinates(
+  px: number,
+  py: number,
+  screenWidth: number,
+  screenHeight: number
+): Vector2D {
+  return {
+    x: px / screenWidth,
+    y: py / screenHeight
+  };
+}</code></pre>
+
+        <h2>2.6 데이터 품질 지표</h2>
+
+        <h3>신뢰도 값</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>범위</th>
+                    <th>품질</th>
+                    <th>권장 조치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0.9 - 1.0</td>
+                    <td>우수</td>
+                    <td>정상 사용</td>
+                </tr>
+                <tr>
+                    <td>0.7 - 0.9</td>
+                    <td>양호</td>
+                    <td>정상 사용</td>
+                </tr>
+                <tr>
+                    <td>0.5 - 0.7</td>
+                    <td>보통</td>
+                    <td>품질 모니터링</td>
+                </tr>
+                <tr>
+                    <td>0.3 - 0.5</td>
+                    <td>불량</td>
+                    <td>재보정 고려</td>
+                </tr>
+                <tr>
+                    <td>0.0 - 0.3</td>
+                    <td>매우 불량</td>
+                    <td>데이터가 신뢰할 수 없을 수 있음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2.7 이벤트 시스템</h2>
+
+        <h3>이벤트 카테고리</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>카테고리</th>
+                    <th>이벤트</th>
+                    <th>사용 사례</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>눈 움직임</strong></td>
+                    <td>고정, 단속적 안구 운동, 부드러운 추적</td>
+                    <td>읽기 분석, 주의 추적</td>
+                </tr>
+                <tr>
+                    <td><strong>눈 상태</strong></td>
+                    <td>깜빡임, 윙크, 이중 깜빡임</td>
+                    <td>대체 입력, 피로 감지</td>
+                </tr>
+                <tr>
+                    <td><strong>상호작용</strong></td>
+                    <td>응시, 시선 진입/이탈</td>
+                    <td>AAC 선택, UI 상호작용</td>
+                </tr>
+                <tr>
+                    <td><strong>시스템</strong></td>
+                    <td>보정, 추적 상태</td>
+                    <td>장치 관리</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>고정 이벤트</h3>
+        <p>고정은 눈이 상대적으로 정지해 있을 때 발생하며 시각적 주의를 나타냅니다.</p>
+
+        <pre><code>interface FixationEvent {
+  type: 'fixation_start' | 'fixation_update' | 'fixation_end';
+  timestamp: number;
+  eventId: string;
+  fixationId: string;
+
+  /** 고정 중심점 */
+  centroid: Vector2D;
+
+  /** 고정 반경 (정규화됨) */
+  radius?: number;
+
+  /** 각도 분산 (도) */
+  dispersion?: number;
+
+  /** 지속 시간 (ms, fixation_end 시) */
+  duration?: number;
+}</code></pre>
+
+        <h3>단속적 안구 운동 이벤트</h3>
+        <p>고정 사이의 빠른 눈 움직임입니다.</p>
+
+        <pre><code>interface SaccadeEvent {
+  type: 'saccade_start' | 'saccade_end';
+  timestamp: number;
+  eventId: string;
+  saccadeId: string;
+
+  /** 시작 위치 */
+  startPosition: Vector2D;
+
+  /** 종료 위치 (saccade_end 시) */
+  endPosition?: Vector2D;
+
+  /** 이동 거리 (도) */
+  amplitude?: number;
+
+  /** 최대 속도 (도/초) */
+  peakVelocity?: number;
+
+  /** 지속 시간 (ms) */
+  duration?: number;
+}</code></pre>
+
+        <h3>깜빡임 이벤트</h3>
+        <p>입력 및 피로 모니터링을 위한 눈 닫힘 감지입니다.</p>
+
+        <pre><code>interface BlinkEvent {
+  type: 'blink_start' | 'blink_end' | 'blink' | 'double_blink';
+  timestamp: number;
+  eventId: string;
+  blinkId: string;
+
+  /** 어느 눈이 깜빡였는지 */
+  eye: 'left' | 'right' | 'both';
+
+  /** 깜빡임 지속 시간 (ms) */
+  duration?: number;
+
+  /** 이중 깜빡임 간격 (ms) */
+  interval?: number;
+}</code></pre>
+
+        <div class="info-box warning">
+            <h4>의도적 vs. 자연스러운 깜빡임</h4>
+            <ul>
+                <li><strong>자연스러운 깜빡임</strong>: 100-400ms 지속 시간</li>
+                <li><strong>의도적 깜빡임</strong>: 400ms+ 지속 시간 (구성 가능한 임계값)</li>
+            </ul>
+            <p>AAC 응용 프로그램은 의도적인 깜빡임을 선택 메커니즘으로 사용할 수 있습니다.</p>
+        </div>
+
+        <h3>응시 이벤트</h3>
+        <p>AAC에 중요 - 대상을 보면서 시선 기반 선택.</p>
+
+        <pre><code>interface DwellEvent {
+  type: 'dwell_start' | 'dwell_progress' | 'dwell_complete' | 'dwell_cancel';
+  timestamp: number;
+  eventId: string;
+  dwellId: string;
+
+  /** 대상 요소 */
+  target: GazeTarget;
+
+  /** 구성된 응시 시간 (ms) */
+  dwellThreshold: number;
+
+  /** 경과 시간 (ms) */
+  elapsed: number;
+
+  /** 진행률 (0.0 - 1.0) */
+  progress: number;
+
+  /** 취소 이유 (취소된 경우) */
+  cancelReason?: 'gaze_left' | 'timeout' | 'user_cancel';
+}</code></pre>
+
+        </main>
+</body>
+</html>

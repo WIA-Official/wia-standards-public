@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: API 엔드포인트 - WIA 시선 추적 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA 시선 추적 표준</h1>
+        <p class="subtitle">제3장: API 엔드포인트</p>
+        <span class="version">버전 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>제3장: API 엔드포인트</h1>
+
+        <h2>3.1 개요</h2>
+        <p>WIA 시선 추적 API는 시선 추적 장치를 제어하고, 보정을 관리하고, 시선 데이터를 스트리밍하고, 상호작용 영역을 처리하기 위한 표준화된 엔드포인트 세트를 정의합니다. 이 장에서는 완전한 API 인터페이스를 다룹니다.</p>
+
+        <h2>3.2 장치 탐색 및 연결</h2>
+
+        <h3>사용 가능한 장치 목록</h3>
+        <pre><code>GET /api/v1/devices</code></pre>
+
+        <p><strong>응답:</strong></p>
+        <pre><code>{
+  "devices": [
+    {
+      "deviceId": "tobii-pro-fusion-001",
+      "vendor": "Tobii",
+      "model": "Pro Fusion",
+      "status": "connected",
+      "capabilities": {
+        "samplingRate": [60, 120, 250],
+        "binocular": true,
+        "accuracy": 0.4
+      }
+    }
+  ]
+}</code></pre>
+
+        <h3>장치에 연결</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/connect</code></pre>
+
+        <h2>3.3 보정 API</h2>
+
+        <h3>보정 시작</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/calibration/start</code></pre>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "type": "accessibility",
+  "pointCount": 5,
+  "screenInfo": {
+    "width": 1920,
+    "height": 1080,
+    "dpi": 96
+  }
+}</code></pre>
+
+        <div class="info-box">
+            <h4>보정 유형</h4>
+            <ul>
+                <li><strong>표준</strong>: 9포인트, 최고 정확도, 45-60초</li>
+                <li><strong>빠른</strong>: 5포인트, 양호한 정확도, 20-30초</li>
+                <li><strong>접근성</strong>: 적응형 타이밍, 더 큰 대상, 추가 검증</li>
+            </ul>
+        </div>
+
+        <h2>3.4 데이터 스트리밍 API</h2>
+
+        <h3>시선 스트림 시작</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/stream/start</code></pre>
+
+        <h3>WebSocket 스트림 메시지</h3>
+        <p>WebSocket에 연결되면 클라이언트는 연속적인 시선 데이터를 수신합니다:</p>
+
+        <pre><code>{
+  "type": "gaze_point",
+  "data": {
+    "timestamp": 1704067200000,
+    "x": 0.5234,
+    "y": 0.3891,
+    "confidence": 0.95,
+    "valid": true
+  }
+}</code></pre>
+
+        <h2>3.5 상호작용 영역 API</h2>
+
+        <h3>상호작용 영역 등록</h3>
+        <p>시선 상호작용을 위한 화면 영역(버튼, 키보드 키 등) 정의:</p>
+
+        <pre><code>POST /api/v1/devices/{deviceId}/zones/register</code></pre>
+
+        <p><strong>요청 본문:</strong></p>
+        <pre><code>{
+  "zoneId": "button_send",
+  "boundingBox": {
+    "x": 0.7,
+    "y": 0.8,
+    "width": 0.2,
+    "height": 0.1
+  },
+  "label": "메시지 보내기",
+  "dwellTime": 800,
+  "enableDwell": true
+}</code></pre>
+
+        <h2>3.6 장치 구성</h2>
+
+        <h3>현재 구성 가져오기</h3>
+        <pre><code>GET /api/v1/devices/{deviceId}/config</code></pre>
+
+        <p><strong>응답:</strong></p>
+        <pre><code>{
+  "samplingRate": 120,
+  "fixationDetection": {
+    "minDuration": 100,
+    "maxDispersion": 1.0
+  },
+  "dwellSelection": {
+    "defaultThreshold": 800,
+    "visualFeedback": true
+  }
+}</code></pre>
+
+        <h2>3.7 오류 응답</h2>
+
+        <h3>일반 오류 코드</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>코드</th>
+                    <th>HTTP 상태</th>
+                    <th>설명</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>DEVICE_NOT_FOUND</td>
+                    <td>404</td>
+                    <td>요청한 장치가 존재하지 않음</td>
+                </tr>
+                <tr>
+                    <td>CALIBRATION_REQUIRED</td>
+                    <td>428</td>
+                    <td>장치에 보정이 필요함</td>
+                </tr>
+                <tr>
+                    <td>TRACKING_LOST</td>
+                    <td>503</td>
+                    <td>눈을 감지할 수 없음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        </main>
+</body>
+</html>

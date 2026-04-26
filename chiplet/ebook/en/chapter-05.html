@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Security | WIA-CHIPLET</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 5: Chiplet Security</h1>
+
+    <p>Chiplet architecture introduces unique security challenges that extend beyond traditional monolithic chip security. This chapter addresses supply chain security, hardware trojan detection, authentication mechanisms, and comprehensive security frameworks for multi-vendor chiplet ecosystems.</p>
+
+    <h2>Security Challenges in Chiplet Systems</h2>
+
+    <p>The modular nature of chiplet systems creates an expanded attack surface. With chiplets potentially sourced from multiple vendors, manufactured at different foundries, and assembled by third-party packaging houses, the opportunities for malicious interference multiply significantly.</p>
+
+    <div class="highlight">
+        <strong>The Multi-Vendor Security Problem</strong>
+        <p>A single chiplet system might include components from five different vendors, manufactured at three different foundries, assembled at a fourth location, and tested at yet another. Each handoff represents a potential vulnerability point that must be addressed through comprehensive security measures.</p>
+    </div>
+
+    <h3>Chiplet Security Threat Model</h3>
+
+    <pre><code>// Chiplet Security Threat Model
+interface ChipletThreatModel {
+    // Supply Chain Threats
+    supplyChain: {
+        threats: [
+            "Counterfeit chiplets",
+            "Recycled/remarked components",
+            "Malicious substitution",
+            "Tampering during transit",
+            "Unauthorized overproduction"
+        ];
+        attackVectors: AttackVector[];
+        impact: ImpactAssessment;
+    };
+
+    // Hardware Trojan Threats
+    hardwareTrojans: {
+        types: [
+            "Logic bombs",
+            "Kill switches",
+            "Information leakage",
+            "Denial of service",
+            "Performance degradation"
+        ];
+        insertionPoints: [
+            "Design phase",
+            "Fabrication",
+            "Assembly",
+            "Test/programming"
+        ];
+        triggerMechanisms: ["Time-based", "Input-based", "External signal"];
+    };
+
+    // Runtime Threats
+    runtime: {
+        threats: [
+            "Side-channel attacks",
+            "Fault injection",
+            "Probing attacks",
+            "Interconnect snooping",
+            "Malicious configuration"
+        ];
+        d2dSpecific: [
+            "Inter-chiplet traffic interception",
+            "Protocol manipulation",
+            "Rogue chiplet injection"
+        ];
+    };
+}
+
+// Threat Severity Assessment
+const threatSeverity = {
+    counterfeit: { likelihood: "High", impact: "Critical" },
+    trojan: { likelihood: "Low", impact: "Catastrophic" },
+    sideChannel: { likelihood: "Medium", impact: "High" },
+    supplyChainTampering: { likelihood: "Medium", impact: "Critical" }
+};</code></pre>
+
+    <h2>Supply Chain Security</h2>
+
+    <p>Securing the chiplet supply chain requires a multi-layered approach combining physical security, cryptographic authentication, and comprehensive tracking systems.</p>
+
+    <h3>Chiplet Authentication Framework</h3>
+
+    <pre><code>// Chiplet Authentication System
+interface ChipletAuthentication {
+    // Physical Unclonable Function (PUF)
+    puf: {
+        type: "SRAM" | "RingOscillator" | "Arbiter" | "Butterfly";
+        bitLength: number;        // 256-4096 bits
+        reliability: number;      // % stable bits
+        uniqueness: number;       // % inter-chip variation
+
+        // PUF-based key generation
+        generateKey(): Promise&lt;CryptoKey&gt;;
+        authenticate(challenge: Challenge): Promise&lt;Response&gt;;
+    };
+
+    // Unique Identifier (UID)
+    uid: {
+        format: "128-bit UUID";
+        storage: "Fuse" | "EEPROM" | "PUF-derived";
+        cryptoBinding: boolean;
+    };
+
+    // Certificate Chain
+    certificate: {
+        type: "X.509v3";
+        issuer: "WIA-CA" | "Vendor-CA";
+        attributes: ChipletAttributes;
+        validityPeriod: Date[];
+        revocationCheck: "OCSP" | "CRL";
+    };
+}
+
+// Authentication Protocol
+class ChipletAuthProtocol {
+    async authenticateChiplet(chiplet: ChipletId): Promise&lt;AuthResult&gt; {
+        // Step 1: Read UID
+        const uid = await this.readUID(chiplet);
+
+        // Step 2: Verify certificate chain
+        const cert = await this.getCertificate(uid);
+        const chainValid = await this.verifyCertChain(cert);
+
+        // Step 3: PUF challenge-response
+        const challenge = this.generateChallenge();
+        const response = await this.sendChallenge(chiplet, challenge);
+        const pufValid = await this.verifyPUFResponse(response, cert);
+
+        // Step 4: Check revocation status
+        const notRevoked = await this.checkRevocation(cert);
+
+        return {
+            authenticated: chainValid && pufValid && notRevoked,
+            chipletId: uid,
+            certificate: cert,
+            trustLevel: this.calculateTrustLevel(cert)
+        };
+    }
+}</code></pre>
+
+    <h3>Supply Chain Tracking</h3>
+
+    <table>
+        <tr>
+            <th>Stage</th>
+            <th>Security Measure</th>
+            <th>Verification Method</th>
+        </tr>
+        <tr>
+            <td>Design</td>
+            <td>Secure design environment, access control</td>
+            <td>Audit logs, code signing</td>
+        </tr>
+        <tr>
+            <td>Fabrication</td>
+            <td>Trusted foundry, metering</td>
+            <td>Wafer tracking, yield analysis</td>
+        </tr>
+        <tr>
+            <td>Testing</td>
+            <td>Secure test facilities</td>
+            <td>Test signature verification</td>
+        </tr>
+        <tr>
+            <td>Assembly</td>
+            <td>Tamper-evident packaging</td>
+            <td>Physical inspection, PUF check</td>
+        </tr>
+        <tr>
+            <td>Distribution</td>
+            <td>Chain of custody tracking</td>
+            <td>Blockchain verification</td>
+        </tr>
+    </table>
+
+    <pre><code>// Supply Chain Tracking System
+interface SupplyChainTracker {
+    // Tracking record for each chiplet
+    trackingRecord: {
+        chipletId: string;
+        manufacturingHistory: ManufacturingEvent[];
+        custodyChain: CustodyRecord[];
+        testResults: TestRecord[];
+        certifications: Certification[];
+    };
+
+    // Blockchain-based verification
+    blockchain: {
+        platform: "Hyperledger" | "Ethereum" | "Custom";
+        recordTypes: [
+            "Manufacturing completion",
+            "Test result hash",
+            "Custody transfer",
+            "Integration event"
+        ];
+
+        // Verify complete history
+        verifyHistory(chipletId: string): Promise&lt;VerificationResult&gt;;
+    };
+
+    // Anti-counterfeiting measures
+    antiCounterfeit: {
+        physicalMarking: "Laser engraving" | "Nanoscale patterns";
+        electronicSignature: "PUF" | "OTP" | "Secure element";
+        packageSecurity: "Tamper-evident" | "Tamper-responsive";
+    };
+}</code></pre>
+
+    <h2>Hardware Trojan Detection</h2>
+
+    <p>Hardware trojans represent one of the most serious threats to chiplet security. Detection requires a combination of design-time techniques, manufacturing-time testing, and runtime monitoring.</p>
+
+    <div class="highlight">
+        <strong>Hardware Trojan Characteristics</strong>
+        <p>Hardware trojans typically have three components: a trigger mechanism that activates the trojan, a payload that executes the malicious function, and stealth features that evade detection. Chiplet systems must address trojans that could be inserted at any point in the supply chain.</p>
+    </div>
+
+    <pre><code>// Hardware Trojan Detection Framework
+interface TrojanDetectionFramework {
+    // Design-Time Detection
+    designTime: {
+        methods: [
+            "Formal verification",
+            "Code review and audit",
+            "Golden model comparison",
+            "Information flow analysis",
+            "Structural analysis"
+        ];
+        coverage: "High for known patterns";
+        limitations: "May miss novel trojans";
+    };
+
+    // Manufacturing-Time Detection
+    manufacturingTime: {
+        methods: [
+            "Side-channel analysis (power, EM)",
+            "Path delay measurement",
+            "Logic testing beyond spec",
+            "Physical inspection (SEM, FIB)",
+            "Statistical analysis"
+        ];
+        coverage: "Varies by trojan type";
+        challenges: "Process variation masking";
+    };
+
+    // Runtime Detection
+    runtime: {
+        methods: [
+            "Behavioral monitoring",
+            "Anomaly detection",
+            "Watchdog circuits",
+            "Self-test capabilities",
+            "Redundancy checking"
+        ];
+        coverage: "Activated trojans only";
+        overhead: "Performance/area impact";
+    };
+}
+
+// Side-Channel Analysis for Trojan Detection
+class SideChannelAnalyzer {
+    // Power analysis
+    analyzePowerSignature(trace: PowerTrace): TrojanIndicators {
+        return {
+            abnormalTransients: this.detectTransients(trace),
+            unexpectedCorrelation: this.correlationAnalysis(trace),
+            statisticalOutliers: this.statisticalTests(trace)
+        };
+    }
+
+    // EM emanation analysis
+    analyzeEMSignature(emData: EMTrace): TrojanIndicators {
+        return {
+            spatialAnomalies: this.spatialAnalysis(emData),
+            frequencyAnomalies: this.frequencyAnalysis(emData),
+            temporalPatterns: this.temporalAnalysis(emData)
+        };
+    }
+
+    // Path delay analysis
+    analyzePathDelays(measurements: DelayMeasurement[]): TrojanIndicators {
+        return {
+            unexpectedPaths: this.findUnexpectedPaths(measurements),
+            delayVariation: this.analyzeVariation(measurements),
+            processDeviation: this.compareToExpected(measurements)
+        };
+    }
+}</code></pre>
+
+    <h2>Secure Die-to-Die Communication</h2>
+
+    <p>The die-to-die interface in chiplet systems must be secured against eavesdropping, tampering, and man-in-the-middle attacks. This is especially critical in multi-vendor systems where chiplets from different sources communicate.</p>
+
+    <pre><code>// Secure D2D Communication Protocol
+interface SecureD2DProtocol {
+    // Link Security Establishment
+    linkSecurity: {
+        keyExchange: "ECDH" | "PQC-KEM";  // Post-quantum option
+        keyLength: 256 | 384;
+        authentication: "Mutual" | "Unilateral";
+        certificateValidation: boolean;
+    };
+
+    // Traffic Encryption
+    encryption: {
+        algorithm: "AES-GCM-256" | "ChaCha20-Poly1305";
+        keyRotation: "Per-session" | "Periodic" | "Per-message";
+        nonce: NonceScheme;
+        associatedData: boolean;  // For authenticated encryption
+    };
+
+    // Integrity Protection
+    integrity: {
+        macAlgorithm: "GMAC" | "Poly1305" | "HMAC-SHA256";
+        replayProtection: "Sequence numbers" | "Timestamps";
+        errorHandling: "Silent drop" | "Alert" | "Link reset";
+    };
+
+    // Performance Considerations
+    performance: {
+        latencyOverhead: "2-5 cycles";
+        bandwidthOverhead: "3-5%";
+        powerOverhead: "5-10%";
+    };
+}
+
+// Secure D2D Implementation
+class SecureD2DLink {
+    private sessionKey: CryptoKey;
+    private sequenceNumber: bigint;
+
+    async establishSecureSession(peer: ChipletId): Promise&lt;void&gt; {
+        // Mutual authentication
+        await this.authenticatePeer(peer);
+
+        // Key exchange
+        const ephemeralKey = await this.generateEphemeralKey();
+        const peerPublic = await this.exchangePublicKey(peer, ephemeralKey.publicKey);
+
+        // Derive session key
+        this.sessionKey = await this.deriveSessionKey(ephemeralKey.privateKey, peerPublic);
+
+        // Initialize sequence number
+        this.sequenceNumber = BigInt(0);
+    }
+
+    async sendSecure(data: Uint8Array): Promise&lt;void&gt; {
+        // Increment sequence number
+        this.sequenceNumber++;
+
+        // Construct authenticated encryption
+        const nonce = this.constructNonce(this.sequenceNumber);
+        const aad = this.constructAAD(this.sequenceNumber);
+
+        // Encrypt and authenticate
+        const ciphertext = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: nonce, additionalData: aad },
+            this.sessionKey,
+            data
+        );
+
+        // Transmit
+        await this.transmit(ciphertext);
+    }
+}</code></pre>
+
+    <h2>Security Certification Framework</h2>
+
+    <p>The WIA-CHIPLET standard includes a security certification framework that enables trust evaluation and interoperability in multi-vendor chiplet ecosystems.</p>
+
+    <pre><code>// WIA-CHIPLET Security Certification
+interface SecurityCertification {
+    // Certification Levels
+    levels: {
+        BASIC: {
+            requirements: [
+                "UID with cryptographic binding",
+                "Basic authentication protocol",
+                "Supply chain documentation"
+            ];
+            evaluation: "Self-assessment";
+        };
+
+        STANDARD: {
+            requirements: [
+                "PUF-based authentication",
+                "Encrypted D2D communication",
+                "Trojan detection testing",
+                "Supply chain tracking"
+            ];
+            evaluation: "Third-party lab";
+        };
+
+        ENHANCED: {
+            requirements: [
+                "Formal security verification",
+                "Side-channel resistance",
+                "Active tamper response",
+                "Runtime monitoring"
+            ];
+            evaluation: "Government-accredited lab";
+        };
+
+        MAXIMUM: {
+            requirements: [
+                "All ENHANCED requirements",
+                "Trusted fabrication",
+                "Physical tamper protection",
+                "Continuous monitoring"
+            ];
+            evaluation: "Multi-lab + ongoing audit";
+        };
+    };
+
+    // Certification Process
+    process: {
+        application: "Submit design documentation";
+        evaluation: "Lab testing and analysis";
+        reporting: "Detailed findings report";
+        certification: "Certificate issuance";
+        maintenance: "Annual recertification";
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary</strong>
+        <p>Chiplet security requires a comprehensive approach addressing supply chain integrity, hardware trojan threats, authentication, and secure communication. The WIA-CHIPLET security framework provides standards and certification processes that enable trust in multi-vendor chiplet ecosystems while balancing security requirements with practical implementation considerations.</p>
+    </div>
+</body>
+</html>

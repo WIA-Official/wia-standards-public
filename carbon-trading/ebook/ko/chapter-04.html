@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 레지스트리 및 MRV 시스템 | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>4장: 레지스트리 및 MRV 시스템</h1>
+
+    <div class="highlight">
+        <strong>환경적 무결성:</strong> 탄소 시장의 신뢰성은 탄소 크레딧의 소유권과 소각을 추적하는 견고한 레지스트리 시스템과 각 크레딧이 실제 배출 감소를 나타낸다는 것을 보장하는 엄격한 모니터링, 보고, 검증(MRV) 프로세스에 전적으로 의존합니다.
+    </div>
+
+    <p>탄소 레지스트리는 시스템 내 모든 탄소 크레딧의 발행, 이전 및 소각에 대한 공식 기록을 유지합니다. 배출 감소를 검증하는 MRV 시스템과 결합하여 이러한 인프라 구성 요소는 시장 무결성을 보장하고 사기나 이중 계산을 방지합니다.</p>
+
+    <h2>레지스트리 아키텍처</h2>
+
+    <p>탄소 레지스트리는 시스템 내 모든 탄소 크레딧의 공식 원장을 유지합니다. 각 크레딧에는 발행부터 소각 또는 취소까지 전체 수명 주기를 추적하는 고유한 일련번호가 있습니다.</p>
+
+    <h3>크레딧 수명 주기 상태</h3>
+
+    <pre><code>// 탄소 크레딧 수명 주기
+enum CreditStatus {
+    PENDING_ISSUANCE = 'pending_issuance',
+    ISSUED = 'issued',
+    ACTIVE = 'active',
+    RESERVED = 'reserved',
+    TRANSFERRED = 'transferred',
+    RETIRED = 'retired',
+    CANCELLED = 'cancelled',
+    EXPIRED = 'expired',
+    SUSPENDED = 'suspended'
+}
+
+interface CarbonCredit {
+    serialNumber: string;
+    registryId: string;
+    projectId: string;
+    vintage: number;            // 배출 감소 연도
+    creditType: CreditType;
+    quantity: number;           // 보통 1톤 CO2e
+    status: CreditStatus;
+    currentHolder: string;
+    issuanceDate: Date;
+    expirationDate?: Date;
+    metadata: CreditMetadata;
+    transactionHistory: Transaction[];
+}
+
+interface CreditMetadata {
+    projectName: string;
+    projectType: string;
+    methodology: string;
+    country: string;
+    region?: string;
+    coordinates?: GeoLocation;
+    verificationBody: string;
+    verificationDate: Date;
+    sdgContributions: number[];  // UN SDG 번호
+    cobenefits: string[];
+}</code></pre>
+
+    <h3>레지스트리 운영</h3>
+
+    <pre><code>// 레지스트리 관리 시스템
+class CarbonRegistry {
+    private credits: Map&lt;string, CarbonCredit&gt; = new Map();
+    private accounts: Map&lt;string, RegistryAccount&gt; = new Map();
+
+    async issueCredits(request: IssuanceRequest): Promise&lt;IssuanceResult&gt; {
+        const project = await this.validateProject(request.projectId);
+        await this.validateVerification(request.verificationReport);
+        const serialNumbers = this.generateSerialNumbers(request.quantity, project.registryCode, request.vintage);
+        // 크레딧 기록 생성 및 저장
+        credits.forEach(c => this.credits.set(c.serialNumber, c));
+        await this.creditAccount(project.projectDeveloper, credits);
+        return { success: true, serialNumbers, issuanceId: generateIssuanceId() };
+    }
+
+    async transferCredits(from: string, to: string, serials: string[]): Promise&lt;TransferResult&gt; {
+        // 소유권 확인
+        for (const serial of serials) {
+            const credit = this.credits.get(serial);
+            if (!credit || credit.currentHolder !== from) {
+                throw new OwnershipError(`크레딧 ${serial}은(는) ${from}의 소유가 아님`);
+            }
+        }
+        // 이전 실행 및 계정 잔액 업데이트
+        const transferId = generateTransferId();
+        await this.debitAccount(from, serials);
+        await this.creditAccount(to, serials.map(s => this.credits.get(s)!));
+        return { success: true, transferId };
+    }
+
+    async retireCredits(holder: string, serials: string[], details: RetirementDetails): Promise&lt;RetirementResult&gt; {
+        const retirementId = generateRetirementId();
+        for (const serial of serials) {
+            const credit = this.credits.get(serial)!;
+            credit.status = CreditStatus.RETIRED;
+        }
+        const certificate = await this.generateRetirementCertificate(retirementId, serials, details);
+        return { success: true, retirementId, certificate };
+    }
+}</code></pre>
+
+    <h2>모니터링, 보고, 검증(MRV)</h2>
+
+    <p>MRV는 배출 감소가 측정되고, 문서화되고, 독립적으로 검증되는 프로세스입니다. 견고한 MRV는 크레딧 품질과 시장 신뢰에 필수적입니다.</p>
+
+    <div class="highlight">
+        <strong>MRV 원칙:</strong> 측정할 수 없으면 관리할 수 없습니다. 엄격한 MRV는 모든 탄소 크레딧이 대기에서 감소되거나 제거된 검증된 CO2 환산 1톤을 나타낸다는 것을 보장합니다.
+    </div>
+
+    <h3>모니터링 시스템</h3>
+
+    <p>모니터링은 프로젝트가 달성한 배출 감소에 대한 데이터의 체계적인 수집을 포함합니다. 다른 프로젝트 유형은 다른 모니터링 접근 방식을 필요로 합니다.</p>
+
+    <pre><code>// 모니터링 데이터 구조
+interface MonitoringPlan {
+    projectId: string;
+    methodology: string;
+    monitoringPeriod: { start: Date; end: Date; };
+    parameters: MonitoringParameter[];
+}
+
+interface MonitoringParameter {
+    parameterId: string;
+    name: string;
+    unit: string;
+    measurementMethod: 'direct' | 'calculated' | 'default';
+    uncertainty: number;
+}
+
+// 자동화된 모니터링 시스템
+class MonitoringSystem {
+    private sensors: Map&lt;string, SensorConfig&gt; = new Map();
+    private dataStore: TimeSeriesDB;
+
+    async collectData(projectId: string): Promise&lt;MonitoringData&gt; {
+        const plan = await this.getMonitoringPlan(projectId);
+        const data: ParameterReading[] = [];
+        for (const param of plan.parameters) {
+            const readings = param.measurementMethod === 'direct'
+                ? await this.readSensor(param.parameterId)
+                : await this.calculateParameter(param.parameterId, plan);
+            data.push({ parameterId: param.parameterId, readings, timestamp: new Date() });
+        }
+        const validated = await this.applyQualityChecks(data, plan);
+        await this.dataStore.insert(projectId, validated);
+        return { projectId, period: plan.monitoringPeriod, data: validated };
+    }
+
+    async calculateEmissionsReduction(projectId: string, period: TimePeriod): Promise&lt;EmissionsCalculation&gt; {
+        const monitoringData = await this.dataStore.query(projectId, period);
+        const baseline = await this.getBaseline(projectId);
+        const methodology = await this.getMethodology(projectId);
+        const baselineEmissions = methodology.calculateBaseline(baseline, period);
+        const projectEmissions = methodology.calculateProjectEmissions(monitoringData);
+        const leakage = methodology.calculateLeakage(monitoringData);
+        return {
+            projectId, period, baselineEmissions, projectEmissions, leakage,
+            netReduction: baselineEmissions - projectEmissions - leakage,
+            uncertainty: this.calculateUncertainty(monitoringData)
+        };
+    }
+}</code></pre>
+
+    <h3>보고 요구사항</h3>
+
+    <table>
+        <tr>
+            <th>보고서 유형</th>
+            <th>주기</th>
+            <th>내용</th>
+            <th>수신자</th>
+        </tr>
+        <tr>
+            <td>모니터링 보고서</td>
+            <td>연간/반기</td>
+            <td>수집된 데이터, 계산, 주장된 감소량</td>
+            <td>검증 기관</td>
+        </tr>
+        <tr>
+            <td>검증 보고서</td>
+            <td>검증당</td>
+            <td>감사 결과, 확인된 감소량</td>
+            <td>레지스트리</td>
+        </tr>
+        <tr>
+            <td>발행 요청</td>
+            <td>발행당</td>
+            <td>요청된 크레딧, 지원 문서</td>
+            <td>레지스트리</td>
+        </tr>
+        <tr>
+            <td>연간 보고서</td>
+            <td>연간</td>
+            <td>프로젝트 상태, 지속가능 개발 영향</td>
+            <td>표준 기관</td>
+        </tr>
+    </table>
+
+    <h3>검증 프로세스</h3>
+
+    <pre><code>// 검증 워크플로우
+interface VerificationProcess {
+    verificationId: string;
+    projectId: string;
+    verifierOrg: string;
+    verifierTeam: VerificationTeamMember[];
+    scope: VerificationScope;
+    stages: VerificationStage[];
+}
+
+class VerificationManager {
+    async conductVerification(
+        request: VerificationRequest
+    ): Promise&lt;VerificationReport&gt; {
+        const process: VerificationProcess = {
+            verificationId: generateVerificationId(),
+            projectId: request.projectId,
+            verifierOrg: request.verifierOrg,
+            verifierTeam: await this.assignTeam(request),
+            scope: request.scope,
+            stages: []
+        };
+
+        // 1단계: 문서 검토
+        const docReview = await this.conductDocumentReview(request);
+        process.stages.push(docReview);
+
+        // 2단계: 현장 방문 (필요시)
+        if (this.requiresSiteVisit(request)) {
+            const siteVisit = await this.conductSiteVisit(request);
+            process.stages.push(siteVisit);
+        }
+
+        // 3단계: 데이터 검증
+        const dataVerification = await this.verifyData(request);
+        process.stages.push(dataVerification);
+
+        // 4단계: 계산 확인
+        const calcCheck = await this.verifyCalculations(request);
+        process.stages.push(calcCheck);
+
+        // 5단계: 지적사항 해결
+        const findings = this.aggregateFindings(process.stages);
+        if (findings.some(f => f.severity === 'major')) {
+            await this.requestClarifications(request.projectId, findings);
+        }
+
+        // 검증 의견서 생성
+        const statement = await this.generateVerificationStatement(
+            process,
+            request.claimedReductions
+        );
+
+        return {
+            verificationId: process.verificationId,
+            projectId: request.projectId,
+            period: request.period,
+            claimedReductions: request.claimedReductions,
+            verifiedReductions: statement.verifiedAmount,
+            opinion: statement.opinion,
+            findings: findings.filter(f => f.status === 'open'),
+            verifierSignature: await this.signReport(process)
+        };
+    }
+}</code></pre>
+
+    <h2>레지스트리 상호운용성</h2>
+
+    <p>탄소 시장이 전 세계적으로 확대됨에 따라 다른 레지스트리 시스템 간의 상호운용성이 점점 더 중요해지고 있습니다. WIA-CARBON_TRADING은 레지스트리 간 크레딧 이전을 위한 표준화된 프로토콜을 지원합니다.</p>
+
+    <div class="highlight">
+        <strong>이중 계산 방지:</strong> 크레딧이 레지스트리 간에 이전될 때, 상응조정은 감소량이 한 번만 계산되도록 보장합니다. 수출 레지스트리는 크레딧을 취소하고 수입 레지스트리는 원래 발행에 대한 추적성이 있는 동등한 크레딧을 발행합니다.
+    </div>
+
+    <p>강력한 레지스트리와 MRV 시스템은 신뢰할 수 있는 탄소 시장의 근간을 형성합니다. 다음 장에서는 이러한 시스템을 보호하고 시장 무결성을 보장하는 보안 조치를 다룹니다.</p>
+</body>
+</html>

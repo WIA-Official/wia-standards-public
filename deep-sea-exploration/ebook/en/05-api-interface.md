@@ -438,7 +438,7 @@ Create new sample record:
 
 **API Key Authentication**:
 ```
-Authorization: ApiKey sk_live_abc123xyz
+Authorization: ApiKey EXAMPLE_API_KEY_REPLACE_ME
 ```
 
 **JWT Bearer Token**:
@@ -525,7 +525,7 @@ import { WIADeepSeaClient } from '@wia/deep-sea-sdk';
 
 const client = new WIADeepSeaClient({
   baseUrl: 'https://vehicle.example.com/api/v1',
-  apiKey: 'sk_live_abc123'
+  apiKey: 'EXAMPLE_API_KEY_REPLACE_ME'
 });
 
 // Get current telemetry
@@ -563,7 +563,7 @@ from wia_deepsea import DeepSeaClient
 
 client = DeepSeaClient(
     base_url='https://vehicle.example.com/api/v1',
-    api_key='sk_live_abc123'
+    api_key='EXAMPLE_API_KEY_REPLACE_ME'
 )
 
 # Get current telemetry

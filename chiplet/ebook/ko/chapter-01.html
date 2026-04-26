@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 1: 기초 | WIA-CHIPLET 칩렛 기술 표준</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 1: 칩렛 기초</h1>
+
+    <p>이 챕터에서는 칩렛 아키텍처의 기초 개념을 확립하고, 모놀리식 집적 회로에서 모듈식 다이 분해로의 진화를 탐구합니다. 이러한 기초를 이해하는 것은 후속 챕터에서 다루는 고급 주제를 파악하는 데 필수적입니다. 칩렛 개념, SoC와 칩렛의 비교, 그리고 인터커넥트 기술에 대해 상세히 알아보겠습니다.</p>
+
+    <h2>모놀리식 vs 칩렛 설계 철학</h2>
+
+    <p>50년 이상 반도체 산업은 모든 기능을 단일 실리콘 다이에 통합하는 모놀리식 설계 접근 방식을 추구했습니다. 이 접근 방식은 급속한 트랜지스터 스케일링 시대에 산업에 잘 작동했지만, 근본적인 물리적, 경제적 한계로 인해 패러다임 전환이 촉발되었습니다.</p>
+
+    <div class="highlight">
+        <strong>모놀리식 패러독스</strong>
+        <p>모놀리식 다이 크기가 더 많은 트랜지스터를 수용하기 위해 증가함에 따라 제조 수율은 기하급수적으로 감소합니다. 다이 어느 곳에서든 단일 결함이 발생하면 전체 칩이 사용 불가능해집니다. 수율-면적 곡선으로 알려진 이 관계는 특정 다이 크기를 초과하면 경제적으로 지속 불가능해집니다.</p>
+    </div>
+
+    <h3>모놀리식 설계 특성</h3>
+
+    <pre><code>// 모놀리식 설계 모델
+interface MonolithicChip {
+    // 단일 다이에 모든 것 포함
+    dieArea: number;           // mm - 일반적으로 100-800
+    transistorCount: number;   // 수십억 개
+    processNode: string;       // 예: "5nm", "3nm"
+
+    // 모든 구성 요소가 동일한 공정
+    components: {
+        cpuCores: Component;
+        gpuUnits: Component;
+        memoryCtrls: Component;
+        ioControllers: Component;
+        // 모두 함께 제조
+    };
+
+    // 수율 계산
+    calculateYield(): number {
+        // 포아송 수율 모델
+        const defectDensity = 0.1;  // 결함/cm 제곱
+        const area = this.dieArea / 100;  // cm 제곱으로 변환
+        return Math.exp(-defectDensity * area);
+    }
+}</code></pre>
+
+    <p>모놀리식 접근 방식에는 여러 가지 고유한 한계가 있습니다:</p>
+
+    <ul>
+        <li><strong>수율 스케일링:</strong> 다이 면적을 두 배로 늘리면 일반적인 제조 조건에서 수율이 절반 이하로 감소</li>
+        <li><strong>공정 균일성:</strong> 모든 구성 요소가 최적이 아니더라도 동일한 공정 노드를 사용해야 함</li>
+        <li><strong>설계 경직성:</strong> 어떤 구성 요소라도 변경하면 완전한 재설계 및 재검증 필요</li>
+        <li><strong>개발 시간:</strong> 복잡한 칩은 개념에서 생산까지 3-5년 소요</li>
+        <li><strong>제조 비용:</strong> 최첨단 노드는 팹 개발에 수십억 달러 비용</li>
+    </ul>
+
+    <h3>칩렛 설계 특성</h3>
+
+    <pre><code>// 칩렛 기반 설계 모델
+interface ChipletSystem {
+    chiplets: Chiplet[];
+    interconnect: ChipletInterconnect;
+    package: AdvancedPackage;
+
+    // 시스템 수율 계산
+    calculateSystemYield(): number {
+        // 개별 칩렛 수율의 곱
+        return this.chiplets.reduce((yield, chiplet) => {
+            return yield * chiplet.calculateYield();
+        }, this.package.assemblyYield);
+    }
+
+    // 총 유효 트랜지스터
+    getTotalTransistors(): number {
+        return this.chiplets.reduce((sum, c) => sum + c.transistorCount, 0);
+    }
+}
+
+interface Chiplet {
+    id: string;
+    function: ChipletFunction;
+    dieArea: number;      // 일반적으로 50-150 mm 제곱
+    processNode: string;  // 칩렛마다 다를 수 있음
+    transistorCount: number;
+
+    calculateYield(): number {
+        const defectDensity = this.getDefectDensity();
+        return Math.exp(-defectDensity * this.dieArea / 100);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>수율 수학 예제</strong>
+        <p>결함 밀도가 0.1 결함/cm 제곱인 400mm 제곱 설계를 고려해 봅시다. 모놀리식 수율: e^(-0.1 x 4) = 67%. 4개의 100mm 제곱 칩렛으로 분할: (e^(-0.1 x 1))^4 x 95% 조립 = (90.5%)^4 x 95% = 63.7%. 비슷하지만 칩렛 접근 방식은 믹스 앤 매치와 설계 재사용을 허용하여 경제성을 극적으로 개선합니다.</p>
+    </div>
+
+    <h2>다이 분해 원칙</h2>
+
+    <p>다이 분해는 모놀리식 설계를 개별 칩렛으로 분할하는 프로세스입니다. 이 분할 결정은 기능, 대역폭 요구사항, 전력 공급 및 제조 경제성을 포함한 여러 요소를 고려해야 하는 중요한 사항입니다.</p>
+
+    <h3>분해 경계</h3>
+
+    <pre><code>// 분해 결정 프레임워크
+interface DisaggregationAnalysis {
+    // 잠재적 분할 지점 평가
+    evaluateSplitPoint(boundary: ComponentBoundary): SplitMetrics {
+        return {
+            // 경계를 넘는 대역폭
+            crossBoundaryBandwidth: this.calculateBandwidth(boundary),
+
+            // 지연 영향
+            latencyPenalty: this.estimateLatency(boundary),
+
+            // 전력 오버헤드
+            interconnectPower: this.calculateInterconnectPower(boundary),
+
+            // 경제적 이점
+            yieldImprovement: this.compareYield(boundary),
+
+            // 권장 사항
+            recommendation: this.analyzeTradeoffs(boundary)
+        };
+    }
+}
+
+// 일반적인 분해 패턴
+const disaggregationPatterns = {
+    computeIOSplit: {
+        description: "컴퓨트와 I/O 및 메모리 컨트롤러 분리",
+        bandwidth: "높음 (>1 TB/s)",
+        latency: "중요 (<10ns)",
+        example: "AMD Zen 아키텍처"
+    },
+
+    homogeneousScaling: {
+        description: "다수의 동일한 컴퓨트 칩렛",
+        bandwidth: "중간 (100-500 GB/s)",
+        latency: "중간 (10-50ns)",
+        example: "AMD EPYC 다중 CCD"
+    },
+
+    heterogeneousIntegration: {
+        description: "다른 기능 칩렛 (CPU, GPU, NPU)",
+        bandwidth: "가변적",
+        latency: "애플리케이션 의존적",
+        example: "Intel Ponte Vecchio"
+    },
+
+    memoryDisaggregation: {
+        description: "고대역폭 메모리 분리",
+        bandwidth: "매우 높음 (>2 TB/s)",
+        latency: "중요 (<20ns)",
+        example: "HBM 통합"
+    }
+};</code></pre>
+
+    <h3>대역폭 및 지연 고려사항</h3>
+
+    <p>칩렛 간 인터페이스는 대역폭, 지연, 전력 및 비용을 신중하게 균형 맞춰야 합니다. 온다이 인터커넥트와 달리 칩렛 인터페이스는 패키지 경계를 넘어 추가 오버헤드가 발생합니다.</p>
+
+    <table>
+        <tr>
+            <th>인터커넥트 유형</th>
+            <th>대역폭</th>
+            <th>지연</th>
+            <th>전력 효율</th>
+        </tr>
+        <tr>
+            <td>온다이 (NoC)</td>
+            <td>>10 TB/s</td>
+            <td><1 ns</td>
+            <td><0.5 pJ/bit</td>
+        </tr>
+        <tr>
+            <td>다이-투-다이 (UCIe)</td>
+            <td>1-4 TB/s</td>
+            <td>2-5 ns</td>
+            <td>0.5-1 pJ/bit</td>
+        </tr>
+        <tr>
+            <td>패키지 레벨 (EMIB)</td>
+            <td>500 GB/s - 2 TB/s</td>
+            <td>3-10 ns</td>
+            <td>0.75-1.5 pJ/bit</td>
+        </tr>
+        <tr>
+            <td>오프 패키지 (PCIe)</td>
+            <td>64-256 GB/s</td>
+            <td>100+ ns</td>
+            <td>>5 pJ/bit</td>
+        </tr>
+    </table>
+
+    <h2>패키징 진화</h2>
+
+    <p>반도체 패키징의 진화는 칩렛 아키텍처를 가능하게 했습니다. 단순한 와이어 본딩에서 고급 2.5D 및 3D 통합까지, 패키징 기술은 칩렛 시스템 설계에서 무엇이 가능한지를 결정합니다.</p>
+
+    <h3>역사적 패키징 진행</h3>
+
+    <pre><code>// 패키징 기술 타임라인
+const packagingEvolution = {
+    "1970-1990년대": {
+        technology: "와이어 본딩 / DIP/QFP",
+        interconnectPitch: "100-200 마이크로미터",
+        limitations: "낮은 I/O 수, 높은 인덕턴스"
+    },
+
+    "1990-2000년대": {
+        technology: "플립 칩 / BGA",
+        interconnectPitch: "150-250 마이크로미터",
+        advancement: "면적 배열 I/O, 낮은 인덕턴스"
+    },
+
+    "2010년대": {
+        technology: "2.5D 인터포저 (CoWoS, EMIB)",
+        interconnectPitch: "45-55 마이크로미터",
+        advancement: "다이-투-다이 통합, HBM"
+    },
+
+    "2020년대": {
+        technology: "3D 스태킹 (하이브리드 본딩)",
+        interconnectPitch: "1-10 마이크로미터",
+        advancement: "수직 통합, 대규모 대역폭"
+    },
+
+    "미래": {
+        technology: "모놀리식 3D / 칩렛 생태계",
+        interconnectPitch: "<1 마이크로미터",
+        advancement: "진정한 3D 통합, 표준화된 칩렛"
+    }
+};</code></pre>
+
+    <div class="highlight">
+        <strong>활성화 기술로서의 패키징</strong>
+        <p>고급 패키징은 단순히 다이를 연결하는 것이 아니라 완전히 새로운 시스템 아키텍처를 가능하게 합니다. 150마이크로미터 범프 피치에서 10마이크로미터 미만 하이브리드 본딩으로의 진행은 인터커넥트 밀도에서 15배 향상을 나타내며, 멀티 다이 통합에서 달성 가능한 것을 근본적으로 변화시킵니다.</p>
+    </div>
+
+    <h2>경제 분석 프레임워크</h2>
+
+    <p>칩렛 설계의 경제학을 이해하려면 제품 수명 주기 전반에 걸쳐 여러 요소를 분석해야 합니다.</p>
+
+    <pre><code>// 칩렛 경제 모델
+class ChipletEconomicAnalysis {
+    constructor(
+        private monolithicBaseline: MonolithicDesign,
+        private chipletAlternative: ChipletDesign
+    ) {}
+
+    calculateNRE(): ComparisonResult {
+        // 비반복 엔지니어링 비용
+        return {
+            monolithic: {
+                designCost: this.monolithicBaseline.designComplexity * 50_000_000,
+                maskCost: 15_000_000,  // 전체 칩 마스크 세트
+                validationCost: 20_000_000
+            },
+            chiplet: {
+                designCost: this.chipletAlternative.chiplets.reduce(
+                    (sum, c) => sum + c.designComplexity * 10_000_000, 0
+                ),
+                maskCost: this.chipletAlternative.chiplets.length * 5_000_000,
+                validationCost: 15_000_000  // 점진적 검증
+            }
+        };
+    }
+
+    calculateBreakeven(): number {
+        // 칩렛이 경제적이 되는 볼륨
+        const nreDiff = this.calculateNRE();
+        const unitDiff = this.calculateUnitCost(1000000);
+        return nreDiff.delta / unitDiff.delta;
+    }
+}</code></pre>
+
+    <h2>칩렛 설계 트레이드오프</h2>
+
+    <table>
+        <tr>
+            <th>결정 요소</th>
+            <th>적은 수의 큰 칩렛</th>
+            <th>많은 수의 작은 칩렛</th>
+        </tr>
+        <tr>
+            <td>다이 수율</td>
+            <td>낮은 다이별 수율</td>
+            <td>높은 다이별 수율</td>
+        </tr>
+        <tr>
+            <td>인터커넥트</td>
+            <td>적고 단순한 인터페이스</td>
+            <td>더 복잡한 인터커넥트</td>
+        </tr>
+        <tr>
+            <td>전력 효율</td>
+            <td>적은 인터페이스 오버헤드</td>
+            <td>더 많은 인터페이스 전력</td>
+        </tr>
+        <tr>
+            <td>설계 재사용</td>
+            <td>덜 세분화된 재사용</td>
+            <td>더 많은 재사용 기회</td>
+        </tr>
+        <tr>
+            <td>조립 복잡성</td>
+            <td>단순한 조립</td>
+            <td>더 많은 조립 단계</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>챕터 요약</strong>
+        <p>칩렛 아키텍처는 모놀리식 다이를 상호 연결된 특화된 실리콘 모듈로 대체하여 반도체 설계를 근본적으로 변화시킵니다. 이 접근 방식은 수율 경제성을 개선하고, 공정 혼합을 가능하게 하며, 시장 출시를 가속화하고, 더 큰 설계 유연성을 제공합니다. 이러한 기초를 이해하는 것은 이어지는 상세한 아키텍처 논의에 필수적입니다.</p>
+    </div>
+</body>
+</html>

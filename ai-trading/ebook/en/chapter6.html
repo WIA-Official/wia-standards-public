@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Execution & Infrastructure | WIA-FIN-017</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 3rem; background: linear-gradient(135deg, #22c55e, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin: 2rem 0; }
+        h2 { color: #22c55e; font-size: 2rem; margin: 2rem 0 1rem; }
+        h3 { color: #22c55e; font-size: 1.5rem; margin: 1.5rem 0 0.5rem; }
+        p, li { color: #cbd5e1; margin-bottom: 1rem; }
+        .content-box { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .highlight { background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 1.5rem; margin: 1rem 0; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; padding: 1.5rem; margin: 1rem 0; overflow-x: auto; }
+        .code-block pre { color: #22c55e; font-family: monospace; font-size: 0.85rem; }
+        ul { margin-left: 2rem; }
+        .nav-buttons { display: flex; justify-content: space-between; margin: 3rem 0; }
+        .btn { padding: 1rem 2rem; background: linear-gradient(135deg, #22c55e, #10b981); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        .btn-secondary { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(34, 197, 94, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Execution & Infrastructure</h1>
+
+        <div class="content-box">
+            <h2>Trade Execution Matters</h2>
+            <p>The best predictions are worthless if you can't execute trades efficiently. Poor execution can erode all profits through slippage, delays, and market impact.</p>
+        </div>
+
+        <div class="content-box">
+            <h2>Execution Algorithms</h2>
+
+            <h3>VWAP (Volume-Weighted Average Price)</h3>
+            <p>Execute order to match the volume-weighted average price over a time period</p>
+            <ul>
+                <li>Breaks large order into smaller chunks</li>
+                <li>Matches historical intraday volume pattern</li>
+                <li>Minimizes market impact</li>
+                <li>Benchmark: Did we beat VWAP?</li>
+            </ul>
+
+            <div class="code-block">
+<pre>
+def vwap_schedule(total_shares, historical_volume_profile, num_periods):
+    """Generate VWAP execution schedule"""
+    # Historical volume profile (% of daily volume each period)
+    # E.g., [0.05, 0.08, 0.12, ...] for each 30-min period
+
+    schedule = []
+    for period, vol_pct in enumerate(historical_volume_profile[:num_periods]):
+        shares_to_trade = int(total_shares * vol_pct)
+        schedule.append({
+            'period': period,
+            'shares': shares_to_trade,
+            'participation_rate': 0.10  # Trade 10% of market volume
+        })
+
+    return schedule
+</pre>
+            </div>
+
+            <h3>TWAP (Time-Weighted Average Price)</h3>
+            <p>Execute equal amounts over regular time intervals</p>
+            <ul>
+                <li>Simpler than VWAP, equal slices</li>
+                <li>Used when volume pattern unknown</li>
+                <li>Lower market impact than single large order</li>
+            </ul>
+
+            <h3>Implementation Shortfall</h3>
+            <p>Minimize difference between decision price and execution price</p>
+            <ul>
+                <li>Trades aggressively early to capture alpha</li>
+                <li>Balances market impact vs. opportunity cost</li>
+                <li>Optimal for time-sensitive signals</li>
+            </ul>
+
+            <h3>POV (Percentage of Volume)</h3>
+            <p>Trade fixed percentage of market volume</p>
+            <ul>
+                <li>E.g., trade 10% of all market volume</li>
+                <li>Adapts to market liquidity</li>
+                <li>Completion time depends on market activity</li>
+            </ul>
+        </div>
+
+        <div class="content-box">
+            <h2>Smart Order Routing (SOR)</h2>
+            <p>Automatically route orders to best execution venue</p>
+
+            <h3>Execution Venues</h3>
+            <ul>
+                <li><strong>Lit Exchanges:</strong> NYSE, NASDAQ, etc. (visible orders)</li>
+                <li><strong>Dark Pools:</strong> Hidden liquidity, no market impact</li>
+                <li><strong>ECNs:</strong> Electronic communication networks</li>
+                <li><strong>Alternative Trading Systems (ATS)</strong></li>
+            </ul>
+
+            <h3>SOR Logic</h3>
+            <ul>
+                <li>Compare prices across all venues</li>
+                <li>Account for fees and rebates</li>
+                <li>Consider fill probability and speed</li>
+                <li>Route to best net price</li>
+            </ul>
+        </div>
+
+        <div class="content-box">
+            <h2>Market Microstructure</h2>
+
+            <h3>Order Types</h3>
+            <ul>
+                <li><strong>Market Order:</strong> Execute immediately at best available price</li>
+                <li><strong>Limit Order:</strong> Execute only at specified price or better</li>
+                <li><strong>Stop Order:</strong> Becomes market order when price reached</li>
+                <li><strong>Stop-Limit:</strong> Becomes limit order when stop triggered</li>
+                <li><strong>IOC (Immediate or Cancel):</strong> Fill immediately or cancel</li>
+                <li><strong>FOK (Fill or Kill):</strong> Fill entire order or cancel</li>
+                <li><strong>Iceberg:</strong> Show only small portion of large order</li>
+            </ul>
+
+            <h3>Transaction Cost Analysis (TCA)</h3>
+            <div class="code-block">
+<pre>
+def calculate_tca(execution_price, benchmark_price, shares, side):
+    """Calculate transaction cost metrics"""
+
+    # Slippage
+    if side == 'buy':
+        slippage = (execution_price - benchmark_price) / benchmark_price
+    else:  # sell
+        slippage = (benchmark_price - execution_price) / benchmark_price
+
+    # Cost in basis points
+    cost_bps = slippage * 10000
+
+    # Dollar cost
+    dollar_cost = abs(execution_price - benchmark_price) * shares
+
+    return {
+        'slippage_pct': slippage,
+        'cost_bps': cost_bps,
+        'dollar_cost': dollar_cost
+    }
+</pre>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Low-Latency Infrastructure</h2>
+
+            <h3>Latency Sources</h3>
+            <ul>
+                <li><strong>Network:</strong> Physical distance, routing hops</li>
+                <li><strong>Processing:</strong> Strategy calculation, order generation</li>
+                <li><strong>I/O:</strong> Disk access, database queries</li>
+                <li><strong>Serialization:</strong> Converting data formats</li>
+            </ul>
+
+            <h3>Optimization Techniques</h3>
+            <ul>
+                <li><strong>Colocation:</strong> Servers in same datacenter as exchange</li>
+                <li><strong>Direct Market Access (DMA):</strong> Skip broker routing</li>
+                <li><strong>FIX Protocol:</strong> Industry standard messaging</li>
+                <li><strong>FPGA Acceleration:</strong> Hardware-level processing</li>
+                <li><strong>Kernel Bypass:</strong> Avoid OS network stack overhead</li>
+                <li><strong>Lock-Free Data Structures:</strong> Avoid thread synchronization</li>
+            </ul>
+
+            <h3>Language Choices for HFT</h3>
+            <ul>
+                <li><strong>C++:</strong> Maximum performance, full control</li>
+                <li><strong>Rust:</strong> Memory safety with C++ performance</li>
+                <li><strong>Java:</strong> Good performance with simpler development</li>
+                <li><strong>Python:</strong> Research and backtesting only (too slow for HFT)</li>
+            </ul>
+        </div>
+
+        <div class="content-box">
+            <h2>Technology Stack</h2>
+
+            <h3>Data Storage</h3>
+            <ul>
+                <li><strong>Time Series DB:</strong> TimescaleDB, InfluxDB, QuestDB</li>
+                <li><strong>Historical Data:</strong> HDF5, Parquet, Arctic</li>
+                <li><strong>Real-Time:</strong> Redis, Apache Kafka</li>
+            </ul>
+
+            <h3>Compute Infrastructure</h3>
+            <ul>
+                <li><strong>On-Premise:</strong> Full control, high cost</li>
+                <li><strong>Cloud:</strong> AWS, GCP, Azure (flexible, scalable)</li>
+                <li><strong>Hybrid:</strong> Research in cloud, trading on-premise</li>
+            </ul>
+
+            <h3>Development Stack</h3>
+            <div class="code-block">
+<pre>
+# Python Stack for Algo Trading
+Data: pandas, numpy, polars
+ML: scikit-learn, PyTorch, TensorFlow
+Backtesting: Backtrader, Zipline, VectorBT
+Execution: ccxt (crypto), ib_insync (IB), alpaca-py
+Visualization: matplotlib, plotly, dash
+Infrastructure: Docker, Kubernetes, Airflow
+</pre>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Production Deployment</h2>
+
+            <h3>Deployment Checklist</h3>
+            <ul>
+                <li>✓ Strategy validated on out-of-sample data</li>
+                <li>✓ Risk limits configured and tested</li>
+                <li>✓ Paper trading results acceptable</li>
+                <li>✓ Execution infrastructure tested</li>
+                <li>✓ Monitoring and alerting configured</li>
+                <li>✓ Disaster recovery plan in place</li>
+                <li>✓ Capital allocated appropriately</li>
+            </ul>
+
+            <h3>Monitoring</h3>
+            <ul>
+                <li>Real-time P&L tracking</li>
+                <li>Position monitoring</li>
+                <li>Order execution quality (TCA)</li>
+                <li>System health (latency, errors, uptime)</li>
+                <li>Market data feed status</li>
+                <li>Model performance degradation detection</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>Best Practice:</strong> Start small in live trading. Allocate 10-20% of intended capital initially, then scale up as confidence builds.
+            </div>
+        </div>
+
+        <div class="content-box">
+            <h2>Disaster Recovery</h2>
+
+            <h3>Common Failures</h3>
+            <ul>
+                <li>Market data feed interruption</li>
+                <li>Order execution system failure</li>
+                <li>Network connectivity loss</li>
+                <li>Server hardware failure</li>
+                <li>Software bugs causing erratic behavior</li>
+            </ul>
+
+            <h3>Mitigation Strategies</h3>
+            <ul>
+                <li>Redundant market data feeds</li>
+                <li>Multiple execution connections</li>
+                <li>Automated failover systems</li>
+                <li>Kill switch to close all positions</li>
+                <li>Regular backups and restore testing</li>
+                <li>24/7 monitoring with automated alerts</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

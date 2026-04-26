@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 1: Fundamentals | WIA-CHIPLET</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 1: Chiplet Fundamentals</h1>
+
+    <p>This chapter establishes the foundational concepts of chiplet architecture, exploring the evolution from monolithic integrated circuits to modular die disaggregation. Understanding these fundamentals is essential for grasping the advanced topics covered in subsequent chapters.</p>
+
+    <h2>Monolithic vs. Chiplet Design Philosophy</h2>
+
+    <p>For over five decades, the semiconductor industry pursued a monolithic design approach, integrating all functionality onto a single silicon die. This approach served the industry well during the era of rapid transistor scaling, but fundamental physical and economic limits have prompted a paradigm shift.</p>
+
+    <div class="highlight">
+        <strong>The Monolithic Paradox</strong>
+        <p>As monolithic die sizes increase to accommodate more transistors, manufacturing yields decrease exponentially. A single defect anywhere on the die renders the entire chip unusable. This relationship, known as the yield-area curve, becomes economically untenable beyond certain die sizes.</p>
+    </div>
+
+    <h3>Monolithic Design Characteristics</h3>
+
+    <pre><code>// Monolithic Design Model
+interface MonolithicChip {
+    // Single die contains everything
+    dieArea: number;           // mm² - typically 100-800
+    transistorCount: number;   // billions
+    processNode: string;       // e.g., "5nm", "3nm"
+
+    // All components on same process
+    components: {
+        cpuCores: Component;
+        gpuUnits: Component;
+        memoryCtrls: Component;
+        ioControllers: Component;
+        // All manufactured together
+    };
+
+    // Yield calculation
+    calculateYield(): number {
+        // Poisson yield model
+        const defectDensity = 0.1;  // defects per cm²
+        const area = this.dieArea / 100;  // convert to cm²
+        return Math.exp(-defectDensity * area);
+    }
+}</code></pre>
+
+    <p>The monolithic approach has several inherent limitations:</p>
+
+    <ul>
+        <li><strong>Yield Scaling:</strong> Doubling die area more than halves yield in typical manufacturing conditions</li>
+        <li><strong>Process Uniformity:</strong> All components must use the same process node, even when suboptimal</li>
+        <li><strong>Design Rigidity:</strong> Changes to any component require complete redesign and revalidation</li>
+        <li><strong>Development Time:</strong> Complex chips can take 3-5 years from concept to production</li>
+        <li><strong>Manufacturing Cost:</strong> Leading-edge nodes cost billions in fab development</li>
+    </ul>
+
+    <h3>Chiplet Design Characteristics</h3>
+
+    <pre><code>// Chiplet-Based Design Model
+interface ChipletSystem {
+    chiplets: Chiplet[];
+    interconnect: ChipletInterconnect;
+    package: AdvancedPackage;
+
+    // Calculate system yield
+    calculateSystemYield(): number {
+        // Product of individual chiplet yields
+        return this.chiplets.reduce((yield, chiplet) => {
+            return yield * chiplet.calculateYield();
+        }, this.package.assemblyYield);
+    }
+
+    // Total effective transistors
+    getTotalTransistors(): number {
+        return this.chiplets.reduce((sum, c) => sum + c.transistorCount, 0);
+    }
+}
+
+interface Chiplet {
+    id: string;
+    function: ChipletFunction;
+    dieArea: number;      // Typically 50-150 mm²
+    processNode: string;  // Can differ per chiplet
+    transistorCount: number;
+
+    calculateYield(): number {
+        const defectDensity = this.getDefectDensity();
+        return Math.exp(-defectDensity * this.dieArea / 100);
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Yield Mathematics Example</strong>
+        <p>Consider a 400mm² design with 0.1 defects/cm² density. Monolithic yield: e^(-0.1 × 4) = 67%. Split into four 100mm² chiplets: (e^(-0.1 × 1))^4 × 95% assembly = (90.5%)^4 × 95% = 63.7%. While similar, the chiplet approach allows mix-and-match and design reuse, dramatically improving economics.</p>
+    </div>
+
+    <h2>Die Disaggregation Principles</h2>
+
+    <p>Die disaggregation is the process of partitioning a monolithic design into discrete chiplets. This partitioning decision is critical and must consider multiple factors including functionality, bandwidth requirements, power delivery, and manufacturing economics.</p>
+
+    <h3>Disaggregation Boundaries</h3>
+
+    <pre><code>// Disaggregation Decision Framework
+interface DisaggregationAnalysis {
+    // Evaluate potential split points
+    evaluateSplitPoint(boundary: ComponentBoundary): SplitMetrics {
+        return {
+            // Bandwidth across boundary
+            crossBoundaryBandwidth: this.calculateBandwidth(boundary),
+
+            // Latency impact
+            latencyPenalty: this.estimateLatency(boundary),
+
+            // Power overhead
+            interconnectPower: this.calculateInterconnectPower(boundary),
+
+            // Economic benefit
+            yieldImprovement: this.compareYield(boundary),
+
+            // Recommendation
+            recommendation: this.analyzeTradeoffs(boundary)
+        };
+    }
+}
+
+// Common disaggregation patterns
+const disaggregationPatterns = {
+    computeIOSplit: {
+        description: "Separate compute from I/O and memory controllers",
+        bandwidth: "High (>1 TB/s)",
+        latency: "Critical (<10ns)",
+        example: "AMD Zen architecture"
+    },
+
+    homogeneousScaling: {
+        description: "Multiple identical compute chiplets",
+        bandwidth: "Moderate (100-500 GB/s)",
+        latency: "Moderate (10-50ns)",
+        example: "AMD EPYC multi-CCD"
+    },
+
+    heterogeneousIntegration: {
+        description: "Different function chiplets (CPU, GPU, NPU)",
+        bandwidth: "Variable",
+        latency: "Application dependent",
+        example: "Intel Ponte Vecchio"
+    },
+
+    memoryDisaggregation: {
+        description: "Separate high-bandwidth memory",
+        bandwidth: "Very High (>2 TB/s)",
+        latency: "Critical (<20ns)",
+        example: "HBM integration"
+    }
+};</code></pre>
+
+    <h3>Bandwidth and Latency Considerations</h3>
+
+    <p>The interface between chiplets must carefully balance bandwidth, latency, power, and cost. Unlike on-die interconnects, chiplet interfaces cross package boundaries and incur additional overhead.</p>
+
+    <table>
+        <tr>
+            <th>Interconnect Type</th>
+            <th>Bandwidth</th>
+            <th>Latency</th>
+            <th>Power Efficiency</th>
+        </tr>
+        <tr>
+            <td>On-Die (NoC)</td>
+            <td>>10 TB/s</td>
+            <td><1 ns</td>
+            <td><0.5 pJ/bit</td>
+        </tr>
+        <tr>
+            <td>Die-to-Die (UCIe)</td>
+            <td>1-4 TB/s</td>
+            <td>2-5 ns</td>
+            <td>0.5-1 pJ/bit</td>
+        </tr>
+        <tr>
+            <td>Package-Level (EMIB)</td>
+            <td>500 GB/s - 2 TB/s</td>
+            <td>3-10 ns</td>
+            <td>0.75-1.5 pJ/bit</td>
+        </tr>
+        <tr>
+            <td>Off-Package (PCIe)</td>
+            <td>64-256 GB/s</td>
+            <td>100+ ns</td>
+            <td>>5 pJ/bit</td>
+        </tr>
+    </table>
+
+    <h2>Packaging Evolution</h2>
+
+    <p>The evolution of semiconductor packaging has enabled chiplet architecture. From simple wire bonding to advanced 2.5D and 3D integration, packaging technology determines what is possible in chiplet system design.</p>
+
+    <h3>Historical Packaging Progression</h3>
+
+    <pre><code>// Packaging Technology Timeline
+const packagingEvolution = {
+    "1970s-1990s": {
+        technology: "Wire Bonding / DIP/QFP",
+        interconnectPitch: "100-200 μm",
+        limitations: "Low I/O count, high inductance"
+    },
+
+    "1990s-2000s": {
+        technology: "Flip Chip / BGA",
+        interconnectPitch: "150-250 μm",
+        advancement: "Area array I/O, lower inductance"
+    },
+
+    "2010s": {
+        technology: "2.5D Interposer (CoWoS, EMIB)",
+        interconnectPitch: "45-55 μm",
+        advancement: "Die-to-die integration, HBM"
+    },
+
+    "2020s": {
+        technology: "3D Stacking (Hybrid Bonding)",
+        interconnectPitch: "1-10 μm",
+        advancement: "Vertical integration, massive bandwidth"
+    },
+
+    "Future": {
+        technology: "Monolithic 3D / Chiplet Ecosystem",
+        interconnectPitch: "<1 μm",
+        advancement: "True 3D integration, standardized chiplets"
+    }
+};</code></pre>
+
+    <div class="highlight">
+        <strong>Packaging as Enabling Technology</strong>
+        <p>Advanced packaging is not merely about connecting dies; it enables entirely new system architectures. The progression from 150μm bump pitch to sub-10μm hybrid bonding represents a 15× improvement in interconnect density, fundamentally changing what is achievable in multi-die integration.</p>
+    </div>
+
+    <h3>2.5D vs 3D Packaging Overview</h3>
+
+    <pre><code>// 2.5D Packaging Configuration
+interface Package2_5D {
+    interposer: {
+        type: "Silicon" | "Organic" | "Glass";
+        size: number;        // mm²
+        metalLayers: number; // Typically 4-8
+        tsvPitch: number;    // Through-silicon via pitch
+    };
+
+    chiplets: ChipletPlacement[];
+    hbmStacks: HBMStack[];
+
+    // Characteristics
+    characteristics: {
+        maxChiplets: number;      // Typically 4-8
+        interconnectBandwidth: string;  // e.g., "1+ TB/s"
+        thermalDissipation: string;    // e.g., "500W+"
+        costPremium: string;           // vs standard packaging
+    };
+}
+
+// 3D Packaging Configuration
+interface Package3D {
+    stackConfiguration: DieStack[];
+    bondingType: "MicroBump" | "HybridBond" | "DirectBond";
+
+    characteristics: {
+        verticalBandwidth: string;  // e.g., ">10 TB/s"
+        thermalChallenge: "Significant";  // Heat extraction
+        designComplexity: "Very High";
+        interconnectDensity: string;  // e.g., "1M+ connections/mm²"
+    };
+}</code></pre>
+
+    <h2>Economic Analysis Framework</h2>
+
+    <p>Understanding the economics of chiplet design requires analyzing multiple factors across the product lifecycle. The WIA-CHIPLET standard provides a framework for this analysis.</p>
+
+    <pre><code>// Chiplet Economic Model
+class ChipletEconomicAnalysis {
+    constructor(
+        private monolithicBaseline: MonolithicDesign,
+        private chipletAlternative: ChipletDesign
+    ) {}
+
+    calculateNRE(): ComparisonResult {
+        // Non-Recurring Engineering costs
+        return {
+            monolithic: {
+                designCost: this.monolithicBaseline.designComplexity * 50_000_000,
+                maskCost: 15_000_000,  // Full chip mask set
+                validationCost: 20_000_000
+            },
+            chiplet: {
+                designCost: this.chipletAlternative.chiplets.reduce(
+                    (sum, c) => sum + c.designComplexity * 10_000_000, 0
+                ),
+                maskCost: this.chipletAlternative.chiplets.length * 5_000_000,
+                validationCost: 15_000_000  // Incremental validation
+            }
+        };
+    }
+
+    calculateUnitCost(volume: number): ComparisonResult {
+        // Per-unit manufacturing cost at scale
+        const monoYield = this.monolithicBaseline.calculateYield();
+        const chipletYield = this.chipletAlternative.calculateSystemYield();
+
+        return {
+            monolithic: this.monolithicBaseline.waferCost / monoYield /
+                        this.monolithicBaseline.diesPerWafer,
+            chiplet: this.chipletAlternative.calculateTotalCost()
+        };
+    }
+
+    calculateBreakeven(): number {
+        // Volume at which chiplet becomes economical
+        const nreDiff = this.calculateNRE();
+        const unitDiff = this.calculateUnitCost(1000000);
+        return nreDiff.delta / unitDiff.delta;
+    }
+}</code></pre>
+
+    <h2>Chiplet Design Trade-offs</h2>
+
+    <p>Every chiplet architecture decision involves trade-offs. The following framework helps evaluate these decisions systematically.</p>
+
+    <table>
+        <tr>
+            <th>Decision Factor</th>
+            <th>Fewer, Larger Chiplets</th>
+            <th>More, Smaller Chiplets</th>
+        </tr>
+        <tr>
+            <td>Die Yield</td>
+            <td>Lower per-die yield</td>
+            <td>Higher per-die yield</td>
+        </tr>
+        <tr>
+            <td>Interconnect</td>
+            <td>Fewer, simpler interfaces</td>
+            <td>More complex interconnect</td>
+        </tr>
+        <tr>
+            <td>Power Efficiency</td>
+            <td>Less interface overhead</td>
+            <td>More interface power</td>
+        </tr>
+        <tr>
+            <td>Design Reuse</td>
+            <td>Less granular reuse</td>
+            <td>More reuse opportunity</td>
+        </tr>
+        <tr>
+            <td>Assembly Complexity</td>
+            <td>Simpler assembly</td>
+            <td>More assembly steps</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>Chapter Summary</strong>
+        <p>Chiplet architecture fundamentally changes semiconductor design by replacing monolithic dies with interconnected, specialized silicon modules. This approach improves yield economics, enables process mixing, accelerates time-to-market, and provides greater design flexibility. Understanding these fundamentals is essential for the detailed architecture discussions that follow.</p>
+    </div>
+</body>
+</html>

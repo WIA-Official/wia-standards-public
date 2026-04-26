@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 5: 보안 | WIA-CHIPLET 칩렛 기술 표준</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 5: 칩렛 보안</h1>
+
+    <p>칩렛 아키텍처는 전통적인 모놀리식 칩 보안을 넘어서는 고유한 보안 과제를 도입합니다. 이 챕터에서는 하드웨어 보안, 공급망 무결성, 안티 위조 기술, 하드웨어 트로이 목마 탐지, 인증 메커니즘 및 다중 공급업체 칩렛 생태계를 위한 포괄적인 보안 프레임워크를 다룹니다.</p>
+
+    <h2>칩렛 시스템의 보안 과제</h2>
+
+    <p>칩렛 시스템의 모듈식 특성은 확장된 공격 표면을 만듭니다. 칩렛이 여러 공급업체에서 소싱되고, 다른 파운드리에서 제조되며, 제3자 패키징 하우스에서 조립될 수 있으므로 악의적인 간섭의 기회가 크게 증가합니다.</p>
+
+    <div class="highlight">
+        <strong>다중 공급업체 보안 문제</strong>
+        <p>단일 칩렛 시스템에는 5개의 다른 공급업체의 구성 요소, 3개의 다른 파운드리에서 제조, 4번째 위치에서 조립, 또 다른 곳에서 테스트가 포함될 수 있습니다. 각 핸드오프는 포괄적인 보안 조치를 통해 해결해야 하는 잠재적 취약점을 나타냅니다.</p>
+    </div>
+
+    <h3>칩렛 보안 위협 모델</h3>
+
+    <pre><code>// 칩렛 보안 위협 모델
+interface ChipletThreatModel {
+    // 공급망 위협
+    supplyChain: {
+        threats: [
+            "위조 칩렛",
+            "재활용/재마킹된 구성 요소",
+            "악의적 대체",
+            "운송 중 변조",
+            "무단 과잉 생산"
+        ];
+        attackVectors: AttackVector[];
+        impact: ImpactAssessment;
+    };
+
+    // 하드웨어 트로이 목마 위협
+    hardwareTrojans: {
+        types: [
+            "로직 폭탄",
+            "킬 스위치",
+            "정보 유출",
+            "서비스 거부",
+            "성능 저하"
+        ];
+        insertionPoints: [
+            "설계 단계",
+            "제조",
+            "조립",
+            "테스트/프로그래밍"
+        ];
+        triggerMechanisms: ["시간 기반", "입력 기반", "외부 신호"];
+    };
+
+    // 런타임 위협
+    runtime: {
+        threats: [
+            "사이드 채널 공격",
+            "결함 주입",
+            "프로빙 공격",
+            "인터커넥트 스누핑",
+            "악의적 구성"
+        ];
+        d2dSpecific: [
+            "칩렛 간 트래픽 가로채기",
+            "프로토콜 조작",
+            "불량 칩렛 주입"
+        ];
+    };
+}
+
+// 위협 심각도 평가
+const threatSeverity = {
+    counterfeit: { likelihood: "높음", impact: "치명적" },
+    trojan: { likelihood: "낮음", impact: "재앙적" },
+    sideChannel: { likelihood: "중간", impact: "높음" },
+    supplyChainTampering: { likelihood: "중간", impact: "치명적" }
+};</code></pre>
+
+    <h2>공급망 보안</h2>
+
+    <p>칩렛 공급망을 보호하려면 물리적 보안, 암호화 인증 및 포괄적인 추적 시스템을 결합하는 다층 접근 방식이 필요합니다.</p>
+
+    <h3>칩렛 인증 프레임워크</h3>
+
+    <pre><code>// 칩렛 인증 시스템
+interface ChipletAuthentication {
+    // 물리적 복제 불가 기능 (PUF)
+    puf: {
+        type: "SRAM" | "RingOscillator" | "Arbiter" | "Butterfly";
+        bitLength: number;        // 256-4096 비트
+        reliability: number;      // % 안정 비트
+        uniqueness: number;       // % 칩 간 변동
+
+        // PUF 기반 키 생성
+        generateKey(): Promise<CryptoKey>;
+        authenticate(challenge: Challenge): Promise<Response>;
+    };
+
+    // 고유 식별자 (UID)
+    uid: {
+        format: "128-bit UUID";
+        storage: "퓨즈" | "EEPROM" | "PUF 파생";
+        cryptoBinding: boolean;
+    };
+
+    // 인증서 체인
+    certificate: {
+        type: "X.509v3";
+        issuer: "WIA-CA" | "Vendor-CA";
+        attributes: ChipletAttributes;
+        validityPeriod: Date[];
+        revocationCheck: "OCSP" | "CRL";
+    };
+}
+
+// 인증 프로토콜
+class ChipletAuthProtocol {
+    async authenticateChiplet(chiplet: ChipletId): Promise<AuthResult> {
+        // 1단계: UID 읽기
+        const uid = await this.readUID(chiplet);
+
+        // 2단계: 인증서 체인 확인
+        const cert = await this.getCertificate(uid);
+        const chainValid = await this.verifyCertChain(cert);
+
+        // 3단계: PUF 챌린지-응답
+        const challenge = this.generateChallenge();
+        const response = await this.sendChallenge(chiplet, challenge);
+        const pufValid = await this.verifyPUFResponse(response, cert);
+
+        // 4단계: 폐기 상태 확인
+        const notRevoked = await this.checkRevocation(cert);
+
+        return {
+            authenticated: chainValid && pufValid && notRevoked,
+            chipletId: uid,
+            certificate: cert,
+            trustLevel: this.calculateTrustLevel(cert)
+        };
+    }
+}</code></pre>
+
+    <h3>공급망 추적</h3>
+
+    <table>
+        <tr>
+            <th>단계</th>
+            <th>보안 조치</th>
+            <th>검증 방법</th>
+        </tr>
+        <tr>
+            <td>설계</td>
+            <td>보안 설계 환경, 접근 제어</td>
+            <td>감사 로그, 코드 서명</td>
+        </tr>
+        <tr>
+            <td>제조</td>
+            <td>신뢰할 수 있는 파운드리, 계량</td>
+            <td>웨이퍼 추적, 수율 분석</td>
+        </tr>
+        <tr>
+            <td>테스트</td>
+            <td>보안 테스트 시설</td>
+            <td>테스트 서명 확인</td>
+        </tr>
+        <tr>
+            <td>조립</td>
+            <td>변조 방지 패키징</td>
+            <td>물리적 검사, PUF 확인</td>
+        </tr>
+        <tr>
+            <td>유통</td>
+            <td>관리 연속성 추적</td>
+            <td>블록체인 검증</td>
+        </tr>
+    </table>
+
+    <pre><code>// 공급망 추적 시스템
+interface SupplyChainTracker {
+    // 각 칩렛에 대한 추적 기록
+    trackingRecord: {
+        chipletId: string;
+        manufacturingHistory: ManufacturingEvent[];
+        custodyChain: CustodyRecord[];
+        testResults: TestRecord[];
+        certifications: Certification[];
+    };
+
+    // 블록체인 기반 검증
+    blockchain: {
+        platform: "Hyperledger" | "Ethereum" | "Custom";
+        recordTypes: [
+            "제조 완료",
+            "테스트 결과 해시",
+            "관리권 이전",
+            "통합 이벤트"
+        ];
+
+        // 전체 이력 확인
+        verifyHistory(chipletId: string): Promise<VerificationResult>;
+    };
+
+    // 위조 방지 조치
+    antiCounterfeit: {
+        physicalMarking: "레이저 조각" | "나노스케일 패턴";
+        electronicSignature: "PUF" | "OTP" | "보안 요소";
+        packageSecurity: "변조 방지" | "변조 반응";
+    };
+}</code></pre>
+
+    <h2>하드웨어 트로이 목마 탐지</h2>
+
+    <p>하드웨어 트로이 목마는 칩렛 보안에 대한 가장 심각한 위협 중 하나입니다. 탐지에는 설계 시간 기술, 제조 시간 테스트 및 런타임 모니터링의 조합이 필요합니다.</p>
+
+    <div class="highlight">
+        <strong>하드웨어 트로이 목마 특성</strong>
+        <p>하드웨어 트로이 목마는 일반적으로 세 가지 구성 요소를 가집니다: 트로이 목마를 활성화하는 트리거 메커니즘, 악의적 기능을 실행하는 페이로드, 탐지를 회피하는 스텔스 기능입니다. 칩렛 시스템은 공급망의 어느 지점에서든 삽입될 수 있는 트로이 목마를 다루어야 합니다.</p>
+    </div>
+
+    <pre><code>// 하드웨어 트로이 목마 탐지 프레임워크
+interface TrojanDetectionFramework {
+    // 설계 시간 탐지
+    designTime: {
+        methods: [
+            "형식 검증",
+            "코드 검토 및 감사",
+            "골든 모델 비교",
+            "정보 흐름 분석",
+            "구조 분석"
+        ];
+        coverage: "알려진 패턴에 대해 높음";
+        limitations: "새로운 트로이 목마 놓칠 수 있음";
+    };
+
+    // 제조 시간 탐지
+    manufacturingTime: {
+        methods: [
+            "사이드 채널 분석 (전력, EM)",
+            "경로 지연 측정",
+            "사양 이상 로직 테스트",
+            "물리적 검사 (SEM, FIB)",
+            "통계 분석"
+        ];
+        coverage: "트로이 목마 유형에 따라 다름";
+        challenges: "공정 변동 마스킹";
+    };
+
+    // 런타임 탐지
+    runtime: {
+        methods: [
+            "행동 모니터링",
+            "이상 탐지",
+            "워치독 회로",
+            "자가 테스트 기능",
+            "중복 검사"
+        ];
+        coverage: "활성화된 트로이 목마만";
+        overhead: "성능/면적 영향";
+    };
+}</code></pre>
+
+    <h2>보안 다이-투-다이 통신</h2>
+
+    <p>칩렛 시스템의 다이-투-다이 인터페이스는 도청, 변조 및 중간자 공격에 대해 보호되어야 합니다. 이는 다른 소스의 칩렛이 통신하는 다중 공급업체 시스템에서 특히 중요합니다.</p>
+
+    <pre><code>// 보안 D2D 통신 프로토콜
+interface SecureD2DProtocol {
+    // 링크 보안 설정
+    linkSecurity: {
+        keyExchange: "ECDH" | "PQC-KEM";  // 포스트 양자 옵션
+        keyLength: 256 | 384;
+        authentication: "상호" | "단방향";
+        certificateValidation: boolean;
+    };
+
+    // 트래픽 암호화
+    encryption: {
+        algorithm: "AES-GCM-256" | "ChaCha20-Poly1305";
+        keyRotation: "세션당" | "주기적" | "메시지당";
+        nonce: NonceScheme;
+        associatedData: boolean;  // 인증 암호화용
+    };
+
+    // 무결성 보호
+    integrity: {
+        macAlgorithm: "GMAC" | "Poly1305" | "HMAC-SHA256";
+        replayProtection: "시퀀스 번호" | "타임스탬프";
+        errorHandling: "무음 드롭" | "경고" | "링크 재설정";
+    };
+
+    // 성능 고려사항
+    performance: {
+        latencyOverhead: "2-5 사이클";
+        bandwidthOverhead: "3-5%";
+        powerOverhead: "5-10%";
+    };
+}</code></pre>
+
+    <h2>보안 인증 프레임워크</h2>
+
+    <p>WIA-CHIPLET 표준은 다중 공급업체 칩렛 생태계에서 신뢰 평가 및 상호 운용성을 가능하게 하는 보안 인증 프레임워크를 포함합니다.</p>
+
+    <pre><code>// WIA-CHIPLET 보안 인증
+interface SecurityCertification {
+    // 인증 수준
+    levels: {
+        BASIC: {
+            requirements: [
+                "암호화 바인딩이 있는 UID",
+                "기본 인증 프로토콜",
+                "공급망 문서"
+            ];
+            evaluation: "자체 평가";
+        };
+
+        STANDARD: {
+            requirements: [
+                "PUF 기반 인증",
+                "암호화된 D2D 통신",
+                "트로이 목마 탐지 테스트",
+                "공급망 추적"
+            ];
+            evaluation: "제3자 연구소";
+        };
+
+        ENHANCED: {
+            requirements: [
+                "형식 보안 검증",
+                "사이드 채널 저항",
+                "능동 변조 응답",
+                "런타임 모니터링"
+            ];
+            evaluation: "정부 인증 연구소";
+        };
+
+        MAXIMUM: {
+            requirements: [
+                "모든 ENHANCED 요구사항",
+                "신뢰할 수 있는 제조",
+                "물리적 변조 보호",
+                "지속적 모니터링"
+            ];
+            evaluation: "다중 연구소 + 지속적 감사";
+        };
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>챕터 요약</strong>
+        <p>칩렛 보안은 공급망 무결성, 하드웨어 트로이 목마 위협, 인증 및 보안 통신을 다루는 포괄적인 접근 방식이 필요합니다. WIA-CHIPLET 보안 프레임워크는 보안 요구사항과 실제 구현 고려사항의 균형을 맞추면서 다중 공급업체 칩렛 생태계에서 신뢰를 가능하게 하는 표준 및 인증 프로세스를 제공합니다.</p>
+    </div>
+</body>
+</html>

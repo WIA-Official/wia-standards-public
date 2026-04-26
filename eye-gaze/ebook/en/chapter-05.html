@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA Eye Gaze Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Eye Gaze Tracking Standard</h1>
+        <p class="subtitle">Chapter 5: Integration Guide</p>
+        <span class="version">Version 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>Chapter 5: Integration Guide</h1>
+
+        <h2>5.1 AAC System Integration</h2>
+        <p>Augmentative and Alternative Communication (AAC) systems are the primary use case for eye tracking accessibility.</p>
+
+        <h3>AAC Application Architecture</h3>
+        <pre><code>┌─────────────────────────────────────────────┐
+│           AAC Application Layer             │
+│  ┌──────────────┐      ┌─────────────────┐ │
+│  │ Communication│      │ Environmental   │ │
+│  │    Board     │      │    Control      │ │
+│  └──────────────┘      └─────────────────┘ │
+├─────────────────────────────────────────────┤
+│         WIA Eye Gaze Integration            │
+│  ┌──────────────┐  ┌──────────────────────┐│
+│  │ Dwell Manager│  │ Gaze Event Handler   ││
+│  └──────────────┘  └──────────────────────┘│
+├─────────────────────────────────────────────┤
+│           WIA Standard API                  │
+│     (WebSocket / IPC Connection)            │
+├─────────────────────────────────────────────┤
+│           Eye Tracking Device               │
+└─────────────────────────────────────────────┘</code></pre>
+
+        <h3>Dwell Selection Implementation</h3>
+        <p>Core interaction method for AAC users:</p>
+
+        <pre><code>class DwellSelectionManager {
+  constructor(dwellTime = 800, cooldownTime = 500) {
+    this.dwellTime = dwellTime;
+    this.cooldownTime = cooldownTime;
+    this.currentDwell = null;
+    this.lastSelection = 0;
+  }
+
+  onGazeEnter(target, timestamp) {
+    // Check cooldown period
+    if (timestamp - this.lastSelection < this.cooldownTime) {
+      return;
+    }
+
+    // Start new dwell
+    this.currentDwell = {
+      target: target,
+      startTime: timestamp,
+      progress: 0
+    };
+
+    this.showDwellFeedback(target, 0);
+  }
+
+  onGazeUpdate(target, timestamp) {
+    if (!this.currentDwell || this.currentDwell.target !== target) {
+      return;
+    }
+
+    const elapsed = timestamp - this.currentDwell.startTime;
+    const progress = Math.min(elapsed / this.dwellTime, 1.0);
+
+    this.currentDwell.progress = progress;
+    this.showDwellFeedback(target, progress);
+
+    if (progress >= 1.0) {
+      this.triggerSelection(target);
+    }
+  }
+
+  onGazeLeave(target, timestamp) {
+    if (this.currentDwell && this.currentDwell.target === target) {
+      this.cancelDwell(target);
+    }
+  }
+
+  triggerSelection(target) {
+    console.log('Selection triggered:', target);
+    this.lastSelection = Date.now();
+    this.currentDwell = null;
+    this.hideDwellFeedback();
+
+    // Trigger target action
+    target.onSelect();
+  }
+
+  showDwellFeedback(target, progress) {
+    // Visual feedback (e.g., progress circle)
+    target.element.style.setProperty('--dwell-progress', progress);
+  }
+}</code></pre>
+
+        <h3>Adaptive Dwell Time</h3>
+        <p>Automatically adjust dwell time based on user performance:</p>
+
+        <pre><code>class AdaptiveDwellManager {
+  constructor() {
+    this.baseTime = 800;
+    this.successCount = 0;
+    this.errorCount = 0;
+  }
+
+  recordSuccess() {
+    this.successCount++;
+    if (this.successCount >= 10 && this.errorCount < 2) {
+      // User is proficient, reduce dwell time
+      this.baseTime = Math.max(500, this.baseTime - 50);
+      this.resetCounters();
+    }
+  }
+
+  recordError() {
+    this.errorCount++;
+    if (this.errorCount >= 3) {
+      // User struggling, increase dwell time
+      this.baseTime = Math.min(1500, this.baseTime + 100);
+      this.resetCounters();
+    }
+  }
+
+  getCurrentDwellTime() {
+    return this.baseTime;
+  }
+}</code></pre>
+
+        <h3>AAC Keyboard Layout</h3>
+        <p>Optimized keyboard layout for eye gaze:</p>
+
+        <div class="info-box">
+            <h4>Design Principles for AAC Keyboards</h4>
+            <ul>
+                <li><strong>Large Keys</strong>: Minimum 80x80 pixels (1.5° visual angle)</li>
+                <li><strong>Spacing</strong>: 10-20 pixel gaps to prevent accidental selection</li>
+                <li><strong>High Contrast</strong>: Clear boundaries and text</li>
+                <li><strong>Predictive Text</strong>: Reduce number of selections needed</li>
+                <li><strong>Word/Phrase Banks</strong>: Quick access to common expressions</li>
+            </ul>
+        </div>
+
+        <h2>5.2 Computer Control Integration</h2>
+
+        <h3>Gaze Mouse Emulation</h3>
+        <pre><code>class GazeMouseController {
+  constructor(gazeStream) {
+    this.smoothingWindow = [];
+    this.smoothingSize = 5;
+    this.clickMode = 'dwell'; // dwell | blink | switch
+  }
+
+  onGazePoint(point) {
+    // Apply smoothing
+    const smoothed = this.smoothGazePoint(point);
+
+    // Convert to screen coordinates
+    const screenPos = this.toScreenCoordinates(smoothed);
+
+    // Move system cursor
+    this.moveCursor(screenPos.x, screenPos.y);
+
+    // Check for click trigger
+    if (this.shouldTriggerClick(point)) {
+      this.performClick(screenPos);
+    }
+  }
+
+  smoothGazePoint(point) {
+    this.smoothingWindow.push(point);
+    if (this.smoothingWindow.length > this.smoothingSize) {
+      this.smoothingWindow.shift();
+    }
+
+    // Average recent points
+    const avgX = this.smoothingWindow.reduce((sum, p) => sum + p.x, 0) /
+                 this.smoothingWindow.length;
+    const avgY = this.smoothingWindow.reduce((sum, p) => sum + p.y, 0) /
+                 this.smoothingWindow.length;
+
+    return { x: avgX, y: avgY };
+  }
+
+  toScreenCoordinates(normalizedPoint) {
+    return {
+      x: normalizedPoint.x * screen.width,
+      y: normalizedPoint.y * screen.height
+    };
+  }
+}</code></pre>
+
+        <h3>Scrolling Implementation</h3>
+        <pre><code>class GazeScrollManager {
+  constructor() {
+    this.scrollZones = {
+      top: { y: 0, height: 0.1 },      // Top 10% of screen
+      bottom: { y: 0.9, height: 0.1 }  // Bottom 10% of screen
+    };
+    this.scrollSpeed = 2; // pixels per frame
+  }
+
+  onGazePoint(point) {
+    if (point.y < this.scrollZones.top.height) {
+      // Scroll up
+      window.scrollBy(0, -this.scrollSpeed);
+    } else if (point.y > this.scrollZones.bottom.y) {
+      // Scroll down
+      window.scrollBy(0, this.scrollSpeed);
+    }
+  }
+}</code></pre>
+
+        <h2>5.3 Gaming Integration</h2>
+
+        <h3>Gaze-Assisted Aiming</h3>
+        <pre><code>class GazeAimingSystem {
+  constructor(sensitivity = 0.7) {
+    this.sensitivity = sensitivity;
+    this.aimAssistRadius = 0.05; // 5% of screen
+  }
+
+  updateAim(gazePoint, targets) {
+    // Find nearest target
+    const nearestTarget = this.findNearestTarget(gazePoint, targets);
+
+    if (nearestTarget && nearestTarget.distance < this.aimAssistRadius) {
+      // Snap to target with aim assist
+      return this.applyAimAssist(gazePoint, nearestTarget);
+    }
+
+    // Free aim
+    return gazePoint;
+  }
+
+  findNearestTarget(gazePoint, targets) {
+    let nearest = null;
+    let minDistance = Infinity;
+
+    for (const target of targets) {
+      const dx = gazePoint.x - target.x;
+      const dy = gazePoint.y - target.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = { target, distance };
+      }
+    }
+
+    return nearest;
+  }
+
+  applyAimAssist(gazePoint, nearestTarget) {
+    // Smoothly pull aim toward target
+    const pullStrength = 0.3; // 30% pull
+    return {
+      x: gazePoint.x + (nearestTarget.target.x - gazePoint.x) * pullStrength,
+      y: gazePoint.y + (nearestTarget.target.y - gazePoint.y) * pullStrength
+    };
+  }
+}</code></pre>
+
+        <h3>Attention-Based Game Mechanics</h3>
+        <pre><code>class GazeBasedGameplay {
+  constructor() {
+    this.gazedObjects = new Map();
+    this.activationTime = 1000; // ms
+  }
+
+  onFixation(event) {
+    const object = this.getGameObjectAt(event.centroid);
+
+    if (!object) return;
+
+    if (!this.gazedObjects.has(object.id)) {
+      this.gazedObjects.set(object.id, {
+        startTime: event.timestamp,
+        object: object
+      });
+    }
+
+    const gazeData = this.gazedObjects.get(object.id);
+    const gazeDuration = event.timestamp - gazeData.startTime;
+
+    if (gazeDuration >= this.activationTime) {
+      this.activateObject(object);
+      this.gazedObjects.delete(object.id);
+    }
+  }
+
+  activateObject(object) {
+    // Example: Looking at a door opens it
+    if (object.type === 'door') {
+      object.open();
+    }
+    // Example: Looking at an item picks it up
+    else if (object.type === 'item') {
+      object.pickup();
+    }
+  }
+}</code></pre>
+
+        <h2>5.4 Research Applications</h2>
+
+        <h3>Reading Study Setup</h3>
+        <pre><code>class ReadingStudyRecorder {
+  constructor() {
+    this.gazeData = [];
+    this.fixations = [];
+    this.textRegions = new Map();
+  }
+
+  defineTextRegion(regionId, boundingBox, text) {
+    this.textRegions.set(regionId, {
+      id: regionId,
+      bounds: boundingBox,
+      text: text,
+      fixationCount: 0,
+      totalDuration: 0,
+      firstFixation: null,
+      lastFixation: null
+    });
+  }
+
+  onFixation(event) {
+    this.fixations.push(event);
+
+    // Find which text region this fixation falls in
+    for (const [regionId, region] of this.textRegions) {
+      if (this.pointInBounds(event.centroid, region.bounds)) {
+        region.fixationCount++;
+        region.totalDuration += event.duration;
+
+        if (!region.firstFixation) {
+          region.firstFixation = event.timestamp;
+        }
+        region.lastFixation = event.timestamp;
+      }
+    }
+  }
+
+  generateReport() {
+    const report = {
+      totalFixations: this.fixations.length,
+      averageFixationDuration: this.calculateAverageFixation(),
+      regions: []
+    };
+
+    for (const [regionId, region] of this.textRegions) {
+      report.regions.push({
+        text: region.text,
+        fixationCount: region.fixationCount,
+        totalDuration: region.totalDuration,
+        avgDuration: region.totalDuration / region.fixationCount,
+        timeToFirstFixation: region.firstFixation - this.startTime
+      });
+    }
+
+    return report;
+  }
+}</code></pre>
+
+        <h3>Heatmap Generation</h3>
+        <pre><code>class GazeHeatmapGenerator {
+  constructor(width, height, resolution = 10) {
+    this.width = width;
+    this.height = height;
+    this.resolution = resolution;
+    this.grid = this.createGrid();
+  }
+
+  createGrid() {
+    const cols = Math.ceil(this.width / this.resolution);
+    const rows = Math.ceil(this.height / this.resolution);
+    return Array(rows).fill(0).map(() => Array(cols).fill(0));
+  }
+
+  addGazePoint(point, duration = 1) {
+    const x = Math.floor((point.x * this.width) / this.resolution);
+    const y = Math.floor((point.y * this.height) / this.resolution);
+
+    if (x >= 0 && x < this.grid[0].length &&
+        y >= 0 && y < this.grid.length) {
+      this.grid[y][x] += duration;
+    }
+  }
+
+  generateHeatmap() {
+    // Find max value for normalization
+    const maxValue = Math.max(...this.grid.flat());
+
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = this.width;
+    canvas.height = this.height;
+    const ctx = canvas.getContext('2d');
+
+    // Draw heatmap
+    for (let y = 0; y < this.grid.length; y++) {
+      for (let x = 0; x < this.grid[y].length; x++) {
+        const intensity = this.grid[y][x] / maxValue;
+        ctx.fillStyle = this.intensityToColor(intensity);
+        ctx.fillRect(
+          x * this.resolution,
+          y * this.resolution,
+          this.resolution,
+          this.resolution
+        );
+      }
+    }
+
+    return canvas;
+  }
+
+  intensityToColor(intensity) {
+    // Blue (low) → Green → Yellow → Red (high)
+    const hue = (1 - intensity) * 240; // 240=blue, 0=red
+    return `hsl(${hue}, 100%, 50%)`;
+  }
+}</code></pre>
+
+        <h2>5.5 Best Practices</h2>
+
+        <h3>Accessibility Guidelines</h3>
+        <div class="info-box success">
+            <h4>UI Design for Eye Gaze</h4>
+            <ul>
+                <li><strong>Target Size</strong>: Minimum 1.5° visual angle (80px at typical viewing distance)</li>
+                <li><strong>Spacing</strong>: 0.3° minimum gap between interactive elements</li>
+                <li><strong>Contrast</strong>: WCAG AAA compliance (7:1 ratio minimum)</li>
+                <li><strong>Feedback</strong>: Clear visual indication of dwell progress</li>
+                <li><strong>Error Prevention</strong>: Confirmation for destructive actions</li>
+                <li><strong>Undo/Redo</strong>: Always available for error recovery</li>
+            </ul>
+        </div>
+
+        <h3>Performance Optimization</h3>
+        <ul>
+            <li><strong>Throttle Updates</strong>: Process gaze data at application frame rate (60Hz), not device rate (120Hz+)</li>
+            <li><strong>Use RAF</strong>: Sync gaze processing with requestAnimationFrame</li>
+            <li><strong>Spatial Indexing</strong>: Use quadtree/R-tree for fast hit testing</li>
+            <li><strong>Debounce Events</strong>: Avoid rapid-fire event handlers</li>
+        </ul>
+
+        <h3>User Customization</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Setting</th>
+                    <th>Default</th>
+                    <th>Range</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Dwell Time</td>
+                    <td>800ms</td>
+                    <td>300-2000ms</td>
+                    <td>Selection activation time</td>
+                </tr>
+                <tr>
+                    <td>Smoothing</td>
+                    <td>5 samples</td>
+                    <td>1-10 samples</td>
+                    <td>Cursor steadiness</td>
+                </tr>
+                <tr>
+                    <td>Feedback Type</td>
+                    <td>Visual</td>
+                    <td>Visual/Audio/Both</td>
+                    <td>Dwell progress indication</td>
+                </tr>
+                <tr>
+                    <td>Click Mode</td>
+                    <td>Dwell</td>
+                    <td>Dwell/Blink/Switch</td>
+                    <td>Selection method</td>
+                </tr>
+            </tbody>
+        </table>
+
+        </main>
+</body>
+</html>

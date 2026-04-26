@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 2: 시스템 아키텍처 | WIA-CARBON_CAPTURE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 2: 시스템 아키텍처 및 설계</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 탄소 포집 플랜트 설계 원리 습득, 공정 흐름도 이해, 장비 사양 학습, 기존 산업 인프라와의 통합 패턴 이해
+    </div>
+
+    <h2>탄소 포집 플랜트 개요</h2>
+
+    <p>탄소 포집 플랜트는 배기가스 스트림에서 CO2를 효율적으로 분리하기 위해 여러 단위 공정을 통합하는 복잡한 산업 시설입니다. 설계는 포집 효율, 에너지 소비, 자본 비용 및 운영 신뢰성 간의 균형을 맞춰야 합니다. 현대 포집 플랜트는 일반적으로 하루에 수백만 입방미터의 배기가스를 처리하면서 90% 이상의 포집률을 달성합니다.</p>
+
+    <pre><code>// 탄소 포집 플랜트 구성
+interface CaptureCapture {
+    plantId: string;
+    capacity: {
+        flueGasFlow: number;      // Nm³/시간
+        CO2CaptureRate: number;   // 톤/일
+        captureEfficiency: number; // 퍼센트
+    };
+
+    mainUnits: {
+        pretreatment: PretreatmentUnit;
+        absorber: AbsorberColumn;
+        stripper: StripperColumn;
+        compression: CompressionTrain;
+        utilities: UtilitySystem;
+    };
+
+    performance: {
+        energyConsumption: number;  // GJ/톤 CO2
+        waterConsumption: number;   // m³/톤 CO2
+        solventLoss: number;        // kg/톤 CO2
+        availability: number;       // 퍼센트
+    };
+}</code></pre>
+
+    <h2>공정 흐름 아키텍처</h2>
+
+    <p>표준 아민 기반 포집 공정은 잘 확립된 흐름 패턴을 따릅니다. 이 아키텍처를 이해하는 것은 포집 시설의 적절한 설계와 운영에 필수적입니다.</p>
+
+    <pre><code>// 공정 흐름도 - 아민 포집 시스템
+/*
+                                    응축기
+                                      |
+    배기가스 ──► 전처리 ──► 흡수탑 ──► 청정 가스
+                           |    ↑
+                      리치 │    │ 린
+                     아민  │    │ 아민
+                           ↓    │
+                        열교환기
+                           |    ↑
+                           ↓    │
+                        스트리퍼 ──► CO2 제품
+                           |
+                        재비기
+                           ↑
+                         스팀
+*/
+
+const processFlow = {
+    stage1_pretreatment: {
+        equipment: ["직접 접촉 냉각기", "입자 필터", "SO2 스크러버"],
+        purpose: "흡수를 위한 배기가스 조절",
+        outputTemp: 40,  // °C
+        outputCondition: "포화, 정화됨"
+    },
+
+    stage2_absorption: {
+        equipment: ["흡수탑", "세척 섹션", "데미스터"],
+        purpose: "린 아민으로 CO2 포집",
+        keyMetrics: {
+            L_G_ratio: 2.5,          // 액체/가스 질량비
+            contactTime: 8,           // 초
+            captureEfficiency: 90     // 퍼센트
+        }
+    },
+
+    stage3_solventRegeneration: {
+        equipment: ["린/리치 열교환기", "스트리퍼 컬럼", "재비기"],
+        purpose: "CO2 방출 및 용매 재생",
+        keyMetrics: {
+            reboilerDuty: 3.5,       // GJ/톤 CO2
+            stripperPressure: 1.8,   // bar
+            regenerationTemp: 120     // °C
+        }
+    },
+
+    stage4_compression: {
+        equipment: ["녹아웃 드럼", "압축기", "인터쿨러", "탈수"],
+        purpose: "CO2를 운송 압력으로 압축",
+        outputPressure: 150,  // bar
+        outputPurity: 99.9    // 퍼센트
+    }
+};</code></pre>
+
+    <h2>흡수탑 설계</h2>
+
+    <p>흡수탑은 배기가스에서 CO2가 포집되는 주요 물질 전달 장비입니다. 적절한 설계는 압력 강하와 용매 손실을 최소화하면서 높은 포집 효율을 보장합니다.</p>
+
+    <pre><code>// 흡수탑 설계 사양
+interface AbsorberDesign {
+    geometry: {
+        internalDiameter: number;  // 미터
+        totalHeight: number;       // 미터
+        packingHeight: number;     // 미터
+        numberOfBeds: number;
+        bedHeight: number;         // 베드당 미터
+    };
+
+    packing: {
+        type: "structured" | "random";
+        material: string;
+        specificArea: number;      // m²/m³
+        voidFraction: number;      // 무차원
+        pressureDrop: number;      // mbar/m
+    };
+
+    internals: {
+        liquidDistributors: number;
+        redistributors: number;
+        supportPlates: number;
+        holdDownPlates: number;
+    };
+
+    operatingLimits: {
+        maxGasVelocity: number;    // m/s
+        minLiquidRate: number;     // m³/m²/h
+        floodingMargin: number;    // 플러딩 이하 퍼센트
+    };
+}
+
+// 예시: 500 MW 발전소 흡수탑
+const absorberSpec: AbsorberDesign = {
+    geometry: {
+        internalDiameter: 15.5,
+        totalHeight: 45,
+        packingHeight: 24,
+        numberOfBeds: 4,
+        bedHeight: 6
+    },
+    packing: {
+        type: "structured",
+        material: "스테인레스 스틸 316L",
+        specificArea: 250,
+        voidFraction: 0.97,
+        pressureDrop: 25
+    },
+    internals: {
+        liquidDistributors: 5,
+        redistributors: 3,
+        supportPlates: 4,
+        holdDownPlates: 4
+    },
+    operatingLimits: {
+        maxGasVelocity: 2.8,
+        minLiquidRate: 15,
+        floodingMargin: 30
+    }
+};</code></pre>
+
+    <h2>스트리퍼 컬럼 및 재비기 시스템</h2>
+
+    <p>스트리퍼 컬럼은 재비기에서 공급되는 열을 사용하여 흡수된 CO2를 방출함으로써 리치 아민 용액을 재생합니다. 이 유닛은 포집 플랜트에서 가장 큰 에너지 소비자를 나타냅니다.</p>
+
+    <div class="highlight">
+        <strong>에너지 최적화:</strong> 재비기 듀티는 일반적으로 포집 플랜트 총 에너지 소비의 60-70%를 차지합니다. 고급 용매, 공정 수정 및 열 통합을 통해 재비기 듀티를 줄이는 것이 포집 비용을 낮추는 주요 경로입니다.
+    </div>
+
+    <pre><code>// 스트리퍼 및 재비기 사양
+interface StripperSystem {
+    column: {
+        diameter: number;           // 미터
+        height: number;             // 미터
+        packingHeight: number;      // 미터
+        operatingPressure: number;  // bar
+        topTemperature: number;     // °C
+        bottomTemperature: number;  // °C
+    };
+
+    reboiler: {
+        type: "kettle" | "thermosiphon" | "forcedCirculation";
+        duty: number;               // MW
+        steamPressure: number;      // bar
+        steamTemperature: number;   // °C
+        heatTransferArea: number;   // m²
+        U_coefficient: number;      // W/m²/K
+    };
+
+    condenser: {
+        duty: number;               // MW
+        coolingMedium: string;
+        coolantTemperature: number; // °C
+        refluxRatio: number;        // 무차원
+    };
+}
+
+// 재비기 듀티 계산
+function calculateReboilerDuty(
+    CO2CaptureRate: number,      // 톤/시간
+    specificDuty: number,        // GJ/톤 CO2
+    heatExchangerEfficiency: number  // 분율
+): number {
+    const grossDuty = CO2CaptureRate * specificDuty * 1000 / 3600;  // MW
+    const netDuty = grossDuty / heatExchangerEfficiency;
+    return netDuty;  // MW
+}</code></pre>
+
+    <h2>압축 트레인 설계</h2>
+
+    <p>CO2 압축 트레인은 포집된 CO2의 압력을 대기압 근처에서 파이프라인 운송 압력(일반적으로 100-150 bar)으로 높입니다. 에너지 소비를 최소화하기 위해 인터쿨링이 있는 다단 압축이 사용됩니다.</p>
+
+    <pre><code>// CO2 압축 트레인 구성
+interface CompressionTrain {
+    stages: CompressionStage[];
+    totalPower: number;          // MW
+    overallEfficiency: number;   // 퍼센트
+    coolingDuty: number;         // MW
+}
+
+interface CompressionStage {
+    stageNumber: number;
+    compressorType: "centrifugal" | "reciprocating" | "integrallygeared";
+    inletPressure: number;       // bar
+    outletPressure: number;      // bar
+    compressionRatio: number;    // 무차원
+    polytropicEfficiency: number; // 퍼센트
+    power: number;               // MW
+    intercooler: {
+        outletTemperature: number;  // °C
+        duty: number;               // MW
+    };
+}
+
+// 4단 압축 트레인 예시
+const compressionTrain: CompressionTrain = {
+    stages: [
+        { stageNumber: 1, compressorType: "centrifugal", inletPressure: 1.5,
+          outletPressure: 5, compressionRatio: 3.33, polytropicEfficiency: 82,
+          power: 4.5, intercooler: { outletTemperature: 35, duty: 3.8 }},
+        { stageNumber: 2, compressorType: "centrifugal", inletPressure: 5,
+          outletPressure: 15, compressionRatio: 3.0, polytropicEfficiency: 84,
+          power: 3.8, intercooler: { outletTemperature: 35, duty: 3.2 }},
+        { stageNumber: 3, compressorType: "centrifugal", inletPressure: 15,
+          outletPressure: 45, compressionRatio: 3.0, polytropicEfficiency: 85,
+          power: 3.2, intercooler: { outletTemperature: 35, duty: 2.8 }},
+        { stageNumber: 4, compressorType: "centrifugal", inletPressure: 45,
+          outletPressure: 150, compressionRatio: 3.33, polytropicEfficiency: 85,
+          power: 3.5, intercooler: { outletTemperature: 35, duty: 0 }}
+    ],
+    totalPower: 15,
+    overallEfficiency: 84,
+    coolingDuty: 9.8
+};</code></pre>
+
+    <h2>열 통합 전략</h2>
+
+    <p>효과적인 열 통합은 탄소 포집의 에너지 페널티를 크게 줄일 수 있습니다. 다양한 공정 스트림에서 열을 회수하고 호스트 플랜트의 열 사이클과 통합함으로써 전체 효율을 상당히 개선할 수 있습니다.</p>
+
+    <table>
+        <tr>
+            <th>열원</th>
+            <th>온도 (°C)</th>
+            <th>잠재적 용도</th>
+            <th>에너지 절감</th>
+        </tr>
+        <tr>
+            <td>린 아민 쿨러</td>
+            <td>50-80</td>
+            <td>리치 아민 예열</td>
+            <td>5-10%</td>
+        </tr>
+        <tr>
+            <td>CO2 압축기 인터쿨러</td>
+            <td>80-150</td>
+            <td>급수 가열</td>
+            <td>3-5%</td>
+        </tr>
+        <tr>
+            <td>스트리퍼 오버헤드 응축기</td>
+            <td>80-100</td>
+            <td>리치 아민 예열</td>
+            <td>8-12%</td>
+        </tr>
+        <tr>
+            <td>배기가스 (포집 전)</td>
+            <td>120-180</td>
+            <td>용매 재생</td>
+            <td>10-15%</td>
+        </tr>
+    </table>
+
+    <pre><code>// 열교환기 네트워크 최적화
+interface HeatExchangerNetwork {
+    exchangers: HeatExchanger[];
+    totalHeatRecovery: number;    // MW
+    minimumApproach: number;      // °C
+    annualEnergySaving: number;   // GJ/년
+}
+
+interface HeatExchanger {
+    id: string;
+    hotStream: string;
+    coldStream: string;
+    duty: number;                 // MW
+    LMTD: number;                 // °C
+    area: number;                 // m²
+    U_coefficient: number;        // W/m²/K
+}
+
+// 열교환기 면적 계산
+function calculateHeatExchangerArea(
+    duty: number,         // MW
+    U: number,            // W/m²/K
+    LMTD: number          // °C
+): number {
+    return (duty * 1e6) / (U * LMTD);  // m²
+}</code></pre>
+
+    <h2>계측 및 제어 아키텍처</h2>
+
+    <p>현대 탄소 포집 플랜트는 최적 운영을 유지하고 안전을 보장하기 위해 정교한 분산 제어 시스템(DCS)을 사용합니다. 제어 아키텍처는 수백 개의 제어 루프를 관리하고 플랜트 전체 시스템과 인터페이스합니다.</p>
+
+    <div class="highlight">
+        <strong>제어 철학:</strong> 탄소 포집 플랜트는 일반적으로 기본 계층 조절 제어, 감독 고급 공정 제어(APC), 실시간 최적화(RTO) 계층으로 구성된 계층적 제어 구조를 사용하여 안전한 운영을 유지하면서 효율을 극대화합니다.
+    </div>
+
+    <pre><code>// 제어 시스템 아키텍처
+interface ControlArchitecture {
+    dcs: {
+        vendor: string;
+        redundancy: "dual" | "triple";
+        scanRate: number;           // 밀리초
+        ioCount: number;
+    };
+
+    controlLoops: {
+        flow: number;
+        pressure: number;
+        temperature: number;
+        level: number;
+        analytical: number;
+        total: number;
+    };
+
+    apc: {
+        enabled: boolean;
+        vendor: string;
+        controlledVariables: number;
+        manipulatedVariables: number;
+        updateRate: number;         // 초
+    };
+
+    rto: {
+        enabled: boolean;
+        optimizationInterval: number;  // 분
+        objectiveFunction: string;
+    };
+
+    safetySystem: {
+        silLevel: 1 | 2 | 3;
+        tripPoints: number;
+        emergencyShutdowns: number;
+    };
+}</code></pre>
+
+    <h2>요약</h2>
+
+    <p>이 챕터에서는 공정 흐름 설계부터 장비 사양, 제어 시스템 및 부지 배치까지 탄소 포집 시스템의 포괄적인 아키텍처를 다루었습니다. 이러한 구성 요소를 응집력 있고 효율적인 시설로 통합하려면 신중한 엔지니어링과 시스템 간 인터페이스에 대한 주의가 필요합니다.</p>
+
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Trading Instruments | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Trading Instruments</h1>
+
+    <div class="highlight">
+        <strong>Market Depth:</strong> WIA-CARBON_TRADING supports a comprehensive suite of trading instruments including spot contracts, futures, options, and structured products, enabling participants to manage carbon exposure across different time horizons and risk profiles.
+    </div>
+
+    <p>Carbon markets have evolved sophisticated financial instruments that enable efficient price discovery, risk management, and liquidity provision. This chapter explores the trading products available on WIA-CARBON_TRADING and the mechanisms that enable effective carbon price formation.</p>
+
+    <h2>Spot Market Trading</h2>
+
+    <p>The spot market forms the foundation of carbon trading, enabling immediate delivery of carbon credits and allowances. Spot prices reflect current supply and demand conditions and serve as the reference point for derivative pricing.</p>
+
+    <h3>Spot Contract Specifications</h3>
+
+    <pre><code>// Spot Contract Definition
+interface SpotContract {
+    contractId: string;
+    underlying: CarbonCreditType;
+    tradingUnit: number;        // Standard lot size (e.g., 1000 tonnes)
+    tickSize: number;           // Minimum price increment
+    settlementType: 'physical' | 'cash';
+    settlementCycle: 'T+0' | 'T+1' | 'T+2';
+    tradingHours: TradingSession[];
+    deliveryRegistry: string;
+}
+
+// Example EU Allowance Spot Contract
+const euaSpot: SpotContract = {
+    contractId: "EUA-SPOT",
+    underlying: {
+        type: 'allowance',
+        scheme: 'EU-ETS',
+        vintage: 'current',
+        serialRange: null       // Any valid EUA
+    },
+    tradingUnit: 1000,          // 1000 EUAs per lot
+    tickSize: 0.01,             // EUR 0.01 per tonne
+    settlementType: 'physical',
+    settlementCycle: 'T+2',
+    tradingHours: [
+        {
+            session: 'continuous',
+            start: '07:00',
+            end: '17:00',
+            timezone: 'CET'
+        }
+    ],
+    deliveryRegistry: 'EU-REGISTRY'
+};
+
+// Spot Market Data Structure
+interface SpotMarketData {
+    contractId: string;
+    timestamp: Date;
+    bid: number;
+    bidSize: number;
+    ask: number;
+    askSize: number;
+    last: number;
+    volume: number;
+    openInterest: number;
+    high: number;
+    low: number;
+    vwap: number;               // Volume-weighted average price
+    change: number;
+    changePercent: number;
+}</code></pre>
+
+    <h3>Order Book Dynamics</h3>
+
+    <p>The order book aggregates buy and sell orders at different price levels, providing visibility into market depth and liquidity. Understanding order book dynamics is crucial for effective trading execution.</p>
+
+    <pre><code>// Order Book Analysis
+class OrderBookAnalyzer {
+    analyzeDepth(orderBook: OrderBook): MarketDepthAnalysis {
+        const bidLevels = this.aggregateLevels(orderBook.bids);
+        const askLevels = this.aggregateLevels(orderBook.asks);
+
+        return {
+            bidDepth: bidLevels,
+            askDepth: askLevels,
+            spread: askLevels[0]?.price - bidLevels[0]?.price,
+            spreadPercent: (askLevels[0]?.price - bidLevels[0]?.price) / bidLevels[0]?.price * 100,
+            imbalance: this.calculateImbalance(bidLevels, askLevels),
+            liquidityScore: this.calculateLiquidityScore(bidLevels, askLevels)
+        };
+    }
+
+    calculateImbalance(bids: PriceLevel[], asks: PriceLevel[]): number {
+        const bidVolume = bids.slice(0, 5).reduce((sum, l) => sum + l.quantity, 0);
+        const askVolume = asks.slice(0, 5).reduce((sum, l) => sum + l.quantity, 0);
+        return (bidVolume - askVolume) / (bidVolume + askVolume);
+    }
+
+    estimateSlippage(side: 'buy' | 'sell', quantity: number, book: OrderBook): SlippageEstimate {
+        const levels = side === 'buy' ? book.asks : book.bids;
+        let remaining = quantity;
+        let totalCost = 0;
+        let executionLevels: ExecutionLevel[] = [];
+
+        for (const level of levels) {
+            const fillQty = Math.min(remaining, level.quantity);
+            totalCost += fillQty * level.price;
+            remaining -= fillQty;
+
+            executionLevels.push({
+                price: level.price,
+                quantity: fillQty
+            });
+
+            if (remaining === 0) break;
+        }
+
+        const avgPrice = totalCost / (quantity - remaining);
+        const bestPrice = levels[0].price;
+
+        return {
+            averagePrice: avgPrice,
+            slippage: avgPrice - bestPrice,
+            slippagePercent: (avgPrice - bestPrice) / bestPrice * 100,
+            filledQuantity: quantity - remaining,
+            unfilledQuantity: remaining,
+            executionLevels
+        };
+    }
+}</code></pre>
+
+    <h2>Futures Contracts</h2>
+
+    <p>Carbon futures enable participants to lock in prices for future delivery, providing crucial hedging capabilities for compliance entities and speculative opportunities for traders. Futures prices incorporate expectations about future supply, demand, and policy developments.</p>
+
+    <div class="highlight">
+        <strong>Futures Benefits:</strong> Carbon futures provide price certainty for compliance planning, enable risk transfer between hedgers and speculators, and contribute to efficient price discovery by aggregating market expectations about future conditions.
+    </div>
+
+    <h3>Futures Contract Specifications</h3>
+
+    <table>
+        <tr>
+            <th>Parameter</th>
+            <th>EUA Futures</th>
+            <th>CCA Futures</th>
+            <th>Nature Credit Futures</th>
+        </tr>
+        <tr>
+            <td>Contract Size</td>
+            <td>1,000 tonnes</td>
+            <td>1,000 tonnes</td>
+            <td>1,000 tonnes</td>
+        </tr>
+        <tr>
+            <td>Tick Size</td>
+            <td>EUR 0.01</td>
+            <td>USD 0.01</td>
+            <td>USD 0.01</td>
+        </tr>
+        <tr>
+            <td>Delivery Months</td>
+            <td>Mar, Jun, Sep, Dec</td>
+            <td>All months</td>
+            <td>Mar, Jun, Sep, Dec</td>
+        </tr>
+        <tr>
+            <td>Settlement</td>
+            <td>Physical</td>
+            <td>Physical</td>
+            <td>Physical</td>
+        </tr>
+        <tr>
+            <td>Position Limits</td>
+            <td>250,000 contracts</td>
+            <td>100,000 contracts</td>
+            <td>50,000 contracts</td>
+        </tr>
+    </table>
+
+    <pre><code>// Futures Contract Implementation
+interface FuturesContract {
+    contractId: string;
+    underlying: CarbonCreditType;
+    contractSize: number;
+    tickSize: number;
+    tickValue: number;
+    deliveryMonth: Date;
+    firstTradingDay: Date;
+    lastTradingDay: Date;
+    firstNoticeDay: Date;
+    lastDeliveryDay: Date;
+    settlementMethod: 'physical' | 'cash';
+    marginRequirements: {
+        initial: number;        // Percentage
+        maintenance: number;    // Percentage
+    };
+    positionLimits: {
+        spotMonth: number;
+        allMonths: number;
+    };
+}
+
+// Futures Pricing Model
+class FuturesPricer {
+    calculateTheoreticalPrice(
+        spotPrice: number,
+        riskFreeRate: number,
+        storageAndCarryCost: number,
+        timeToExpiry: number,      // Years
+        convenienceYield: number
+    ): number {
+        // Cost of carry model
+        // F = S * e^((r + c - y) * T)
+        const netCarry = riskFreeRate + storageAndCarryCost - convenienceYield;
+        return spotPrice * Math.exp(netCarry * timeToExpiry);
+    }
+
+    calculateBasis(futuresPrice: number, spotPrice: number): number {
+        return futuresPrice - spotPrice;
+    }
+
+    calculateImpliedRepo(
+        spotPrice: number,
+        futuresPrice: number,
+        timeToExpiry: number
+    ): number {
+        // Implied financing rate
+        return Math.log(futuresPrice / spotPrice) / timeToExpiry;
+    }
+
+    buildForwardCurve(
+        spotPrice: number,
+        futuresChain: FuturesQuote[]
+    ): ForwardCurve {
+        const points = futuresChain.map(f => ({
+            maturity: f.deliveryMonth,
+            price: f.price,
+            impliedRate: this.calculateImpliedRepo(
+                spotPrice,
+                f.price,
+                this.yearFraction(new Date(), f.deliveryMonth)
+            )
+        }));
+
+        return { spotPrice, forwardPoints: points };
+    }
+}</code></pre>
+
+    <h2>Options on Carbon</h2>
+
+    <p>Carbon options provide the right, but not the obligation, to buy (call) or sell (put) carbon credits at a specified price. Options enable sophisticated risk management strategies and allow participants to express views on price volatility.</p>
+
+    <h3>Option Specifications</h3>
+
+    <pre><code>// Carbon Option Contract
+interface CarbonOption {
+    optionId: string;
+    underlying: string;          // Futures contract or spot
+    optionType: 'call' | 'put';
+    exerciseStyle: 'european' | 'american';
+    strikePrice: number;
+    expirationDate: Date;
+    contractSize: number;
+    premiumQuotation: 'per_tonne' | 'total';
+    settlementMethod: 'physical' | 'cash';
+}
+
+// Option Pricing using Black-Scholes
+class CarbonOptionPricer {
+    private normalCDF(x: number): number {
+        const a1 = 0.254829592;
+        const a2 = -0.284496736;
+        const a3 = 1.421413741;
+        const a4 = -1.453152027;
+        const a5 = 1.061405429;
+        const p = 0.3275911;
+
+        const sign = x < 0 ? -1 : 1;
+        x = Math.abs(x) / Math.sqrt(2);
+
+        const t = 1.0 / (1.0 + p * x);
+        const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+
+        return 0.5 * (1.0 + sign * y);
+    }
+
+    priceOption(
+        spotPrice: number,
+        strikePrice: number,
+        timeToExpiry: number,
+        riskFreeRate: number,
+        volatility: number,
+        optionType: 'call' | 'put'
+    ): OptionPricing {
+        const d1 = (Math.log(spotPrice / strikePrice) +
+                   (riskFreeRate + volatility * volatility / 2) * timeToExpiry) /
+                   (volatility * Math.sqrt(timeToExpiry));
+        const d2 = d1 - volatility * Math.sqrt(timeToExpiry);
+
+        let price: number;
+        let delta: number;
+
+        if (optionType === 'call') {
+            price = spotPrice * this.normalCDF(d1) -
+                    strikePrice * Math.exp(-riskFreeRate * timeToExpiry) * this.normalCDF(d2);
+            delta = this.normalCDF(d1);
+        } else {
+            price = strikePrice * Math.exp(-riskFreeRate * timeToExpiry) * this.normalCDF(-d2) -
+                    spotPrice * this.normalCDF(-d1);
+            delta = this.normalCDF(d1) - 1;
+        }
+
+        // Calculate Greeks
+        const gamma = Math.exp(-d1 * d1 / 2) /
+                     (spotPrice * volatility * Math.sqrt(2 * Math.PI * timeToExpiry));
+        const vega = spotPrice * Math.sqrt(timeToExpiry) *
+                    Math.exp(-d1 * d1 / 2) / Math.sqrt(2 * Math.PI);
+        const theta = this.calculateTheta(spotPrice, strikePrice, timeToExpiry,
+                                         riskFreeRate, volatility, optionType, d1, d2);
+
+        return { price, delta, gamma, vega, theta };
+    }
+}</code></pre>
+
+    <h2>Price Discovery Mechanisms</h2>
+
+    <p>Effective price discovery is essential for market efficiency. WIA-CARBON_TRADING employs multiple mechanisms to ensure accurate and transparent price formation.</p>
+
+    <h3>Continuous Trading</h3>
+
+    <p>During regular trading hours, prices are discovered through continuous order matching. The best bid and ask prices from the order book determine the current market spread, while executed trades establish transaction prices.</p>
+
+    <h3>Auction Mechanisms</h3>
+
+    <p>Periodic auctions aggregate orders and execute at a single clearing price, providing concentrated liquidity events. Auctions are particularly important for compliance market allowance distribution.</p>
+
+    <pre><code>// Auction Price Discovery
+class AuctionEngine {
+    private orders: AuctionOrder[] = [];
+
+    determineAuctionPrice(): AuctionResult {
+        // Separate buy and sell orders
+        const buyOrders = this.orders.filter(o => o.side === 'buy')
+                                     .sort((a, b) => b.price - a.price);
+        const sellOrders = this.orders.filter(o => o.side === 'sell')
+                                      .sort((a, b) => a.price - b.price);
+
+        // Build demand and supply curves
+        const demandCurve = this.buildCumulativeCurve(buyOrders, 'descending');
+        const supplyCurve = this.buildCumulativeCurve(sellOrders, 'ascending');
+
+        // Find equilibrium price (maximum volume)
+        let maxVolume = 0;
+        let clearingPrice = 0;
+
+        const allPrices = [...new Set([
+            ...buyOrders.map(o => o.price),
+            ...sellOrders.map(o => o.price)
+        ])].sort((a, b) => a - b);
+
+        for (const price of allPrices) {
+            const demandAtPrice = this.getQuantityAtPrice(demandCurve, price, 'demand');
+            const supplyAtPrice = this.getQuantityAtPrice(supplyCurve, price, 'supply');
+            const volumeAtPrice = Math.min(demandAtPrice, supplyAtPrice);
+
+            if (volumeAtPrice > maxVolume) {
+                maxVolume = volumeAtPrice;
+                clearingPrice = price;
+            }
+        }
+
+        // Match orders at clearing price
+        const matches = this.matchAtPrice(clearingPrice, buyOrders, sellOrders);
+
+        return {
+            clearingPrice,
+            totalVolume: maxVolume,
+            matches,
+            coverRatio: this.calculateCoverRatio(demandCurve, supplyCurve, clearingPrice)
+        };
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Market Integrity:</strong> All price discovery mechanisms are subject to surveillance and manipulation detection algorithms that monitor for wash trading, spoofing, and other market abuse behaviors.
+    </div>
+
+    <p>The variety of trading instruments on WIA-CARBON_TRADING enables participants to implement sophisticated carbon management strategies. The next chapter examines the registry systems and MRV processes that ensure the integrity of all traded carbon assets.</p>
+</body>
+</html>

@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Phase 4 - Integration | WIA-ACS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #EF4444; --text: #f1f5f9; --text-secondary: #cbd5e1; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: var(--primary); text-decoration: none; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 6px; }
+        h1 { font-size: 2.5rem; color: var(--primary); margin: 2rem 0 1rem; }
+        h2 { font-size: 1.8rem; color: var(--primary); margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--bg-tertiary); }
+        h3 { font-size: 1.4rem; color: var(--text); margin: 1.5rem 0 1rem; }
+        p { margin: 1rem 0; color: var(--text-secondary); }
+        strong { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg-secondary); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--bg-tertiary); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: 600; }
+        .code-block { background: var(--bg-secondary); border: 1px solid var(--bg-tertiary); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        pre { font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text); }
+        .info-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .summary { background: var(--bg-secondary); border: 2px solid var(--primary); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: var(--text-secondary); }
+        li { margin: 0.5rem 0; }
+        .questions { background: var(--bg-secondary); padding: 2rem; border-radius: 8px; margin: 2rem 0; }
+        .questions h2 { border: none; margin-top: 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .questions li { margin: 1rem 0; color: var(--text); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 7: Phase 4 - Integration</h1>
+
+        <p>
+            Phase 4 of WIA-ACS focuses on practical integration with existing enterprise systems, including LDAP/Active
+            Directory, physical access control systems (PACS), biometric devices, smart cards, RFID/NFC readers, and
+            cloud identity providers. This chapter provides detailed integration patterns, adapter architectures, and
+            real-world deployment scenarios to enable WIA-ACS adoption in heterogeneous environments.
+        </p>
+
+        <h2>Integration Architecture</h2>
+
+        <p>
+            WIA-ACS employs an adapter pattern for integrations, allowing new systems to be connected without modifying
+            the core platform:
+        </p>
+
+        <div class="code-block">
+            <pre>
+┌─────────────────────────────────────────────────────────────┐
+│                    WIA-ACS Core Platform                     │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐             │
+│  │    Auth    │ │   Authz    │ │   Audit    │             │
+│  │  Service   │ │  Service   │ │  Service   │             │
+│  └──────┬─────┘ └──────┬─────┘ └──────┬─────┘             │
+└─────────┼──────────────┼──────────────┼────────────────────┘
+          │              │              │
+    ┌─────▼──────────────▼──────────────▼──────┐
+    │        Integration Adapter Layer          │
+    │  (Translates between WIA-ACS and external)│
+    └─────┬────────┬────────┬─────────┬─────────┘
+          │        │        │         │
+    ┌─────▼──┐ ┌──▼────┐ ┌─▼─────┐ ┌─▼───────┐
+    │  LDAP  │ │ PACS  │ │  Bio  │ │ Cloud   │
+    │Adapter │ │Adapter│ │Adapter│ │ Adapter │
+    └─────┬──┘ └──┬────┘ └─┬─────┘ └─┬───────┘
+          │       │        │         │
+    ┌─────▼──┐ ┌──▼────┐ ┌─▼─────┐ ┌─▼───────┐
+    │   AD   │ │  HID  │ │Suprema│ │ Azure   │
+    │  LDAP  │ │ Lenel │ │ ZKTeco│ │   AD    │
+    └────────┘ └───────┘ └───────┘ └─────────┘
+            </pre>
+        </div>
+
+        <h3>Adapter Interface Specification</h3>
+        <div class="code-block">
+            <pre>
+interface IAdapter {
+  // Lifecycle methods
+  initialize(config: AdapterConfig): Promise&lt;void&gt;;
+  healthCheck(): Promise&lt;HealthStatus&gt;;
+  shutdown(): Promise&lt;void&gt;;
+
+  // Data synchronization
+  syncUsers(options: SyncOptions): Promise&lt;SyncResult&gt;;
+  syncCredentials(options: SyncOptions): Promise&lt;SyncResult&gt;;
+
+  // Event handling
+  onEvent(event: ExternalEvent): Promise&lt;WiaEvent&gt;;
+  subscribeToEvents(callback: EventCallback): void;
+
+  // Capabilities
+  getCapabilities(): AdapterCapabilities;
+}
+
+type AdapterCapabilities = {
+  supportsUserSync: boolean;
+  supportsCredentialSync: boolean;
+  supportsRealTimeEvents: boolean;
+  supportedCredentialTypes: CredentialType[];
+  supportedAuthMethods: AuthMethod[];
+  bidirectionalSync: boolean;
+};
+            </pre>
+        </div>
+
+        <h2>LDAP and Active Directory Integration</h2>
+
+        <p>
+            LDAP (Lightweight Directory Access Protocol) and Microsoft Active Directory are the most common
+            enterprise identity sources. WIA-ACS integrates bidirectionally for user provisioning and authentication.
+        </p>
+
+        <h3>LDAP Adapter Configuration</h3>
+        <div class="code-block">
+            <pre>
+{
+  "adapter_type": "ldap",
+  "adapter_id": "ldap-corporate-ad",
+  "connection": {
+    "url": "ldaps://ldap.example.com:636",
+    "bind_dn": "cn=wia-acs-service,ou=Service Accounts,dc=example,dc=com",
+    "bind_password": "${LDAP_BIND_PASSWORD}",
+    "tls": {
+      "enabled": true,
+      "verify_cert": true,
+      "ca_cert_path": "/etc/ssl/certs/ca-bundle.crt",
+      "client_cert_path": null,
+      "min_tls_version": "1.2"
+    },
+    "timeout_seconds": 30,
+    "connection_pool_size": 10
+  },
+  "schema_mapping": {
+    "user": {
+      "base_dn": "ou=Users,dc=example,dc=com",
+      "object_class": "inetOrgPerson",
+      "filter": "(&(objectClass=inetOrgPerson)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
+      "attributes": {
+        "user_id": "employeeNumber",
+        "given_name": "givenName",
+        "family_name": "sn",
+        "email": "mail",
+        "phone": "telephoneNumber",
+        "department": "department",
+        "title": "title",
+        "manager": "manager",
+        "employee_type": "employeeType"
+      }
+    },
+    "group": {
+      "base_dn": "ou=Groups,dc=example,dc=com",
+      "object_class": "groupOfNames",
+      "filter": "(objectClass=groupOfNames)",
+      "member_attribute": "member"
+    }
+  },
+  "sync": {
+    "schedule": "0 */4 * * *",
+    "full_sync_interval_hours": 24,
+    "incremental_sync": true,
+    "usnChanged_attribute": "modifyTimestamp",
+    "deleted_users_ou": "ou=Disabled Users,dc=example,dc=com",
+    "batch_size": 500
+  },
+  "role_mapping": [
+    {
+      "ldap_group": "cn=Engineering,ou=Groups,dc=example,dc=com",
+      "wia_role": "role-engineering"
+    },
+    {
+      "ldap_group": "cn=Security,ou=Groups,dc=example,dc=com",
+      "wia_role": "role-security"
+    },
+    {
+      "ldap_group": "cn=Employees,ou=Groups,dc=example,dc=com",
+      "wia_role": "role-employee"
+    }
+  ]
+}
+            </pre>
+        </div>
+
+        <h3>User Synchronization Workflow</h3>
+        <div class="code-block">
+            <pre>
+Incremental Sync (every 4 hours):
+
+1. Query LDAP for changes since last sync
+   (&(modifyTimestamp&gt;=20251226120000Z))
+
+2. For each changed entry:
+   a. Map LDAP attributes to WIA-ACS user schema
+   b. Resolve group memberships to roles
+   c. Check if user exists in WIA-ACS
+   d. Create new user or update existing
+
+3. Handle deletions:
+   a. Query users in WIA-ACS not in LDAP result
+   b. Mark as "terminated" status
+   c. Revoke all active credentials
+   d. Log deprovisioning event
+
+4. Update sync metadata:
+   last_sync_timestamp: 2025-12-26T16:00:00Z
+   users_created: 5
+   users_updated: 47
+   users_deleted: 2
+   errors: []
+
+Full Sync (daily):
+
+1. Retrieve all users from LDAP
+2. Compare with WIA-ACS user database
+3. Identify orphaned accounts (in WIA-ACS but not LDAP)
+4. Reconcile discrepancies
+5. Generate sync report
+            </pre>
+        </div>
+
+        <h2>Physical Access Control System (PACS) Integration</h2>
+
+        <p>
+            WIA-ACS integrates with major PACS vendors including HID, Lenel, Software House, Genetec, and others.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PACS Vendor</th>
+                    <th>Protocol</th>
+                    <th>Integration Method</th>
+                    <th>Capabilities</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>HID VertX</td>
+                    <td>REST API, OSDP</td>
+                    <td>Direct API integration</td>
+                    <td>Bidirectional sync, real-time events</td>
+                </tr>
+                <tr>
+                    <td>Lenel OnGuard</td>
+                    <td>OpenAccess, SQL</td>
+                    <td>Database integration</td>
+                    <td>User sync, event monitoring</td>
+                </tr>
+                <tr>
+                    <td>Software House CCure</td>
+                    <td>SDK, REST API</td>
+                    <td>SDK wrapper</td>
+                    <td>Full control, credential provisioning</td>
+                </tr>
+                <tr>
+                    <td>Genetec Synergis</td>
+                    <td>SDK, WebSDK</td>
+                    <td>Web services</td>
+                    <td>Real-time monitoring, video integration</td>
+                </tr>
+                <tr>
+                    <td>Honeywell Pro-Watch</td>
+                    <td>SOAP API</td>
+                    <td>Web services</td>
+                    <td>User management, access rules</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>HID VertX Integration Example</h3>
+        <div class="code-block">
+            <pre>
+Credential Provisioning to HID VertX:
+
+1. WIA-ACS creates credential
+   POST /v1/credentials
+   {
+     "user_id": "usr-001",
+     "credential_type": "proximity",
+     "encoding": {
+       "format": "wiegand_26bit",
+       "facility_code": 123,
+       "card_number": 45678
+     }
+   }
+
+2. Adapter converts to HID format
+   POST /api/v1/credentials
+   Host: vertx.example.com
+   Authorization: Bearer HID_API_TOKEN
+   {
+     "CardNumber": 45678,
+     "FacilityCode": 123,
+     "CardFormat": "Wiegand26Bit",
+     "Status": "Active",
+     "ActivationDate": "2025-12-26T00:00:00Z",
+     "ExpirationDate": "2026-12-26T23:59:59Z",
+     "Doors": [
+       {"DoorID": 101, "AccessSchedule": "24x7"},
+       {"DoorID": 102, "AccessSchedule": "BusinessHours"}
+     ]
+   }
+
+3. Event monitoring (webhook from HID)
+   POST /webhook/hid-vertx
+   X-HID-Event-Type: AccessGranted
+   {
+     "EventType": "AccessGranted",
+     "Timestamp": "2025-12-26T14:32:17Z",
+     "DoorID": 101,
+     "CardNumber": 45678,
+     "FacilityCode": 123,
+     "Direction": "Entry"
+   }
+
+4. Adapter translates to WIA-ACS event
+   {
+     "event_type": "access_granted",
+     "timestamp": "2025-12-26T14:32:17Z",
+     "actor": {
+       "credential_id": "cred-xyz789"
+     },
+     "target": {
+       "resource_type": "door",
+       "resource_id": "door-101"
+     },
+     "result": "success"
+   }
+            </pre>
+        </div>
+
+        <h2>Biometric Device Integration</h2>
+
+        <p>
+            WIA-ACS supports various biometric modalities: fingerprint, facial recognition, iris scanning,
+            and palm vein recognition.
+        </p>
+
+        <h3>Fingerprint Reader Integration</h3>
+        <div class="code-block">
+            <pre>
+Enrollment Workflow:
+
+1. User places finger on reader
+2. Reader captures fingerprint (multiple samples)
+3. Generate biometric template
+   {
+     "biometric_type": "fingerprint",
+     "algorithm": "ISO_19794_2",
+     "template": "BASE64_ENCODED_TEMPLATE",
+     "quality_score": 85,
+     "finger_position": "right_index",
+     "minutiae_count": 47
+   }
+
+4. Store template in WIA-ACS
+   POST /v1/biometrics
+   {
+     "user_id": "usr-001",
+     "biometric_type": "fingerprint",
+     "template_hash": "SHA256_OF_TEMPLATE",
+     "template_encrypted": "AES256_ENCRYPTED_TEMPLATE",
+     "metadata": {
+       "enrolled_at": "2025-12-26T10:00:00Z",
+       "device_id": "bio-reader-001",
+       "quality_score": 85
+     }
+   }
+
+Authentication Workflow:
+
+1. User places finger on reader
+2. Generate authentication template
+3. Send to WIA-ACS for matching
+   POST /v1/biometrics/authenticate
+   {
+     "device_id": "bio-reader-001",
+     "biometric_type": "fingerprint",
+     "template": "BASE64_ENCODED_TEMPLATE",
+     "quality_score": 82
+   }
+
+4. WIA-ACS performs 1:N matching
+   - Retrieve all fingerprint templates
+   - Compare against authentication template
+   - Apply threshold (FAR = 0.001%, FRR = 0.1%)
+   - Return best match if above threshold
+
+5. Response
+   {
+     "match": true,
+     "user_id": "usr-001",
+     "confidence": 98.7,
+     "match_duration_ms": 87
+   }
+
+Performance Requirements:
+- 1:1 matching: < 100ms
+- 1:10,000 matching: < 2 seconds
+- False Accept Rate (FAR): < 0.001%
+- False Reject Rate (FRR): < 0.1%
+            </pre>
+        </div>
+
+        <h2>Smart Card and RFID Integration</h2>
+
+        <h3>PIV/CAC Smart Card Support</h3>
+        <div class="code-block">
+            <pre>
+PIV (Personal Identity Verification) Card Structure:
+
+Card contains:
+├── Contactless interface (13.56 MHz)
+├── Contact interface (ISO 7816)
+├── Cryptographic processor
+└── Data objects:
+    ├── Cardholder Unique Identifier (CHUID)
+    ├── Card Authentication Certificate
+    ├── PIV Authentication Certificate (9A)
+    ├── Digital Signature Certificate (9C)
+    ├── Key Management Certificate (9D)
+    ├── Card Authentication Key (9E)
+    ├── Fingerprint templates (optional)
+    └── Facial image
+
+Authentication Flow:
+
+1. Card presented to reader
+2. Reader requests PIV Auth Certificate
+   APDU: 00 CB 3F FF 05 5C 03 5F C1 05
+
+3. Card returns certificate
+4. Reader generates random challenge
+5. Card signs challenge with private key
+6. Reader verifies signature with public key
+7. Extract user ID from certificate DN
+   Subject: CN=DOE.JOHN.MIDDLE.1234567890
+
+8. Map to WIA-ACS user
+   POST /v1/authenticate
+   {
+     "credential_type": "smart_card",
+     "certificate_dn": "CN=DOE.JOHN.MIDDLE.1234567890",
+     "challenge_response": "SIGNED_CHALLENGE"
+   }
+
+9. WIA-ACS validates and returns token
+            </pre>
+        </div>
+
+        <h3>RFID/NFC Reader Integration</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Technology</th>
+                    <th>Frequency</th>
+                    <th>Read Range</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>LF Proximity</td>
+                    <td>125 kHz</td>
+                    <td>10 cm</td>
+                    <td>Legacy access cards</td>
+                </tr>
+                <tr>
+                    <td>HF RFID/NFC</td>
+                    <td>13.56 MHz</td>
+                    <td>10-30 cm</td>
+                    <td>Smart cards, mobile NFC</td>
+                </tr>
+                <tr>
+                    <td>UHF RFID</td>
+                    <td>860-960 MHz</td>
+                    <td>1-10 meters</td>
+                    <td>Vehicle access, asset tracking</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Cloud Identity Provider Integration</h2>
+
+        <h3>Azure AD Integration</h3>
+        <div class="code-block">
+            <pre>
+Azure AD SCIM Provisioning:
+
+1. Configure enterprise application
+   - Enable SCIM provisioning
+   - Set tenant URL: https://acs.example.com/scim/v2
+   - Set secret token: SCIM_BEARER_TOKEN
+
+2. Attribute mapping
+   Azure AD          →  WIA-ACS
+   ──────────────────────────────
+   id                →  external_id
+   displayName       →  identity.name
+   givenName         →  identity.given_name
+   surname           →  identity.family_name
+   userPrincipalName →  identity.email
+   department        →  employment.department
+   jobTitle          →  employment.title
+
+3. Azure AD provisions user
+   POST /scim/v2/Users
+   {
+     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+     "externalId": "00000000-0000-0000-0000-000000000001",
+     "userName": "john.doe@example.com",
+     "name": {
+       "givenName": "John",
+       "familyName": "Doe"
+     },
+     "emails": [{
+       "value": "john.doe@example.com",
+       "primary": true
+     }],
+     "active": true
+   }
+
+4. WIA-ACS creates user and returns
+   {
+     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+     "id": "usr-001",
+     "externalId": "00000000-0000-0000-0000-000000000001",
+     "meta": {
+       "resourceType": "User",
+       "created": "2025-12-26T10:00:00Z",
+       "lastModified": "2025-12-26T10:00:00Z",
+       "location": "https://acs.example.com/scim/v2/Users/usr-001"
+     }
+   }
+
+5. Deprovisioning (user disabled in Azure AD)
+   PATCH /scim/v2/Users/usr-001
+   {
+     "Operations": [{
+       "op": "replace",
+       "path": "active",
+       "value": false
+     }]
+   }
+            </pre>
+        </div>
+
+        <h2>Event Correlation and Unified Audit Trail</h2>
+
+        <p>
+            WIA-ACS correlates events from all integrated systems into a unified audit trail:
+        </p>
+
+        <div class="code-block">
+            <pre>
+Event Correlation Example:
+
+Time    System          Event
+─────────────────────────────────────────────────────────────
+10:00   Azure AD        User john.doe@example.com created
+10:01   WIA-ACS         User usr-001 provisioned via SCIM
+10:02   WIA-ACS         Credential cred-xyz789 issued to usr-001
+10:03   HID VertX       Card 123-45678 programmed
+10:05   LDAP Sync       User synchronized to corporate directory
+
+14:30   HID VertX       Card 123-45678 presented at Door 101
+14:30   WIA-ACS         Authentication successful for cred-xyz789
+14:30   WIA-ACS         Authorization granted for door-101
+14:30   HID VertX       Door 101 unlocked
+
+17:00   Azure AD        User john.doe@example.com disabled
+17:01   WIA-ACS         User usr-001 status changed to suspended
+17:01   WIA-ACS         Credential cred-xyz789 revoked
+17:02   HID VertX       Card 123-45678 deactivated
+
+Unified Query:
+GET /v1/audit/events?user_id=usr-001&start_date=2025-12-26T00:00:00Z
+
+Returns chronological events from all systems with correlation IDs
+            </pre>
+        </div>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p>
+                This chapter covered Phase 4 of WIA-ACS: integration with existing systems. We explored the adapter
+                architecture, LDAP/Active Directory synchronization, PACS vendor integrations, biometric device
+                connectivity, smart card systems, RFID/NFC readers, and cloud identity providers. These integrations
+                enable WIA-ACS to work seamlessly with current enterprise infrastructure while providing unified
+                management and audit trails.
+            </p>
+
+            <h3>Key Takeaways</h3>
+            <ol>
+                <li>Adapter pattern enables WIA-ACS to integrate with diverse systems without core platform changes</li>
+                <li>LDAP/Active Directory integration provides bidirectional user synchronization and authentication</li>
+                <li>PACS integrations enable unified credential management across multiple physical access systems</li>
+                <li>Biometric integration supports multiple modalities with standardized enrollment and authentication</li>
+                <li>Event correlation creates unified audit trails across all integrated systems for comprehensive security monitoring</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Explain the adapter pattern used in WIA-ACS. What are the key methods every adapter must implement?</li>
+                <li>Describe the difference between incremental and full LDAP synchronization. When would you use each?</li>
+                <li>How does WIA-ACS provision a credential to a HID VertX PACS? Trace the flow from API call to door configuration.</li>
+                <li>What are the performance requirements for biometric matching? Why is the False Accept Rate (FAR) more critical than False Reject Rate (FRR)?</li>
+                <li>Explain how PIV/CAC smart card authentication works. What makes it more secure than proximity cards?</li>
+                <li>How does event correlation across multiple systems improve security operations?</li>
+            </ol>
+        </div>
+
+        <div class="info-box">
+            <h3>Looking Ahead</h3>
+            <p>
+                With all four phases complete, Chapter 8 provides comprehensive guidance on implementing and certifying
+                WIA-ACS compliant systems, including deployment architectures, testing procedures, certification
+                requirements, and best practices for production operations.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 6: 통합 | WIA-CHIPLET 칩렛 기술 표준</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 6: 이기종 통합과 검증</h1>
+
+    <p>이 챕터에서는 성공적인 칩렛 시스템 개발에 필요한 중요한 EDA 도구, 설계 플로우 및 검증 방법론을 다룹니다. 이기종 통합, 메모리 칩렛 통합, 가속기 연동을 포함한 멀티 다이 시스템의 통합 및 검증은 전통적인 모놀리식 칩 개발을 넘어서는 특화된 접근 방식이 필요한 고유한 과제를 제시합니다.</p>
+
+    <h2>칩렛용 EDA 도구 생태계</h2>
+
+    <p>칩렛 설계에는 멀티 다이 설계, 고급 패키징 및 시스템 수준 통합을 처리하는 확장된 EDA 도구 생태계가 필요합니다. 전통적인 싱글 다이 도구 플로우는 특화된 기능으로 보강되어야 합니다.</p>
+
+    <div class="highlight">
+        <strong>도구 체인 진화</strong>
+        <p>EDA 벤더들은 칩렛 설계를 지원하기 위해 제품을 크게 확장했습니다. 새로운 도구는 멀티 다이 계획, 인터포저 설계, 3D-IC 조립 및 잠재적으로 다른 설계 소스의 여러 칩렛에 걸친 시스템 수준 검증을 다룹니다.</p>
+    </div>
+
+    <h3>칩렛 설계 도구 플로우</h3>
+
+    <pre><code>// 칩렛 EDA 도구 플로우
+interface ChipletEDAFlow {
+    // 시스템 수준 설계
+    systemLevel: {
+        tools: [
+            "시스템 아키텍처 탐색",
+            "칩렛 분할 분석",
+            "인터커넥트 계획",
+            "전력/열 예산"
+        ];
+        inputs: ["시스템 요구사항", "IP 카탈로그"];
+        outputs: ["칩렛 사양", "인터페이스 정의"];
+    };
+
+    // 개별 칩렛 설계
+    chipletDesign: {
+        rtlDesign: {
+            tools: ["HDL 편집기", "합성", "린팅"];
+            standard: "기존 싱글 다이 플로우";
+        };
+        physicalDesign: {
+            tools: ["배치 및 라우팅", "DRC/LVS", "추출"];
+            additions: ["D2D 인터페이스 배치", "PHY 통합"];
+        };
+        signoff: {
+            tools: ["타이밍", "전력", "EM/IR", "SI"];
+            additions: ["D2D 타이밍 제약", "패키지 인식 분석"];
+        };
+    };
+
+    // 패키지 설계
+    packageDesign: {
+        tools: [
+            "인터포저/기판 설계",
+            "범프/비아 계획",
+            "신호 라우팅",
+            "전력 분배 네트워크",
+            "열 분석"
+        ];
+        integration: {
+            importChipletAbstracts: boolean;
+            coDesign: boolean;
+        };
+    };
+
+    // 시스템 통합
+    systemIntegration: {
+        tools: [
+            "멀티 다이 조립",
+            "시스템 수준 타이밍",
+            "전력 무결성",
+            "열 공동 시뮬레이션",
+            "신호 무결성"
+        ];
+        verification: SystemVerificationTools;
+    };
+}</code></pre>
+
+    <h2>멀티 다이 물리적 설계</h2>
+
+    <p>칩렛 시스템의 물리적 설계는 다이-투-다이 인터페이스, 패키지 제약 및 시스템 수준 최적화를 다루기 위해 전통적인 싱글 다이 방법론을 확장합니다.</p>
+
+    <h3>다이-투-다이 인터페이스 물리적 설계</h3>
+
+    <pre><code>// D2D PHY 물리적 구현
+interface D2DPhysicalDesign {
+    // 범프 계획
+    bumpPlan: {
+        pitch: number;            // 마이크로미터 (일반적으로 25-130)
+        diameter: number;         // 마이크로미터
+        arrangement: "Array" | "Peripheral" | "Mixed";
+        signalAssignment: SignalToBumpMap;
+        powerGroundRatio: number; // 신호당 P/G 범프
+    };
+
+    // PHY 배치
+    phyPlacement: {
+        location: "다이 엣지" | "분산";
+        orientation: "수평" | "수직";
+        abutmentRules: AbutmentSpec;
+        keepouts: KeepoutZone[];
+    };
+
+    // 라우팅 제약
+    routing: {
+        matchedLengths: SignalGroup[];
+        impedanceTargets: ImpedanceSpec[];
+        shielding: ShieldingRequirements;
+        crosstalkLimits: CrosstalkSpec;
+    };
+
+    // 전력 공급
+    powerDelivery: {
+        dedicatedPGBumps: number;
+        onDieDecap: CapacitorSpec;
+        irDropBudget: number;      // mV
+    };
+}</code></pre>
+
+    <h3>인터포저 및 패키지 설계</h3>
+
+    <table>
+        <tr>
+            <th>설계 측면</th>
+            <th>실리콘 인터포저</th>
+            <th>유기 기판</th>
+            <th>유리 인터포저</th>
+        </tr>
+        <tr>
+            <td>최소 라인/스페이스</td>
+            <td>0.4/0.4 마이크로미터</td>
+            <td>5/5 마이크로미터</td>
+            <td>2/2 마이크로미터</td>
+        </tr>
+        <tr>
+            <td>비아 피치</td>
+            <td>40-100 마이크로미터 (TSV)</td>
+            <td>200+ 마이크로미터</td>
+            <td>50-100 마이크로미터 (TGV)</td>
+        </tr>
+        <tr>
+            <td>메탈 레이어</td>
+            <td>4-8</td>
+            <td>8-20</td>
+            <td>4-6</td>
+        </tr>
+        <tr>
+            <td>대역폭 밀도</td>
+            <td>매우 높음</td>
+            <td>낮음-중간</td>
+            <td>높음</td>
+        </tr>
+        <tr>
+            <td>비용</td>
+            <td>높음</td>
+            <td>낮음</td>
+            <td>중간</td>
+        </tr>
+    </table>
+
+    <h2>검증 방법론</h2>
+
+    <p>칩렛 검증은 개별 칩렛 기능에서 완전한 시스템 통합까지 여러 수준에 걸쳐 있습니다. 포괄적인 검증 전략은 멀티 다이 시스템에 고유한 과제를 다루어야 합니다.</p>
+
+    <div class="highlight">
+        <strong>검증 복잡성</strong>
+        <p>칩렛 시스템은 전통적인 접근 방식의 시뮬레이션 용량을 초과할 수 있습니다. 4칩렛 시스템은 1000억 개의 트랜지스터를 가질 수 있으며, 이는 실용적인 전체 시스템 시뮬레이션을 훨씬 넘어섭니다. 검증 전략은 계층적 방법, 추상화 및 에뮬레이션을 사용해야 합니다.</p>
+    </div>
+
+    <h3>다중 수준 검증 전략</h3>
+
+    <pre><code>// 칩렛 검증 계층
+interface VerificationStrategy {
+    // 수준 1: 개별 칩렛 검증
+    chipletLevel: {
+        approach: "칩렛당 전체 UVM 환경";
+        scope: "칩렛 내 완전한 기능";
+        coverage: {
+            functional: "100% 계획 커버리지",
+            code: ">95% 라인, 분기, 토글",
+            assertions: ">98% 통과율"
+        };
+        methods: ["시뮬레이션", "Formal", "에뮬레이션"];
+    };
+
+    // 수준 2: D2D 인터페이스 검증
+    interfaceLevel: {
+        approach: "프로토콜 인식 검증";
+        scope: "D2D 프로토콜 준수 및 상호 운용성";
+        components: {
+            protocolVIP: "UCIe/BoW VIP",
+            complianceTests: "표준 준수 스위트",
+            stressTests: "코너 케이스 및 오류 주입"
+        };
+        methods: ["VIP 기반 시뮬레이션", "Formal 프로토콜 검사"];
+    };
+
+    // 수준 3: 시스템 통합 검증
+    systemLevel: {
+        approach: "가상 플랫폼 및 에뮬레이션";
+        scope: "멀티 칩렛 상호작용, 시스템 동작";
+        abstraction: {
+            transactionLevel: "TLM 2.0 모델",
+            cycleAccurate: "RTL + 추상 모델",
+            fullRTL: "FPGA/에뮬레이션만"
+        };
+        methods: ["가상 플랫폼", "FPGA 프로토타이핑", "에뮬레이션"];
+    };
+
+    // 수준 4: 실리콘 검증
+    siliconLevel: {
+        approach: "생산 유사 테스트";
+        scope: "실리콘의 전체 시스템";
+        methods: ["ATE 테스트", "시스템 수준 테스트", "특성화"];
+    };
+}
+
+// D2D 인터페이스 VIP
+class UCIeVIP {
+    // 프로토콜 검사
+    checkProtocolCompliance(transaction: UCIeTransaction): CheckResult {
+        return {
+            formatValid: this.checkFormat(transaction),
+            timingValid: this.checkTiming(transaction),
+            flowControlValid: this.checkFlowControl(transaction),
+            errorHandlingValid: this.checkErrorHandling(transaction)
+        };
+    }
+
+    // 커버리지 수집
+    collectCoverage(transaction: UCIeTransaction): void {
+        this.coverTransactionType(transaction.type);
+        this.coverLaneWidth(transaction.width);
+        this.coverSpeed(transaction.speed);
+        this.coverErrorCases(transaction.errors);
+    }
+}</code></pre>
+
+    <h3>시스템 검증을 위한 가상 플랫폼</h3>
+
+    <pre><code>// 가상 플랫폼 아키텍처
+interface VirtualPlatform {
+    // 플랫폼 구성 요소
+    components: {
+        chipletModels: Map<ChipletId, ChipletModel>;
+        interconnectModel: D2DInterconnectModel;
+        memoryModels: MemorySubsystem;
+        peripheralModels: PeripheralSubsystem;
+    };
+
+    // 모델 추상화 수준
+    abstraction: {
+        functional: {
+            speed: "초당 100만+ 사이클";
+            accuracy: "기능만";
+            useCase: "소프트웨어 개발";
+        };
+        approximately_timed: {
+            speed: "초당 10만 사이클";
+            accuracy: "~10% 타이밍 정확도";
+            useCase: "성능 추정";
+        };
+        cycle_accurate: {
+            speed: "초당 1000 사이클";
+            accuracy: "사이클 정확";
+            useCase: "하드웨어 검증";
+        };
+    };
+
+    // 검증 기능
+    verification: {
+        assertion_checking: boolean;
+        coverage_collection: boolean;
+        debug_access: boolean;
+        checkpoint_restore: boolean;
+    };
+}</code></pre>
+
+    <h2>테스트 설계 (DFT)</h2>
+
+    <p>칩렛 시스템은 개별 칩렛 테스트, D2D 인터페이스 테스트 및 시스템 수준 테스트 액세스를 다루는 정교한 DFT 전략이 필요합니다.</p>
+
+    <pre><code>// 칩렛 DFT 아키텍처
+interface ChipletDFTArchitecture {
+    // 칩렛별 DFT
+    chipletDFT: {
+        scanChains: ScanChainConfig;
+        bist: {
+            logicBIST: LBISTConfig;
+            memoryBIST: MBISTConfig;
+            serdsBIST: SerDesBISTConfig;
+        };
+        compression: CompressionConfig;
+        testAccess: TAP_IEEE1149_1;
+    };
+
+    // D2D 인터페이스 테스트
+    d2dTesting: {
+        loopbackModes: [
+            "근단 루프백",
+            "원단 루프백",
+            "인터포저 통과 루프백"
+        ];
+        bist: D2D_BISTConfig;
+        eyeDiagram: boolean;
+        marginTest: boolean;
+    };
+
+    // 시스템 수준 테스트 액세스
+    systemTestAccess: {
+        testArchitecture: "IEEE 1838" | "Custom";
+        multiDieJTAG: {
+            topology: "데이지 체인" | "스타";
+            dieBridging: boolean;
+        };
+        externalAccess: TestAccessPort;
+    };
+}</code></pre>
+
+    <div class="highlight">
+        <strong>챕터 요약</strong>
+        <p>칩렛 시스템의 통합 및 검증에는 확장된 EDA 도구 기능, 다중 수준 검증 전략 및 정교한 DFT 아키텍처가 필요합니다. 성공은 적절한 도구 플로우, D2D 프로토콜용 검증 IP, 가상 플랫폼 개발 및 가장 초기 설계 단계부터의 테스트 가능성 계획에 달려 있습니다. 이기종 통합, 메모리 칩렛 및 가속기 연동은 이러한 검증 방법론의 핵심 적용 분야입니다.</p>
+    </div>
+</body>
+</html>

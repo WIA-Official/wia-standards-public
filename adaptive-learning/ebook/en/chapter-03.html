@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Learning Path Algorithms - WIA-ADAPTIVE_LEARNING</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 1rem;
+        }
+        h2 {
+            color: var(--primary);
+            font-size: 1.75rem;
+            margin: 2rem 0 1rem 0;
+        }
+        h3 {
+            color: var(--success);
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+            text-align: justify;
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: linear-gradient(135deg, var(--bg-secondary), #1a365d);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-success {
+            background: linear-gradient(135deg, var(--bg-secondary), #064e3b);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-warning {
+            background: linear-gradient(135deg, var(--bg-secondary), #451a03);
+            border-left: 4px solid var(--warning);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background: var(--bg-secondary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter 3: Learning Path Algorithms</h1>
+
+    <p>The effectiveness of an adaptive learning system depends heavily on its ability to determine optimal learning paths for individual learners. This chapter explores the algorithms and personalization engines that power intelligent content sequencing and recommendation in WIA-ADAPTIVE_LEARNING compliant systems.</p>
+
+    <h2>Personalization Engine Architecture</h2>
+
+    <p>The personalization engine is the algorithmic core of an adaptive learning system. It takes learner model data, content metadata, and learning objectives as inputs and produces personalized content recommendations and learning path suggestions.</p>
+
+    <pre>
+// Personalization Engine Core Interface
+interface PersonalizationEngine {
+  // Generate next content recommendation
+  getNextRecommendation(
+    learnerId: string,
+    context: LearningContext
+  ): Promise&lt;ContentRecommendation&gt;;
+
+  // Generate complete learning path
+  generateLearningPath(
+    learnerId: string,
+    targetConcepts: string[],
+    constraints: PathConstraints
+  ): Promise&lt;LearningPath&gt;;
+
+  // Replan path based on new evidence
+  adaptPath(
+    learnerId: string,
+    currentPath: LearningPath,
+    newEvidence: LearningEvidence
+  ): Promise&lt;LearningPath&gt;;
+}
+
+interface LearningContext {
+  currentConcept?: string;
+  sessionDuration: number; // minutes elapsed
+  sessionGoal?: string;
+  availableTime?: number; // minutes remaining
+  deviceType: 'desktop' | 'tablet' | 'mobile';
+  connectivity: 'online' | 'offline' | 'limited';
+}
+
+interface ContentRecommendation {
+  contentId: string;
+  content: LearningObject;
+  rationale: string;
+  confidence: number;
+  alternatives: LearningObject[];
+  predictedOutcomes: {
+    masteryGain: number;
+    estimatedDuration: number;
+    difficultyMatch: number;
+  };
+}
+    </pre>
+
+    <h2>Content Selection Algorithms</h2>
+
+    <p>Content selection determines which learning object to present next. Multiple algorithmic approaches can be employed, each with different strengths and appropriate use cases.</p>
+
+    <h3>Zone of Proximal Development Targeting</h3>
+
+    <p>This approach selects content that falls within the learner's zone of proximal development—challenging enough to promote growth but not so difficult as to cause frustration. The algorithm estimates the probability of success on each available content item and selects items with optimal challenge levels.</p>
+
+    <div class="highlight">
+        <h3>Optimal Challenge Point</h3>
+        <p>Research suggests that learning is optimized when learners have approximately a 70-85% probability of success. Content that is too easy (>95% success probability) fails to challenge, while content that is too difficult (&lt;50% success probability) leads to frustration and disengagement.</p>
+    </div>
+
+    <pre>
+// ZPD-Based Content Selection
+class ZPDContentSelector {
+  private readonly targetSuccessProbability = 0.75;
+  private readonly toleranceRange = 0.10;
+
+  selectContent(
+    availableContent: LearningObject[],
+    learnerState: KnowledgeState,
+    predictor: SuccessPredictor
+  ): LearningObject | null {
+    const scoredContent = availableContent.map(content => {
+      const successProb = predictor.predictSuccess(learnerState, content);
+      const distance = Math.abs(successProb - this.targetSuccessProbability);
+
+      return {
+        content,
+        successProb,
+        score: distance <= this.toleranceRange ? 1 - distance : 0
+      };
+    });
+
+    // Sort by score descending
+    scoredContent.sort((a, b) => b.score - a.score);
+
+    // Return best match or null if none in range
+    return scoredContent[0]?.score > 0 ? scoredContent[0].content : null;
+  }
+}
+
+// Success Predictor using Item Response Theory
+class IRTSuccessPredictor implements SuccessPredictor {
+  predictSuccess(learnerState: KnowledgeState, content: LearningObject): number {
+    const ability = learnerState.estimatedAbility;
+    const difficulty = content.metadata.difficulty;
+    const discrimination = 1.0; // Can be item-specific
+
+    // 3-Parameter Logistic Model
+    const guessing = 0.25; // For multiple choice
+    const probability = guessing + (1 - guessing) /
+      (1 + Math.exp(-discrimination * (ability - difficulty)));
+
+    return probability;
+  }
+}
+    </pre>
+
+    <h3>Multi-Armed Bandit Approaches</h3>
+
+    <p>Multi-armed bandit algorithms balance exploration (trying new content to learn its effectiveness) with exploitation (using known effective content). This approach is particularly valuable when content effectiveness varies across learners.</p>
+
+    <pre>
+// Thompson Sampling for Content Selection
+class ThompsonSamplingSelector {
+  private contentStats: Map&lt;string, { alpha: number; beta: number }&gt; = new Map();
+
+  initialize(contentIds: string[]): void {
+    for (const id of contentIds) {
+      // Prior: Beta(1, 1) = uniform distribution
+      this.contentStats.set(id, { alpha: 1, beta: 1 });
+    }
+  }
+
+  selectContent(availableContent: string[]): string {
+    let bestContent = availableContent[0];
+    let bestSample = -1;
+
+    for (const contentId of availableContent) {
+      const stats = this.contentStats.get(contentId)!;
+      // Sample from Beta distribution
+      const sample = this.sampleBeta(stats.alpha, stats.beta);
+
+      if (sample > bestSample) {
+        bestSample = sample;
+        bestContent = contentId;
+      }
+    }
+
+    return bestContent;
+  }
+
+  updateStats(contentId: string, success: boolean): void {
+    const stats = this.contentStats.get(contentId)!;
+    if (success) {
+      stats.alpha += 1;
+    } else {
+      stats.beta += 1;
+    }
+  }
+
+  private sampleBeta(alpha: number, beta: number): number {
+    // Simplified beta sampling using gamma distribution
+    const x = this.sampleGamma(alpha);
+    const y = this.sampleGamma(beta);
+    return x / (x + y);
+  }
+
+  private sampleGamma(shape: number): number {
+    // Marsaglia and Tsang's method (simplified)
+    if (shape < 1) {
+      return this.sampleGamma(shape + 1) * Math.pow(Math.random(), 1 / shape);
+    }
+    const d = shape - 1/3;
+    const c = 1 / Math.sqrt(9 * d);
+    while (true) {
+      let x: number, v: number;
+      do {
+        x = this.normalRandom();
+        v = 1 + c * x;
+      } while (v <= 0);
+      v = v * v * v;
+      const u = Math.random();
+      if (u < 1 - 0.0331 * (x*x) * (x*x)) return d * v;
+      if (Math.log(u) < 0.5 * x*x + d * (1 - v + Math.log(v))) return d * v;
+    }
+  }
+
+  private normalRandom(): number {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+}
+    </pre>
+
+    <h2>Learning Path Generation</h2>
+
+    <p>Learning path generation creates a sequence of content items that efficiently moves a learner from their current state to desired learning outcomes. This is a complex optimization problem that must consider prerequisites, learner preferences, time constraints, and pedagogical principles.</p>
+
+    <h3>Constraint-Based Path Planning</h3>
+
+    <p>Path planning algorithms must respect various constraints while optimizing for learning efficiency. Common constraints include prerequisite relationships, time limits, content availability, and learner preferences.</p>
+
+    <table>
+        <tr>
+            <th>Constraint Type</th>
+            <th>Description</th>
+            <th>Handling Approach</th>
+        </tr>
+        <tr>
+            <td>Prerequisites</td>
+            <td>Content requires prior knowledge</td>
+            <td>Topological ordering</td>
+        </tr>
+        <tr>
+            <td>Time Limits</td>
+            <td>Session or course duration</td>
+            <td>Knapsack optimization</td>
+        </tr>
+        <tr>
+            <td>Modality Variety</td>
+            <td>Mix of content types</td>
+            <td>Diversity constraints</td>
+        </tr>
+        <tr>
+            <td>Spacing</td>
+            <td>Distributed practice</td>
+            <td>Temporal scheduling</td>
+        </tr>
+    </table>
+
+    <pre>
+// Learning Path Generator
+class LearningPathGenerator {
+  constructor(
+    private knowledgeGraph: KnowledgeGraph,
+    private contentRepository: ContentRepository
+  ) {}
+
+  async generatePath(
+    learnerState: KnowledgeState,
+    targetConcepts: string[],
+    constraints: PathConstraints
+  ): Promise&lt;LearningPath&gt; {
+    // Step 1: Identify knowledge gaps
+    const gaps = this.identifyGaps(learnerState, targetConcepts);
+
+    // Step 2: Determine prerequisite chain
+    const requiredConcepts = this.expandPrerequisites(gaps);
+
+    // Step 3: Topologically sort concepts
+    const orderedConcepts = this.topologicalSort(requiredConcepts);
+
+    // Step 4: Select content for each concept
+    const contentSequence = await this.selectContentForConcepts(
+      orderedConcepts,
+      learnerState,
+      constraints
+    );
+
+    // Step 5: Optimize for constraints
+    const optimizedPath = this.optimizeForConstraints(
+      contentSequence,
+      constraints
+    );
+
+    return {
+      concepts: orderedConcepts,
+      content: optimizedPath,
+      estimatedDuration: this.calculateDuration(optimizedPath),
+      checkpoints: this.identifyCheckpoints(optimizedPath)
+    };
+  }
+
+  private identifyGaps(
+    learnerState: KnowledgeState,
+    targets: string[]
+  ): string[] {
+    return targets.filter(concept => {
+      const mastery = learnerState.conceptMastery.get(concept) || 0;
+      return mastery < 0.8; // Below mastery threshold
+    });
+  }
+
+  private expandPrerequisites(concepts: string[]): Set&lt;string&gt; {
+    const required = new Set&lt;string&gt;(concepts);
+    const queue = [...concepts];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const prereqs = this.knowledgeGraph.getPrerequisites(current);
+
+      for (const prereq of prereqs) {
+        if (!required.has(prereq)) {
+          required.add(prereq);
+          queue.push(prereq);
+        }
+      }
+    }
+
+    return required;
+  }
+
+  private topologicalSort(concepts: Set&lt;string&gt;): string[] {
+    const sorted: string[] = [];
+    const visited = new Set&lt;string&gt;();
+
+    const visit = (concept: string): void => {
+      if (visited.has(concept) || !concepts.has(concept)) return;
+      visited.add(concept);
+
+      for (const prereq of this.knowledgeGraph.getPrerequisites(concept)) {
+        visit(prereq);
+      }
+      sorted.push(concept);
+    };
+
+    for (const concept of concepts) {
+      visit(concept);
+    }
+
+    return sorted;
+  }
+}
+    </pre>
+
+    <div class="highlight-success">
+        <h3>Spaced Repetition Integration</h3>
+        <p>Effective learning paths incorporate spaced repetition principles, scheduling review of previously learned material at optimal intervals. The WIA-ADAPTIVE_LEARNING standard requires support for spaced repetition scheduling based on established algorithms such as SM-2 or its successors.</p>
+    </div>
+
+    <h2>Reinforcement Learning Approaches</h2>
+
+    <p>Reinforcement learning offers a powerful framework for learning path optimization. The system learns to make sequencing decisions that maximize long-term learning outcomes through trial and feedback.</p>
+
+    <pre>
+// RL-Based Path Optimizer
+interface RLPathOptimizer {
+  // State representation
+  encodeState(learnerState: KnowledgeState, context: LearningContext): number[];
+
+  // Action selection
+  selectAction(state: number[]): ContentAction;
+
+  // Reward computation
+  computeReward(
+    priorState: KnowledgeState,
+    action: ContentAction,
+    posteriorState: KnowledgeState,
+    engagement: EngagementMetrics
+  ): number;
+
+  // Policy update
+  update(experience: Experience): void;
+}
+
+// Deep Q-Network for Content Sequencing
+class DQNSequencer {
+  private model: NeuralNetwork;
+  private targetModel: NeuralNetwork;
+  private replayBuffer: Experience[] = [];
+  private readonly bufferSize = 10000;
+  private readonly batchSize = 32;
+  private readonly gamma = 0.99; // Discount factor
+
+  selectContent(state: number[]): string {
+    // Epsilon-greedy exploration
+    if (Math.random() < this.epsilon) {
+      return this.randomContent();
+    }
+
+    const qValues = this.model.predict(state);
+    return this.contentActions[this.argmax(qValues)];
+  }
+
+  train(experience: Experience): void {
+    this.replayBuffer.push(experience);
+    if (this.replayBuffer.length > this.bufferSize) {
+      this.replayBuffer.shift();
+    }
+
+    if (this.replayBuffer.length >= this.batchSize) {
+      const batch = this.sampleBatch();
+      this.updateModel(batch);
+    }
+  }
+
+  private updateModel(batch: Experience[]): void {
+    for (const exp of batch) {
+      const target = exp.reward +
+        this.gamma * Math.max(...this.targetModel.predict(exp.nextState));
+
+      const currentQ = this.model.predict(exp.state);
+      currentQ[exp.actionIndex] = target;
+
+      this.model.fit(exp.state, currentQ);
+    }
+  }
+}
+    </pre>
+
+    <h2>Adaptive Sequencing Strategies</h2>
+
+    <p>Different sequencing strategies may be appropriate for different learning contexts. The WIA-ADAPTIVE_LEARNING standard supports multiple configurable strategies.</p>
+
+    <div class="highlight-warning">
+        <h3>Strategy Selection Guidelines</h3>
+        <ul>
+            <li><strong>Mastery-Based:</strong> Best for foundational skills requiring high proficiency</li>
+            <li><strong>Interleaved:</strong> Effective for discrimination learning and transfer</li>
+            <li><strong>Spiral:</strong> Suitable for complex topics revisited at increasing depth</li>
+            <li><strong>Adaptive Difficulty:</strong> Maintains engagement through challenge calibration</li>
+        </ul>
+    </div>
+
+    <pre>
+// Sequencing Strategy Implementations
+abstract class SequencingStrategy {
+  abstract getNext(
+    learnerState: KnowledgeState,
+    availableContent: LearningObject[]
+  ): LearningObject;
+}
+
+class MasteryBasedStrategy extends SequencingStrategy {
+  private readonly masteryThreshold = 0.85;
+
+  getNext(state: KnowledgeState, content: LearningObject[]): LearningObject {
+    // Find first unmastered concept in sequence
+    for (const item of content) {
+      const conceptMastery = state.conceptMastery.get(item.metadata.concepts[0]) || 0;
+      if (conceptMastery < this.masteryThreshold) {
+        return item;
+      }
+    }
+    return content[content.length - 1];
+  }
+}
+
+class InterleavedStrategy extends SequencingStrategy {
+  private recentConcepts: string[] = [];
+  private readonly historyLength = 5;
+
+  getNext(state: KnowledgeState, content: LearningObject[]): LearningObject {
+    // Prefer content from different concepts than recently seen
+    const scored = content.map(item => {
+      const concept = item.metadata.concepts[0];
+      const recency = this.recentConcepts.indexOf(concept);
+      const recencyScore = recency === -1 ? 1 : (this.historyLength - recency) / this.historyLength;
+
+      return { item, score: recencyScore };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    const selected = scored[0].item;
+    this.updateHistory(selected.metadata.concepts[0]);
+
+    return selected;
+  }
+
+  private updateHistory(concept: string): void {
+    this.recentConcepts.unshift(concept);
+    if (this.recentConcepts.length > this.historyLength) {
+      this.recentConcepts.pop();
+    }
+  }
+}
+    </pre>
+
+    <h2>Summary</h2>
+
+    <p>Learning path algorithms form the intelligent core of adaptive learning systems. By combining knowledge modeling, content selection, and path optimization techniques, these algorithms create personalized learning experiences that adapt to each learner's unique characteristics and progress.</p>
+
+    <div class="highlight">
+        <h3>Key Algorithm Categories</h3>
+        <ul>
+            <li>Content selection using ZPD targeting and success prediction</li>
+            <li>Multi-armed bandit approaches for exploration-exploitation balance</li>
+            <li>Constraint-based path planning with prerequisite handling</li>
+            <li>Reinforcement learning for long-term optimization</li>
+            <li>Configurable sequencing strategies for different contexts</li>
+        </ul>
+    </div>
+</body>
+</html>

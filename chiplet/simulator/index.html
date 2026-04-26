@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧩 WIA Chiplet Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e0e0;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        }
+
+        .logo {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            background: rgba(45, 53, 97, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: rgba(102, 126, 234, 0.2);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            color: #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel {
+            background: linear-gradient(135deg, #2d3561 0%, #1f2544 100%);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .chiplet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chiplet-card {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .chiplet-card:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        }
+
+        .chiplet-card.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .chiplet-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .chiplet-spec {
+            font-size: 0.9em;
+            color: #b0b0b0;
+            margin: 5px 0;
+        }
+
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .control-group select,
+        .control-group input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 1em;
+        }
+
+        .control-group select:focus,
+        .control-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background: rgba(102, 126, 234, 0.2);
+            border: 2px solid rgba(102, 126, 234, 0.5);
+        }
+
+        .visualization {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            border-radius: 10px;
+            margin: 20px 0;
+            min-height: 300px;
+            position: relative;
+        }
+
+        .chiplet-visual {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .chiplet-box {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s;
+        }
+
+        .chiplet-box:hover {
+            transform: scale(1.1);
+        }
+
+        .chiplet-box .icon {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .chiplet-box .name {
+            font-size: 0.8em;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .connection {
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-card .label {
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .value {
+            color: #667eea;
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .stat-card .unit {
+            color: #b0b0b0;
+            font-size: 0.9em;
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #667eea;
+            padding-left: 15px;
+        }
+
+        .log-entry.info {
+            border-left-color: #4CAF50;
+            color: #4CAF50;
+        }
+
+        .log-entry.warning {
+            border-left-color: #FFC107;
+            color: #FFC107;
+        }
+
+        .log-entry.error {
+            border-left-color: #F44336;
+            color: #F44336;
+        }
+
+        .log-entry .timestamp {
+            color: #888;
+            font-size: 0.85em;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: rgba(102, 126, 234, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+        }
+
+        .integration-canvas {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            position: relative;
+        }
+
+        .package-layer {
+            border: 3px dashed rgba(102, 126, 234, 0.5);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .package-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: #1f2544;
+            padding: 5px 15px;
+            border-radius: 5px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+            border-top: 2px solid rgba(102, 126, 234, 0.3);
+            color: #888;
+        }
+
+        .philosophy {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .chiplet-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <!-- WIA top-nav (added by inject-annexes.sh for v3 21/21 compliance) -->
+    <style>
+      .wia-topnav { display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 20px; border-bottom: 1px solid rgba(127,127,127,0.25);
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                    font-size: 14px; background: rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 9999; }
+      .wia-topnav a { color: inherit; text-decoration: none; }
+      .wia-topnav a:hover { text-decoration: underline; }
+      .wia-topnav__left { display: flex; align-items: center; gap: 16px; }
+      .wia-topnav__home { font-weight: 700; }
+      .wia-topnav__crumb { opacity: 0.75; }
+      .wia-topnav__crumb .sep { margin: 0 6px; opacity: 0.5; }
+      .wia-topnav__right { display: flex; align-items: center; gap: 16px; }
+      @media (max-width: 720px) { .wia-topnav { flex-direction: column; gap: 8px; } .wia-topnav__crumb { display: none; } }
+    </style>
+    <nav class="wia-topnav top-nav" aria-label="WIA Standards top-nav">
+      <div class="wia-topnav__left">
+        <a class="wia-topnav__home" href="https://wiastandards.com" target="_blank" rel="noopener">🌐 WIA Standards</a>
+        <span class="wia-topnav__crumb">
+          <a href="https://wiastandards.com" target="_blank" rel="noopener">Home</a>
+          <span class="sep">›</span>
+          <a href="https://wiastandards.com/#standards" target="_blank" rel="noopener">Standards</a>
+          <span class="sep">›</span>
+          <span aria-current="page">Chiplet</span>
+        </span>
+      </div>
+      <div class="wia-topnav__right">
+        <a href="https://cert.wiastandards.com" target="_blank" rel="noopener">🏆 Certification</a>
+        <a href="https://wiabook.com" target="_blank" rel="noopener">📚 Ebook</a>
+        <a href="https://github.com/WIA-Official/wia-standards" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="logo">🧩</div>
+            <h1>WIA Chiplet Simulator</h1>
+            <p class="subtitle">Interactive Chiplet Architecture Design & Simulation</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('chiplets')">🧩 Chiplets</button>
+            <button class="tab" onclick="switchTab('interface')">⚡ Interface</button>
+            <button class="tab" onclick="switchTab('integration')">🔧 Integration</button>
+            <button class="tab" onclick="switchTab('performance')">📊 Performance</button>
+            <button class="tab" onclick="switchTab('logs')">📋 Logs</button>
+        </div>
+
+        <!-- Tab 1: Chiplets -->
+        <div id="chiplets" class="tab-content active">
+            <div class="panel">
+                <h2>Available Chiplets</h2>
+                <p style="color: #b0b0b0; margin-bottom: 20px;">Select chiplets to add to your system design</p>
+
+                <div class="chiplet-grid">
+                    <div class="chiplet-card" onclick="toggleChiplet(this, 'compute')">
+                        <h3>💻 Compute Chiplet</h3>
+                        <div class="chiplet-spec">Process: 3nm FinFET</div>
+                        <div class="chiplet-spec">Cores: 16x ARM v9</div>
+                        <div class="chiplet-spec">Frequency: 3.5 GHz</div>
+                        <div class="chiplet-spec">Power: 45W TDP</div>
+                        <div class="chiplet-spec">UCIe: 32 lanes</div>
+                    </div>
+
+                    <div class="chiplet-card" onclick="toggleChiplet(this, 'memory')">
+                        <h3>🗄️ Memory Chiplet</h3>
+                        <div class="chiplet-spec">Process: 7nm DRAM</div>
+                        <div class="chiplet-spec">Capacity: 32GB HBM3</div>
+                        <div class="chiplet-spec">Bandwidth: 1.2 TB/s</div>
+                        <div class="chiplet-spec">Power: 12W TDP</div>
+                        <div class="chiplet-spec">UCIe: 64 lanes</div>
+                    </div>
+
+                    <div class="chiplet-card" onclick="toggleChiplet(this, 'ai')">
+                        <h3>🤖 AI Accelerator</h3>
+                        <div class="chiplet-spec">Process: 5nm</div>
+                        <div class="chiplet-spec">TOPs: 500 INT8</div>
+                        <div class="chiplet-spec">Tensor Cores: 256</div>
+                        <div class="chiplet-spec">Power: 35W TDP</div>
+                        <div class="chiplet-spec">UCIe: 32 lanes</div>
+                    </div>
+
+                    <div class="chiplet-card" onclick="toggleChiplet(this, 'io')">
+                        <h3>🔌 I/O Chiplet</h3>
+                        <div class="chiplet-spec">Process: 14nm</div>
+                        <div class="chiplet-spec">PCIe: 5.0 x16</div>
+                        <div class="chiplet-spec">Ethernet: 200Gb/s</div>
+                        <div class="chiplet-spec">Power: 8W TDP</div>
+                        <div class="chiplet-spec">UCIe: 16 lanes</div>
+                    </div>
+
+                    <div class="chiplet-card" onclick="toggleChiplet(this, 'gpu')">
+                        <h3>🎮 Graphics Chiplet</h3>
+                        <div class="chiplet-spec">Process: 4nm</div>
+                        <div class="chiplet-spec">Cores: 128 CUs</div>
+                        <div class="chiplet-spec">TFLOPS: 40 FP32</div>
+                        <div class="chiplet-spec">Power: 50W TDP</div>
+                        <div class="chiplet-spec">UCIe: 32 lanes</div>
+                    </div>
+
+                    <div class="chiplet-card" onclick="toggleChiplet(this, 'security')">
+                        <h3>🛡️ Security Chiplet</h3>
+                        <div class="chiplet-spec">Process: 22nm</div>
+                        <div class="chiplet-spec">Crypto: AES-256</div>
+                        <div class="chiplet-spec">TPM: 2.0</div>
+                        <div class="chiplet-spec">Power: 2W TDP</div>
+                        <div class="chiplet-spec">UCIe: 8 lanes</div>
+                    </div>
+                </div>
+
+                <div class="control-panel">
+                    <button class="btn" onclick="addSelectedChiplets()">Add to System</button>
+                    <button class="btn btn-secondary" onclick="clearSelection()">Clear Selection</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Current System Configuration</h2>
+                <div class="visualization">
+                    <div id="systemVisualization" class="chiplet-visual">
+                        <div style="color: #888; text-align: center; width: 100%;">
+                            Select chiplets to build your system
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Interface -->
+        <div id="interface" class="tab-content">
+            <div class="panel">
+                <h2>UCIe Interface Configuration</h2>
+
+                <div class="control-panel">
+                    <div class="control-group">
+                        <label>Interface Type</label>
+                        <select id="interfaceType" onchange="updateInterface()">
+                            <option value="ucie">UCIe Standard</option>
+                            <option value="ucie-advanced">UCIe Advanced</option>
+                            <option value="custom">Custom Protocol</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Lane Count</label>
+                        <select id="laneCount" onchange="updateInterface()">
+                            <option value="16">16 lanes</option>
+                            <option value="32" selected>32 lanes</option>
+                            <option value="64">64 lanes</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Protocol</label>
+                        <select id="protocol" onchange="updateInterface()">
+                            <option value="raw">Raw Mode</option>
+                            <option value="streaming">Streaming</option>
+                            <option value="pcie">PCIe Mapping</option>
+                            <option value="cxl" selected>CXL Mapping</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Voltage (V)</label>
+                        <input type="number" id="voltage" value="0.75" min="0.4" max="1.0" step="0.05" onchange="updateInterface()">
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="margin-top: 30px;">
+                    <div class="stat-card">
+                        <div class="label">Bandwidth</div>
+                        <div class="value" id="bandwidth">512</div>
+                        <div class="unit">GB/s</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Latency</div>
+                        <div class="value" id="latency">4.2</div>
+                        <div class="unit">ns</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Energy Efficiency</div>
+                        <div class="value" id="efficiency">0.42</div>
+                        <div class="unit">pJ/bit</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Total Power</div>
+                        <div class="value" id="interfacePower">3.2</div>
+                        <div class="unit">W</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Signal Integrity Analysis</h2>
+                <div class="visualization">
+                    <canvas id="signalCanvas" width="800" height="200" style="width: 100%; height: auto;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Integration -->
+        <div id="integration" class="tab-content">
+            <div class="panel">
+                <h2>Package Integration</h2>
+
+                <div class="control-panel">
+                    <div class="control-group">
+                        <label>Package Type</label>
+                        <select id="packageType" onchange="updateIntegration()">
+                            <option value="2.5D" selected>2.5D Interposer</option>
+                            <option value="3D">3D Stacking (TSV)</option>
+                            <option value="organic">Organic Substrate</option>
+                            <option value="hybrid">Hybrid</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Interposer Material</label>
+                        <select id="interposer" onchange="updateIntegration()">
+                            <option value="silicon" selected>Silicon</option>
+                            <option value="glass">Glass</option>
+                            <option value="organic">Organic</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Bump Pitch (μm)</label>
+                        <select id="bumpPitch" onchange="updateIntegration()">
+                            <option value="25">25 μm (Advanced)</option>
+                            <option value="40">40 μm</option>
+                            <option value="55" selected>55 μm (Standard)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="integration-canvas">
+                    <div class="package-layer">
+                        <div class="package-label" id="packageLabel">2.5D Silicon Interposer</div>
+                        <div class="chiplet-visual" id="integrationViz">
+                            <div class="chiplet-box">
+                                <div class="icon">💻</div>
+                                <div class="name">Compute</div>
+                            </div>
+                            <div class="connection"></div>
+                            <div class="chiplet-box">
+                                <div class="icon">🗄️</div>
+                                <div class="name">Memory</div>
+                            </div>
+                            <div class="connection"></div>
+                            <div class="chiplet-box">
+                                <div class="icon">🔌</div>
+                                <div class="name">I/O</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="margin-top: 20px;">
+                    <div class="stat-card">
+                        <div class="label">Package Size</div>
+                        <div class="value" id="packageSize">42.5</div>
+                        <div class="unit">mm × 42.5 mm</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Die Count</div>
+                        <div class="value" id="dieCount">3</div>
+                        <div class="unit">chiplets</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Yield Estimate</div>
+                        <div class="value" id="yieldEst">78</div>
+                        <div class="unit">%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Cost Index</div>
+                        <div class="value" id="costIndex">85</div>
+                        <div class="unit">relative</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Performance -->
+        <div id="performance" class="tab-content">
+            <div class="panel">
+                <h2>System Performance Metrics</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="label">Total Compute</div>
+                        <div class="value" id="totalCompute">128</div>
+                        <div class="unit">TFLOPS</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Memory Bandwidth</div>
+                        <div class="value" id="memBandwidth">1200</div>
+                        <div class="unit">GB/s</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">System Power</div>
+                        <div class="value" id="sysPower">152</div>
+                        <div class="unit">W</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Performance/Watt</div>
+                        <div class="value" id="perfWatt">0.84</div>
+                        <div class="unit">TFLOPS/W</div>
+                    </div>
+                </div>
+
+                <div class="slider-container" style="margin-top: 30px;">
+                    <label style="color: #667eea; font-weight: bold;">Workload Distribution</label>
+                    <div style="margin: 20px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>Compute Load</span>
+                            <span id="computeLoad">75%</span>
+                        </div>
+                        <input type="range" class="slider" min="0" max="100" value="75" onchange="updateWorkload(this, 'compute')">
+                    </div>
+
+                    <div style="margin: 20px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>Memory Load</span>
+                            <span id="memoryLoad">60%</span>
+                        </div>
+                        <input type="range" class="slider" min="0" max="100" value="60" onchange="updateWorkload(this, 'memory')">
+                    </div>
+
+                    <div style="margin: 20px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>I/O Load</span>
+                            <span id="ioLoad">40%</span>
+                        </div>
+                        <input type="range" class="slider" min="0" max="100" value="40" onchange="updateWorkload(this, 'io')">
+                    </div>
+                </div>
+
+                <div class="control-panel">
+                    <button class="btn" onclick="runBenchmark()">Run Benchmark</button>
+                    <button class="btn btn-secondary" onclick="optimizePerformance()">Auto Optimize</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Thermal Analysis</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="label">Junction Temp</div>
+                        <div class="value" id="junctionTemp">72</div>
+                        <div class="unit">°C</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Ambient Temp</div>
+                        <div class="value" id="ambientTemp">25</div>
+                        <div class="unit">°C</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Thermal Margin</div>
+                        <div class="value" id="thermalMargin">28</div>
+                        <div class="unit">°C</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="label">Cooling Power</div>
+                        <div class="value" id="coolingPower">15</div>
+                        <div class="unit">W</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Logs -->
+        <div id="logs" class="tab-content">
+            <div class="panel">
+                <h2>System Logs</h2>
+                <div class="control-panel">
+                    <button class="btn" onclick="refreshLogs()">Refresh</button>
+                    <button class="btn btn-secondary" onclick="clearLogs()">Clear Logs</button>
+                    <button class="btn btn-secondary" onclick="exportLogs()">Export</button>
+                </div>
+
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry info">
+                        <span class="timestamp">[2025-12-27 10:00:00]</span> System initialized successfully
+                    </div>
+                    <div class="log-entry info">
+                        <span class="timestamp">[2025-12-27 10:00:01]</span> UCIe interface configuration loaded
+                    </div>
+                    <div class="log-entry info">
+                        <span class="timestamp">[2025-12-27 10:00:02]</span> Chiplet discovery started
+                    </div>
+                    <div class="log-entry info">
+                        <span class="timestamp">[2025-12-27 10:00:03]</span> Found 3 chiplets in system
+                    </div>
+                    <div class="log-entry info">
+                        <span class="timestamp">[2025-12-27 10:00:04]</span> Power management initialized
+                    </div>
+                    <div class="log-entry info">
+                        <span class="timestamp">[2025-12-27 10:00:05]</span> Thermal monitoring active
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+            <p>&copy; 2025 SmileStory Inc. / WIA</p>
+            <p>WIA-SEMI-004: Chiplet Standard Simulator v1.0.0</p>
+        </footer>
+    </div>
+
+    <script>
+        let selectedChiplets = new Set();
+        let systemChiplets = [];
+
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+
+            // Initialize tab-specific content
+            if (tabName === 'interface') {
+                drawSignalIntegrity();
+            }
+        }
+
+        function toggleChiplet(element, chipletId) {
+            element.classList.toggle('selected');
+            if (selectedChiplets.has(chipletId)) {
+                selectedChiplets.delete(chipletId);
+            } else {
+                selectedChiplets.add(chipletId);
+            }
+        }
+
+        function addSelectedChiplets() {
+            selectedChiplets.forEach(chipletId => {
+                if (!systemChiplets.includes(chipletId)) {
+                    systemChiplets.push(chipletId);
+                    addLog(`Added ${chipletId} chiplet to system`, 'info');
+                }
+            });
+            updateSystemVisualization();
+            clearSelection();
+        }
+
+        function clearSelection() {
+            selectedChiplets.clear();
+            document.querySelectorAll('.chiplet-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+        }
+
+        function updateSystemVisualization() {
+            const viz = document.getElementById('systemVisualization');
+            if (systemChiplets.length === 0) {
+                viz.innerHTML = '<div style="color: #888; text-align: center; width: 100%;">Select chiplets to build your system</div>';
+                return;
+            }
+
+            const chipletIcons = {
+                'compute': '💻',
+                'memory': '🗄️',
+                'ai': '🤖',
+                'io': '🔌',
+                'gpu': '🎮',
+                'security': '🛡️'
+            };
+
+            let html = '';
+            systemChiplets.forEach((chiplet, index) => {
+                html += `
+                    <div class="chiplet-box">
+                        <div class="icon">${chipletIcons[chiplet]}</div>
+                        <div class="name">${chiplet}</div>
+                    </div>
+                `;
+                if (index < systemChiplets.length - 1) {
+                    html += '<div class="connection"></div>';
+                }
+            });
+
+            viz.innerHTML = html;
+            updatePerformanceMetrics();
+        }
+
+        function updateInterface() {
+            const lanes = parseInt(document.getElementById('laneCount').value);
+            const protocol = document.getElementById('protocol').value;
+
+            // Calculate bandwidth
+            const bandwidth = lanes * 16; // GB/s
+            document.getElementById('bandwidth').textContent = bandwidth;
+
+            // Calculate latency
+            const latency = protocol === 'raw' ? 3.5 : (protocol === 'cxl' ? 4.2 : 5.8);
+            document.getElementById('latency').textContent = latency.toFixed(1);
+
+            // Calculate efficiency
+            const efficiency = (0.3 + (lanes / 200)).toFixed(2);
+            document.getElementById('efficiency').textContent = efficiency;
+
+            // Calculate power
+            const power = (lanes * 0.1).toFixed(1);
+            document.getElementById('interfacePower').textContent = power;
+
+            addLog(`Interface updated: ${lanes} lanes, ${protocol} protocol`, 'info');
+            drawSignalIntegrity();
+        }
+
+        function drawSignalIntegrity() {
+            const canvas = document.getElementById('signalCanvas');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(102, 126, 234, 0.2)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < width; i += 50) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, height);
+                ctx.stroke();
+            }
+
+            // Draw signal
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+
+            for (let x = 0; x < width; x++) {
+                const y = height / 2 + Math.sin(x * 0.05) * 40 + Math.random() * 5;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        function updateIntegration() {
+            const packageType = document.getElementById('packageType').value;
+            const interposer = document.getElementById('interposer').value;
+
+            document.getElementById('packageLabel').textContent = `${packageType} ${interposer.charAt(0).toUpperCase() + interposer.slice(1)} Package`;
+
+            addLog(`Integration updated: ${packageType} package with ${interposer} interposer`, 'info');
+        }
+
+        function updateWorkload(slider, type) {
+            const value = slider.value;
+            document.getElementById(type + 'Load').textContent = value + '%';
+
+            // Update power consumption based on load
+            const basePower = 152;
+            const totalLoad = (parseInt(document.getElementById('computeLoad').textContent) +
+                              parseInt(document.getElementById('memoryLoad').textContent) +
+                              parseInt(document.getElementById('ioLoad').textContent)) / 3;
+
+            const sysPower = (basePower * totalLoad / 100).toFixed(0);
+            document.getElementById('sysPower').textContent = sysPower;
+
+            const junctionTemp = (45 + totalLoad * 0.55).toFixed(0);
+            document.getElementById('junctionTemp').textContent = junctionTemp;
+
+            addLog(`${type} workload set to ${value}%`, 'info');
+        }
+
+        function updatePerformanceMetrics() {
+            // Simulate performance calculations based on selected chiplets
+            const hasCompute = systemChiplets.includes('compute');
+            const hasGPU = systemChiplets.includes('gpu');
+            const hasAI = systemChiplets.includes('ai');
+            const hasMemory = systemChiplets.includes('memory');
+
+            let tflops = 0;
+            let power = 0;
+
+            if (hasCompute) { tflops += 8; power += 45; }
+            if (hasGPU) { tflops += 40; power += 50; }
+            if (hasAI) { tflops += 80; power += 35; }
+            if (hasMemory) { power += 12; }
+
+            document.getElementById('totalCompute').textContent = tflops;
+            document.getElementById('sysPower').textContent = power;
+
+            if (power > 0) {
+                const perfWatt = (tflops / power).toFixed(2);
+                document.getElementById('perfWatt').textContent = perfWatt;
+            }
+        }
+
+        function runBenchmark() {
+            addLog('Starting benchmark...', 'info');
+
+            setTimeout(() => {
+                addLog('Benchmark completed', 'info');
+                addLog('Performance: 95th percentile', 'info');
+            }, 1000);
+        }
+
+        function optimizePerformance() {
+            addLog('Running optimization algorithm...', 'info');
+
+            setTimeout(() => {
+                document.getElementById('computeLoad').textContent = '85%';
+                document.getElementById('memoryLoad').textContent = '70%';
+                document.getElementById('ioLoad').textContent = '55%';
+                addLog('System optimized for balanced performance', 'info');
+            }, 1500);
+        }
+
+        function addLog(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function refreshLogs() {
+            addLog('Logs refreshed', 'info');
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            addLog('Logs cleared', 'info');
+        }
+
+        function exportLogs() {
+            const logs = document.getElementById('logContainer').innerText;
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chiplet-simulator-logs.txt';
+            a.click();
+            addLog('Logs exported', 'info');
+        }
+
+        // Initialize
+        updateInterface();
+        updateIntegration();
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

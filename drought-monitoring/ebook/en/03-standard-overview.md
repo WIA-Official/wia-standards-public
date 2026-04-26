@@ -17,11 +17,11 @@ The standard does not invent new drought indices or algorithms. Rather, it stand
 | Component | Scientific Foundation | Key References |
 |-----------|----------------------|----------------|
 | PDSI | Palmer (1965), Self-calibrated PDSI | J. Applied Meteorology |
-| SPI/SPEI | 선행 연구, 선행 연구 | J. Climate |
+| SPI/SPEI | — | J. Climate |
 | NDVI | Rouse et al. (1974), Tucker (1979) | Remote Sensing |
-| FAO-56 ET | 선행 연구 | FAO Irrigation Paper 56 |
-| Atmospheric Correction | 선행 연구, 6S Model | RSE |
-| Cloud Masking | 선행 연구, Fmask | RSE |
+| FAO-56 ET | — | FAO Irrigation Paper 56 |
+| Atmospheric Correction | 관련 분야 자료, 6S Model | RSE |
+| Cloud Masking | 관련 분야 자료, Fmask | RSE |
 
 **Principle 2: Operational Practicality**
 

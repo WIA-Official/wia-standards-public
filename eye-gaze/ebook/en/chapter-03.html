@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA Eye Gaze Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Eye Gaze Tracking Standard</h1>
+        <p class="subtitle">Chapter 3: API Endpoints</p>
+        <span class="version">Version 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>Chapter 3: API Endpoints</h1>
+
+        <h2>3.1 Overview</h2>
+        <p>The WIA Eye Gaze API defines a standardized set of endpoints for controlling eye tracking devices, managing calibration, streaming gaze data, and handling interaction zones. This chapter covers the complete API surface.</p>
+
+        <h2>3.2 Device Discovery & Connection</h2>
+
+        <h3>List Available Devices</h3>
+        <pre><code>GET /api/v1/devices</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "devices": [
+    {
+      "deviceId": "tobii-pro-fusion-001",
+      "vendor": "Tobii",
+      "model": "Pro Fusion",
+      "status": "connected",
+      "capabilities": {
+        "samplingRate": [60, 120, 250],
+        "binocular": true,
+        "accuracy": 0.4
+      }
+    }
+  ]
+}</code></pre>
+
+        <h3>Get Device Capabilities</h3>
+        <pre><code>GET /api/v1/devices/{deviceId}/capabilities</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "device": {
+    "deviceId": "tobii-pro-fusion-001",
+    "vendor": "Tobii",
+    "model": "Pro Fusion",
+    "firmwareVersion": "2.1.0",
+    "protocolVersion": "1.0.0"
+  },
+  "tracking": {
+    "binocular": true,
+    "headTracking": true,
+    "gaze3D": true,
+    "samplingRate": {
+      "supported": [60, 120, 250],
+      "default": 120,
+      "current": 120
+    },
+    "accuracy": { "typical": 0.4, "best": 0.3 },
+    "latency": { "average": 3, "maximum": 10 }
+  },
+  "supportedFeatures": [
+    "GAZE_POINT",
+    "BINOCULAR",
+    "PUPIL_DIAMETER",
+    "CALIBRATION"
+  ]
+}</code></pre>
+
+        <h3>Connect to Device</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/connect</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "clientId": "aac-app-001",
+  "clientName": "My AAC Application",
+  "requestedCapabilities": ["GAZE_POINT", "CALIBRATION"]
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "session_2025_001",
+  "status": "connected",
+  "grantedCapabilities": ["GAZE_POINT", "CALIBRATION"],
+  "streamUrl": "ws://localhost:8080/stream"
+}</code></pre>
+
+        <h2>3.3 Calibration API</h2>
+
+        <h3>Start Calibration</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/calibration/start</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "type": "accessibility",  // standard | quick | accessibility
+  "pointCount": 5,          // Number of calibration points
+  "screenInfo": {
+    "width": 1920,
+    "height": 1080,
+    "dpi": 96
+  }
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "calibrationId": "cal_2025_001",
+  "pointCount": 5,
+  "points": [
+    { "x": 0.5, "y": 0.5 },   // Center
+    { "x": 0.1, "y": 0.1 },   // Top-left
+    { "x": 0.9, "y": 0.1 },   // Top-right
+    { "x": 0.1, "y": 0.9 },   // Bottom-left
+    { "x": 0.9, "y": 0.9 }    // Bottom-right
+  ],
+  "status": "ready"
+}</code></pre>
+
+        <h3>Collect Calibration Point</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/calibration/{calibrationId}/collect</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "pointIndex": 0,
+  "position": { "x": 0.5, "y": 0.5 }
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "pointIndex": 0,
+  "status": "collected",
+  "quality": "good",
+  "samplesCollected": 120
+}</code></pre>
+
+        <h3>Finalize Calibration</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/calibration/{calibrationId}/compute</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "calibrationId": "cal_2025_001",
+  "result": {
+    "success": true,
+    "averageAccuracy": 0.45,
+    "averagePrecision": 0.12,
+    "pointResults": [
+      {
+        "pointIndex": 0,
+        "position": { "x": 0.5, "y": 0.5 },
+        "accuracy": 0.38,
+        "precision": 0.10,
+        "valid": true
+      }
+    ]
+  }
+}</code></pre>
+
+        <div class="info-box">
+            <h4>Calibration Types</h4>
+            <ul>
+                <li><strong>Standard</strong>: 9-point, best accuracy, 45-60 seconds</li>
+                <li><strong>Quick</strong>: 5-point, good accuracy, 20-30 seconds</li>
+                <li><strong>Accessibility</strong>: Adaptive timing, larger targets, extra validation</li>
+            </ul>
+        </div>
+
+        <h2>3.4 Data Streaming API</h2>
+
+        <h3>Start Gaze Stream</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/stream/start</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "frequency": 60,           // Sampling rate in Hz
+  "includeEyeData": true,    // Include individual eye data
+  "includeEvents": true,     // Include fixation/saccade events
+  "format": "json"           // json | binary | msgpack
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "streamId": "stream_001",
+  "status": "streaming",
+  "actualFrequency": 60,
+  "websocketUrl": "ws://localhost:8080/stream/stream_001"
+}</code></pre>
+
+        <h3>WebSocket Stream Message</h3>
+        <p>Once connected to the WebSocket, clients receive continuous gaze data:</p>
+
+        <pre><code>{
+  "type": "gaze_point",
+  "data": {
+    "timestamp": 1704067200000,
+    "x": 0.5234,
+    "y": 0.3891,
+    "confidence": 0.95,
+    "valid": true,
+    "leftEye": {
+      "gaze": { "x": 0.5198, "y": 0.3876 },
+      "valid": true,
+      "pupilDiameter": 4.2
+    },
+    "rightEye": {
+      "gaze": { "x": 0.5270, "y": 0.3906 },
+      "valid": true,
+      "pupilDiameter": 4.1
+    }
+  }
+}</code></pre>
+
+        <h3>Stop Gaze Stream</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/stream/stop</code></pre>
+
+        <h2>3.5 Event Subscription</h2>
+
+        <h3>Subscribe to Events</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/events/subscribe</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "eventTypes": [
+    "fixation_start",
+    "fixation_end",
+    "blink",
+    "dwell_complete"
+  ]
+}</code></pre>
+
+        <h3>Event Message Format</h3>
+        <pre><code>{
+  "type": "event",
+  "event": {
+    "type": "fixation_start",
+    "timestamp": 1704067200000,
+    "eventId": "evt_001",
+    "fixationId": "fix_001",
+    "centroid": { "x": 0.52, "y": 0.39 }
+  }
+}</code></pre>
+
+        <h2>3.6 Interaction Zones API</h2>
+
+        <h3>Register Interaction Zone</h3>
+        <p>Define screen regions for gaze interaction (buttons, keyboard keys, etc.):</p>
+
+        <pre><code>POST /api/v1/devices/{deviceId}/zones/register</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "zoneId": "button_send",
+  "boundingBox": {
+    "x": 0.7,
+    "y": 0.8,
+    "width": 0.2,
+    "height": 0.1
+  },
+  "semanticType": "button",
+  "label": "Send Message",
+  "dwellTime": 800,          // ms for selection
+  "enableDwell": true
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "zoneId": "button_send",
+  "status": "registered"
+}</code></pre>
+
+        <h3>Zone Event Notifications</h3>
+        <p>When gaze enters/leaves or dwells in a registered zone:</p>
+
+        <pre><code>{
+  "type": "zone_event",
+  "event": {
+    "type": "dwell_complete",
+    "timestamp": 1704067200800,
+    "zoneId": "button_send",
+    "dwellTime": 850,
+    "position": { "x": 0.78, "y": 0.85 }
+  }
+}</code></pre>
+
+        <h3>Update Zone</h3>
+        <pre><code>PATCH /api/v1/devices/{deviceId}/zones/{zoneId}</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "dwellTime": 1000,  // Update dwell time
+  "enabled": true
+}</code></pre>
+
+        <h3>Unregister Zone</h3>
+        <pre><code>DELETE /api/v1/devices/{deviceId}/zones/{zoneId}</code></pre>
+
+        <h2>3.7 Device Configuration</h2>
+
+        <h3>Get Current Configuration</h3>
+        <pre><code>GET /api/v1/devices/{deviceId}/config</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "samplingRate": 120,
+  "smoothing": {
+    "enabled": true,
+    "windowSize": 5
+  },
+  "fixationDetection": {
+    "minDuration": 100,
+    "maxDispersion": 1.0
+  },
+  "dwellSelection": {
+    "defaultThreshold": 800,
+    "visualFeedback": true
+  }
+}</code></pre>
+
+        <h3>Update Configuration</h3>
+        <pre><code>PATCH /api/v1/devices/{deviceId}/config</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "samplingRate": 60,
+  "fixationDetection": {
+    "minDuration": 150
+  }
+}</code></pre>
+
+        <h2>3.8 Session Management</h2>
+
+        <h3>Get Session Info</h3>
+        <pre><code>GET /api/v1/sessions/{sessionId}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "session_2025_001",
+  "deviceId": "tobii-pro-fusion-001",
+  "startTime": 1704067200000,
+  "duration": 3600000,
+  "samplesCollected": 432000,
+  "calibrationStatus": "valid",
+  "lastCalibration": 1704067200000
+}</code></pre>
+
+        <h3>Export Session Data</h3>
+        <pre><code>POST /api/v1/sessions/{sessionId}/export</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "format": "csv",  // csv | json | hdf5
+  "includeEvents": true,
+  "includeRawData": false
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "exportId": "export_001",
+  "downloadUrl": "/downloads/session_2025_001.csv",
+  "fileSize": 15728640,
+  "recordCount": 432000
+}</code></pre>
+
+        <h2>3.9 Error Responses</h2>
+
+        <h3>Standard Error Format</h3>
+        <pre><code>{
+  "error": {
+    "code": "DEVICE_NOT_FOUND",
+    "message": "Device tobii-pro-fusion-002 not found",
+    "details": {
+      "availableDevices": ["tobii-pro-fusion-001"]
+    }
+  }
+}</code></pre>
+
+        <h3>Common Error Codes</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>HTTP Status</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>DEVICE_NOT_FOUND</td>
+                    <td>404</td>
+                    <td>Requested device doesn't exist</td>
+                </tr>
+                <tr>
+                    <td>DEVICE_BUSY</td>
+                    <td>409</td>
+                    <td>Device in use by another client</td>
+                </tr>
+                <tr>
+                    <td>CALIBRATION_REQUIRED</td>
+                    <td>428</td>
+                    <td>Device needs calibration</td>
+                </tr>
+                <tr>
+                    <td>INVALID_PARAMETER</td>
+                    <td>400</td>
+                    <td>Invalid request parameter</td>
+                </tr>
+                <tr>
+                    <td>TRACKING_LOST</td>
+                    <td>503</td>
+                    <td>Eyes not detected</td>
+                </tr>
+                <tr>
+                    <td>UNAUTHORIZED</td>
+                    <td>401</td>
+                    <td>Authentication required</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.10 Rate Limiting & Performance</h2>
+
+        <div class="info-box">
+            <h4>API Rate Limits</h4>
+            <ul>
+                <li><strong>Control Endpoints</strong>: 60 requests/minute</li>
+                <li><strong>Configuration Updates</strong>: 10 requests/minute</li>
+                <li><strong>Data Streaming</strong>: No limit (controlled by sampling rate)</li>
+                <li><strong>Calibration</strong>: 5 starts/hour (prevent abuse)</li>
+            </ul>
+        </div>
+
+        <h3>Performance Best Practices</h3>
+        <ul>
+            <li><strong>Batch Operations</strong>: Register multiple zones in a single request when possible</li>
+            <li><strong>WebSocket Preferred</strong>: Use WebSocket streaming instead of polling for real-time data</li>
+            <li><strong>Filter Events</strong>: Subscribe only to events you need</li>
+            <li><strong>Binary Format</strong>: Use binary format for high-frequency data (120Hz+)</li>
+        </ul>
+
+        <h2>3.11 Multi-Monitor Support</h2>
+
+        <h3>Register Screen Layout</h3>
+        <pre><code>POST /api/v1/devices/{deviceId}/screens</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "screens": [
+    {
+      "screenId": "primary",
+      "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+      "primary": true
+    },
+    {
+      "screenId": "secondary",
+      "bounds": { "x": 1920, "y": 0, "width": 1920, "height": 1080 },
+      "primary": false
+    }
+  ]
+}</code></pre>
+
+        <p>Gaze coordinates will be normalized per-screen or across the entire virtual desktop depending on configuration.</p>
+
+        </main>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Manufacturing and Operations | WIA-CHIPLET</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 7: Manufacturing and Operations</h1>
+
+    <p>This chapter covers the manufacturing processes, quality control procedures, and yield optimization strategies essential for successful chiplet-based product deployment. Understanding manufacturing considerations is crucial for achieving the cost and performance benefits that chiplet architecture promises.</p>
+
+    <h2>Chiplet Manufacturing Flow</h2>
+
+    <p>Chiplet manufacturing involves multiple stages spanning wafer fabrication, die preparation, advanced packaging, and system assembly. Each stage has unique challenges and quality requirements.</p>
+
+    <div class="highlight">
+        <strong>Manufacturing Complexity</strong>
+        <p>A typical chiplet product may involve 3-5 different wafer fabrication processes, multiple known-good-die (KGD) testing stages, advanced packaging assembly, and comprehensive system-level testing. Coordinating this complex supply chain is essential for product success.</p>
+    </div>
+
+    <h3>End-to-End Manufacturing Flow</h3>
+
+    <pre><code>// Chiplet Manufacturing Flow
+interface ChipletManufacturingFlow {
+    // Stage 1: Wafer Fabrication (per chiplet type)
+    waferFab: {
+        foundry: string;
+        processNode: string;
+        cycleTime: number;      // days
+        outputs: ["Wafers with chiplet dies"];
+
+        qualityMetrics: {
+            defectDensity: number;    // defects/cm²
+            parametricYield: number;  // %
+            electricalYield: number;  // %
+        };
+    };
+
+    // Stage 2: Wafer-Level Testing
+    waferTest: {
+        testCoverage: number;         // % fault coverage
+        testTime: number;             // seconds per die
+        binning: BinDefinition[];
+
+        outputs: ["Wafer maps", "KGD identification"];
+    };
+
+    // Stage 3: Die Preparation
+    diePreparation: {
+        waferThinning: number;        // μm final thickness
+        bumpForming: BumpProcess;
+        dicing: "Blade" | "Laser" | "Plasma";
+        diePick: "Vision-guided";
+
+        outputs: ["Known-good singulated dies"];
+    };
+
+    // Stage 4: Advanced Packaging
+    advancedPackaging: {
+        process: "2.5D" | "3D" | "FanOut";
+        assembly: PackagingAssembly;
+        underfill: UnderfillProcess;
+        lidAttach: LidAttachProcess;
+
+        outputs: ["Assembled multi-die package"];
+    };
+
+    // Stage 5: Package-Level Testing
+    packageTest: {
+        structuralTest: boolean;
+        functionalTest: boolean;
+        characterization: boolean;
+        burnIn: BurnInSpec;
+
+        outputs: ["Tested, qualified packages"];
+    };
+}
+
+// Known-Good-Die Strategy
+interface KGDStrategy {
+    // Test Levels
+    testLevels: {
+        level1: "Structural tests (scan, BIST)";
+        level2: "At-speed functional";
+        level3: "Characterization parameters";
+        level4: "Burn-in stress";
+    };
+
+    // Economic Analysis
+    economics: {
+        testCost: number;             // $ per die
+        escapeRate: number;           // % defects escaping
+        packagingCost: number;        // $ per package
+        reworkCost: number;           // $ if defect found late
+
+        // Optimization
+        optimalTestLevel(): TestLevel {
+            // Balance test cost vs escape cost
+            return this.minimizeTotalCost();
+        }
+    };
+}</code></pre>
+
+    <h2>Advanced Packaging Processes</h2>
+
+    <p>Advanced packaging is the heart of chiplet manufacturing. Different packaging approaches offer varying trade-offs between performance, cost, and manufacturability.</p>
+
+    <h3>2.5D Packaging Assembly</h3>
+
+    <pre><code>// 2.5D Packaging Process (CoWoS-style)
+interface CoWoSAssembly {
+    // Interposer Fabrication
+    interposerFab: {
+        substrate: "Silicon";
+        tsvProcess: {
+            diameter: "5-10 μm";
+            depth: "100 μm";
+            pitch: "50-100 μm";
+            fillMaterial: "Copper";
+        };
+        redistribution: {
+            layers: "4-6";
+            minLineSpace: "0.4/0.4 μm";
+        };
+        microBumpPrepare: {
+            pitch: "40-55 μm";
+            material: "Cu/Sn-Ag";
+        };
+    };
+
+    // Chiplet Assembly
+    chipletAssembly: {
+        sequence: [
+            "Place HBM stacks (if present)",
+            "Place logic chiplets",
+            "Mass reflow",
+            "Underfill application",
+            "Underfill cure"
+        ];
+        placement: {
+            accuracy: "<1 μm";
+            coplanarity: "<5 μm";
+            throughput: "Units per hour";
+        };
+        reflow: {
+            profile: ReflowProfile;
+            atmosphere: "N2" | "Formic acid";
+            peakTemp: number;
+        };
+    };
+
+    // Interposer Attach to Substrate
+    substrateAttach: {
+        bumpPitch: "130-150 μm";
+        process: "C4 or μ-bump";
+        underfill: "Capillary or molded";
+    };
+
+    // Lid and TIM
+    lidAttach: {
+        lid: "Copper or NiPlated";
+        tim1: "Thermal paste or solder";
+        tim2: "At system assembly";
+    };
+}
+
+// 3D Stacking Process
+interface Stack3DAssembly {
+    // Die Preparation
+    diePrepare: {
+        thinning: "10-50 μm";
+        tsv_reveal: boolean;
+        bumpForm: "μ-bump or Cu pillar";
+    };
+
+    // Bonding Options
+    bonding: {
+        thermocompression: {
+            temp: "200-300°C";
+            pressure: "30-100 MPa";
+            time: "Seconds";
+            throughput: "Moderate";
+        };
+        hybridBonding: {
+            temp: "Room temp + anneal";
+            pitch: "<10 μm possible";
+            bondStrength: "Excellent";
+            throughput: "Lower";
+        };
+    };
+
+    // Stack Assembly
+    stackAssembly: {
+        sequence: "Bottom-up or top-down";
+        alignment: "<0.5 μm accuracy";
+        inspection: "IR through-silicon";
+    };
+}</code></pre>
+
+    <h2>Quality Control and Testing</h2>
+
+    <p>Quality control in chiplet manufacturing requires comprehensive testing strategies that address defects at each stage while balancing test costs against escape risks.</p>
+
+    <table>
+        <tr>
+            <th>Test Stage</th>
+            <th>Coverage Target</th>
+            <th>Defect Types</th>
+            <th>Test Time</th>
+        </tr>
+        <tr>
+            <td>Wafer Probe</td>
+            <td>>98% stuck-at</td>
+            <td>Fab defects</td>
+            <td>1-5 sec/die</td>
+        </tr>
+        <tr>
+            <td>KGD Testing</td>
+            <td>>99% structural</td>
+            <td>+ speed, parameters</td>
+            <td>5-30 sec/die</td>
+        </tr>
+        <tr>
+            <td>Post-Assembly</td>
+            <td>100% connectivity</td>
+            <td>Assembly defects</td>
+            <td>10-60 sec/pkg</td>
+        </tr>
+        <tr>
+            <td>System Test</td>
+            <td>Functional</td>
+            <td>Integration issues</td>
+            <td>60+ sec/pkg</td>
+        </tr>
+        <tr>
+            <td>Burn-In</td>
+            <td>Infant mortality</td>
+            <td>Latent defects</td>
+            <td>Hours/pkg</td>
+        </tr>
+    </table>
+
+    <pre><code>// Quality Control Framework
+interface QualityControlFramework {
+    // Defect Detection Strategy
+    defectDetection: {
+        // In-line monitoring
+        inlineMonitoring: {
+            spcMetrics: SPCParameter[];
+            samplingRate: number;
+            controlLimits: ControlLimit[];
+            outOfControlActions: Action[];
+        };
+
+        // End-of-line testing
+        eolTesting: {
+            testProgram: TestProgram;
+            coverageMetrics: CoverageMetric[];
+            passCriteria: PassCriteria;
+        };
+    };
+
+    // Defect Analysis
+    defectAnalysis: {
+        failureAnalysis: {
+            techniques: ["X-ray", "SAM", "Cross-section", "OBIRCH"];
+            rootCauseProcess: RootCauseAnalysis;
+        };
+        yieldAnalysis: {
+            paretoAnalysis: boolean;
+            spatialAnalysis: boolean;
+            trendAnalysis: boolean;
+        };
+    };
+
+    // Corrective Actions
+    correctiveActions: {
+        containment: "Immediate isolation of suspect material";
+        correction: "Process adjustment or rework";
+        prevention: "Design or process changes";
+        verification: "Confirm effectiveness";
+    };
+}
+
+// Defect Pareto Analysis
+class DefectParetoAnalysis {
+    analyzeYieldLoss(defectData: DefectData[]): ParetoResult {
+        // Group by defect type
+        const grouped = this.groupByType(defectData);
+
+        // Calculate yield impact
+        const impacts = grouped.map(g => ({
+            type: g.type,
+            count: g.defects.length,
+            yieldLoss: this.calculateYieldLoss(g.defects),
+            cumulativePercent: 0
+        }));
+
+        // Sort by impact
+        impacts.sort((a, b) => b.yieldLoss - a.yieldLoss);
+
+        // Calculate cumulative percentage
+        let cumulative = 0;
+        const totalLoss = impacts.reduce((s, i) => s + i.yieldLoss, 0);
+        for (const impact of impacts) {
+            cumulative += impact.yieldLoss / totalLoss * 100;
+            impact.cumulativePercent = cumulative;
+        }
+
+        return { impacts, topContributors: impacts.slice(0, 5) };
+    }
+}</code></pre>
+
+    <h2>Yield Optimization</h2>
+
+    <p>Yield optimization in chiplet systems involves both individual chiplet yield and composite assembly yield. The mathematics differ significantly from monolithic chip yield.</p>
+
+    <div class="highlight">
+        <strong>Yield Multiplication Challenge</strong>
+        <p>In a 5-chiplet system, even if each chiplet has 95% yield and assembly has 98% yield, the composite yield is 0.95^5 * 0.98 = 76%. Every percentage point of improvement at any stage compounds across the system.</p>
+    </div>
+
+    <pre><code>// Yield Modeling for Chiplet Systems
+interface ChipletYieldModel {
+    // Individual Chiplet Yield
+    chipletYield: {
+        // Poisson yield model
+        calculateDieYield(area: number, D0: number): number {
+            return Math.exp(-D0 * area);
+        }
+
+        // Murphy yield model (more realistic)
+        calculateMurphyYield(area: number, D0: number): number {
+            const x = D0 * area;
+            return ((1 - Math.exp(-x)) / x) ** 2;
+        }
+
+        // Negative binomial (clustered defects)
+        calculateNegBinomialYield(area: number, D0: number, alpha: number): number {
+            return Math.pow(1 + D0 * area / alpha, -alpha);
+        }
+    };
+
+    // Assembly Yield
+    assemblyYield: {
+        // Bump yield (random defects)
+        bumpYield(bumps: number, defectRate: number): number {
+            return Math.pow(1 - defectRate, bumps);
+        }
+
+        // Placement yield
+        placementYield(chiplets: number, placementDefect: number): number {
+            return Math.pow(1 - placementDefect, chiplets);
+        }
+
+        // Underfill/bonding yield
+        bondingYield(area: number, voidRate: number): number {
+            return 1 - voidRate;  // Simplified
+        }
+    };
+
+    // Composite System Yield
+    systemYield(chipletYields: number[], assemblyYield: number): number {
+        const productOfChiplets = chipletYields.reduce((a, b) => a * b, 1);
+        return productOfChiplets * assemblyYield;
+    }
+}
+
+// Yield Optimization Strategies
+const yieldOptimization = {
+    chipletLevel: {
+        strategies: [
+            "Reduce die size (exponential yield benefit)",
+            "Improve design for manufacturing (DFM)",
+            "Redundancy for critical circuits",
+            "Relaxed design rules where possible"
+        ],
+        metrics: ["D0 reduction", "DFM score", "Redundancy coverage"]
+    },
+
+    assemblyLevel: {
+        strategies: [
+            "Improve bump quality and uniformity",
+            "Enhance placement accuracy",
+            "Optimize reflow profile",
+            "Reduce underfill voids"
+        ],
+        metrics: ["Bump yield", "Placement sigma", "Void rate"]
+    },
+
+    systemLevel: {
+        strategies: [
+            "Known-good-die testing before assembly",
+            "Redundant chiplet configurations",
+            "Repair capabilities",
+            "Flexible SKU from partial good"
+        ],
+        metrics: ["KGD escape rate", "Repair coverage", "Salvage rate"]
+    }
+};</code></pre>
+
+    <h2>Supply Chain Management</h2>
+
+    <p>Chiplet supply chains are inherently complex, involving multiple fabrication sources, packaging houses, and test facilities. Effective supply chain management is critical for cost control and product availability.</p>
+
+    <pre><code>// Chiplet Supply Chain Model
+interface ChipletSupplyChain {
+    // Chiplet Sources
+    chipletSources: {
+        internalDesigns: ChipletSource[];
+        thirdPartyIP: ChipletSource[];
+        merchantChiplets: ChipletSource[];
+    };
+
+    // Fabrication Partners
+    fabrication: {
+        foundries: Map&lt;ProcessNode, Foundry[]&gt;;
+        qualificationStatus: Map&lt;ChipletId, QualStatus&gt;;
+        leadTimes: Map&lt;ChipletId, number&gt;;      // weeks
+        capacityAllocations: Map&lt;ChipletId, number&gt;;
+    };
+
+    // Packaging Partners
+    packaging: {
+        osatPartners: OSATPartner[];
+        technologies: Map&lt;PackageType, OSATPartner[]&gt;;
+        capacityPlanning: CapacityPlan;
+    };
+
+    // Inventory Management
+    inventory: {
+        safetyStockLevels: Map&lt;ChipletId, number&gt;;
+        leadTimeBuffers: number;      // weeks
+        demandForecasting: ForecastModel;
+    };
+
+    // Risk Management
+    riskManagement: {
+        singleSourceRisks: Risk[];
+        mitigationStrategies: Strategy[];
+        alternativeQualifications: Map&lt;ChipletId, ChipletId[]&gt;;
+    };
+}
+
+// Capacity Planning
+class CapacityPlanner {
+    planCapacity(demand: DemandForecast, supply: SupplyConstraints): CapacityPlan {
+        // Aggregate demand by chiplet type
+        const chipletDemand = this.aggregateDemand(demand);
+
+        // Map to fab and packaging capacity
+        const fabRequirements = this.mapToFabCapacity(chipletDemand);
+        const pkgRequirements = this.mapToPackagingCapacity(demand);
+
+        // Identify bottlenecks
+        const bottlenecks = this.findBottlenecks(fabRequirements, pkgRequirements, supply);
+
+        // Generate plan with alternatives
+        return {
+            baselinePlan: this.generatePlan(fabRequirements, pkgRequirements),
+            bottlenecks: bottlenecks,
+            contingencies: this.generateContingencies(bottlenecks)
+        };
+    }
+}</code></pre>
+
+    <div class="highlight">
+        <strong>Chapter Summary</strong>
+        <p>Manufacturing chiplet systems requires mastery of complex multi-stage processes spanning wafer fabrication, die preparation, advanced packaging, and comprehensive testing. Yield optimization at every stage is critical, as defects compound across the system. Effective supply chain management ensures product availability while managing costs and risks.</p>
+    </div>
+</body>
+</html>

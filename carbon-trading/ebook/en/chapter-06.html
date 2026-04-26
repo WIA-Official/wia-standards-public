@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: System Integration | WIA-CARBON_TRADING</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>Chapter 6: System Integration</h1>
+
+    <div class="highlight">
+        <strong>Connectivity Vision:</strong> WIA-CARBON_TRADING is designed as an open platform that seamlessly integrates with regulatory systems, financial infrastructure, enterprise applications, and external data providers to create a comprehensive carbon management ecosystem.
+    </div>
+
+    <p>Effective carbon trading requires integration with numerous external systems including regulatory authorities, banking networks, corporate ERP systems, and market data providers. This chapter explores the integration capabilities that make WIA-CARBON_TRADING a hub for carbon market operations.</p>
+
+    <h2>Regulatory API Integration</h2>
+
+    <p>Carbon markets operate under regulatory oversight, requiring regular reporting and compliance verification. WIA-CARBON_TRADING provides standardized interfaces for regulatory communication.</p>
+
+    <h3>Regulatory Reporting Framework</h3>
+
+    <pre><code>// Regulatory Reporting System
+interface RegulatoryReport {
+    reportId: string;
+    reportType: RegulatoryReportType;
+    jurisdiction: string;
+    reportingPeriod: {
+        start: Date;
+        end: Date;
+    };
+    submissionDeadline: Date;
+    status: ReportStatus;
+    data: ReportData;
+    validationResults: ValidationResult[];
+}
+
+enum RegulatoryReportType {
+    POSITION_REPORT = 'position_report',
+    TRANSACTION_REPORT = 'transaction_report',
+    SUSPICIOUS_ACTIVITY = 'suspicious_activity',
+    LARGE_TRADER = 'large_trader',
+    EMISSIONS_SURRENDER = 'emissions_surrender',
+    AUCTION_PARTICIPATION = 'auction_participation'
+}
+
+class RegulatoryReportingService {
+    private regulators: Map&lt;string, RegulatoryConnector&gt; = new Map();
+
+    async generateReport(
+        type: RegulatoryReportType,
+        jurisdiction: string,
+        period: TimePeriod
+    ): Promise&lt;RegulatoryReport&gt; {
+        const regulator = this.regulators.get(jurisdiction);
+        if (!regulator) {
+            throw new Error(`No connector for jurisdiction: ${jurisdiction}`);
+        }
+
+        // Gather required data
+        const data = await this.gatherReportData(type, period);
+
+        // Apply jurisdiction-specific formatting
+        const formattedData = regulator.formatReport(type, data);
+
+        // Validate against regulatory schema
+        const validation = await regulator.validateReport(formattedData);
+
+        const report: RegulatoryReport = {
+            reportId: generateReportId(),
+            reportType: type,
+            jurisdiction,
+            reportingPeriod: period,
+            submissionDeadline: regulator.getDeadline(type, period),
+            status: validation.valid ? 'ready' : 'validation_failed',
+            data: formattedData,
+            validationResults: validation.results
+        };
+
+        return report;
+    }
+
+    async submitReport(report: RegulatoryReport): Promise&lt;SubmissionResult&gt; {
+        const regulator = this.regulators.get(report.jurisdiction)!;
+
+        // Submit via regulatory API
+        const submission = await regulator.submit(report);
+
+        // Store submission record
+        await this.storeSubmissionRecord(report, submission);
+
+        // Update report status
+        report.status = 'submitted';
+
+        return {
+            reportId: report.reportId,
+            submissionId: submission.id,
+            timestamp: submission.timestamp,
+            confirmationNumber: submission.confirmationNumber
+        };
+    }
+}
+
+// EU ETS Specific Connector
+class EUETSConnector implements RegulatoryConnector {
+    private apiClient: EURegistryAPIClient;
+
+    async submitTransactionReport(
+        transactions: Transaction[]
+    ): Promise&lt;SubmissionResult&gt; {
+        // Format per EU ETS requirements
+        const euFormat = transactions.map(t => ({
+            transactionId: t.id,
+            transactionType: this.mapTransactionType(t.type),
+            accountHolderBuyer: t.buyerId,
+            accountHolderSeller: t.sellerId,
+            quantity: t.quantity,
+            unitType: 'EUA',
+            transactionDate: t.executionTime.toISOString()
+        }));
+
+        // Submit to EU Registry
+        return this.apiClient.submitTransactions(euFormat);
+    }
+}</code></pre>
+
+    <h2>Banking System Integration</h2>
+
+    <p>Seamless integration with banking systems enables efficient fund transfers, margin management, and payment processing for carbon trading activities.</p>
+
+    <h3>Payment Gateway Architecture</h3>
+
+    <pre><code>// Banking Integration Layer
+interface BankingConnector {
+    bankId: string;
+    supportedCurrencies: string[];
+    capabilities: BankingCapability[];
+    connect(): Promise&lt;void&gt;;
+    disconnect(): Promise&lt;void&gt;;
+}
+
+class PaymentGateway {
+    private connectors: Map&lt;string, BankingConnector&gt; = new Map();
+    private ledger: InternalLedger;
+
+    async processDeposit(
+        request: DepositRequest
+    ): Promise&lt;DepositResult&gt; {
+        // Validate deposit request
+        const validation = await this.validateDeposit(request);
+        if (!validation.valid) {
+            throw new ValidationError(validation.errors);
+        }
+
+        // Get appropriate banking connector
+        const connector = this.selectConnector(request.currency);
+
+        // Initiate bank transfer
+        const bankReference = await connector.initiateInbound({
+            amount: request.amount,
+            currency: request.currency,
+            sourceAccount: request.sourceAccount,
+            reference: request.reference
+        });
+
+        // Create pending ledger entry
+        const ledgerEntry = await this.ledger.createPendingCredit({
+            accountId: request.tradingAccountId,
+            amount: request.amount,
+            currency: request.currency,
+            bankReference: bankReference.id,
+            status: 'pending_confirmation'
+        });
+
+        return {
+            depositId: ledgerEntry.id,
+            bankReference: bankReference.id,
+            status: 'pending',
+            estimatedArrival: bankReference.estimatedArrival
+        };
+    }
+
+    async processWithdrawal(
+        request: WithdrawalRequest
+    ): Promise&lt;WithdrawalResult&gt; {
+        // Verify available balance
+        const balance = await this.ledger.getAvailableBalance(
+            request.tradingAccountId,
+            request.currency
+        );
+
+        if (balance < request.amount) {
+            throw new InsufficientFundsError();
+        }
+
+        // Apply AML checks
+        const amlResult = await this.amlService.screenWithdrawal(request);
+        if (!amlResult.approved) {
+            throw new AMLBlockError(amlResult.reason);
+        }
+
+        // Reserve funds
+        await this.ledger.reserveFunds(
+            request.tradingAccountId,
+            request.amount,
+            request.currency
+        );
+
+        // Initiate bank transfer
+        const connector = this.selectConnector(request.currency);
+        const transfer = await connector.initiateOutbound({
+            amount: request.amount,
+            currency: request.currency,
+            destinationAccount: request.destinationAccount,
+            reference: request.reference
+        });
+
+        // Update ledger
+        await this.ledger.completeDebit(
+            request.tradingAccountId,
+            request.amount,
+            transfer.id
+        );
+
+        return {
+            withdrawalId: transfer.id,
+            status: 'processing',
+            estimatedArrival: transfer.estimatedArrival
+        };
+    }
+}</code></pre>
+
+    <h3>Real-Time Settlement Networks</h3>
+
+    <div class="highlight">
+        <strong>Settlement Options:</strong> WIA-CARBON_TRADING supports multiple settlement rails including SWIFT, SEPA, Fedwire, and real-time payment networks, enabling efficient global settlement regardless of participant location.
+    </div>
+
+    <table>
+        <tr>
+            <th>Network</th>
+            <th>Coverage</th>
+            <th>Settlement Speed</th>
+            <th>Cut-off Times</th>
+        </tr>
+        <tr>
+            <td>SEPA Instant</td>
+            <td>EU/EEA</td>
+            <td>10 seconds</td>
+            <td>24/7</td>
+        </tr>
+        <tr>
+            <td>Fedwire</td>
+            <td>United States</td>
+            <td>Same day</td>
+            <td>18:00 ET</td>
+        </tr>
+        <tr>
+            <td>SWIFT gpi</td>
+            <td>Global</td>
+            <td>Same day to T+1</td>
+            <td>Varies by corridor</td>
+        </tr>
+        <tr>
+            <td>CHAPS</td>
+            <td>United Kingdom</td>
+            <td>Same day</td>
+            <td>17:00 GMT</td>
+        </tr>
+    </table>
+
+    <h2>Enterprise System Integration</h2>
+
+    <p>Corporate participants often need to integrate carbon trading with their existing enterprise resource planning (ERP), sustainability management, and financial reporting systems.</p>
+
+    <pre><code>// Enterprise Integration SDK
+class CarbonTradingEnterpriseSDK {
+    private apiClient: WIACarbonAPIClient;
+
+    // SAP Integration Module
+    async syncWithSAP(sapConfig: SAPConfiguration): Promise&lt;SyncResult&gt; {
+        const connector = new SAPConnector(sapConfig);
+
+        // Sync carbon inventory to SAP
+        const inventory = await this.apiClient.getCarbonInventory();
+        await connector.updateMaterialMaster(inventory);
+
+        // Sync transactions to SAP FI
+        const transactions = await this.apiClient.getRecentTransactions();
+        await connector.postFinancialDocuments(transactions);
+
+        // Sync compliance obligations
+        const obligations = await this.apiClient.getComplianceObligations();
+        await connector.updateComplianceModule(obligations);
+
+        return { synced: true, timestamp: new Date() };
+    }
+
+    // Salesforce Integration Module
+    async syncWithSalesforce(
+        sfConfig: SalesforceConfiguration
+    ): Promise&lt;SyncResult&gt; {
+        const connector = new SalesforceConnector(sfConfig);
+
+        // Sync carbon offset purchases to Salesforce
+        const offsets = await this.apiClient.getOffsetPurchases();
+        await connector.createCarbonOffsetRecords(offsets);
+
+        // Update sustainability dashboard
+        const metrics = await this.apiClient.getSustainabilityMetrics();
+        await connector.updateDashboardMetrics(metrics);
+
+        return { synced: true, timestamp: new Date() };
+    }
+}
+
+// Webhook Configuration for Real-time Updates
+interface WebhookConfiguration {
+    endpointUrl: string;
+    events: WebhookEventType[];
+    secret: string;
+    retryPolicy: RetryPolicy;
+}
+
+class WebhookService {
+    async registerWebhook(
+        config: WebhookConfiguration
+    ): Promise&lt;WebhookRegistration&gt; {
+        // Verify endpoint availability
+        await this.verifyEndpoint(config.endpointUrl);
+
+        // Generate webhook credentials
+        const credentials = this.generateCredentials();
+
+        // Store registration
+        const registration: WebhookRegistration = {
+            webhookId: generateWebhookId(),
+            ...config,
+            credentials,
+            status: 'active',
+            createdAt: new Date()
+        };
+
+        await this.storage.save(registration);
+
+        return registration;
+    }
+
+    async deliverEvent(
+        event: WebhookEvent,
+        registration: WebhookRegistration
+    ): Promise&lt;DeliveryResult&gt; {
+        const payload = {
+            eventId: event.id,
+            eventType: event.type,
+            timestamp: event.timestamp,
+            data: event.data
+        };
+
+        // Sign payload
+        const signature = this.signPayload(payload, registration.secret);
+
+        // Deliver with retry
+        let attempt = 0;
+        while (attempt < registration.retryPolicy.maxAttempts) {
+            try {
+                const response = await this.httpClient.post(
+                    registration.endpointUrl,
+                    payload,
+                    {
+                        headers: {
+                            'X-WIA-Signature': signature,
+                            'X-WIA-Event-Type': event.type
+                        }
+                    }
+                );
+
+                if (response.status === 200) {
+                    return { delivered: true, attempt };
+                }
+            } catch (error) {
+                attempt++;
+                await this.delay(registration.retryPolicy.backoffMs * attempt);
+            }
+        }
+
+        return { delivered: false, attempts: attempt };
+    }
+}</code></pre>
+
+    <h2>Market Data Integration</h2>
+
+    <p>Access to comprehensive market data is essential for informed trading decisions. WIA-CARBON_TRADING provides multiple channels for consuming market data.</p>
+
+    <pre><code>// Market Data Feed Configuration
+interface MarketDataFeed {
+    feedType: 'streaming' | 'polling' | 'snapshot';
+    protocol: 'websocket' | 'fix' | 'rest';
+    dataTypes: MarketDataType[];
+    latency: 'ultra_low' | 'low' | 'standard';
+}
+
+class MarketDataService {
+    async subscribeToFeed(
+        subscription: FeedSubscription
+    ): Promise&lt;DataStream&gt; {
+        const feed = this.selectFeed(subscription.requirements);
+
+        const stream = await feed.connect({
+            instruments: subscription.instruments,
+            dataTypes: subscription.dataTypes,
+            callback: subscription.onData
+        });
+
+        return stream;
+    }
+}
+
+// Example: Real-time Price Feed
+const priceSubscription = await marketData.subscribeToFeed({
+    requirements: {
+        feedType: 'streaming',
+        protocol: 'websocket',
+        latency: 'low'
+    },
+    instruments: ['EUA-SPOT', 'EUA-DEC24', 'CCA-SPOT'],
+    dataTypes: ['quote', 'trade', 'depth'],
+    onData: (update) => {
+        console.log(`${update.instrument}: ${update.bid}/${update.ask}`);
+        // Update trading system
+        tradingEngine.updatePrice(update);
+    }
+});</code></pre>
+
+    <div class="highlight">
+        <strong>Data Quality:</strong> All market data feeds include comprehensive data quality indicators including staleness flags, source identification, and confidence scores to help participants make informed decisions.
+    </div>
+
+    <p>Robust system integration enables WIA-CARBON_TRADING to serve as the central hub for carbon market operations. The next chapter examines the operational aspects of running the trading platform.</p>
+</body>
+</html>

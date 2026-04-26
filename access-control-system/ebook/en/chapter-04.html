@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Phase 1 - Data Format | WIA-ACS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155; --primary: #EF4444; --text: #f1f5f9; --text-secondary: #cbd5e1; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: var(--primary); text-decoration: none; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 6px; }
+        h1 { font-size: 2.5rem; color: var(--primary); margin: 2rem 0 1rem; }
+        h2 { font-size: 1.8rem; color: var(--primary); margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--bg-tertiary); }
+        h3 { font-size: 1.4rem; color: var(--text); margin: 1.5rem 0 1rem; }
+        p { margin: 1rem 0; color: var(--text-secondary); }
+        strong { color: var(--text); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: var(--bg-secondary); }
+        th, td { padding: 1rem; text-align: left; border: 1px solid var(--bg-tertiary); }
+        th { background: var(--bg-tertiary); color: var(--primary); font-weight: 600; }
+        .code-block { background: var(--bg-secondary); border: 1px solid var(--bg-tertiary); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        pre { font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text); }
+        .info-box { background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 1.5rem; margin: 1.5rem 0; border-radius: 4px; }
+        .summary { background: var(--bg-secondary); border: 2px solid var(--primary); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: var(--text-secondary); }
+        li { margin: 0.5rem 0; }
+        .questions { background: var(--bg-secondary); padding: 2rem; border-radius: 8px; margin: 2rem 0; }
+        .questions h2 { border: none; margin-top: 0; }
+        .questions ol { margin-left: 1.5rem; }
+        .questions li { margin: 1rem 0; color: var(--text); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Phase 1 - Data Format</h1>
+
+        <p>
+            Phase 1 of the WIA-ACS standard establishes standardized data formats for all entities in an access
+            control system. By defining common schemas for users, credentials, permissions, access rules, and
+            audit events, this phase enables data exchange, reporting, and migration between systems—even without
+            full API integration. This chapter details the data models, schemas, and validation rules that form
+            the foundation of WIA-ACS interoperability.
+        </p>
+
+        <h2>Core Entities and Relationships</h2>
+
+        <p>
+            WIA-ACS defines several core entities that represent the fundamental concepts of access control:
+        </p>
+
+        <div class="code-block">
+            <pre>
+Entity Relationship Diagram:
+
+┌──────────┐         ┌──────────────┐         ┌──────────┐
+│  User    │────────┤  Credential  │─────────│ Device   │
+└────┬─────┘         └──────────────┘         └──────────┘
+     │                      │
+     │ has                  │ uses
+     │                      │
+┌────▼─────┐         ┌──────▼───────┐
+│   Role   │         │  Access Rule │
+└────┬─────┘         └──────┬───────┘
+     │                      │
+     │ grants               │ applies to
+     │                      │
+┌────▼─────────────────────▼────┐
+│       Permission              │
+└───────────────┬───────────────┘
+                │
+                │ recorded in
+                │
+        ┌───────▼────────┐
+        │  Audit Event   │
+        └────────────────┘
+            </pre>
+        </div>
+
+        <h2>User Entity Schema</h2>
+
+        <p>
+            The User entity represents an individual person who may be granted access to resources. WIA-ACS
+            user schema balances completeness with privacy, collecting only necessary information.
+        </p>
+
+        <div class="code-block">
+            <pre>
+{
+  "$schema": "https://wia-acs.org/schemas/v1/user.json",
+  "user_id": "usr-20251226-abc123",
+  "external_id": "employee-12345",
+  "status": "active",
+  "identity": {
+    "given_name": "John",
+    "family_name": "Doe",
+    "middle_name": "Michael",
+    "preferred_name": "Johnny",
+    "email": "john.doe@example.com",
+    "email_verified": true,
+    "phone": "+1-555-0123",
+    "phone_verified": true
+  },
+  "employment": {
+    "employee_id": "E-12345",
+    "department": "Engineering",
+    "title": "Senior Software Engineer",
+    "manager_id": "usr-20241201-xyz789",
+    "start_date": "2020-01-15",
+    "end_date": null,
+    "employment_type": "full_time"
+  },
+  "roles": [
+    "role-employee",
+    "role-engineering",
+    "role-building-access"
+  ],
+  "attributes": {
+    "clearance_level": 3,
+    "location": "headquarters",
+    "floor": "5",
+    "cost_center": "ENG-001"
+  },
+  "metadata": {
+    "created_at": "2020-01-15T09:00:00Z",
+    "updated_at": "2025-12-26T14:30:00Z",
+    "created_by": "sys-hr-integration",
+    "updated_by": "usr-admin-001"
+  }
+}
+            </pre>
+        </div>
+
+        <h3>Required vs. Optional Fields</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Required</th>
+                    <th>Format</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>user_id</td>
+                    <td>Yes</td>
+                    <td>String (UUID)</td>
+                    <td>Unique identifier across all WIA-ACS systems</td>
+                </tr>
+                <tr>
+                    <td>external_id</td>
+                    <td>No</td>
+                    <td>String</td>
+                    <td>ID in source system (HR, LDAP, etc.)</td>
+                </tr>
+                <tr>
+                    <td>status</td>
+                    <td>Yes</td>
+                    <td>Enum</td>
+                    <td>active, suspended, terminated</td>
+                </tr>
+                <tr>
+                    <td>identity.*</td>
+                    <td>Partial</td>
+                    <td>Various</td>
+                    <td>Minimum: given_name, family_name, email</td>
+                </tr>
+                <tr>
+                    <td>roles</td>
+                    <td>Yes</td>
+                    <td>Array</td>
+                    <td>At least one role required for access</td>
+                </tr>
+                <tr>
+                    <td>attributes</td>
+                    <td>No</td>
+                    <td>Object</td>
+                    <td>Custom attributes for ABAC policies</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Credential Entity Schema</h2>
+
+        <p>
+            Credentials are the physical or digital tokens that prove a user's identity. WIA-ACS supports
+            multiple credential types with a unified schema:
+        </p>
+
+        <div class="code-block">
+            <pre>
+{
+  "$schema": "https://wia-acs.org/schemas/v1/credential.json",
+  "credential_id": "cred-20251226-xyz789",
+  "user_id": "usr-20251226-abc123",
+  "credential_type": "smart_card",
+  "status": "active",
+  "issued_at": "2025-12-26T10:00:00Z",
+  "expires_at": "2026-12-26T10:00:00Z",
+  "activates_at": "2025-12-26T10:00:00Z",
+  "issuer": "WIA-ACS-Core-v1.0",
+  "encoding": {
+    "format": "piv",
+    "facility_code": 123,
+    "card_number": 45678,
+    "chip_uid": "04:3F:2A:B5:C8:19:80",
+    "certificate_dn": "CN=John Doe,OU=Engineering,O=Example Corp,C=US"
+  },
+  "factors": [
+    {
+      "factor_type": "something_you_have",
+      "method": "smart_card",
+      "strength": "high"
+    },
+    {
+      "factor_type": "something_you_know",
+      "method": "pin",
+      "strength": "medium",
+      "pin_hash": "bcrypt:$2b$12$..."
+    }
+  ],
+  "access_profiles": [
+    "profile-building-entry",
+    "profile-office-floor-5",
+    "profile-parking-garage"
+  ],
+  "restrictions": {
+    "time_zones": [
+      {
+        "days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "start_time": "06:00",
+        "end_time": "22:00",
+        "timezone": "America/New_York"
+      }
+    ],
+    "locations": ["headquarters", "branch-office-nyc"],
+    "ip_ranges": ["10.0.0.0/8", "192.168.1.0/24"]
+  },
+  "metadata": {
+    "created_at": "2025-12-26T10:00:00Z",
+    "updated_at": "2025-12-26T10:00:00Z",
+    "created_by": "usr-admin-001",
+    "revocation_reason": null,
+    "replacement_of": null
+  }
+}
+            </pre>
+        </div>
+
+        <h3>Supported Credential Types</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Technology</th>
+                    <th>Typical Use</th>
+                    <th>Security Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>magnetic_stripe</td>
+                    <td>Magnetic stripe card</td>
+                    <td>Legacy systems</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>proximity</td>
+                    <td>125 kHz RFID</td>
+                    <td>Basic physical access</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>smart_card</td>
+                    <td>13.56 MHz contactless, PIV/CAC</td>
+                    <td>Government, high-security</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td>mobile</td>
+                    <td>Bluetooth LE, NFC</td>
+                    <td>Smartphone-based access</td>
+                    <td>Medium-High</td>
+                </tr>
+                <tr>
+                    <td>biometric</td>
+                    <td>Fingerprint, facial, iris</td>
+                    <td>High-security areas</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td>pin_code</td>
+                    <td>Numeric or alphanumeric PIN</td>
+                    <td>Secondary factor</td>
+                    <td>Low-Medium</td>
+                </tr>
+                <tr>
+                    <td>otp</td>
+                    <td>Time-based one-time password</td>
+                    <td>Multi-factor authentication</td>
+                    <td>High</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Role and Permission Models</h2>
+
+        <p>
+            WIA-ACS supports both RBAC (Role-Based Access Control) and ABAC (Attribute-Based Access Control)
+            through flexible permission modeling.
+        </p>
+
+        <h3>Role Schema</h3>
+
+        <div class="code-block">
+            <pre>
+{
+  "$schema": "https://wia-acs.org/schemas/v1/role.json",
+  "role_id": "role-engineering",
+  "name": "Engineering Department",
+  "description": "Access rights for engineering team members",
+  "role_type": "department",
+  "parent_roles": ["role-employee"],
+  "permissions": [
+    {
+      "resource_type": "door",
+      "resource_id": "door-engineering-lab",
+      "actions": ["entry", "exit"],
+      "conditions": {
+        "time_range": "business_hours",
+        "requires_escort": false
+      }
+    },
+    {
+      "resource_type": "system",
+      "resource_id": "sys-dev-servers",
+      "actions": ["read", "write"],
+      "conditions": {
+        "mfa_required": true,
+        "ip_restriction": "internal_network"
+      }
+    }
+  ],
+  "metadata": {
+    "created_at": "2020-01-01T00:00:00Z",
+    "updated_at": "2025-12-26T14:30:00Z",
+    "managed_by": "usr-admin-001"
+  }
+}
+            </pre>
+        </div>
+
+        <h3>Permission Schema (ABAC)</h3>
+
+        <div class="code-block">
+            <pre>
+{
+  "$schema": "https://wia-acs.org/schemas/v1/permission.json",
+  "permission_id": "perm-server-room-access",
+  "name": "Server Room Access Policy",
+  "effect": "allow",
+  "principals": {
+    "user_attributes": {
+      "department": ["IT", "Security"],
+      "clearance_level": {"gte": 4}
+    },
+    "role_attributes": {
+      "role_type": ["technical", "security"]
+    }
+  },
+  "resources": {
+    "resource_type": "door",
+    "resource_attributes": {
+      "location": "headquarters",
+      "security_zone": "high"
+    },
+    "resource_ids": ["door-server-room-a", "door-server-room-b"]
+  },
+  "actions": ["entry", "exit"],
+  "conditions": {
+    "time": {
+      "business_hours": true,
+      "emergency_override": "security_officer_approval"
+    },
+    "context": {
+      "mfa_verified_within_minutes": 15,
+      "location_proximity_meters": 100,
+      "device_compliance_verified": true
+    }
+  },
+  "priority": 100,
+  "enabled": true,
+  "metadata": {
+    "created_at": "2025-01-01T00:00:00Z",
+    "updated_at": "2025-12-26T14:30:00Z",
+    "owner": "usr-security-manager-001"
+  }
+}
+            </pre>
+        </div>
+
+        <h2>Access Rule Schema</h2>
+
+        <p>
+            Access rules define when and how credentials grant access to specific resources:
+        </p>
+
+        <div class="code-block">
+            <pre>
+{
+  "$schema": "https://wia-acs.org/schemas/v1/access-rule.json",
+  "rule_id": "rule-main-entrance",
+  "name": "Main Building Entrance Access",
+  "resource_type": "door",
+  "resource_id": "door-main-lobby",
+  "allowed_credentials": {
+    "credential_types": ["smart_card", "mobile", "biometric"],
+    "minimum_factors": 1,
+    "credential_status": ["active"]
+  },
+  "allowed_roles": ["role-employee", "role-contractor", "role-visitor"],
+  "schedules": [
+    {
+      "schedule_id": "sched-business-hours",
+      "name": "Business Hours",
+      "enabled": true,
+      "periods": [
+        {
+          "days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          "start_time": "06:00",
+          "end_time": "22:00"
+        },
+        {
+          "days": ["saturday"],
+          "start_time": "08:00",
+          "end_time": "18:00"
+        }
+      ],
+      "holidays": {
+        "calendar": "US_Federal",
+        "behavior": "deny_access"
+      }
+    }
+  ],
+  "antipassback": {
+    "enabled": true,
+    "mode": "soft",
+    "timeout_minutes": 2
+  },
+  "occupancy_limits": {
+    "max_occupancy": 500,
+    "behavior_when_full": "deny_entry"
+  },
+  "audit": {
+    "log_level": "detailed",
+    "alert_on": ["forced_entry", "repeated_denials", "disabled_credential_attempt"]
+  },
+  "metadata": {
+    "created_at": "2020-01-01T00:00:00Z",
+    "updated_at": "2025-12-26T14:30:00Z",
+    "managed_by": "usr-security-ops-001"
+  }
+}
+            </pre>
+        </div>
+
+        <h2>Audit Event Schema</h2>
+
+        <p>
+            Comprehensive, tamper-proof audit logging is critical for security and compliance. WIA-ACS defines
+            a standard event schema with cryptographic integrity:
+        </p>
+
+        <div class="code-block">
+            <pre>
+{
+  "$schema": "https://wia-acs.org/schemas/v1/audit-event.json",
+  "event_id": "evt-20251226-143217-abc123",
+  "event_type": "access_granted",
+  "category": "authentication",
+  "severity": "info",
+  "timestamp": "2025-12-26T14:32:17.234Z",
+  "actor": {
+    "user_id": "usr-20251226-abc123",
+    "user_name": "John Doe",
+    "credential_id": "cred-20251226-xyz789",
+    "credential_type": "smart_card",
+    "ip_address": "192.168.1.45",
+    "device_id": "reader-main-lobby-001",
+    "session_id": "sess-20251226-143000-xyz"
+  },
+  "target": {
+    "resource_type": "door",
+    "resource_id": "door-main-lobby",
+    "resource_name": "Main Lobby Entrance",
+    "location": "Building A - Floor 1"
+  },
+  "action": "entry_granted",
+  "result": "success",
+  "decision": {
+    "decision_engine": "wia-acs-authz-v1.0",
+    "decision_time_ms": 87,
+    "matched_rules": ["rule-main-entrance"],
+    "applied_roles": ["role-employee", "role-building-access"],
+    "evaluation_method": "rbac"
+  },
+  "context": {
+    "mfa_verified": true,
+    "mfa_method": "pin",
+    "door_unlock_duration_ms": 5000,
+    "occupancy_before": 247,
+    "occupancy_after": 248,
+    "weather_condition": "normal",
+    "business_hours": true
+  },
+  "integrity": {
+    "previous_event_hash": "sha256:abcdef1234567890...",
+    "this_event_hash": "sha256:1234567890abcdef...",
+    "signature": "rsa-sha256:BASE64_SIGNATURE",
+    "chain_sequence": 1234567
+  },
+  "metadata": {
+    "correlation_id": "corr-20251226-143000-xyz",
+    "retention_days": 2555,
+    "classification": "internal",
+    "tags": ["physical_access", "headquarters"]
+  }
+}
+            </pre>
+        </div>
+
+        <h3>Event Types and Categories</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Event Types</th>
+                    <th>Severity Levels</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Authentication</td>
+                    <td>access_granted, access_denied, mfa_success, mfa_failure</td>
+                    <td>info, warning, error</td>
+                </tr>
+                <tr>
+                    <td>Credential Lifecycle</td>
+                    <td>credential_issued, credential_revoked, credential_expired</td>
+                    <td>info, warning</td>
+                </tr>
+                <tr>
+                    <td>User Management</td>
+                    <td>user_created, user_modified, user_deleted, role_assigned</td>
+                    <td>info</td>
+                </tr>
+                <tr>
+                    <td>Security Events</td>
+                    <td>forced_entry, tailgate_detected, repeated_failures</td>
+                    <td>warning, critical</td>
+                </tr>
+                <tr>
+                    <td>System Events</td>
+                    <td>device_online, device_offline, firmware_updated</td>
+                    <td>info, warning</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Data Validation and Constraints</h2>
+
+        <p>
+            All WIA-ACS schemas include JSON Schema validation rules to ensure data integrity:
+        </p>
+
+        <div class="code-block">
+            <pre>
+Example Validation Rules:
+
+user_id:
+  - Pattern: ^usr-[0-9]{8}-[a-z0-9]{6}$
+  - Uniqueness: Global unique constraint
+  - Immutable: Cannot be changed after creation
+
+email:
+  - Format: Valid RFC 5322 email address
+  - Maximum length: 255 characters
+  - Must be verified before use in authentication
+
+status:
+  - Enum: ["active", "suspended", "terminated"]
+  - Transition rules:
+      active → suspended (reversible)
+      active → terminated (irreversible)
+      suspended → active (with approval)
+
+roles:
+  - Type: Array of role IDs
+  - Minimum items: 1 (at least one role required)
+  - Each role must exist in role database
+  - Circular dependencies detected and prevented
+
+timestamp fields:
+  - Format: ISO 8601 with timezone (RFC 3339)
+  - Validation: Future timestamps rejected for created_at
+  - Precision: Milliseconds
+
+expires_at:
+  - Must be after issued_at
+  - Maximum validity: Configurable (default 2 years)
+  - Warning period: 30 days before expiration
+            </pre>
+        </div>
+
+        <h2>Data Migration and Import/Export</h2>
+
+        <p>
+            WIA-ACS provides standardized formats for data migration from legacy systems:
+        </p>
+
+        <h3>CSV Import Format</h3>
+
+        <div class="code-block">
+            <pre>
+user_id,external_id,status,given_name,family_name,email,department,roles
+usr-001,E-12345,active,John,Doe,john.doe@example.com,Engineering,"role-employee,role-engineering"
+usr-002,E-12346,active,Jane,Smith,jane.smith@example.com,Security,"role-employee,role-security"
+
+Validation:
+- Header row required
+- UTF-8 encoding
+- Quote strings containing commas
+- Array fields pipe-delimited alternative: "role-employee|role-engineering"
+            </pre>
+        </div>
+
+        <h3>Bulk Export Format (NDJSON)</h3>
+
+        <div class="code-block">
+            <pre>
+Newline-Delimited JSON for efficient streaming:
+
+{"user_id":"usr-001","status":"active","identity":{"given_name":"John"...}}
+{"user_id":"usr-002","status":"active","identity":{"given_name":"Jane"...}}
+{"user_id":"usr-003","status":"terminated","identity":{"given_name":"Bob"...}}
+
+Benefits:
+- Stream processing of large datasets
+- Fault tolerance (corrupted line doesn't break entire file)
+- Easy to parallelize processing
+- Compatible with tools like jq, BigQuery, Athena
+            </pre>
+        </div>
+
+        <h2>Internationalization and Localization</h2>
+
+        <p>
+            WIA-ACS supports global deployments with built-in i18n:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Localization Support</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Names</td>
+                    <td>UTF-8, multiple scripts</td>
+                    <td>given_name: "田中", family_name: "太郎"</td>
+                </tr>
+                <tr>
+                    <td>Addresses</td>
+                    <td>Country-specific formats</td>
+                    <td>postal_code: "123-4567" (Japan)</td>
+                </tr>
+                <tr>
+                    <td>Phone Numbers</td>
+                    <td>E.164 international format</td>
+                    <td>phone: "+81-90-1234-5678"</td>
+                </tr>
+                <tr>
+                    <td>Timestamps</td>
+                    <td>ISO 8601 with timezone</td>
+                    <td>"2025-12-26T23:32:17+09:00"</td>
+                </tr>
+                <tr>
+                    <td>Display Names</td>
+                    <td>Localized translations</td>
+                    <td>name_i18n: {"en": "Server Room", "ko": "서버실"}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <h2>Chapter Summary</h2>
+            <p>
+                This chapter detailed Phase 1 of WIA-ACS: standardized data formats. We explored schemas for users,
+                credentials, roles, permissions, access rules, and audit events. These JSON-based schemas enable
+                data exchange between systems, support both RBAC and ABAC models, include comprehensive validation
+                rules, and provide migration tools for legacy systems.
+            </p>
+
+            <h3>Key Takeaways</h3>
+            <ol>
+                <li>Standardized schemas enable interoperability even without full system integration</li>
+                <li>User and credential schemas balance security requirements with privacy protection</li>
+                <li>Permission models support both simple RBAC and complex ABAC authorization</li>
+                <li>Audit event schema includes cryptographic integrity for tamper-proof logging</li>
+                <li>Data validation rules ensure consistency and prevent common errors across implementations</li>
+            </ol>
+        </div>
+
+        <div class="questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>What are the minimum required fields for a WIA-ACS user entity? Why is each required?</li>
+                <li>Explain the difference between RBAC permissions and ABAC permissions in WIA-ACS. Provide an example of when ABAC would be necessary.</li>
+                <li>How does the credential schema support multi-factor authentication? Describe the encoding for a smart card + PIN combination.</li>
+                <li>What is the purpose of the integrity section in audit events? How does it prevent tampering?</li>
+                <li>Design a permission schema for this scenario: Software engineers can access the development server only during business hours from the office network, with MFA required.</li>
+                <li>Why does WIA-ACS use NDJSON for bulk exports instead of a single JSON array?</li>
+            </ol>
+        </div>
+
+        <div class="info-box">
+            <h3>Looking Ahead</h3>
+            <p>
+                With standardized data formats established, Chapter 5 explores Phase 2: API Interfaces. We'll examine
+                the RESTful and gRPC APIs that enable programmatic access to authentication, authorization, credential
+                management, and audit services.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

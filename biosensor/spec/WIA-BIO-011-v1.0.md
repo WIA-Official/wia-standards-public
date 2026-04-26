@@ -803,9 +803,7 @@ Target: 90 - 110% recovery
 ### 10.1 Scientific Literature
 
 1. Clark, L.C., Lyons, C. (1962). "Electrode systems for continuous monitoring in cardiovascular surgery"
-2. 선행 연구. "Electrochemical biosensors: recommended definitions and classification"
 3. Turner, A.P.F. (2013). "Biosensors: sense and sensibility"
-4. 선행 연구. "Electrochemical biosensors"
 5. Bahadır, E.B., Sezgintürk, M.K. (2016). "Applications of commercial biosensors in clinical, food, environmental, and biothreat/biowarfare analyses"
 
 ### 10.2 Standards and Guidelines

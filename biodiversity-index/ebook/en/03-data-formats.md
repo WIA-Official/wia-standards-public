@@ -575,8 +575,7 @@ The diversity index schema captures calculated biodiversity metrics with statist
   "metadata": {
     "calculation_date": "2025-12-20T14:30:00Z",
     "calculation_time_ms": 2847,
-    "software_version": "WIA-Biodiversity-SDK-v1.2.0",
-    "algorithm_reference": "선행 연구, Ecological Monographs"
+    "software_version": "WIA-Biodiversity-SDK-v1.2.0"
   }
 }
 ```

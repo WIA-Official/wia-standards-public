@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Schema - WIA Eye Gaze Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Eye Gaze Tracking Standard</h1>
+        <p class="subtitle">Chapter 2: Data Schema</p>
+        <span class="version">Version 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>Chapter 2: Data Schema</h1>
+
+        <h2>2.1 Overview</h2>
+        <p>The WIA Eye Gaze data schema defines standardized structures for representing gaze tracking data, ensuring interoperability across all devices and applications. This chapter covers the core data types, coordinate systems, and event structures.</p>
+
+        <h2>2.2 Base Types</h2>
+
+        <h3>Vector2D</h3>
+        <p>Represents 2D coordinates in normalized or pixel space.</p>
+        <pre><code>interface Vector2D {
+  x: number;  // X coordinate
+  y: number;  // Y coordinate
+}</code></pre>
+
+        <h3>Vector3D</h3>
+        <p>Represents 3D coordinates for spatial gaze tracking.</p>
+        <pre><code>interface Vector3D {
+  x: number;  // X coordinate (mm)
+  y: number;  // Y coordinate (mm)
+  z: number;  // Z coordinate (mm, distance from device)
+}</code></pre>
+
+        <h3>BoundingBox</h3>
+        <p>Defines rectangular regions on screen.</p>
+        <pre><code>interface BoundingBox {
+  x: number;       // Top-left X (normalized)
+  y: number;       // Top-left Y (normalized)
+  width: number;   // Width (normalized)
+  height: number;  // Height (normalized)
+}</code></pre>
+
+        <h2>2.3 GazePoint - The Core Data Structure</h2>
+        <p>GazePoint is the fundamental unit of eye tracking data, representing where the user is looking at a specific moment in time.</p>
+
+        <h3>Complete GazePoint Structure</h3>
+        <pre><code>interface GazePoint {
+  // === Required Fields ===
+
+  /** Unix timestamp in milliseconds */
+  timestamp: number;
+
+  /** Screen X coordinate (0.0 = left, 1.0 = right) */
+  x: number;
+
+  /** Screen Y coordinate (0.0 = top, 1.0 = bottom) */
+  y: number;
+
+  /** Data confidence (0.0 - 1.0) */
+  confidence: number;
+
+  /** Data validity flag */
+  valid: boolean;
+
+  // === Optional Fields ===
+
+  /** Left eye data */
+  leftEye?: EyeData;
+
+  /** Right eye data */
+  rightEye?: EyeData;
+
+  /** Is currently in fixation */
+  fixation?: boolean;
+
+  /** Is currently in saccade */
+  saccade?: boolean;
+
+  /** Fixation ID (groups fixation points) */
+  fixationId?: string;
+
+  /** Device-specific timestamp */
+  deviceTimestamp?: number;
+
+  /** Additional metadata */
+  metadata?: Record&lt;string, unknown&gt;;
+}</code></pre>
+
+        <h3>Example GazePoint</h3>
+        <pre><code>{
+  "timestamp": 1704067200000,
+  "x": 0.5234,
+  "y": 0.3891,
+  "confidence": 0.95,
+  "valid": true,
+  "leftEye": {
+    "gaze": { "x": 0.5198, "y": 0.3876 },
+    "valid": true,
+    "pupilDiameter": 4.2,
+    "eyeOpenness": 0.92
+  },
+  "rightEye": {
+    "gaze": { "x": 0.5270, "y": 0.3906 },
+    "valid": true,
+    "pupilDiameter": 4.1,
+    "eyeOpenness": 0.91
+  },
+  "fixation": true,
+  "fixationId": "fix_001"
+}</code></pre>
+
+        <h2>2.4 EyeData - Individual Eye Information</h2>
+        <p>Detailed data for left and right eyes individually.</p>
+
+        <pre><code>interface EyeData {
+  // === Basic Gaze Data ===
+
+  /** Gaze coordinates for this eye */
+  gaze: Vector2D;
+
+  /** Data validity */
+  valid: boolean;
+
+  // === Pupil Data ===
+
+  /** Pupil diameter in millimeters */
+  pupilDiameter?: number;
+
+  /** Pupil center in camera image (normalized) */
+  pupilCenter?: Vector2D;
+
+  // === 3D Data ===
+
+  /** Eye position in 3D space (mm from tracker) */
+  gazeOrigin?: Vector3D;
+
+  /** Gaze direction as unit vector */
+  gazeDirection?: Vector3D;
+
+  // === Eye State ===
+
+  /** Eye openness (0.0 = closed, 1.0 = fully open) */
+  eyeOpenness?: number;
+
+  /** Eye opening in millimeters */
+  eyeOpennessMm?: number;
+}</code></pre>
+
+        <div class="info-box">
+            <h4>Pupil Diameter Applications</h4>
+            <p>Pupil diameter is useful for:</p>
+            <ul>
+                <li><strong>Cognitive Load</strong> - Larger pupils indicate higher mental effort</li>
+                <li><strong>Emotional Response</strong> - Pupil changes correlate with arousal and interest</li>
+                <li><strong>Lighting Adaptation</strong> - Tracking pupil response to brightness changes</li>
+                <li><strong>Fatigue Detection</strong> - Pupil dynamics change with tiredness</li>
+            </ul>
+        </div>
+
+        <h2>2.5 Coordinate System</h2>
+
+        <h3>Screen Coordinates (Normalized)</h3>
+        <p>All gaze coordinates use normalized values from 0.0 to 1.0:</p>
+
+        <pre><code>Screen Layout:
+
+(0.0, 0.0) ──────────────────────► X (1.0, 0.0)
+     │
+     │     ┌─────────────────────┐
+     │     │                     │
+     │     │      Screen         │
+     │     │                     │
+     │     │   (0.5, 0.5)        │
+     │     │     Center          │
+     │     │                     │
+     │     └─────────────────────┘
+     │
+     ▼
+Y (0.0, 1.0)                    (1.0, 1.0)</code></pre>
+
+        <h3>Coordinate Conversion</h3>
+        <p>Converting between normalized and pixel coordinates:</p>
+
+        <pre><code>// Normalized to Pixel
+function toPixelCoordinates(
+  normalizedPoint: Vector2D,
+  screenWidth: number,
+  screenHeight: number
+): { px: number; py: number } {
+  return {
+    px: Math.round(normalizedPoint.x * screenWidth),
+    py: Math.round(normalizedPoint.y * screenHeight)
+  };
+}
+
+// Example: 1920x1080 screen
+// (0.5, 0.5) → (960, 540)
+
+// Pixel to Normalized
+function toNormalizedCoordinates(
+  px: number,
+  py: number,
+  screenWidth: number,
+  screenHeight: number
+): Vector2D {
+  return {
+    x: px / screenWidth,
+    y: py / screenHeight
+  };
+}</code></pre>
+
+        <h3>3D Coordinate System</h3>
+        <p>For devices supporting 3D gaze tracking:</p>
+
+        <pre><code>3D Space (Eye Tracker as Origin):
+
+             Y (up)
+             │
+             │
+             │
+             ┼──────────► X (right)
+            /
+           /
+          /
+         Z (toward user)
+
+* Origin: Eye tracker center
+* Unit: Millimeters (mm)
+* Right-handed coordinate system</code></pre>
+
+        <h2>2.6 Data Quality Indicators</h2>
+
+        <h3>Confidence Values</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Range</th>
+                    <th>Quality</th>
+                    <th>Recommended Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0.9 - 1.0</td>
+                    <td>Excellent</td>
+                    <td>Normal use</td>
+                </tr>
+                <tr>
+                    <td>0.7 - 0.9</td>
+                    <td>Good</td>
+                    <td>Normal use</td>
+                </tr>
+                <tr>
+                    <td>0.5 - 0.7</td>
+                    <td>Fair</td>
+                    <td>Monitor quality</td>
+                </tr>
+                <tr>
+                    <td>0.3 - 0.5</td>
+                    <td>Poor</td>
+                    <td>Consider recalibration</td>
+                </tr>
+                <tr>
+                    <td>0.0 - 0.3</td>
+                    <td>Very Poor</td>
+                    <td>Data may be unreliable</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Invalid Data Handling</h3>
+        <pre><code>// Invalid data example (during blink)
+{
+  "timestamp": 1704067200000,
+  "x": 0,
+  "y": 0,
+  "confidence": 0,
+  "valid": false,
+  "invalidReason": "blink"
+}</code></pre>
+
+        <h3>Invalid Reasons</h3>
+        <ul>
+            <li><code>"blink"</code> - Eye blink detected</li>
+            <li><code>"tracking_lost"</code> - Eyes not detected by tracker</li>
+            <li><code>"out_of_range"</code> - User outside tracking area</li>
+            <li><code>"calibration_required"</code> - Device needs calibration</li>
+            <li><code>"unknown"</code> - Unspecified reason</li>
+        </ul>
+
+        <h2>2.7 Event System</h2>
+
+        <h3>Event Categories</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Events</th>
+                    <th>Use Cases</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Eye Movement</strong></td>
+                    <td>Fixation, Saccade, Smooth Pursuit</td>
+                    <td>Reading analysis, attention tracking</td>
+                </tr>
+                <tr>
+                    <td><strong>Eye State</strong></td>
+                    <td>Blink, Wink, Double Blink</td>
+                    <td>Alternative input, fatigue detection</td>
+                </tr>
+                <tr>
+                    <td><strong>Interaction</strong></td>
+                    <td>Dwell, Gaze Enter/Leave</td>
+                    <td>AAC selection, UI interaction</td>
+                </tr>
+                <tr>
+                    <td><strong>System</strong></td>
+                    <td>Calibration, Tracking Status</td>
+                    <td>Device management</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Fixation Events</h3>
+        <p>Fixations occur when the eyes remain relatively still, indicating visual attention.</p>
+
+        <pre><code>interface FixationEvent {
+  type: 'fixation_start' | 'fixation_update' | 'fixation_end';
+  timestamp: number;
+  eventId: string;
+  fixationId: string;
+
+  /** Fixation center point */
+  centroid: Vector2D;
+
+  /** Fixation radius (normalized) */
+  radius?: number;
+
+  /** Angular dispersion (degrees) */
+  dispersion?: number;
+
+  /** Duration (ms, on fixation_end) */
+  duration?: number;
+}</code></pre>
+
+        <div class="info-box">
+            <h4>Fixation Detection Parameters</h4>
+            <ul>
+                <li><strong>Minimum Duration</strong>: 100ms (configurable)</li>
+                <li><strong>Maximum Dispersion</strong>: 1.0° (configurable)</li>
+                <li><strong>Merge Distance</strong>: 0.5° (nearby fixations merged)</li>
+            </ul>
+        </div>
+
+        <h3>Saccade Events</h3>
+        <p>Rapid eye movements between fixations.</p>
+
+        <pre><code>interface SaccadeEvent {
+  type: 'saccade_start' | 'saccade_end';
+  timestamp: number;
+  eventId: string;
+  saccadeId: string;
+
+  /** Start position */
+  startPosition: Vector2D;
+
+  /** End position (on saccade_end) */
+  endPosition?: Vector2D;
+
+  /** Movement distance (degrees) */
+  amplitude?: number;
+
+  /** Peak velocity (degrees/second) */
+  peakVelocity?: number;
+
+  /** Duration (ms) */
+  duration?: number;
+}</code></pre>
+
+        <h3>Blink Events</h3>
+        <p>Eye closure detection for input and fatigue monitoring.</p>
+
+        <pre><code>interface BlinkEvent {
+  type: 'blink_start' | 'blink_end' | 'blink' | 'double_blink';
+  timestamp: number;
+  eventId: string;
+  blinkId: string;
+
+  /** Which eye blinked */
+  eye: 'left' | 'right' | 'both';
+
+  /** Blink duration (ms) */
+  duration?: number;
+
+  /** Interval for double blink (ms) */
+  interval?: number;
+}</code></pre>
+
+        <div class="info-box warning">
+            <h4>Intentional vs. Natural Blinks</h4>
+            <ul>
+                <li><strong>Natural Blink</strong>: 100-400ms duration</li>
+                <li><strong>Intentional Blink</strong>: 400ms+ duration (configurable threshold)</li>
+            </ul>
+            <p>AAC applications can use intentional blinks as a selection mechanism.</p>
+        </div>
+
+        <h3>Dwell Events</h3>
+        <p>Critical for AAC - gaze-based selection by looking at a target.</p>
+
+        <pre><code>interface DwellEvent {
+  type: 'dwell_start' | 'dwell_progress' | 'dwell_complete' | 'dwell_cancel';
+  timestamp: number;
+  eventId: string;
+  dwellId: string;
+
+  /** Target element */
+  target: GazeTarget;
+
+  /** Configured dwell time (ms) */
+  dwellThreshold: number;
+
+  /** Elapsed time (ms) */
+  elapsed: number;
+
+  /** Progress (0.0 - 1.0) */
+  progress: number;
+
+  /** Cancel reason (if cancelled) */
+  cancelReason?: 'gaze_left' | 'timeout' | 'user_cancel';
+}</code></pre>
+
+        <h3>Dwell Interaction Flow</h3>
+        <pre><code>User looks at button
+    │
+    ▼
+gaze_enter {target: button_1}
+    │
+    ▼
+dwell_start {target: button_1, threshold: 800ms}
+    │
+    ├─ dwell_progress {progress: 0.25}
+    ├─ dwell_progress {progress: 0.50}
+    ├─ dwell_progress {progress: 0.75}
+    ├─ dwell_progress {progress: 1.00}
+    │      │
+    │      ▼
+    │  dwell_complete {target: button_1}
+    │      ↓
+    │  [Action Triggered]
+    │
+    └─ (if gaze leaves)
+       dwell_cancel {reason: 'gaze_left'}
+           │
+           ▼
+       gaze_leave {target: button_1}</code></pre>
+
+        <h2>2.8 Batch Data Format</h2>
+        <p>For efficient transmission of multiple samples:</p>
+
+        <pre><code>interface GazeBatch {
+  version: string;
+  deviceId: string;
+  sessionId: string;
+  startTimestamp: number;
+  endTimestamp: number;
+  samplingRate: number;
+  samples: GazePoint[];
+}</code></pre>
+
+        <h3>Example Batch</h3>
+        <pre><code>{
+  "version": "1.0.0",
+  "deviceId": "tobii-pro-fusion-001",
+  "sessionId": "session_2025_001",
+  "startTimestamp": 1704067200000,
+  "endTimestamp": 1704067200100,
+  "samplingRate": 120,
+  "samples": [
+    { "timestamp": 1704067200000, "x": 0.52, "y": 0.39, "confidence": 0.95, "valid": true },
+    { "timestamp": 1704067200008, "x": 0.52, "y": 0.39, "confidence": 0.94, "valid": true },
+    { "timestamp": 1704067200016, "x": 0.53, "y": 0.38, "confidence": 0.96, "valid": true }
+  ]
+}</code></pre>
+
+        <h2>2.9 Vendor Compatibility Mapping</h2>
+        <p>The WIA standard provides mapping from vendor-specific formats:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>WIA Field</th>
+                    <th>Tobii</th>
+                    <th>Gazepoint</th>
+                    <th>Pupil Labs</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>timestamp</td>
+                    <td>system_time_stamp</td>
+                    <td>TIME</td>
+                    <td>timestamp</td>
+                </tr>
+                <tr>
+                    <td>x</td>
+                    <td>gaze_point_on_display_area[0]</td>
+                    <td>FPOGX</td>
+                    <td>norm_pos[0]</td>
+                </tr>
+                <tr>
+                    <td>y</td>
+                    <td>gaze_point_on_display_area[1]</td>
+                    <td>FPOGY</td>
+                    <td>1 - norm_pos[1]</td>
+                </tr>
+                <tr>
+                    <td>confidence</td>
+                    <td>(calculated)</td>
+                    <td>FPOGV</td>
+                    <td>confidence</td>
+                </tr>
+                <tr>
+                    <td>pupilDiameter</td>
+                    <td>pupil_diameter</td>
+                    <td>LPD/RPD</td>
+                    <td>diameter_3d</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box warning">
+            <h4>Coordinate System Differences</h4>
+            <p>Note: Pupil Labs uses inverted Y-axis. Always apply appropriate transformations when mapping vendor data to WIA format.</p>
+        </div>
+
+        </main>
+</body>
+</html>

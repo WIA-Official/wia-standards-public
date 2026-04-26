@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA Eye Gaze Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Eye Gaze Tracking Standard</h1>
+        <p class="subtitle">Chapter 6: Security & Privacy</p>
+        <span class="version">Version 1.0.0</span>
+    </header>
+
+    <main>
+        <h1>Chapter 6: Security & Privacy</h1>
+
+        <h2>6.1 Overview</h2>
+        <p>Eye tracking data is highly personal and sensitive. This chapter covers security measures, privacy protections, and consent management for WIA-compliant systems.</p>
+
+        <div class="info-box danger">
+            <h4>Why Eye Data Is Sensitive</h4>
+            <p>Eye tracking data can reveal:</p>
+            <ul>
+                <li><strong>Reading Patterns</strong> - What text you've read and comprehended</li>
+                <li><strong>Attention & Interest</strong> - What captures your attention</li>
+                <li><strong>Cognitive State</strong> - Mental workload, fatigue, stress levels</li>
+                <li><strong>Emotional Responses</strong> - Arousal and emotional reactions via pupil changes</li>
+                <li><strong>Biometric Identity</strong> - Eye movement patterns can identify individuals</li>
+                <li><strong>Health Information</strong> - Certain eye behaviors correlate with medical conditions</li>
+            </ul>
+        </div>
+
+        <h2>6.2 Data Classification</h2>
+
+        <h3>Sensitivity Levels</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Sensitivity</th>
+                    <th>Examples</th>
+                    <th>Protection Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Gaze Coordinates</td>
+                    <td>High</td>
+                    <td>Screen positions, fixations</td>
+                    <td>Encryption, access control</td>
+                </tr>
+                <tr>
+                    <td>Pupil Data</td>
+                    <td>Very High</td>
+                    <td>Pupil diameter, changes</td>
+                    <td>Encryption, consent required</td>
+                </tr>
+                <tr>
+                    <td>Eye Images</td>
+                    <td>Critical</td>
+                    <td>Camera images of eyes</td>
+                    <td>Never stored, consent + encryption</td>
+                </tr>
+                <tr>
+                    <td>Aggregated Stats</td>
+                    <td>Medium</td>
+                    <td>Average accuracy, session duration</td>
+                    <td>Anonymization</td>
+                </tr>
+                <tr>
+                    <td>Device Metadata</td>
+                    <td>Low</td>
+                    <td>Device model, firmware version</td>
+                    <td>Standard protection</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 Consent Management</h2>
+
+        <h3>Informed Consent Requirements</h3>
+        <p>Before collecting eye tracking data, applications must obtain explicit consent:</p>
+
+        <pre><code>interface ConsentRequest {
+  /** Application requesting consent */
+  applicationId: string;
+  applicationName: string;
+
+  /** What data will be collected */
+  dataTypes: DataType[];
+
+  /** Purpose of data collection */
+  purpose: string;
+
+  /** How long data will be retained */
+  retentionPeriod: string;
+
+  /** Will data be shared with third parties */
+  sharingPolicy: SharingPolicy;
+
+  /** User rights (access, deletion, etc.) */
+  userRights: string[];
+}
+
+type DataType =
+  | 'gaze_coordinates'
+  | 'pupil_diameter'
+  | 'eye_images'
+  | 'fixation_events'
+  | 'screen_content';
+
+interface SharingPolicy {
+  shared: boolean;
+  recipients?: string[];
+  purpose?: string;
+}</code></pre>
+
+        <h3>Consent Dialog Example</h3>
+        <pre><code>{
+  "applicationName": "My AAC App",
+  "purpose": "Enable eye-controlled communication",
+  "dataTypes": [
+    "gaze_coordinates",
+    "fixation_events"
+  ],
+  "retentionPeriod": "Session only (deleted on exit)",
+  "sharingPolicy": {
+    "shared": false
+  },
+  "userRights": [
+    "View collected data",
+    "Delete data at any time",
+    "Revoke consent",
+    "Export data"
+  ]
+}</code></pre>
+
+        <h3>Granular Consent</h3>
+        <p>Users should be able to consent to specific data types:</p>
+
+        <pre><code>interface ConsentResponse {
+  granted: boolean;
+  grantedDataTypes: DataType[];
+  timestamp: number;
+  expiresAt?: number;  // Optional expiration
+  restrictions?: {
+    noRecording?: boolean;
+    noSharing?: boolean;
+    sessionOnly?: boolean;
+  };
+}</code></pre>
+
+        <h2>6.4 Data Encryption</h2>
+
+        <h3>Transport Encryption</h3>
+        <p>All network communication must use TLS 1.3+:</p>
+
+        <pre><code>// WebSocket with TLS
+const ws = new WebSocket('wss://tracker.local:8443/stream', {
+  rejectUnauthorized: true,
+  minVersion: 'TLSv1.3'
+});
+
+// Verify server certificate
+ws.on('upgrade', (response) => {
+  const cert = response.socket.getPeerCertificate();
+  if (!isValidCertificate(cert)) {
+    ws.close();
+    throw new Error('Invalid server certificate');
+  }
+});</code></pre>
+
+        <h3>At-Rest Encryption</h3>
+        <p>Stored eye tracking data must be encrypted:</p>
+
+        <pre><code>// AES-256-GCM encryption
+interface EncryptedGazeData {
+  version: '1.0';
+  algorithm: 'AES-256-GCM';
+  iv: string;           // Base64 initialization vector
+  ciphertext: string;   // Base64 encrypted data
+  authTag: string;      // Base64 authentication tag
+  metadata?: {
+    timestamp: number;
+    recordCount: number;
+  };
+}</code></pre>
+
+        <h3>End-to-End Encryption</h3>
+        <p>For multi-user scenarios (e.g., research data collection):</p>
+
+        <pre><code>// Researcher's public key encrypts data
+{
+  "encryptedSymmetricKey": "...",  // RSA-OAEP encrypted AES key
+  "encryptedData": "...",           // AES-GCM encrypted gaze data
+  "recipientKeyId": "researcher-001"
+}
+
+// Only researcher with private key can decrypt</code></pre>
+
+        <h2>6.5 Access Control</h2>
+
+        <h3>Role-Based Access Control (RBAC)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Role</th>
+                    <th>Permissions</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>User</strong></td>
+                    <td>Read own data, Grant/revoke consent, Delete data</td>
+                    <td>AAC user</td>
+                </tr>
+                <tr>
+                    <td><strong>Application</strong></td>
+                    <td>Read data (with consent), Stream real-time data</td>
+                    <td>AAC software</td>
+                </tr>
+                <tr>
+                    <td><strong>Researcher</strong></td>
+                    <td>Read anonymized data, Export aggregates</td>
+                    <td>Research study</td>
+                </tr>
+                <tr>
+                    <td><strong>Administrator</strong></td>
+                    <td>Manage devices, Configure system, View logs</td>
+                    <td>IT support</td>
+                </tr>
+                <tr>
+                    <td><strong>Clinician</strong></td>
+                    <td>View patient data (with consent), Generate reports</td>
+                    <td>AAC assessment</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>API Access Control</h3>
+        <pre><code>// Token-based authentication
+POST /api/v1/auth/token
+{
+  "clientId": "aac-app-001",
+  "clientSecret": "...",
+  "scope": ["gaze:read", "calibration:execute"]
+}
+
+// Response
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "scope": ["gaze:read", "calibration:execute"]
+}
+
+// Use token in requests
+GET /api/v1/devices/001/stream
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...</code></pre>
+
+        <h2>6.6 Data Minimization</h2>
+
+        <h3>Principles</h3>
+        <ul>
+            <li><strong>Collect Only What's Needed</strong> - Don't request pupil data if only gaze coordinates are needed</li>
+            <li><strong>Reduce Granularity</strong> - Aggregate or round data when high precision isn't necessary</li>
+            <li><strong>Delete Early</strong> - Implement automatic deletion of temporary data</li>
+            <li><strong>Anonymize</strong> - Remove identifying information when possible</li>
+        </ul>
+
+        <h3>Data Retention Policies</h3>
+        <pre><code>interface RetentionPolicy {
+  /** Data category */
+  dataType: string;
+
+  /** How long to keep data */
+  retentionPeriod: number; // milliseconds
+
+  /** What happens after retention period */
+  action: 'delete' | 'anonymize' | 'archive';
+
+  /** Exceptions to retention period */
+  exceptions?: {
+    legalHold?: boolean;
+    userRequested?: boolean;
+  };
+}
+
+// Example policies
+const policies = [
+  {
+    dataType: 'session_data',
+    retentionPeriod: 0,           // Delete immediately on session end
+    action: 'delete'
+  },
+  {
+    dataType: 'calibration_profile',
+    retentionPeriod: 90 * 86400000, // 90 days
+    action: 'delete'
+  },
+  {
+    dataType: 'research_data',
+    retentionPeriod: 365 * 86400000, // 1 year
+    action: 'anonymize'
+  }
+];</code></pre>
+
+        <h2>6.7 Privacy by Design</h2>
+
+        <h3>Privacy-Preserving Techniques</h3>
+
+        <h4>1. Differential Privacy</h4>
+        <p>Add controlled noise to aggregate statistics:</p>
+
+        <pre><code>function addDifferentialPrivacy(value, epsilon = 1.0) {
+  // Laplace mechanism
+  const scale = 1.0 / epsilon;
+  const noise = laplaceSample(0, scale);
+  return value + noise;
+}
+
+// Example: Average fixation duration
+const trueAverage = 245.3; // ms
+const privateAverage = addDifferentialPrivacy(trueAverage);
+// Result: 247.1 ms (statistically similar, but not exact)</code></pre>
+
+        <h4>2. k-Anonymity</h4>
+        <p>Ensure data cannot be linked to fewer than k individuals:</p>
+
+        <pre><code>// Generalize gaze coordinates to regions
+function anonymizeGazeData(gazePoints, k = 5) {
+  // Group points into grid cells
+  const gridSize = 0.1; // 10% of screen
+  const cells = groupIntoGrid(gazePoints, gridSize);
+
+  // Only return cells with k+ points
+  return cells.filter(cell => cell.points.length >= k);
+}</code></pre>
+
+        <h4>3. Homomorphic Encryption</h4>
+        <p>Compute on encrypted data without decrypting:</p>
+
+        <pre><code>// Research scenario: Compute average fixation duration
+// without seeing individual data points
+const encryptedDurations = fixations.map(f =>
+  encrypt(f.duration, publicKey)
+);
+
+const encryptedSum = homomorphicSum(encryptedDurations);
+const encryptedAvg = homomorphicDivide(
+  encryptedSum,
+  fixations.length
+);
+
+// Researcher can decrypt only the average, not individual durations</code></pre>
+
+        <h2>6.8 Audit Logging</h2>
+
+        <h3>Security Event Logging</h3>
+        <pre><code>interface SecurityAuditLog {
+  timestamp: number;
+  eventType: string;
+  userId?: string;
+  applicationId: string;
+  deviceId?: string;
+  action: string;
+  resource: string;
+  outcome: 'success' | 'failure';
+  details?: Record&lt;string, unknown&gt;;
+}
+
+// Log examples
+const logs = [
+  {
+    timestamp: 1704067200000,
+    eventType: 'consent_granted',
+    userId: 'user_001',
+    applicationId: 'aac-app-001',
+    action: 'grant_consent',
+    resource: 'gaze_data',
+    outcome: 'success',
+    details: {
+      dataTypes: ['gaze_coordinates', 'fixation_events']
+    }
+  },
+  {
+    timestamp: 1704067200001,
+    eventType: 'data_access',
+    applicationId: 'aac-app-001',
+    deviceId: 'device_001',
+    action: 'stream_start',
+    resource: 'gaze_stream',
+    outcome: 'success'
+  },
+  {
+    timestamp: 1704067200002,
+    eventType: 'unauthorized_access',
+    applicationId: 'unknown-app',
+    action: 'stream_start',
+    resource: 'gaze_stream',
+    outcome: 'failure',
+    details: {
+      reason: 'No consent granted'
+    }
+  }
+];</code></pre>
+
+        <h3>Data Access Logs</h3>
+        <p>Users should be able to view who accessed their data:</p>
+
+        <pre><code>GET /api/v1/users/{userId}/access-log
+
+Response:
+{
+  "accessLog": [
+    {
+      "timestamp": 1704067200000,
+      "application": "My AAC App",
+      "action": "Read gaze coordinates",
+      "duration": 3600000,  // 1 hour session
+      "recordsAccessed": 432000
+    }
+  ]
+}</code></pre>
+
+        <h2>6.9 Regulatory Compliance</h2>
+
+        <h3>GDPR Compliance (EU)</h3>
+        <div class="info-box">
+            <h4>GDPR Requirements</h4>
+            <ul>
+                <li><strong>Right to Access</strong> - Users can view their data</li>
+                <li><strong>Right to Rectification</strong> - Users can correct inaccurate data</li>
+                <li><strong>Right to Erasure</strong> - "Right to be forgotten"</li>
+                <li><strong>Right to Data Portability</strong> - Export data in machine-readable format</li>
+                <li><strong>Right to Object</strong> - Refuse certain processing</li>
+                <li><strong>Data Breach Notification</strong> - Report breaches within 72 hours</li>
+            </ul>
+        </div>
+
+        <h3>HIPAA Compliance (US Healthcare)</h3>
+        <p>For medical AAC applications:</p>
+        <ul>
+            <li><strong>PHI Protection</strong> - Eye data linked to medical records is Protected Health Information</li>
+            <li><strong>BAA Required</strong> - Business Associate Agreement with service providers</li>
+            <li><strong>Encryption Mandatory</strong> - Both in transit and at rest</li>
+            <li><strong>Access Logging</strong> - Detailed audit trails required</li>
+            <li><strong>Breach Notification</strong> - Notify affected individuals</li>
+        </ul>
+
+        <h3>COPPA Compliance (Children's Privacy)</h3>
+        <p>For applications used by children under 13:</p>
+        <ul>
+            <li><strong>Parental Consent</strong> - Verifiable parental consent required</li>
+            <li><strong>Data Minimization</strong> - Collect only necessary data</li>
+            <li><strong>No Profiling</strong> - Don't build behavioral profiles of children</li>
+            <li><strong>Transparency</strong> - Clear, child-appropriate privacy notices</li>
+        </ul>
+
+        <h2>6.10 Security Best Practices</h2>
+
+        <h3>For Device Manufacturers</h3>
+        <ul>
+            <li>Implement secure boot and firmware signing</li>
+            <li>Regular security updates and patching</li>
+            <li>Hardware-based encryption keys (TPM/Secure Enclave)</li>
+            <li>No default passwords or credentials</li>
+            <li>Secure development lifecycle (SDL)</li>
+        </ul>
+
+        <h3>For Application Developers</h3>
+        <ul>
+            <li>Request minimal permissions needed</li>
+            <li>Implement consent management UI</li>
+            <li>Never log sensitive data</li>
+            <li>Use secure credential storage</li>
+            <li>Regular security audits and penetration testing</li>
+        </ul>
+
+        <h3>For Users</h3>
+        <ul>
+            <li>Review and understand consent requests</li>
+            <li>Only install trusted applications</li>
+            <li>Regularly review access logs</li>
+            <li>Revoke unused application permissions</li>
+            <li>Keep devices and software updated</li>
+        </ul>
+
+        </main>
+</body>
+</html>

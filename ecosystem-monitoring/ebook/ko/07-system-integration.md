@@ -655,7 +655,7 @@ wia_client.update_dataset_metadata(
 )
 
 # 4. 인용 생성
-citation = f"""선행 연구. Green River Watershed Biodiversity
+citation = f"""관련 분야 자료. Green River Watershed Biodiversity
 Monitoring 2020-2025 [데이터셋]. WIA 생태계 모니터링 저장소.
 https://doi.org/{doi}"""
 ```

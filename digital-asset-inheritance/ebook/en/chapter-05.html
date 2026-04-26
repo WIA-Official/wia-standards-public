@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - API Interface Design | WIA-LEG-006</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(139, 92, 246, 0.2); padding: 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 800px; margin: 0 auto; }
+        .logo { font-size: 2rem; margin-bottom: 0.5rem; }
+        h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+        h2 { color: #8B5CF6; font-size: 1.75rem; margin: 2rem 0 1rem; }
+        h3 { color: #A78BFA; font-size: 1.5rem; margin: 1.5rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1rem; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; padding: 1rem; margin: 1.5rem 0; border-radius: 4px; }
+        ul, ol { color: #cbd5e1; margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: rgba(30, 41, 59, 0.5); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+        th { background: rgba(139, 92, 246, 0.2); color: #8B5CF6; font-weight: 600; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(139, 92, 246, 0.2); }
+        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #8B5CF6; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .btn:hover { background: #7C3AED; }
+        .btn-secondary { background: transparent; border: 2px solid #8B5CF6; color: #8B5CF6; }
+        code { background: rgba(139, 92, 246, 0.1); color: #A78BFA; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        pre { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        .key-takeaways { background: rgba(139, 92, 246, 0.1); border: 2px solid #8B5CF6; border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .key-takeaways h3 { margin-top: 0; }
+        .review-questions { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .endpoint { background: rgba(30, 41, 59, 0.7); border-left: 3px solid #8B5CF6; padding: 1rem; margin: 1rem 0; border-radius: 4px; }
+        .method { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: 700; font-size: 0.85rem; margin-right: 0.5rem; }
+        .method-get { background: #10b981; color: white; }
+        .method-post { background: #3b82f6; color: white; }
+        .method-put { background: #f59e0b; color: white; }
+        .method-delete { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">💎 Chapter 5</div>
+            <h1>Phase 2: API Interface Design</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Introduction to API Phase</h2>
+        <p>
+            Phase 2 of WIA-LEG-006 transforms the data formats from Phase 1 into actionable APIs that enable programmatic interaction with digital asset inheritance systems. These RESTful APIs allow wallets, estate planning platforms, executors, and beneficiaries to create, query, update, and execute inheritance plans in a standardized, interoperable manner.
+        </p>
+
+        <p>
+            This chapter provides comprehensive API specifications including endpoints, request/response formats, authentication mechanisms, error handling, and integration patterns. Developers can use these specifications to build compliant applications or integrate existing systems with WIA-LEG-006 infrastructure.
+        </p>
+
+        <h2>API Architecture</h2>
+
+        <h3>Base URL and Versioning</h3>
+        <p>
+            All WIA-LEG-006 APIs follow a consistent URL structure:
+        </p>
+        <pre><code>https://api.{provider}.com/wia/leg-006/v1/{resource}</code></pre>
+
+        <p>
+            Version is included in the URL path to enable smooth API evolution while maintaining backwards compatibility. Breaking changes require a new major version (v2, v3, etc.), while minor updates and bug fixes maintain the same version.
+        </p>
+
+        <h3>Authentication and Authorization</h3>
+        <p>
+            Phase 2 APIs implement OAuth 2.0 with JWT tokens for authentication, supplemented by additional verification for sensitive operations:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Operation Type</th>
+                    <th>Authentication Required</th>
+                    <th>Additional Verification</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Read public plan info</td>
+                    <td>API Key</td>
+                    <td>None</td>
+                </tr>
+                <tr>
+                    <td>Read full plan details</td>
+                    <td>OAuth 2.0 + JWT</td>
+                    <td>Owner/Beneficiary identity</td>
+                </tr>
+                <tr>
+                    <td>Create/Update plan</td>
+                    <td>OAuth 2.0 + JWT</td>
+                    <td>MFA + Biometric</td>
+                </tr>
+                <tr>
+                    <td>Execute inheritance</td>
+                    <td>OAuth 2.0 + JWT</td>
+                    <td>Multi-party signatures + Legal docs</td>
+                </tr>
+                <tr>
+                    <td>Emergency access</td>
+                    <td>Hardware security key</td>
+                    <td>Court order verification</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Core API Endpoints</h2>
+
+        <h3>Inheritance Plan Management</h3>
+
+        <div class="endpoint">
+            <p><span class="method method-post">POST</span> <code>/plans</code></p>
+            <p><strong>Description:</strong> Create a new inheritance plan</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "owner": {
+    "did": "did:wia:owner:abc123",
+    "authentication": {
+      "method": "biometric",
+      "token": "jwt-token-here"
+    }
+  },
+  "plan": {
+    // Complete Phase 1 data structure
+  },
+  "encryption": {
+    "publicKey": "owner-public-key",
+    "algorithm": "RSA-4096"
+  }
+}</code></pre>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "planId": "plan-7f9fade1c0d5",
+  "status": "created",
+  "version": "1.0",
+  "createdAt": "2025-01-15T10:30:00Z",
+  "encryptionFingerprint": "sha256:abc...",
+  "backupLocations": [
+    "ipfs://QmX7KwXNFjKj8w3nQGxBvCvqV2zxK9yDhXjL8pTvWqRsN5",
+    "arweave://tx-id-here"
+  ]
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <p><span class="method method-get">GET</span> <code>/plans/{planId}</code></p>
+            <p><strong>Description:</strong> Retrieve inheritance plan details</p>
+            <p><strong>Query Parameters:</strong></p>
+            <ul>
+                <li><code>version</code> (optional): Specific version to retrieve, defaults to latest</li>
+                <li><code>include</code> (optional): Comma-separated list of sections (assets,beneficiaries,distribution)</li>
+                <li><code>decrypt</code> (optional): Return decrypted sensitive fields (requires additional auth)</li>
+            </ul>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "planId": "plan-7f9fade1c0d5",
+  "version": "1.2",
+  "status": "active",
+  "lastModified": "2025-01-20T14:45:00Z",
+  "plan": {
+    // Phase 1 data structure
+  },
+  "permissions": {
+    "canModify": true,
+    "canExecute": false,
+    "canView": ["metadata", "beneficiaries"]
+  }
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <p><span class="method method-put">PUT</span> <code>/plans/{planId}</code></p>
+            <p><strong>Description:</strong> Update existing inheritance plan</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "currentVersion": "1.1",
+  "changes": {
+    "assets": {
+      "add": [/* new asset objects */],
+      "update": [/* modified assets */],
+      "remove": ["asset-id-1", "asset-id-2"]
+    },
+    "beneficiaries": {
+      "update": [/* modified beneficiary allocations */]
+    }
+  },
+  "changeReason": "Added new Bitcoin holdings and NFT collection",
+  "authentication": {
+    "mfa": "123456",
+    "biometric": "fingerprint-hash"
+  }
+}</code></pre>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "planId": "plan-7f9fade1c0d5",
+  "newVersion": "1.2",
+  "previousVersionHash": "sha256:7f9fa...",
+  "changesApplied": 15,
+  "warnings": [
+    "Beneficiary allocation now totals 105% - review distribution rules"
+  ]
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <p><span class="method method-delete">DELETE</span> <code>/plans/{planId}</code></p>
+            <p><strong>Description:</strong> Revoke inheritance plan (does not delete from blockchain)</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "revocationReason": "Creating new plan",
+  "authentication": {
+    "mfa": "123456",
+    "confirmationPhrase": "I understand this action cannot be undone"
+  }
+}</code></pre>
+        </div>
+
+        <h3>Asset Discovery and Inventory</h3>
+
+        <div class="endpoint">
+            <p><span class="method method-post">POST</span> <code>/assets/discover</code></p>
+            <p><strong>Description:</strong> Scan for digital assets across blockchains and platforms</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "owner": "did:wia:owner:abc123",
+  "searchCriteria": {
+    "walletAddresses": [
+      "bc1q...",
+      "0x123..."
+    ],
+    "blockchains": ["Bitcoin", "Ethereum", "Polygon", "Solana"],
+    "platforms": ["OpenSea", "Decentraland", "ENS"],
+    "timeRange": {
+      "from": "2020-01-01",
+      "to": "2025-01-15"
+    }
+  },
+  "includeHistory": true,
+  "estimateValues": true
+}</code></pre>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "discoveryId": "disc-xyz789",
+  "status": "completed",
+  "assetsFound": 47,
+  "totalEstimatedValue": {
+    "amount": 892000,
+    "currency": "USD"
+  },
+  "assets": [
+    // Array of discovered assets in Phase 1 format
+  ],
+  "recommendations": [
+    "Consider adding 12 NFTs currently not in inheritance plan",
+    "Bitcoin holdings on 3 addresses detected - consolidate for easier management"
+  ]
+}</code></pre>
+        </div>
+
+        <h3>Beneficiary Management</h3>
+
+        <div class="endpoint">
+            <p><span class="method method-post">POST</span> <code>/beneficiaries/verify</code></p>
+            <p><strong>Description:</strong> Verify beneficiary identity and inheritance rights</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "planId": "plan-7f9fade1c0d5",
+  "beneficiary": {
+    "did": "did:wia:beneficiary:alice123",
+    "credentials": {
+      "governmentId": "encrypted-id-scan",
+      "verifiableCredential": "VC-jwt-token",
+      "biometric": "facial-recognition-data"
+    }
+  },
+  "verificationLevel": "high-assurance"
+}</code></pre>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "verificationId": "ver-abc456",
+  "status": "verified",
+  "confidence": 0.99,
+  "beneficiaryId": "ben-001",
+  "entitlements": {
+    "assets": ["asset-crypto-001", "asset-nft-001"],
+    "percentage": 50,
+    "estimatedValue": 445000,
+    "conditions": {
+      "ageRequirement": {
+        "required": 25,
+        "current": 24,
+        "eligible": "2026-03-22"
+      }
+    }
+  },
+  "nextSteps": [
+    "Wait until age 25 for full distribution",
+    "Trust distributions will begin on schedule"
+  ]
+}</code></pre>
+        </div>
+
+        <h3>Trigger Management</h3>
+
+        <div class="endpoint">
+            <p><span class="method method-post">POST</span> <code>/triggers/checkin</code></p>
+            <p><strong>Description:</strong> Owner check-in to reset dead man's switch</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "planId": "plan-7f9fade1c0d5",
+  "authentication": {
+    "method": "biometric",
+    "data": "fingerprint-template",
+    "location": {
+      "latitude": 37.7749,
+      "longitude": -122.4194
+    },
+    "deviceId": "iPhone-ABC123"
+  }
+}</code></pre>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "checkInId": "checkin-timestamp-12345",
+  "status": "confirmed",
+  "nextCheckInDue": "2026-01-15T10:30:00Z",
+  "daysUntilTrigger": 365,
+  "notificationSettings": {
+    "firstWarning": 335,
+    "secondWarning": 350,
+    "finalWarning": 358
+  }
+}</code></pre>
+        </div>
+
+        <div class="endpoint">
+            <p><span class="method method-post">POST</span> <code>/triggers/execute</code></p>
+            <p><strong>Description:</strong> Trigger inheritance execution (authorized parties only)</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "planId": "plan-7f9fade1c0d5",
+  "trigger": {
+    "type": "manual-executor",
+    "reason": "Owner deceased",
+    "documentation": [
+      {
+        "type": "death-certificate",
+        "issuer": "California Department of Public Health",
+        "documentHash": "sha256:abc...",
+        "storageUrl": "ipfs://QmX..."
+      },
+      {
+        "type": "letters-testamentary",
+        "issuer": "San Francisco Superior Court",
+        "caseNumber": "PES-2025-12345"
+      }
+    ]
+  },
+  "executors": [
+    {
+      "did": "did:wia:executor:xyz789",
+      "signature": "digital-signature-1"
+    },
+    {
+      "did": "did:wia:attorney:legal456",
+      "signature": "digital-signature-2"
+    }
+  ]
+}</code></pre>
+            <p><strong>Response:</strong></p>
+            <pre><code>{
+  "executionId": "exec-timestamp-67890",
+  "status": "initiated",
+  "validationResults": {
+    "documentationComplete": true,
+    "signaturesValid": true,
+    "legalRequirementsMet": true
+  },
+  "timeline": {
+    "notificationPeriod": "7 days",
+    "contestPeriod": "30 days",
+    "estimatedDistribution": "2025-03-15"
+  },
+  "nextSteps": [
+    "Beneficiaries will be notified within 24 hours",
+    "Assets will be locked pending contest period",
+    "Distribution will occur automatically unless contested"
+  ]
+}</code></pre>
+        </div>
+
+        <h2>Webhook System</h2>
+        <p>
+            The API supports webhooks for real-time notifications of important events:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Description</th>
+                    <th>Payload Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>plan.created</td>
+                    <td>New plan created</td>
+                    <td>{"planId": "...", "owner": "...", "timestamp": "..."}</td>
+                </tr>
+                <tr>
+                    <td>plan.updated</td>
+                    <td>Plan modified</td>
+                    <td>{"planId": "...", "version": "...", "changes": [...]}</td>
+                </tr>
+                <tr>
+                    <td>trigger.warning</td>
+                    <td>Inactivity warning</td>
+                    <td>{"planId": "...", "daysRemaining": 30, "severity": "high"}</td>
+                </tr>
+                <tr>
+                    <td>trigger.activated</td>
+                    <td>Inheritance triggered</td>
+                    <td>{"planId": "...", "triggerType": "...", "executionId": "..."}</td>
+                </tr>
+                <tr>
+                    <td>distribution.initiated</td>
+                    <td>Asset distribution started</td>
+                    <td>{"executionId": "...", "beneficiaries": [...], "assets": [...]}</td>
+                </tr>
+                <tr>
+                    <td>distribution.completed</td>
+                    <td>Distribution finished</td>
+                    <td>{"executionId": "...", "status": "success", "transactions": [...]}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Webhook Configuration</h3>
+        <div class="endpoint">
+            <p><span class="method method-post">POST</span> <code>/webhooks</code></p>
+            <p><strong>Description:</strong> Register webhook endpoint</p>
+            <p><strong>Request Body:</strong></p>
+            <pre><code>{
+  "url": "https://myapp.com/webhooks/wia-leg-006",
+  "events": ["trigger.warning", "trigger.activated", "distribution.completed"],
+  "authentication": {
+    "method": "hmac-sha256",
+    "secret": "webhook-secret-key"
+  },
+  "retryPolicy": {
+    "maxAttempts": 5,
+    "backoff": "exponential"
+  }
+}</code></pre>
+        </div>
+
+        <h2>Error Handling</h2>
+        <p>
+            All API errors follow a consistent format:
+        </p>
+
+        <pre><code>{
+  "error": {
+    "code": "INSUFFICIENT_AUTH",
+    "message": "Multi-factor authentication required for this operation",
+    "details": {
+      "requiredFactors": ["password", "biometric"],
+      "providedFactors": ["password"]
+    },
+    "timestamp": "2025-01-15T10:30:00Z",
+    "requestId": "req-abc123",
+    "documentation": "https://docs.wia.org/leg-006/errors/INSUFFICIENT_AUTH"
+  }
+}</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>HTTP Status</th>
+                    <th>Error Code</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>400</td>
+                    <td>INVALID_REQUEST</td>
+                    <td>Malformed request body or parameters</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>UNAUTHORIZED</td>
+                    <td>Missing or invalid authentication</td>
+                </tr>
+                <tr>
+                    <td>403</td>
+                    <td>INSUFFICIENT_AUTH</td>
+                    <td>Additional verification required</td>
+                </tr>
+                <tr>
+                    <td>404</td>
+                    <td>NOT_FOUND</td>
+                    <td>Plan or resource does not exist</td>
+                </tr>
+                <tr>
+                    <td>409</td>
+                    <td>CONFLICT</td>
+                    <td>Version conflict or concurrent modification</td>
+                </tr>
+                <tr>
+                    <td>422</td>
+                    <td>VALIDATION_ERROR</td>
+                    <td>Data validation failed</td>
+                </tr>
+                <tr>
+                    <td>429</td>
+                    <td>RATE_LIMIT</td>
+                    <td>Too many requests</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>INTERNAL_ERROR</td>
+                    <td>Server error</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="key-takeaways">
+            <h3>Chapter Summary: Key Takeaways</h3>
+            <ol>
+                <li><strong>RESTful Design:</strong> Phase 2 APIs follow REST principles with clear resource-oriented URLs, standard HTTP methods, and predictable response formats.</li>
+                <li><strong>Layered Security:</strong> Different operations require different authentication levels, from simple API keys to multi-factor biometric verification and multi-party signatures.</li>
+                <li><strong>Comprehensive Endpoints:</strong> APIs cover the complete inheritance lifecycle from plan creation and asset discovery through trigger management and distribution execution.</li>
+                <li><strong>Real-Time Notifications:</strong> Webhook system enables applications to respond immediately to critical events like trigger warnings and distribution initiation.</li>
+                <li><strong>Developer-Friendly:</strong> Consistent error handling, comprehensive documentation, and predictable behaviors reduce integration complexity.</li>
+                <li><strong>Interoperability Foundation:</strong> Standardized APIs enable diverse applications—wallets, estate planners, exchanges, custodians—to interoperate seamlessly.</li>
+            </ol>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Why does the API use URL-based versioning rather than header-based versioning, and what are the trade-offs?</li>
+                <li>Explain the multi-level authentication system. Why do different operations require different authentication strengths?</li>
+                <li>How does the asset discovery API help address the "hidden assets" problem identified in Chapter 2?</li>
+                <li>Describe the complete workflow for triggering inheritance execution via the API, including all required documentation and signatures.</li>
+                <li>What is the purpose of the webhook system, and how does it enable real-time inheritance monitoring?</li>
+                <li>How do the error codes and consistent error format improve the developer experience when integrating with WIA-LEG-006 APIs?</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <strong>Looking Ahead:</strong> Chapter 6 examines Phase 3: Smart Contract Protocol, diving into the on-chain execution mechanisms that enable automated, trustless inheritance on blockchain networks. We'll explore multi-signature implementations, dead man's switch contracts, oracle integration, and cross-chain coordination.
+        </div>
+
+        </div>
+</body>
+</html>

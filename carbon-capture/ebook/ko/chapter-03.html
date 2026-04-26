@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>챕터 3: 포집 기술 | WIA-CARBON_CAPTURE</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #0f172a; --text: #e2e8f0; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--primary); font-size: 2.2rem; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; }
+        h2 { color: #60a5fa; font-size: 1.5rem; margin: 2rem 0 1rem; }
+        h3 { color: #93c5fd; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        p { margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        pre { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1.5rem 0; }
+        code { font-family: 'D2Coding', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        .highlight strong { color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <h1>챕터 3: 포인트 소스 포집 기술</h1>
+
+    <div class="highlight">
+        <strong>학습 목표:</strong> 연소후, 연소전, 순산소 연소 포집 기술 습득. 산업 환경에서 각 접근 방식의 장점, 한계 및 최적 응용 분야 이해
+    </div>
+
+    <h2>포인트 소스 포집 개요</h2>
+
+    <p>포인트 소스 포집은 발전소, 정유소, 시멘트 공장, 제철소와 같은 대규모 고정 배출원에서 CO2를 포집하는 것을 말합니다. 이러한 출처는 전 세계 CO2 배출량의 약 60%를 차지하며, 포인트 소스 포집은 기후 변화 완화 전략의 핵심 구성 요소입니다.</p>
+
+    <pre><code>// 포인트 소스 배출 범주
+const pointSourceEmissions = {
+    powerGeneration: {
+        coalPlants: { emissions: 14.5, unit: "Gt CO2/년", CO2Concentration: "12-15%" },
+        naturalGas: { emissions: 6.3, unit: "Gt CO2/년", CO2Concentration: "3-5%" },
+        percentage: 40
+    },
+    industry: {
+        cement: { emissions: 2.8, unit: "Gt CO2/년", CO2Concentration: "14-33%" },
+        steel: { emissions: 2.6, unit: "Gt CO2/년", CO2Concentration: "20-27%" },
+        refineries: { emissions: 1.3, unit: "Gt CO2/년", CO2Concentration: "3-13%" },
+        chemicals: { emissions: 1.2, unit: "Gt CO2/년", CO2Concentration: "가변적" },
+        percentage: 25
+    },
+    captureReadiness: {
+        highConcentration: ["암모니아", "에탄올", "천연가스 처리"],
+        mediumConcentration: ["시멘트", "철강", "석탄 발전"],
+        lowConcentration: ["천연가스 발전", "정유소"]
+    }
+};</code></pre>
+
+    <h2>연소후 포집</h2>
+
+    <p>연소후 포집은 가장 성숙하고 널리 배포된 탄소 포집 기술입니다. 연료 연소 후 배기가스에서 CO2를 분리하는 방식입니다. 이 접근 방식은 기존 발전소 및 산업 시설에 레트로핏이 가능하여 단기 배포에 특히 매력적입니다.</p>
+
+    <h3>연소후 공정 흐름</h3>
+
+    <pre><code>// 연소후 포집 공정
+interface PostCombustionSystem {
+    flueGasConditions: {
+        temperature: number;      // °C (일반적으로 120-180)
+        pressure: number;         // bar (일반적으로 1.0-1.1)
+        CO2Concentration: number; // mol% (일반적으로 10-15)
+        flowRate: number;         // Nm³/시간
+        contaminants: {
+            SO2: number;          // ppm
+            NOx: number;          // ppm
+            particulateMatter: number;  // mg/Nm³
+            O2: number;           // mol%
+        };
+    };
+
+    pretreatment: {
+        directContactCooler: boolean;
+        desulfurization: boolean;
+        particulateRemoval: boolean;
+        targetConditions: {
+            temperature: 40,      // °C
+            SO2: "<10 ppm",
+            PM: "<5 mg/Nm³"
+        };
+    };
+
+    captureSection: {
+        technology: "amine" | "carbonate" | "membrane";
+        solvent: string;
+        captureEfficiency: number;  // 퍼센트
+        specificEnergy: number;     // GJ/톤 CO2
+    };
+}
+
+// 예시: 석탄 발전소 연소후 포집
+const coalPlantCapture: PostCombustionSystem = {
+    flueGasConditions: {
+        temperature: 150,
+        pressure: 1.05,
+        CO2Concentration: 13.5,
+        flowRate: 2500000,
+        contaminants: { SO2: 50, NOx: 200, particulateMatter: 20, O2: 5 }
+    },
+    pretreatment: {
+        directContactCooler: true,
+        desulfurization: true,
+        particulateRemoval: true,
+        targetConditions: { temperature: 40, SO2: "<10 ppm", PM: "<5 mg/Nm³" }
+    },
+    captureSection: {
+        technology: "amine",
+        solvent: "30 wt% MEA",
+        captureEfficiency: 90,
+        specificEnergy: 3.6
+    }
+};</code></pre>
+
+    <h3>고급 아민 용매</h3>
+
+    <p>모노에탄올아민(MEA)이 벤치마크 용매로 남아 있지만, 상당한 연구를 통해 성능 특성이 개선된 고급 용매가 개발되었습니다.</p>
+
+    <table>
+        <tr>
+            <th>용매 시스템</th>
+            <th>재생 에너지</th>
+            <th>장점</th>
+            <th>TRL</th>
+        </tr>
+        <tr>
+            <td>30% MEA</td>
+            <td>3.6-4.0 GJ/t</td>
+            <td>성숙, 잘 이해됨</td>
+            <td>9</td>
+        </tr>
+        <tr>
+            <td>CESAR1 (AMP/PZ)</td>
+            <td>2.7-3.0 GJ/t</td>
+            <td>25% 낮은 에너지</td>
+            <td>7</td>
+        </tr>
+        <tr>
+            <td>KS-1 (입체장애 아민)</td>
+            <td>2.5-2.8 GJ/t</td>
+            <td>낮은 열화</td>
+            <td>8</td>
+        </tr>
+        <tr>
+            <td>수용성 암모니아</td>
+            <td>2.0-2.5 GJ/t</td>
+            <td>최저 에너지, 저렴</td>
+            <td>6</td>
+        </tr>
+        <tr>
+            <td>상변화 용매</td>
+            <td>2.0-2.5 GJ/t</td>
+            <td>감소된 순환</td>
+            <td>5</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        <strong>용매 선택 기준:</strong> 용매 선택은 CO2 로딩 용량, 반응 속도, 재생 에너지, 열 및 산화 안정성, 부식성, 휘발성, 환경 영향 및 비용을 포함한 여러 요소에 따라 달라집니다. 혼합 용매는 종종 최적의 특성 균형을 제공합니다.
+    </div>
+
+    <h2>연소전 포집</h2>
+
+    <p>연소전 포집은 연소 전에 연료를 수소가 풍부한 합성가스로 전환하고, 이 고압, 고농도 스트림에서 CO2를 포집합니다. 이 접근 방식은 석탄가스화복합발전(IGCC) 발전소와 수소 생산 시설에 특히 적합합니다.</p>
+
+    <pre><code>// 연소전 포집 공정
+/*
+연료 (석탄/가스)
+    ↓
+가스화기/개질기 → 합성가스 (CO + H2)
+    ↓
+수성 가스 전환 → H2 + CO2
+    ↓
+CO2 포집 → 저장을 위한 순수 CO2
+    ↓
+수소 → 가스 터빈에서 연소 → 전기
+*/
+
+interface PreCombustionSystem {
+    fuelProcessing: {
+        type: "gasification" | "steamReforming" | "autothermalReforming";
+        operatingPressure: number;    // bar
+        operatingTemperature: number; // °C
+        oxygenRequirement: number;    // kg O2/kg 연료
+    };
+
+    waterGasShift: {
+        stages: number;
+        catalysts: string[];
+        COConversion: number;         // 퍼센트
+        outletComposition: {
+            H2: number;               // mol%
+            CO2: number;              // mol%
+            CO: number;               // mol%
+            H2O: number;              // mol%
+        };
+    };
+
+    CO2Capture: {
+        technology: "physical" | "chemical";
+        solvent: string;
+        pressure: number;             // bar
+        captureEfficiency: number;    // 퍼센트
+        specificEnergy: number;       // GJ/톤 CO2
+    };
+}
+
+// 예시: 연소전 포집이 있는 IGCC
+const igccCapture: PreCombustionSystem = {
+    fuelProcessing: {
+        type: "gasification",
+        operatingPressure: 40,
+        operatingTemperature: 1400,
+        oxygenRequirement: 0.85
+    },
+    waterGasShift: {
+        stages: 2,
+        catalysts: ["고온 Fe-Cr", "저온 Cu-Zn"],
+        COConversion: 98,
+        outletComposition: { H2: 55, CO2: 40, CO: 1, H2O: 4 }
+    },
+    CO2Capture: {
+        technology: "physical",
+        solvent: "Selexol (DEPG)",
+        pressure: 35,
+        captureEfficiency: 95,
+        specificEnergy: 0.8
+    }
+};</code></pre>
+
+    <h2>순산소 연소</h2>
+
+    <p>순산소 연소는 연소를 위해 공기 대신 순수 산소를 사용하여 주로 CO2와 수증기로 구성된 배기가스를 생산합니다. 물 응축 후 별도의 포집 공정 없이 고순도 CO2 스트림을 얻습니다.</p>
+
+    <pre><code>// 순산소 연소 시스템
+interface OxyFuelSystem {
+    airSeparationUnit: {
+        technology: "cryogenic" | "membrane" | "adsorption";
+        oxygenPurity: number;       // 퍼센트
+        oxygenProduction: number;   // 톤/시간
+        specificEnergy: number;     // kWh/톤 O2
+    };
+
+    combustion: {
+        oxygenExcess: number;       // 퍼센트
+        recycleRatio: number;       // 재순환 배기가스 비율
+        flameTemperature: number;   // °C
+        adiabaticTemp: number;      // °C (재순환 없이)
+    };
+
+    flueGasComposition: {
+        CO2: number;                // mol% (건조 기준)
+        H2O: number;                // mol%
+        O2: number;                 // mol%
+        N2: number;                 // mol%
+        Ar: number;                 // mol%
+    };
+
+    CO2Processing: {
+        condensationTemp: number;   // °C
+        dehydration: boolean;
+        purification: "none" | "distillation" | "catalytic";
+        finalPurity: number;        // 퍼센트
+    };
+}
+
+// 예시: 순산소 석탄 발전소
+const oxyFuelPlant: OxyFuelSystem = {
+    airSeparationUnit: {
+        technology: "cryogenic",
+        oxygenPurity: 95,
+        oxygenProduction: 850,
+        specificEnergy: 220
+    },
+    combustion: {
+        oxygenExcess: 3,
+        recycleRatio: 0.7,
+        flameTemperature: 1900,
+        adiabaticTemp: 3500
+    },
+    flueGasComposition: {
+        CO2: 80,
+        H2O: 8,
+        O2: 4,
+        N2: 6,
+        Ar: 2
+    },
+    CO2Processing: {
+        condensationTemp: 25,
+        dehydration: true,
+        purification: "distillation",
+        finalPurity: 99.9
+    }
+};</code></pre>
+
+    <div class="highlight">
+        <strong>순산소 연소 장점:</strong> 연소 과정에서 질소를 제거함으로써 순산소 기술은 CO2 농도가 80-95%(건조 기준)인 배기가스를 생산하여 CO2 정제를 크게 단순화합니다. 주요 에너지 페널티는 공기 분리 장치에서 발생합니다.
+    </div>
+
+    <h2>기술 비교</h2>
+
+    <table>
+        <tr>
+            <th>매개변수</th>
+            <th>연소후</th>
+            <th>연소전</th>
+            <th>순산소</th>
+        </tr>
+        <tr>
+            <td>공급 CO2</td>
+            <td>3-15%</td>
+            <td>15-60%</td>
+            <td>80-95%</td>
+        </tr>
+        <tr>
+            <td>공급 압력</td>
+            <td>~1 bar</td>
+            <td>15-40 bar</td>
+            <td>~1 bar</td>
+        </tr>
+        <tr>
+            <td>에너지 페널티</td>
+            <td>25-40%</td>
+            <td>15-25%</td>
+            <td>25-35%</td>
+        </tr>
+        <tr>
+            <td>레트로핏 가능성</td>
+            <td>높음</td>
+            <td>낮음</td>
+            <td>중간</td>
+        </tr>
+        <tr>
+            <td>성숙도 (TRL)</td>
+            <td>9</td>
+            <td>7-8</td>
+            <td>6-7</td>
+        </tr>
+        <tr>
+            <td>포집 비용</td>
+            <td>$50-100/t</td>
+            <td>$30-70/t</td>
+            <td>$40-80/t</td>
+        </tr>
+    </table>
+
+    <h2>화학 루핑 연소</h2>
+
+    <p>화학 루핑 연소(CLC)는 금속 산화물 입자를 산소 운반체로 사용하여 에너지 집약적인 공기 분리 또는 용매 재생 없이 본질적인 CO2 분리를 가능하게 하는 신흥 기술입니다.</p>
+
+    <pre><code>// 화학 루핑 연소 공정
+interface ChemicalLoopingSystem {
+    oxygenCarrier: {
+        metal: "Fe" | "Ni" | "Cu" | "Mn" | "Co";
+        support: string;
+        particleSize: number;        // 마이크로미터
+        density: number;             // kg/m³
+        oxygenCapacity: number;      // wt%
+        lifetime: number;            // 시간
+    };
+
+    fuelReactor: {
+        type: "fluidizedBed" | "movingBed" | "rotary";
+        temperature: number;         // °C
+        pressure: number;            // bar
+        solidCirculationRate: number; // kg/s
+        gasResidenceTime: number;    // 초
+    };
+
+    airReactor: {
+        temperature: number;         // °C
+        airFlowRate: number;         // kg/s
+        heatRelease: number;         // MW
+    };
+
+    performance: {
+        fuelConversion: number;      // 퍼센트
+        CO2Purity: number;           // 퍼센트
+        thermalEfficiency: number;   // 퍼센트
+        inherentCapture: true;
+    };
+}
+
+// 산소 운반체 반응
+const clcReactions = {
+    fuelReactor: {
+        general: "(2n+m)MeO + CnH2m → (2n+m)Me + nCO2 + mH2O",
+        methane: "4NiO + CH4 → 4Ni + CO2 + 2H2O",
+        deltaH: "흡열"
+    },
+    airReactor: {
+        general: "Me + 0.5O2 → MeO",
+        nickel: "Ni + 0.5O2 → NiO",
+        deltaH: "발열"
+    }
+};</code></pre>
+
+    <h2>산업 사례 연구</h2>
+
+    <h3>Boundary Dam (캐나다) - 연소후</h3>
+    <p>2014년 이후 연간 100만 톤 CO2를 포집하는 석탄 발전소의 세계 최초 상업 규모 연소후 포집 시설입니다.</p>
+
+    <h3>Petra Nova (미국) - 연소후</h3>
+    <p>240 MW 석탄 유닛에서 연간 160만 톤 CO2를 포집하도록 설계된 최대 연소후 포집 시설입니다.</p>
+
+    <h3>NET Power Allam 사이클 (미국) - 순산소</h3>
+    <p>본질적인 탄소 포집이 있는 초임계 CO2를 작동 유체로 사용하는 혁신적인 천연가스 발전소입니다.</p>
+
+    <pre><code>// 상업 프로젝트 성능 데이터
+const commercialProjects = {
+    boundaryDam: {
+        location: "서스캐처원, 캐나다",
+        technology: "연소후 아민",
+        capacity: "1 Mt CO2/년",
+        captureRate: "90%",
+        startYear: 2014,
+        CO2Use: "EOR + 저장"
+    },
+    petraNova: {
+        location: "텍사스, 미국",
+        technology: "연소후 아민 (KM-CDR)",
+        capacity: "1.6 Mt CO2/년",
+        captureRate: "90%",
+        startYear: 2017,
+        CO2Use: "EOR"
+    },
+    questCCS: {
+        location: "앨버타, 캐나다",
+        technology: "아민 스크러빙",
+        capacity: "1.2 Mt CO2/년",
+        source: "수소 생산",
+        startYear: 2015,
+        CO2Use: "지질 저장"
+    }
+};</code></pre>
+
+    <h2>요약</h2>
+
+    <p>포인트 소스 포집 기술은 산업 CO2 배출량을 줄이기 위한 여러 경로를 제공합니다. 연소후 포집은 가장 유연한 레트로핏 옵션을 제공하고, 연소전 포집은 신규 플랜트에 효율성 장점을 제공하며, 순산소 연소는 본질적인 CO2 분리를 제공합니다. 최적의 선택은 특정 응용 분야, 기존 인프라 및 프로젝트 경제성에 따라 달라집니다.</p>
+
+</body>
+</html>

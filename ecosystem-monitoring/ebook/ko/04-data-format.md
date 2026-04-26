@@ -562,7 +562,6 @@ enum AQICategory {
   "access": {
     "license": "CC BY 4.0",
     "restrictions": "민감한 종 위치 (독수리, 박쥐)는 1km 정밀도로 모호화됨",
-    "citation": "선행 연구. Green River Watershed Biodiversity Monitoring 2020-2025. doi:10.1234/example"
   },
 
   "related_resources": {

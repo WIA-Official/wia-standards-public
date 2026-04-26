@@ -383,10 +383,7 @@ Guided by the philosophy of 弘益人間 (Benefit All Humanity), the WIA standar
 
 ## Further Reading
 
-- 선행 연구. "An authoritative global database for active submarine hydrothermal vent fields." *Geochemistry, Geophysics, Geosystems*.
 - Jamieson, A.J. (2015). *The Hadal Zone: Life in the Deepest Oceans*. Cambridge University Press.
-- 선행 연구. "Deep, diverse and definitely different: unique attributes of the world's largest ecosystem." *Biogeosciences*.
-- 선행 연구. "Autonomous Underwater Vehicles (AUVs): Their past, present and future contributions to the advancement of marine geoscience." *Marine Geology*.
 
 ---
 
