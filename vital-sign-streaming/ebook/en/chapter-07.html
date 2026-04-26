@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 7: Phase 4 - Ecosystem Integration</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] Standard Ebook</a> | Chapter 7 (of 8)</p>
+
+<h1>Chapter 7: Phase 4 - Ecosystem Integration</h1>
+
+<h2>7.1 EHR/EMR Integration</h2>
+<p><strong>FHIR Resource Mapping:</strong></p>
+<pre>
+{
+  "resourceType": "Observation",
+  "status": "final",
+  "category": ["vital-signs"],
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "8867-4",
+      "display": "Heart rate"
+    }]
+  },
+  "valueQuantity": {
+    "value": 72,
+    "unit": "beats/minute"
+  }
+}
+</pre>
+
+<h2>7.2 Telemedicine Integration</h2>
+<pre>
+// Real-time monitoring during video consultation
+vitalSignStream.onData((data) => {
+  twilioRoom.localDataTrack.send(JSON.stringify({
+    type: 'vital-sign',
+    data: data
+  }));
+});
+</pre>
+
+<h2>7.3 Wearable Device Integration</h2>
+<p><strong>Apple HealthKit:</strong></p>
+<pre>
+// Swift
+let heartRate = HKQuantity(
+  unit: HKUnit.count().unitDivided(by: .minute()),
+  doubleValue: vitalSignData.analysis.heartRate
+)
+healthStore.save(sample)
+</pre>
+
+<p><strong>Google Fit:</strong></p>
+<pre>
+// Kotlin
+val dataPoint = DataPoint.builder(dataSource)
+  .setField(Field.FIELD_BPM, heartRate)
+  .build()
+Fitness.getHistoryClient(context, account)
+  .insertData(dataSet)
+</pre>
+
+<h2>7.4 AI/ML Integration</h2>
+<pre>
+// Anomaly Detection
+class ECGAnomalyDetector {
+  async detectAnomalies(ecgData) {
+    const prediction = await this.model.predict(ecgData);
+    return prediction.anomalies;
+  }
+}
+
+const detector = new ECGAnomalyDetector();
+const anomalies = await detector.detectAnomalies(data);
+
+if (anomalies.length > 0) {
+  await notifyPatient(anomalies);
+}
+</pre>
+
+<h2>7.5 Cloud Storage Integration</h2>
+<p><strong>AWS HealthLake:</strong></p>
+<pre>
+await saveToHealthLake({
+  DatastoreId: 'your-datastore-id',
+  InputDataConfig: {
+    S3Uri: await uploadToS3(fhirBundle)
+  }
+});
+</pre>
+
+<p><strong>Azure Health Data Services:</strong></p>
+<pre>
+await azureFHIRClient.createObservation(vitalSignData);
+</pre>
+
+<h2>7.6 WIA Family Integration</h2>
+<p>WIA Vital Sign Streaming composes with neighbouring WIA standards to keep clinical workflows coherent across the rest of the platform.</p>
+
+<ul>
+  <li><strong>WIA-OMNI-API</strong> — clinician identity and credentials (medical licence, role assignments, training records) live in WIA-OMNI-API; hosts fetch them by DID rather than holding raw documents.</li>
+  <li><strong>WIA-ACCESSIBILITY</strong> — clinician and patient accessibility profiles drive UI choices: large-text mode, high-contrast waveform rendering, audio-cued alerts for visually impaired clinicians, simplified summary view for cognitively impaired patients.</li>
+  <li><strong>WIA-AIR-SHIELD</strong> — transport hardening; hosts MAY refuse subscription requests from peers whose AIR-SHIELD score is below a host-set threshold.</li>
+  <li><strong>WIA-INTENT</strong> — a clinician's "show me last hour for patient 01HXY" intent is lowered to fetch consent → resolve stream → issue replay → render under WIA-ACCESSIBILITY profile.</li>
+  <li><strong>WIA-SOCIAL</strong> — clinical milestones (de-identified) MAY be published via WIA-SOCIAL bridges with <code>audience=internal</code> for departmental announcements without leaving the EHR perimeter.</li>
+</ul>
+
+<h2>7.7 Migration Paths</h2>
+
+<h3>7.7.1 From a vendor-locked bedside monitor</h3>
+<p>A hospital migrating from a single-vendor bedside monitor follows: deploy a WIA host alongside the existing monitor; run a vendor-bridge adapter that reads the monitor's serial / network protocol and emits WIA frames; run a 14-day shadow period with both surfaces active; switch alerting to WIA only after three consecutive zero-divergence days.</p>
+
+<h3>7.7.2 Between hospitals</h3>
+<p>Patient transfer A → B: A signs a <code>move</code> envelope; B replays the prior 60 minutes from A and opens its own subscriber stream; A continues to source frames for 30 minutes after handover for clinical continuity, then closes the source. A returns <code>301 Moved Permanently</code> for the prior stream URL for at least 12 months.</p>
+
+<h2>7.8 Conformance Profiles</h2>
+<table border="1" cellpadding="10">
+  <thead>
+    <tr><th>Level</th><th>Required integrations</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Minimal</strong></td><td>FHIR Observation export, WIA-OMNI-API credential fetch</td></tr>
+    <tr><td><strong>Core</strong></td><td>Plus WIA-ACCESSIBILITY enforcement, telemedicine bridge for ≥1 vendor</td></tr>
+    <tr><td><strong>Full</strong></td><td>Plus WIA-AIR-SHIELD scoring, WIA-INTENT lowering, AI/ML anomaly bridge, AWS HealthLake / Azure / GCP export</td></tr>
+  </tbody>
+</table>
+
+<h2>7.9 Security Considerations</h2>
+<ul>
+  <li>Vendor adapters hold device-side credentials; operators MUST use WIA-OMNI-API for credential storage and HSM-backed refresh tokens.</li>
+  <li>Streaming endpoints carry PHI; hosts MUST treat them as the highest audit priority and MUST page on-call when authentication failures spike beyond a baseline threshold.</li>
+  <li>AI/ML anomaly bridges receive de-identified or pseudo-identified data per the patient's consent envelope; bridges MUST refuse data whose audience does not permit the planned downstream use.</li>
+</ul>
+
+</body>
+</html>

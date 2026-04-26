@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Voice-Sign Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 7: Implementation Examples</h1>
+            <p class="subtitle">Python, TypeScript, and Bash for Voice-Sign Systems</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>Implementation Examples</h1>
+
+            <h2>7.1 Overview</h2>
+            <p>This chapter provides practical code examples for implementing Voice-Sign conversion systems in Python, TypeScript, and Bash. These examples demonstrate common use cases and best practices.</p>
+
+            <h2>7.2 Python Implementation</h2>
+
+            <h3>Basic Translation Client</h3>
+            <pre><code>#!/usr/bin/env python3
+"""
+WIA Voice-Sign Translation Client
+Simple Python client for voice-to-sign conversion
+"""
+
+import requests
+import base64
+import json
+from pathlib import Path
+
+class VoiceSignClient:
+    def __init__(self, api_key: str, base_url: str = "https://api.wia.org/voice-sign/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        })
+
+    def translate_audio_file(self, audio_path: Path, target_language: str = "ASL") -> dict:
+        """
+        Translate audio file to sign language
+
+        Args:
+            audio_path: Path to audio file (WAV, MP3, etc.)
+            target_language: Target sign language (ASL, BSL, KSL, etc.)
+
+        Returns:
+            Translation result including transcript, gloss, and pose data
+        """
+        # Read and encode audio file
+        with open(audio_path, 'rb') as f:
+            audio_data = base64.b64encode(f.read()).decode('utf-8')
+
+        # Prepare request
+        payload = {
+            "audio": {
+                "data": audio_data,
+                "format": audio_path.suffix[1:],  # Remove leading dot
+                "sample_rate": 16000
+            },
+            "target_language": target_language,
+            "output": {
+                "include_transcript": True,
+                "include_gloss": True,
+                "include_pose": True,
+                "include_render": False
+            }
+        }
+
+        # Send request
+        response = self.session.post(
+            f"{self.base_url}/translate",
+            json=payload
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def translate_text(self, text: str, target_language: str = "ASL") -> dict:
+        """
+        Translate text to sign language
+
+        Args:
+            text: Text to translate
+            target_language: Target sign language
+
+        Returns:
+            Sign gloss and pose data
+        """
+        payload = {
+            "text": text,
+            "source_language": "en",
+            "target_language": target_language
+        }
+
+        response = self.session.post(
+            f"{self.base_url}/sign/translate",
+            json=payload
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def stream_audio(self, audio_stream, target_language: str = "ASL",
+                     callback=None):
+        """
+        Stream audio for real-time translation
+
+        Args:
+            audio_stream: Audio stream (iterator of audio chunks)
+            target_language: Target sign language
+            callback: Function to call with each result
+        """
+        import websocket
+        import threading
+
+        ws_url = f"{self.base_url.replace('https', 'wss')}/stream"
+
+        def on_message(ws, message):
+            data = json.loads(message)
+            if callback:
+                callback(data)
+
+        def on_open(ws):
+            # Start streaming session
+            ws.send(json.dumps({
+                "type": "start",
+                "config": {
+                    "target_language": target_language,
+                    "audio_format": "pcm",
+                    "sample_rate": 16000
+                }
+            }))
+
+            # Send audio chunks
+            for chunk in audio_stream:
+                audio_b64 = base64.b64encode(chunk).decode('utf-8')
+                ws.send(json.dumps({
+                    "type": "audio_chunk",
+                    "audio_data": audio_b64
+                }))
+
+            # End stream
+            ws.send(json.dumps({"type": "stop"}))
+
+        ws = websocket.WebSocketApp(
+            ws_url,
+            header={"Authorization": f"Bearer {self.api_key}"},
+            on_message=on_message,
+            on_open=on_open
+        )
+
+        ws.run_forever()
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize client
+    client = VoiceSignClient(api_key="your_api_key_here")
+
+    # Translate audio file
+    result = client.translate_audio_file(
+        audio_path=Path("hello.wav"),
+        target_language="ASL"
+    )
+
+    print(f"Transcript: {result['transcript']['text']}")
+    print(f"Sign Glosses: {[g['gloss'] for g in result['gloss']['glosses']]}")
+
+    # Translate text
+    text_result = client.translate_text("Hello, how are you?", "ASL")
+    print(f"Glosses: {[g['gloss'] for g in text_result['glosses']]}")
+</code></pre>
+
+            <h3>Real-Time Microphone Streaming</h3>
+            <pre><code>#!/usr/bin/env python3
+"""
+Real-time voice-to-sign translation from microphone
+"""
+
+import pyaudio
+import numpy as np
+from voice_sign_client import VoiceSignClient
+
+class RealtimeTranslator:
+    def __init__(self, api_key: str, target_language: str = "ASL"):
+        self.client = VoiceSignClient(api_key)
+        self.target_language = target_language
+
+        # Audio parameters
+        self.sample_rate = 16000
+        self.chunk_size = 1600  # 100ms at 16kHz
+        self.format = pyaudio.paInt16
+        self.channels = 1
+
+    def start(self):
+        """Start real-time translation from microphone"""
+        audio = pyaudio.PyAudio()
+
+        # Open microphone stream
+        stream = audio.open(
+            format=self.format,
+            channels=self.channels,
+            rate=self.sample_rate,
+            input=True,
+            frames_per_buffer=self.chunk_size
+        )
+
+        print("Listening... Speak into the microphone.")
+        print("Press Ctrl+C to stop.")
+
+        def audio_generator():
+            try:
+                while True:
+                    data = stream.read(self.chunk_size, exception_on_overflow=False)
+                    yield data
+            except KeyboardInterrupt:
+                pass
+
+        def on_result(result):
+            if result['type'] == 'transcript':
+                text = result['transcript_delta']['text']
+                is_final = result['transcript_delta']['is_final']
+                marker = "✓" if is_final else "..."
+                print(f"Transcript {marker}: {text}")
+
+            elif result['type'] == 'gloss':
+                gloss = result['gloss_delta']['gloss']
+                print(f"Sign: {gloss['gloss']} ({gloss['sign_type']})")
+
+        try:
+            self.client.stream_audio(
+                audio_generator(),
+                self.target_language,
+                callback=on_result
+            )
+        finally:
+            stream.stop_stream()
+            stream.close()
+            audio.terminate()
+
+
+if __name__ == "__main__":
+    translator = RealtimeTranslator(api_key="your_api_key_here")
+    translator.start()
+</code></pre>
+
+            <h2>7.3 TypeScript Implementation</h2>
+
+            <h3>Browser-Based Client</h3>
+            <pre><code>/**
+ * WIA Voice-Sign Client for Browser
+ * TypeScript implementation for web applications
+ */
+
+interface VoiceSignConfig {
+  apiKey: string;
+  baseUrl?: string;
+  targetLanguage?: string;
+}
+
+interface TranslationResult {
+  transcript?: {
+    text: string;
+    confidence: number;
+    words: Array&lt;{word: string; confidence: number}&gt;;
+  };
+  gloss?: {
+    sign_language: string;
+    glosses: Array&lt;{gloss: string; sign_type: string}&gt;;
+  };
+  pose?: {
+    frame_rate: number;
+    frames: any[];
+  };
+}
+
+class VoiceSignClient {
+  private apiKey: string;
+  private baseUrl: string;
+  private targetLanguage: string;
+
+  constructor(config: VoiceSignConfig) {
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl || 'https://api.wia.org/voice-sign/v1';
+    this.targetLanguage = config.targetLanguage || 'ASL';
+  }
+
+  /**
+   * Translate audio from microphone
+   */
+  async translateFromMicrophone(): Promise&lt;TranslationResult&gt; {
+    // Request microphone access
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    // Create audio context
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    const audioChunks: Blob[] = [];
+
+    processor.onaudioprocess = (e) => {
+      const inputData = e.inputBuffer.getChannelData(0);
+      const blob = new Blob([this.float32ToInt16(inputData)]);
+      audioChunks.push(blob);
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+
+    // Record for 3 seconds
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Stop recording
+    processor.disconnect();
+    source.disconnect();
+    stream.getTracks().forEach(track => track.stop());
+
+    // Convert to single blob
+    const audioBlob = new Blob(audioChunks, { type: 'audio/pcm' });
+
+    // Send to API
+    return this.translateAudioBlob(audioBlob);
+  }
+
+  /**
+   * Translate audio blob
+   */
+  async translateAudioBlob(audioBlob: Blob): Promise&lt;TranslationResult&gt; {
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const base64Audio = this.arrayBufferToBase64(arrayBuffer);
+
+    const response = await fetch(`${this.baseUrl}/translate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        audio: {
+          data: base64Audio,
+          format: 'pcm',
+          sample_rate: 16000,
+          channels: 1
+        },
+        target_language: this.targetLanguage,
+        output: {
+          include_transcript: true,
+          include_gloss: true,
+          include_pose: true
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Translation failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Translate text to sign language
+   */
+  async translateText(text: string): Promise&lt;TranslationResult&gt; {
+    const response = await fetch(`${this.baseUrl}/sign/translate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text,
+        target_language: this.targetLanguage
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Translation failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Real-time streaming with WebSocket
+   */
+  streamAudio(onResult: (result: any) => void): {
+    send: (audioData: ArrayBuffer) => void;
+    stop: () => void;
+  } {
+    const wsUrl = this.baseUrl.replace('https', 'wss') + '/stream';
+    const ws = new WebSocket(wsUrl, ['voice-sign-v1']);
+
+    ws.onopen = () => {
+      // Start streaming session
+      ws.send(JSON.stringify({
+        type: 'start',
+        config: {
+          target_language: this.targetLanguage,
+          audio_format: 'pcm',
+          sample_rate: 16000
+        }
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      const result = JSON.parse(event.data);
+      onResult(result);
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    return {
+      send: (audioData: ArrayBuffer) => {
+        const base64 = this.arrayBufferToBase64(audioData);
+        ws.send(JSON.stringify({
+          type: 'audio_chunk',
+          audio_data: base64
+        }));
+      },
+      stop: () => {
+        ws.send(JSON.stringify({ type: 'stop' }));
+        ws.close();
+      }
+    };
+  }
+
+  // Helper methods
+  private float32ToInt16(float32Array: Float32Array): Int16Array {
+    const int16Array = new Int16Array(float32Array.length);
+    for (let i = 0; i < float32Array.length; i++) {
+      const s = Math.max(-1, Math.min(1, float32Array[i]));
+      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return int16Array;
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+}
+
+// Example usage
+const client = new VoiceSignClient({
+  apiKey: 'your_api_key_here',
+  targetLanguage: 'ASL'
+});
+
+// Translate from microphone
+client.translateFromMicrophone().then(result => {
+  console.log('Transcript:', result.transcript?.text);
+  console.log('Sign glosses:', result.gloss?.glosses);
+});
+
+// Translate text
+client.translateText('Hello, world!').then(result => {
+  console.log('Sign glosses:', result.gloss?.glosses);
+});
+</code></pre>
+
+            <h2>7.4 Bash Implementation</h2>
+
+            <h3>Command-Line Tool</h3>
+            <pre><code>#!/bin/bash
+#
+# WIA Voice-Sign CLI Tool
+# Simple bash script for voice-to-sign translation
+#
+
+set -e
+
+# Configuration
+API_KEY="${WIA_API_KEY:-}"
+BASE_URL="${WIA_BASE_URL:-https://api.wia.org/voice-sign/v1}"
+TARGET_LANGUAGE="${WIA_TARGET_LANGUAGE:-ASL}"
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Help message
+usage() {
+    cat &lt;&lt;EOF
+Usage: $0 [OPTIONS] COMMAND
+
+WIA Voice-Sign Translation CLI
+
+Commands:
+    translate-file &lt;audio-file&gt;    Translate audio file to sign language
+    translate-text &lt;text&gt;          Translate text to sign language
+    stream                        Stream from microphone (requires ffmpeg)
+
+Options:
+    -k, --api-key KEY            API key (or set WIA_API_KEY env var)
+    -l, --language LANG          Target sign language (default: ASL)
+    -o, --output FILE            Output file for results
+    -h, --help                   Show this help message
+
+Examples:
+    $0 translate-file hello.wav
+    $0 translate-text "Hello, how are you?"
+    $0 --language BSL translate-file speech.mp3
+
+EOF
+    exit 0
+}
+
+# Check dependencies
+check_dependencies() {
+    local deps=("curl" "jq" "base64")
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &gt;/dev/null 2&gt;&1; then
+            echo -e "${RED}Error: $dep is required but not installed.${NC}" &gt;&2
+            exit 1
+        fi
+    done
+}
+
+# Translate audio file
+translate_file() {
+    local audio_file="$1"
+
+    if [[ ! -f "$audio_file" ]]; then
+        echo -e "${RED}Error: File not found: $audio_file${NC}" &gt;&2
+        exit 1
+    fi
+
+    echo -e "${BLUE}Translating audio file: $audio_file${NC}"
+
+    # Encode audio to base64
+    local audio_b64=$(base64 -w 0 "$audio_file")
+    local format="${audio_file##*.}"
+
+    # Prepare JSON payload
+    local payload=$(jq -n \
+        --arg audio "$audio_b64" \
+        --arg format "$format" \
+        --arg lang "$TARGET_LANGUAGE" \
+        '{
+            audio: {
+                data: $audio,
+                format: $format,
+                sample_rate: 16000
+            },
+            target_language: $lang,
+            output: {
+                include_transcript: true,
+                include_gloss: true,
+                include_pose: false
+            }
+        }')
+
+    # Send request
+    local response=$(curl -s -X POST \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "$BASE_URL/translate")
+
+    # Parse and display results
+    local status=$(echo "$response" | jq -r '.status')
+
+    if [[ "$status" == "success" ]]; then
+        echo -e "${GREEN}✓ Translation successful${NC}"
+        echo ""
+        echo -e "${BLUE}Transcript:${NC}"
+        echo "$response" | jq -r '.transcript.text'
+        echo ""
+        echo -e "${BLUE}Sign Glosses:${NC}"
+        echo "$response" | jq -r '.gloss.glosses[] | "  \(.gloss) (\(.sign_type))"'
+        echo ""
+        echo -e "${BLUE}Confidence: $(echo "$response" | jq -r '.gloss.confidence')${NC}"
+    else
+        echo -e "${RED}Translation failed${NC}" &gt;&2
+        echo "$response" | jq '.'
+        exit 1
+    fi
+}
+
+# Translate text
+translate_text() {
+    local text="$1"
+
+    echo -e "${BLUE}Translating text: $text${NC}"
+
+    # Send request
+    local response=$(curl -s -X POST \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"text\": \"$text\", \"target_language\": \"$TARGET_LANGUAGE\"}" \
+        "$BASE_URL/sign/translate")
+
+    # Display results
+    echo -e "${GREEN}✓ Translation successful${NC}"
+    echo ""
+    echo -e "${BLUE}Sign Glosses:${NC}"
+    echo "$response" | jq -r '.glosses[] | "  \(.gloss) (\(.sign_type))"'
+}
+
+# Stream from microphone
+stream_microphone() {
+    if ! command -v ffmpeg &gt;/dev/null 2&gt;&1; then
+        echo -e "${RED}Error: ffmpeg is required for streaming${NC}" &gt;&2
+        exit 1
+    fi
+
+    echo -e "${BLUE}Starting microphone stream...${NC}"
+    echo "Press Ctrl+C to stop"
+
+    # Record and stream audio
+    ffmpeg -f alsa -i default -ar 16000 -ac 1 -f s16le - 2&gt;/dev/null | \
+    while read -r -n 3200 chunk; do
+        local chunk_b64=$(echo -n "$chunk" | base64 -w 0)
+        # Send chunk to streaming endpoint
+        # (Simplified - real implementation would use WebSocket)
+        echo "Processing audio chunk..."
+    done
+}
+
+# Main
+main() {
+    check_dependencies
+
+    if [[ -z "$API_KEY" ]]; then
+        echo -e "${RED}Error: API key required. Set WIA_API_KEY or use --api-key${NC}" &gt;&2
+        exit 1
+    fi
+
+    case "${1:-}" in
+        translate-file)
+            translate_file "$2"
+            ;;
+        translate-text)
+            translate_text "$2"
+            ;;
+        stream)
+            stream_microphone
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo -e "${RED}Error: Unknown command${NC}" &gt;&2
+            usage
+            ;;
+    esac
+}
+
+main "$@"
+</code></pre>
+
+            <h2>7.5 Avatar Rendering Example</h2>
+
+            <h3>Three.js Avatar Renderer</h3>
+            <pre><code>/**
+ * Avatar Renderer using Three.js
+ * Renders sign language poses as 3D avatar animation
+ */
+
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+
+class SignLanguageAvatar {
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private renderer: THREE.WebGLRenderer;
+  private avatar: THREE.Object3D | null = null;
+  private bones: Map&lt;string, THREE.Bone&gt; = new Map();
+
+  constructor(container: HTMLElement) {
+    // Setup scene
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xf0f0f0);
+
+    // Setup camera
+    this.camera = new THREE.PerspectiveCamera(
+      50,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+    this.camera.position.set(0, 1.5, 3);
+    this.camera.lookAt(0, 1, 0);
+
+    // Setup renderer
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(this.renderer.domElement);
+
+    // Add lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    this.scene.add(directionalLight);
+
+    // Start animation loop
+    this.animate();
+  }
+
+  /**
+   * Load avatar model
+   */
+  async loadAvatar(modelUrl: string): Promise&lt;void&gt; {
+    const loader = new GLTFLoader();
+    const gltf = await loader.loadAsync(modelUrl);
+
+    this.avatar = gltf.scene;
+    this.scene.add(this.avatar);
+
+    // Map bones for pose updates
+    this.avatar.traverse((child) => {
+      if (child instanceof THREE.Bone) {
+        this.bones.set(child.name, child);
+      }
+    });
+  }
+
+  /**
+   * Update avatar pose from pose data
+   */
+  updatePose(poseFrame: any): void {
+    if (!this.avatar) return;
+
+    // Update joint positions and rotations
+    poseFrame.joints.forEach((joint: any) => {
+      const bone = this.bones.get(`joint_${joint.joint_id}`);
+      if (bone) {
+        // Update position
+        bone.position.set(
+          joint.position.x,
+          joint.position.y,
+          joint.position.z
+        );
+
+        // Update rotation (quaternion)
+        bone.quaternion.set(
+          joint.rotation.x,
+          joint.rotation.y,
+          joint.rotation.z,
+          joint.rotation.w
+        );
+      }
+    });
+
+    // Update hand poses
+    if (poseFrame.left_hand) {
+      this.updateHandPose('left', poseFrame.left_hand);
+    }
+    if (poseFrame.right_hand) {
+      this.updateHandPose('right', poseFrame.right_hand);
+    }
+  }
+
+  private updateHandPose(hand: 'left' | 'right', handPose: any): void {
+    handPose.landmarks.forEach((landmark: any) => {
+      const boneName = `${hand}_${landmark.name}`;
+      const bone = this.bones.get(boneName);
+      if (bone) {
+        bone.position.set(
+          landmark.position.x,
+          landmark.position.y,
+          landmark.position.z
+        );
+      }
+    });
+  }
+
+  private animate = (): void => {
+    requestAnimationFrame(this.animate);
+    this.renderer.render(this.scene, this.camera);
+  };
+}
+
+// Usage example
+const container = document.getElementById('avatar-container')!;
+const avatar = new SignLanguageAvatar(container);
+
+await avatar.loadAvatar('/models/sign-avatar.glb');
+
+// Connect to Voice-Sign API and update pose
+const client = new VoiceSignClient({ apiKey: 'your_api_key' });
+const stream = client.streamAudio((result) => {
+  if (result.type === 'pose') {
+    avatar.updatePose(result.pose_frame);
+  }
+});
+</code></pre>
+
+            <div class="info-box success">
+                <strong>Best Practices</strong>
+                <ul>
+                    <li>Always validate API responses and handle errors gracefully</li>
+                    <li>Use connection pooling for high-volume applications</li>
+                    <li>Implement retry logic with exponential backoff</li>
+                    <li>Cache frequently translated phrases to reduce latency</li>
+                    <li>Monitor API usage to avoid rate limits</li>
+                    <li>Use WebSocket streaming for real-time applications</li>
+                    <li>Implement proper audio preprocessing (noise reduction, VAD)</li>
+                    <li>Test with diverse audio quality and accents</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter6.html">← Previous: Security & Privacy</a>
+                <a href="chapter8.html">Next: Certification & Compliance →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

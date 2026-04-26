@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 구현 예제 - WIA 음성-수화 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>제7장: 구현 예제</h1>
+            <p class="subtitle">음성-수화 시스템을 위한 Python, TypeScript, Bash</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>구현 예제</h1>
+
+            <h2>7.1 개요</h2>
+            <p>이 장에서는 Python, TypeScript 및 Bash로 음성-수화 변환 시스템을 구현하기 위한 실용적인 코드 예제를 제공합니다. 이러한 예제는 일반적인 사용 사례 및 모범 사례를 보여줍니다.</p>
+
+            <h2>7.2 Python 구현</h2>
+
+            <h3>기본 번역 클라이언트</h3>
+            <pre><code>#!/usr/bin/env python3
+"""
+WIA 음성-수화 번역 클라이언트
+음성-수화 변환을 위한 간단한 Python 클라이언트
+"""
+
+import requests
+import base64
+import json
+from pathlib import Path
+
+class VoiceSignClient:
+    def __init__(self, api_key: str, base_url: str = "https://api.wia.org/voice-sign/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        })
+
+    def translate_audio_file(self, audio_path: Path, target_language: str = "ASL") -> dict:
+        """
+        오디오 파일을 수화로 번역
+
+        Args:
+            audio_path: 오디오 파일 경로 (WAV, MP3 등)
+            target_language: 대상 수화 언어 (ASL, BSL, KSL 등)
+
+        Returns:
+            전사, 글로스 및 포즈 데이터를 포함한 번역 결과
+        """
+        # 오디오 파일 읽기 및 인코딩
+        with open(audio_path, 'rb') as f:
+            audio_data = base64.b64encode(f.read()).decode('utf-8')
+
+        # 요청 준비
+        payload = {
+            "audio": {
+                "data": audio_data,
+                "format": audio_path.suffix[1:],
+                "sample_rate": 16000
+            },
+            "target_language": target_language,
+            "output": {
+                "include_transcript": True,
+                "include_gloss": True,
+                "include_pose": True,
+                "include_render": False
+            }
+        }
+
+        # 요청 전송
+        response = self.session.post(
+            f"{self.base_url}/translate",
+            json=payload
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+# 사용 예제
+if __name__ == "__main__":
+    # 클라이언트 초기화
+    client = VoiceSignClient(api_key="your_api_key_here")
+
+    # 오디오 파일 번역
+    result = client.translate_audio_file(
+        audio_path=Path("hello.wav"),
+        target_language="KSL"  # 한국 수화
+    )
+
+    print(f"전사: {result['transcript']['text']}")
+    print(f"수화 글로스: {[g['gloss'] for g in result['gloss']['glosses']]}")
+</code></pre>
+
+            <h3>실시간 마이크 스트리밍</h3>
+            <pre><code>#!/usr/bin/env python3
+"""
+마이크에서 실시간 음성-수화 번역
+"""
+
+import pyaudio
+import numpy as np
+from voice_sign_client import VoiceSignClient
+
+class RealtimeTranslator:
+    def __init__(self, api_key: str, target_language: str = "KSL"):
+        self.client = VoiceSignClient(api_key)
+        self.target_language = target_language
+
+        # 오디오 매개변수
+        self.sample_rate = 16000
+        self.chunk_size = 1600  # 16kHz에서 100ms
+        self.format = pyaudio.paInt16
+        self.channels = 1
+
+    def start(self):
+        """마이크에서 실시간 번역 시작"""
+        audio = pyaudio.PyAudio()
+
+        # 마이크 스트림 열기
+        stream = audio.open(
+            format=self.format,
+            channels=self.channels,
+            rate=self.sample_rate,
+            input=True,
+            frames_per_buffer=self.chunk_size
+        )
+
+        print("듣는 중... 마이크에 대고 말하세요.")
+        print("중지하려면 Ctrl+C를 누르세요.")
+
+        def on_result(result):
+            if result['type'] == 'transcript':
+                text = result['transcript_delta']['text']
+                is_final = result['transcript_delta']['is_final']
+                marker = "✓" if is_final else "..."
+                print(f"전사 {marker}: {text}")
+
+            elif result['type'] == 'gloss':
+                gloss = result['gloss_delta']['gloss']
+                print(f"수화: {gloss['gloss']} ({gloss['sign_type']})")
+
+if __name__ == "__main__":
+    translator = RealtimeTranslator(api_key="your_api_key_here")
+    translator.start()
+</code></pre>
+
+            <h2>7.3 TypeScript 구현</h2>
+
+            <h3>브라우저 기반 클라이언트</h3>
+            <pre><code>/**
+ * 브라우저용 WIA 음성-수화 클라이언트
+ * 웹 애플리케이션을 위한 TypeScript 구현
+ */
+
+interface VoiceSignConfig {
+  apiKey: string;
+  baseUrl?: string;
+  targetLanguage?: string;
+}
+
+interface TranslationResult {
+  transcript?: {
+    text: string;
+    confidence: number;
+    words: Array&lt;{word: string; confidence: number}&gt;;
+  };
+  gloss?: {
+    sign_language: string;
+    glosses: Array&lt;{gloss: string; sign_type: string}&gt;;
+  };
+  pose?: {
+    frame_rate: number;
+    frames: any[];
+  };
+}
+
+class VoiceSignClient {
+  private apiKey: string;
+  private baseUrl: string;
+  private targetLanguage: string;
+
+  constructor(config: VoiceSignConfig) {
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl || 'https://api.wia.org/voice-sign/v1';
+    this.targetLanguage = config.targetLanguage || 'KSL';
+  }
+
+  /**
+   * 마이크에서 오디오 번역
+   */
+  async translateFromMicrophone(): Promise&lt;TranslationResult&gt; {
+    // 마이크 액세스 요청
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    // 오디오 컨텍스트 생성
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    const audioChunks: Blob[] = [];
+
+    processor.onaudioprocess = (e) => {
+      const inputData = e.inputBuffer.getChannelData(0);
+      const blob = new Blob([this.float32ToInt16(inputData)]);
+      audioChunks.push(blob);
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+
+    // 3초 동안 녹음
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // 녹음 중지
+    processor.disconnect();
+    source.disconnect();
+    stream.getTracks().forEach(track => track.stop());
+
+    // 단일 blob으로 변환
+    const audioBlob = new Blob(audioChunks, { type: 'audio/pcm' });
+
+    // API로 전송
+    return this.translateAudioBlob(audioBlob);
+  }
+
+  /**
+   * 텍스트를 수화로 번역
+   */
+  async translateText(text: string): Promise&lt;TranslationResult&gt; {
+    const response = await fetch(`${this.baseUrl}/sign/translate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text,
+        target_language: this.targetLanguage
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`번역 실패: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+}
+
+// 사용 예제
+const client = new VoiceSignClient({
+  apiKey: 'your_api_key_here',
+  targetLanguage: 'KSL'  // 한국 수화
+});
+
+// 마이크에서 번역
+client.translateFromMicrophone().then(result => {
+  console.log('전사:', result.transcript?.text);
+  console.log('수화 글로스:', result.gloss?.glosses);
+});
+
+// 텍스트 번역
+client.translateText('안녕하세요, 세계!').then(result => {
+  console.log('수화 글로스:', result.gloss?.glosses);
+});
+</code></pre>
+
+            <h2>7.4 Bash 구현</h2>
+
+            <h3>명령줄 도구</h3>
+            <pre><code>#!/bin/bash
+#
+# WIA 음성-수화 CLI 도구
+# 음성-수화 번역을 위한 간단한 bash 스크립트
+#
+
+set -e
+
+# 설정
+API_KEY="${WIA_API_KEY:-}"
+BASE_URL="${WIA_BASE_URL:-https://api.wia.org/voice-sign/v1}"
+TARGET_LANGUAGE="${WIA_TARGET_LANGUAGE:-KSL}"
+
+# 출력용 색상
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # 색상 없음
+
+# 도움말 메시지
+usage() {
+    cat &lt;&lt;EOF
+사용법: $0 [옵션] 명령
+
+WIA 음성-수화 번역 CLI
+
+명령:
+    translate-file &lt;오디오-파일&gt;    오디오 파일을 수화로 번역
+    translate-text &lt;텍스트&gt;         텍스트를 수화로 번역
+    stream                        마이크에서 스트리밍 (ffmpeg 필요)
+
+옵션:
+    -k, --api-key KEY            API 키 (또는 WIA_API_KEY 환경 변수 설정)
+    -l, --language LANG          대상 수화 언어 (기본값: KSL)
+    -o, --output FILE            결과 출력 파일
+    -h, --help                   이 도움말 메시지 표시
+
+예제:
+    $0 translate-file hello.wav
+    $0 translate-text "안녕하세요, 어떻게 지내세요?"
+    $0 --language ASL translate-file speech.mp3
+
+EOF
+    exit 0
+}
+
+# 오디오 파일 번역
+translate_file() {
+    local audio_file="$1"
+
+    if [[ ! -f "$audio_file" ]]; then
+        echo -e "${RED}오류: 파일을 찾을 수 없습니다: $audio_file${NC}" &gt;&2
+        exit 1
+    fi
+
+    echo -e "${BLUE}오디오 파일 번역 중: $audio_file${NC}"
+
+    # 오디오를 base64로 인코딩
+    local audio_b64=$(base64 -w 0 "$audio_file")
+    local format="${audio_file##*.}"
+
+    # JSON 페이로드 준비
+    local payload=$(jq -n \
+        --arg audio "$audio_b64" \
+        --arg format "$format" \
+        --arg lang "$TARGET_LANGUAGE" \
+        '{
+            audio: {
+                data: $audio,
+                format: $format,
+                sample_rate: 16000
+            },
+            target_language: $lang,
+            output: {
+                include_transcript: true,
+                include_gloss: true,
+                include_pose: false
+            }
+        }')
+
+    # 요청 전송
+    local response=$(curl -s -X POST \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "$BASE_URL/translate")
+
+    # 결과 파싱 및 표시
+    local status=$(echo "$response" | jq -r '.status')
+
+    if [[ "$status" == "success" ]]; then
+        echo -e "${GREEN}✓ 번역 성공${NC}"
+        echo ""
+        echo -e "${BLUE}전사:${NC}"
+        echo "$response" | jq -r '.transcript.text'
+        echo ""
+        echo -e "${BLUE}수화 글로스:${NC}"
+        echo "$response" | jq -r '.gloss.glosses[] | "  \(.gloss) (\(.sign_type))"'
+    else
+        echo -e "${RED}번역 실패${NC}" &gt;&2
+        echo "$response" | jq '.'
+        exit 1
+    fi
+}
+
+main() {
+    if [[ -z "$API_KEY" ]]; then
+        echo -e "${RED}오류: API 키가 필요합니다. WIA_API_KEY를 설정하거나 --api-key를 사용하세요${NC}" &gt;&2
+        exit 1
+    fi
+
+    case "${1:-}" in
+        translate-file)
+            translate_file "$2"
+            ;;
+        translate-text)
+            translate_text "$2"
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo -e "${RED}오류: 알 수 없는 명령${NC}" &gt;&2
+            usage
+            ;;
+    esac
+}
+
+main "$@"
+</code></pre>
+
+            <h2>7.5 아바타 렌더링 예제</h2>
+
+            <h3>Three.js 아바타 렌더러</h3>
+            <pre><code>/**
+ * Three.js를 사용한 아바타 렌더러
+ * 수화 포즈를 3D 아바타 애니메이션으로 렌더링
+ */
+
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+
+class SignLanguageAvatar {
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private renderer: THREE.WebGLRenderer;
+  private avatar: THREE.Object3D | null = null;
+
+  constructor(container: HTMLElement) {
+    // 장면 설정
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xf0f0f0);
+
+    // 카메라 설정
+    this.camera = new THREE.PerspectiveCamera(
+      50,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+    this.camera.position.set(0, 1.5, 3);
+    this.camera.lookAt(0, 1, 0);
+
+    // 렌더러 설정
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(this.renderer.domElement);
+
+    // 조명 추가
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    this.scene.add(directionalLight);
+
+    // 애니메이션 루프 시작
+    this.animate();
+  }
+
+  /**
+   * 아바타 모델 로드
+   */
+  async loadAvatar(modelUrl: string): Promise&lt;void&gt; {
+    const loader = new GLTFLoader();
+    const gltf = await loader.loadAsync(modelUrl);
+
+    this.avatar = gltf.scene;
+    this.scene.add(this.avatar);
+  }
+
+  /**
+   * 포즈 데이터로 아바타 포즈 업데이트
+   */
+  updatePose(poseFrame: any): void {
+    if (!this.avatar) return;
+
+    // 관절 위치 및 회전 업데이트
+    poseFrame.joints.forEach((joint: any) => {
+      // 위치 업데이트
+      // 회전 업데이트 (쿼터니언)
+    });
+  }
+}
+
+// 사용 예제
+const container = document.getElementById('avatar-container')!;
+const avatar = new SignLanguageAvatar(container);
+
+await avatar.loadAvatar('/models/sign-avatar.glb');
+
+// Voice-Sign API에 연결하고 포즈 업데이트
+const client = new VoiceSignClient({ apiKey: 'your_api_key' });
+const stream = client.streamAudio((result) => {
+  if (result.type === 'pose') {
+    avatar.updatePose(result.pose_frame);
+  }
+});
+</code></pre>
+
+            <div class="info-box success">
+                <strong>모범 사례</strong>
+                <ul>
+                    <li>항상 API 응답을 검증하고 오류를 우아하게 처리</li>
+                    <li>대용량 애플리케이션에는 연결 풀링 사용</li>
+                    <li>지수 백오프를 사용한 재시도 로직 구현</li>
+                    <li>자주 번역되는 문구를 캐시하여 지연 시간 감소</li>
+                    <li>속도 제한을 피하기 위해 API 사용량 모니터링</li>
+                    <li>실시간 애플리케이션에는 WebSocket 스트리밍 사용</li>
+                    <li>적절한 오디오 전처리 구현 (노이즈 감소, VAD)</li>
+                    <li>다양한 오디오 품질 및 억양으로 테스트</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter6.html">← 이전: 보안 및 프라이버시</a>
+                <a href="chapter8.html">다음: 인증 및 규정 준수 →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

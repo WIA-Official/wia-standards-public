@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 6: Phase 4 — Integration — WIA Smart Breeding</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+h1, h2, h3 { color: #84CC16; }
+h1 { border-bottom: 3px solid #84CC16; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #84CC16; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #ffd700; font-size: 1.2em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">[smart-breeding] Standard Ebook</a> | Chapter 6 (of 8)</nav>
+
+<h1>Chapter 6: Phase 4 — Integration</h1>
+
+<p>Phase 4 specifies how WIA Smart Breeding composes with existing genomic toolchains and with neighbouring WIA standards.</p>
+
+<h2>6.1 VCF Integration</h2>
+
+<p>VCF (Variant Call Format) v4.3 is the de-facto wire format for genotype data. WIA Smart Breeding integrates with VCF via two paths:</p>
+
+<ul>
+<li><strong>Inline embed:</strong> small SNP panels (under 100 MiB encoded) ride inside the genotype envelope as a base64url-encoded VCF blob.</li>
+<li><strong>External reference:</strong> larger panels and whole-genome sequencing data live as VCF files at a stable URL, with the genotype envelope carrying the URL plus a SHA-256 integrity hash.</li>
+</ul>
+
+<p>WIA hosts MAY publish a VCF-to-WIA bridge endpoint that accepts a vendor's existing VCF and emits a WIA genotype envelope, so labs can on-board without changing their pipeline.</p>
+
+<h2>6.2 PLINK Integration</h2>
+
+<p>PLINK BED/BIM/FAM bundles are the standard format for population-genetics tools (GCTA, GEMMA, ssGBLUP implementations). The WIA host MAY publish a PLINK-export endpoint that materialises a population's federated genotype + pedigree as a PLINK bundle for downstream tooling. The export MUST honour the audience controls of Phase 3 §5.5 — for example, only the <code>evaluation</code> audience can request a full PLINK bundle.</p>
+
+<h2>6.3 HapMap and GFF3 Integration</h2>
+
+<p>HapMap reference panels are referenced by URL plus integrity hash. GFF3 annotation files (gene model coordinates) are likewise referenced rather than embedded; the WIA host MAY cache them but MUST NOT re-publish them as canonical WIA records.</p>
+
+<h2>6.4 WIA Family Integration</h2>
+
+<ul>
+<li><strong>WIA-OMNI-API</strong> — breeder identity and credentials (cooperative membership, certified-organic status, AI/ET licence) live in WIA-OMNI-API.</li>
+<li><strong>WIA-AIR-SHIELD</strong> — transport hardening for cross-organisation data exchange. Hosts MAY refuse handshakes from peers below a configured AIR-SHIELD score.</li>
+<li><strong>WIA-INTENT</strong> — a breeder's "find me top 10 sires for milk yield in my breed and price band" intent lowers to mating-plan endpoint queries scoped by the breeder's owner consent.</li>
+<li><strong>WIA-ACCESSIBILITY</strong> — breeder-facing UI surfaces accommodate accessibility profiles (large-text mode for ageing breeders, voice-input for hands-free pen-side data entry).</li>
+</ul>
+
+<h2>6.5 Worked Example — Joint Genetic Evaluation</h2>
+
+<p>Three breeding cooperatives (α in Korea, β in Denmark, γ in Australia) want a joint Holstein milk-yield evaluation without merging their member databases. The flow:</p>
+
+<ol>
+<li>Each cooperative publishes a discovery document and an owner-consent envelope (signed by each member breeder) authorising the cooperative-aggregation scope.</li>
+<li>An evaluation centre (<code>did:wia:evaluation:interbull-mirror</code>) requests federated handshakes with α, β, γ.</li>
+<li>α, β, γ each issue receipts and serve their members' genotype + phenotype under audience <code>evaluation</code>.</li>
+<li>The evaluation centre runs ssGBLUP on the federated dataset and emits per-individual GEBV envelopes back to each cooperative.</li>
+<li>Each cooperative writes the GEBV envelopes to its own host; member breeders read their own animals' GEBV with audience <code>commercial</code>.</li>
+</ol>
+
+<p>No raw genotypes ever leave the federation; only signed envelopes pass between hosts, and every read is audit-logged by the source.</p>
+
+<h2>6.6 Conformance Profiles</h2>
+
+<table>
+<thead><tr><th>Level</th><th>Required integrations</th></tr></thead>
+<tbody>
+<tr><td><strong>Minimal</strong></td><td>VCF inline + external-ref, WIA-OMNI-API credential fetch</td></tr>
+<tr><td><strong>Core</strong></td><td>Plus PLINK export, joint evaluation participation</td></tr>
+<tr><td><strong>Full</strong></td><td>Plus WIA-AIR-SHIELD scoring, WIA-INTENT lowering, mating-plan endpoint</td></tr>
+</tbody>
+</table>
+
+<footer>
+<div class="philosophy">弘益人間 · Benefit All Humanity</div>
+<div>WIA Smart Breeding Standard v1.0.0</div>
+</footer>
+</body>
+</html>

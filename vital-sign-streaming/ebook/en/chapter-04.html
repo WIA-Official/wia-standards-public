@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 4: Phase 1 - Signal Format Standard</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] Standard Ebook</a> | Chapter 4 (of 8)</p>
+
+<h1>Chapter 4: Phase 1 - Signal Format Standard</h1>
+
+<h2>4.1 Common Metadata</h2>
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "ECG|SPO2|BP|HRV|TEMP|RESP",
+  "deviceId": "unique-device-id",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "data": { ... }
+}
+</pre>
+
+<h2>4.2 ECG Signal Format</h2>
+<pre>
+{
+  "signalType": "ECG",
+  "sampling": {
+    "rate": 512,
+    "duration": 10
+  },
+  "leads": [
+    {
+      "name": "Lead I",
+      "data": [0.05, 0.12, ...],
+      "unit": "mV"
+    }
+  ],
+  "analysis": {
+    "heartRate": 72,
+    "rhythm": "Sinus Rhythm",
+    "abnormalities": []
+  }
+}
+</pre>
+
+<h2>4.3 SpO2 Signal Format</h2>
+<pre>
+{
+  "signalType": "SPO2",
+  "measurement": {
+    "spo2": 98,
+    "pulseRate": 72,
+    "perfusionIndex": 5.2
+  },
+  "waveform": {
+    "ppg": {
+      "red": [...],
+      "infrared": [...],
+      "samplingRate": 125
+    }
+  }
+}
+</pre>
+
+<h2>4.4 Blood Pressure Format</h2>
+<pre>
+{
+  "signalType": "BLOOD_PRESSURE",
+  "measurement": {
+    "systolic": 120,
+    "diastolic": 80,
+    "mean": 93,
+    "pulseRate": 72
+  },
+  "measurementMethod": {
+    "type": "oscillometric",
+    "bodyPosition": "seated"
+  }
+}
+</pre>
+
+<h2>4.5 HRV Format</h2>
+<pre>
+{
+  "signalType": "HRV",
+  "rrIntervals": [800, 820, 810, ...],
+  "timeDomain": {
+    "sdnn": 50,
+    "rmssd": 42,
+    "pnn50": 15.2
+  },
+  "frequencyDomain": {
+    "lf": 450,
+    "hf": 350,
+    "lfHfRatio": 1.29
+  }
+}
+</pre>
+
+<h2>4.6 Frame Envelope (canonical)</h2>
+<p>The Phase 1 specification fixes a single canonical frame envelope that wraps any vital signal type. Each frame is the unit of streaming, signing, and replay defence. Required fields: <code>wia_vital_sign_streaming_version</code>, <code>type</code>, <code>stream_id</code>, <code>patient_id</code>, <code>channel</code>, <code>sample_rate_hz</code>, <code>captured_at</code>, <code>samples</code>, <code>encoding</code>, <code>signature</code>. Optional fields include <code>calibration</code>, <code>lead_id</code>, <code>frame_seq</code>, <code>qos</code>, and <code>compression</code>.</p>
+
+<pre>
+{
+  "wia_vital_sign_streaming_version": "1.0.0",
+  "type": "frame",
+  "stream_id": "stream-icu-A-bed-7-ecg",
+  "patient_id": "did:wia:patient:01HXY",
+  "channel": "ecg",
+  "lead_id": "II",
+  "sample_rate_hz": 500,
+  "captured_at": "2026-04-27T10:00:00.000Z",
+  "encoding": "int16",
+  "calibration": { "lsb": 0.000244, "offset": 0, "unit": "mV" },
+  "frame_seq": 12483017,
+  "qos": "assured",
+  "samples": [3, 4, 5, 4, 3, 2, 1, 0, -1, -2, -1, 0, 1, 2, 3, 4],
+  "signature": { "alg": "Ed25519", "value": "AY3o..." }
+}
+</pre>
+
+<h2>4.7 Channel Descriptor</h2>
+<p>For high-rate streams the producer MAY publish a one-shot channel descriptor that the receiver caches; subsequent frames omit the descriptor's fields and inherit them. This optimisation matters for ECG and EEG streams where per-frame metadata overhead would otherwise dominate the wire bandwidth.</p>
+
+<pre>
+{
+  "wia_vital_sign_streaming_version": "1.0.0",
+  "type": "channel_descriptor",
+  "stream_id": "stream-icu-A-bed-7-ecg",
+  "channel": "ecg",
+  "default_calibration": { "lsb": 0.000244, "offset": 0, "unit": "mV" },
+  "default_encoding": "int16",
+  "default_lead_id": "II",
+  "issued_at": "2026-04-27T08:00:00Z",
+  "valid_until": "2026-04-27T20:00:00Z",
+  "signature": { "alg": "Ed25519", "value": "Bz9A..." }
+}
+</pre>
+
+<h2>4.8 Reserved Channels</h2>
+<p>The canonical channel registry includes <code>ecg</code>, <code>ppg</code>, <code>eeg</code>, <code>emg</code>, <code>spo2</code>, <code>hr</code>, <code>sbp</code>, <code>dbp</code>, <code>map</code>, <code>temp</code>, <code>rr</code>, and <code>etco2</code>. Implementations MUST treat unknown channels as <code>unrecognised</code> rather than fail the frame. Future minor versions add channels but never remove them.</p>
+
+<h2>4.9 Encoding Rules</h2>
+<ul>
+  <li>UTF-8 JSON per IETF RFC 8259, <code>snake_case</code> keys.</li>
+  <li>Timestamps RFC 3339 in UTC with <code>Z</code> suffix; ECG and other &ge; 100 Hz channels MUST encode millisecond precision.</li>
+  <li>Numbers fit in IEEE 754 double precision; integer fields fit in signed 64-bit.</li>
+  <li>Binary fields base64url without padding per IETF RFC 4648 §5.</li>
+  <li>The frame MUST be self-describing: a receiver presented with one envelope MUST be able to reconstruct calibrated values without out-of-band metadata.</li>
+</ul>
+
+<h2>4.10 Conformance</h2>
+<p>A Phase 1 conformant implementation MUST emit and accept the frame envelope above with all required fields, honour the channel descriptor inheritance rules, round-trip every frame byte-identically through encode/decode when no normalisation is requested, reject frames that violate the JSON Schema, and treat unknown optional fields as non-fatal extensions.</p>
+
+</body>
+</html>

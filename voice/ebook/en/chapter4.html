@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Voice-Sign Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 4: Protocol Specification</h1>
+            <p class="subtitle">Real-Time Conversion Pipeline and Avatar Streaming</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>Protocol Specification</h1>
+
+            <h2>4.1 Overview</h2>
+            <p>The Voice-Sign protocol defines how audio data flows through the conversion pipeline, from capture to final avatar rendering. It supports both batch processing for pre-recorded audio and real-time streaming for live communication.</p>
+
+            <h2>4.2 Processing Pipeline</h2>
+
+            <h3>Pipeline Stages</h3>
+            <pre><code>┌─────────────────┐
+│ Audio Capture   │  Voice input from microphone/file
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Preprocessing   │  Noise reduction, VAD, normalization
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Speech Recognition │  ASR model (Whisper, etc.)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Text Analysis   │  Linguistic processing, PII detection
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Sign Translation│  Text-to-gloss conversion
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Pose Generation │  Gloss-to-pose animation
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Avatar Rendering│  3D avatar visualization (optional)
+└─────────────────┘</code></pre>
+
+            <h3>Latency Targets</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Target (P50)</th>
+                        <th>Maximum (P99)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Preprocessing</td>
+                        <td>10ms</td>
+                        <td>50ms</td>
+                    </tr>
+                    <tr>
+                        <td>ASR (10s audio)</td>
+                        <td>150ms</td>
+                        <td>500ms</td>
+                    </tr>
+                    <tr>
+                        <td>Translation</td>
+                        <td>50ms</td>
+                        <td>200ms</td>
+                    </tr>
+                    <tr>
+                        <td>Pose Generation</td>
+                        <td>100ms</td>
+                        <td>300ms</td>
+                    </tr>
+                    <tr>
+                        <td>Avatar Rendering</td>
+                        <td>200ms</td>
+                        <td>600ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total Pipeline</strong></td>
+                        <td><strong>300ms</strong></td>
+                        <td><strong>1000ms</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4.3 Real-Time Streaming Protocol</h2>
+
+            <h3>WebSocket Connection Flow</h3>
+            <pre><code>Client                                Server
+  │                                     │
+  ├─── Connect (WSS) ─────────────────▶│
+  │                                     │
+  │◀─── Connection Accepted ───────────┤
+  │                                     │
+  ├─── Start Message ─────────────────▶│
+  │     (config: ASL, pcm, 16kHz)      │
+  │                                     │
+  │◀─── Ready ─────────────────────────┤
+  │                                     │
+  ├─── Audio Chunk 1 ─────────────────▶│
+  │                                     ├─── Process
+  ├─── Audio Chunk 2 ─────────────────▶│    ││
+  │                                     │    ││
+  │◀─── Transcript Delta (partial) ────┤    ││
+  │                                     │    ▼▼
+  ├─── Audio Chunk 3 ─────────────────▶│
+  │                                     │
+  │◀─── Gloss Delta ────────────────── ┤
+  │                                     │
+  │◀─── Pose Frame 1 ──────────────────┤
+  │                                     │
+  │◀─── Pose Frame 2 ──────────────────┤
+  │                                     │
+  ├─── Stop ───────────────────────────▶│
+  │                                     │
+  │◀─── End ───────────────────────────┤
+  │                                     │
+  ├─── Close ──────────────────────────▶│
+  │                                     │</code></pre>
+
+            <h3>Streaming Configuration</h3>
+            <pre><code>{
+  "streaming_config": {
+    // Audio settings
+    "audio": {
+      "format": "pcm",
+      "sample_rate": 16000,
+      "channels": 1,
+      "chunk_duration_ms": 100  // 100ms chunks
+    },
+
+    // Output preferences
+    "output": {
+      "include_transcript": true,
+      "include_gloss": true,
+      "include_pose": true,
+      "include_render": false  // Too heavy for real-time
+    },
+
+    // Quality vs latency tradeoff
+    "mode": "low_latency",  // or "balanced", "high_quality"
+
+    // Language settings
+    "target_language": "ASL",
+    "source_language_hint": "en"
+  }
+}</code></pre>
+
+            <h2>4.4 Chunking Strategy</h2>
+
+            <h3>Audio Chunking</h3>
+            <p>Audio is divided into small chunks for continuous processing:</p>
+            <ul>
+                <li><strong>Chunk Size:</strong> 100-200ms of audio</li>
+                <li><strong>Overlap:</strong> 50ms overlap between chunks for context</li>
+                <li><strong>Buffering:</strong> 500ms buffer for ASR context window</li>
+                <li><strong>VAD:</strong> Voice Activity Detection to skip silence</li>
+            </ul>
+
+            <h3>Transcript Chunking</h3>
+            <p>Transcription results are delivered incrementally:</p>
+            <ul>
+                <li><strong>Partial Results:</strong> Low-confidence intermediate transcriptions</li>
+                <li><strong>Final Results:</strong> High-confidence finalized text</li>
+                <li><strong>Word Boundaries:</strong> Results sent at natural word/phrase boundaries</li>
+            </ul>
+
+            <h2>4.5 Quality of Service (QoS)</h2>
+
+            <h3>Priority Levels</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Priority</th>
+                        <th>Use Case</th>
+                        <th>Max Latency</th>
+                        <th>Queue Position</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Emergency</strong></td>
+                        <td>911 calls, disaster alerts</td>
+                        <td>100ms</td>
+                        <td>Front</td>
+                    </tr>
+                    <tr>
+                        <td><strong>High</strong></td>
+                        <td>Live interpretation, medical</td>
+                        <td>300ms</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Normal</strong></td>
+                        <td>Video calls, education</td>
+                        <td>1000ms</td>
+                        <td>Normal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Low</strong></td>
+                        <td>Batch processing, archives</td>
+                        <td>5000ms</td>
+                        <td>Background</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Emergency Request Handling</h3>
+            <pre><code>POST /translate
+X-Priority: emergency
+X-Emergency-Type: 911
+
+{
+  "audio": "...",
+  "target_language": "ASL",
+  "emergency_context": {
+    "type": "medical",
+    "location": {"latitude": 37.7749, "longitude": -122.4194}
+  }
+}
+
+Response:
+- Bypasses normal queue
+- Allocated dedicated processing resources
+- Logging includes emergency metadata
+- May trigger alert notifications</code></pre>
+
+            <h2>4.6 Caching and Optimization</h2>
+
+            <h3>Translation Cache</h3>
+            <p>Frequently used phrases are cached to reduce latency:</p>
+            <ul>
+                <li><strong>Cache Key:</strong> Hash of (text + source_lang + target_lang)</li>
+                <li><strong>TTL:</strong> 7 days for common phrases, 24 hours for others</li>
+                <li><strong>Size:</strong> 10,000 most common phrases per language pair</li>
+                <li><strong>Invalidation:</strong> Model updates trigger cache refresh</li>
+            </ul>
+
+            <h3>Pose Cache</h3>
+            <p>Common sign sequences are pre-generated:</p>
+            <ul>
+                <li><strong>Common Signs:</strong> Top 1000 signs per language</li>
+                <li><strong>Common Phrases:</strong> Greetings, questions, emergencies</li>
+                <li><strong>Storage:</strong> Compressed pose data in CDN</li>
+            </ul>
+
+            <h2>4.7 Error Handling and Recovery</h2>
+
+            <h3>Retry Strategy</h3>
+            <pre><code>// Exponential backoff
+retry_delays = [1s, 2s, 4s, 8s, 16s]
+
+// Max retries
+max_retries = 5
+
+// Retry conditions
+- Network errors (5xx)
+- Timeout errors
+- Rate limit errors (with backoff)
+
+// No retry conditions
+- Invalid input (4xx)
+- Authentication errors
+- Resource not found</code></pre>
+
+            <h3>Fallback Mechanisms</h3>
+            <ul>
+                <li><strong>Model Fallback:</strong> Switch to backup ASR model if primary fails</li>
+                <li><strong>Quality Degradation:</strong> Lower quality output if high quality unavailable</li>
+                <li><strong>Text-Only Mode:</strong> Provide transcript if sign generation fails</li>
+                <li><strong>Cached Response:</strong> Return cached result if available</li>
+            </ul>
+
+            <h2>4.8 Avatar Streaming Protocol</h2>
+
+            <h3>Streaming Format</h3>
+            <pre><code>// Frame-based streaming
+{
+  "type": "pose_frame",
+  "frame": {
+    "index": 42,
+    "timestamp_ms": 1400,
+    "joints": [
+      {"joint_id": 0, "position": {"x": 0, "y": 1.5, "z": 0}, "rotation": {...}},
+      {"joint_id": 1, "position": {"x": 0.1, "y": 1.4, "z": 0}, "rotation": {...}}
+    ],
+    "left_hand": {...},
+    "right_hand": {...},
+    "face": {...}
+  },
+  "interpolation": "linear",  // or "cubic", "slerp"
+  "duration_ms": 33  // Time to next frame
+}</code></pre>
+
+            <h3>Compression</h3>
+            <p>Pose data is compressed for efficient streaming:</p>
+            <ul>
+                <li><strong>Delta Encoding:</strong> Only send changes from previous frame</li>
+                <li><strong>Quantization:</strong> Reduce precision of position/rotation data</li>
+                <li><strong>Joint Pruning:</strong> Omit static joints (e.g., legs for sign language)</li>
+                <li><strong>Huffman Coding:</strong> Compress repeated patterns</li>
+            </ul>
+
+            <h2>4.9 Synchronization</h2>
+
+            <h3>Audio-Visual Sync</h3>
+            <p>Ensure avatar movements match original audio timing:</p>
+            <ul>
+                <li><strong>Timestamps:</strong> All data includes precise timestamps</li>
+                <li><strong>Clock Sync:</strong> NTP synchronization for distributed systems</li>
+                <li><strong>Buffer Management:</strong> Jitter buffer to handle network variance</li>
+                <li><strong>Drift Compensation:</strong> Periodic resynchronization</li>
+            </ul>
+
+            <h3>Multi-Stream Synchronization</h3>
+            <pre><code>// For multiple concurrent speakers
+{
+  "stream_id": "strm_123",
+  "speaker_id": "spk_alice",
+  "timestamp": "2025-01-15T10:30:00.123Z",
+  "sequence_number": 42,
+  "data": {...}
+}</code></pre>
+
+            <h2>4.10 Performance Monitoring</h2>
+
+            <h3>Metrics Collection</h3>
+            <pre><code>// Per-request metrics
+{
+  "request_id": "req_123",
+  "metrics": {
+    "total_latency_ms": 450,
+    "stage_latencies": {
+      "preprocessing": 10,
+      "asr": 180,
+      "translation": 150,
+      "pose_generation": 110
+    },
+    "queue_wait_ms": 5,
+    "processing_time_ms": 445,
+    "cache_hit": false,
+    "model_versions": {
+      "asr": "whisper-v3",
+      "translation": "wia-sign-v1.0"
+    }
+  }
+}</code></pre>
+
+            <h3>Quality Metrics</h3>
+            <ul>
+                <li><strong>ASR Confidence:</strong> Average word confidence score</li>
+                <li><strong>Translation Confidence:</strong> Gloss confidence scores</li>
+                <li><strong>Pose Quality:</strong> Smoothness and naturalness metrics</li>
+                <li><strong>End-to-End Quality:</strong> Overall translation quality score</li>
+            </ul>
+
+            <div class="info-box">
+                <strong>Protocol Version Negotiation</strong>
+                Clients and servers negotiate protocol version during connection:
+                <pre><code>Client: Sec-WebSocket-Protocol: voice-sign-v1, voice-sign-v2
+Server: Sec-WebSocket-Protocol: voice-sign-v2</code></pre>
+                This ensures backward compatibility as the protocol evolves.
+            </div>
+
+            <div class="navigation">
+                <a href="chapter3.html">← Previous: API Endpoints</a>
+                <a href="chapter5.html">Next: Integration Guide →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

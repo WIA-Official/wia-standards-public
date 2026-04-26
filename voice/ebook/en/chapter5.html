@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA Voice-Sign Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 5: Integration Guide</h1>
+            <p class="subtitle">Video Platforms, Education, and Emergency Systems</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>Integration Guide</h1>
+
+            <h2>5.1 Overview</h2>
+            <p>This chapter provides practical guidance for integrating Voice-Sign conversion capabilities into various platforms and applications, including video conferencing, education systems, and emergency services.</p>
+
+            <h2>5.2 Video Platform Integration</h2>
+
+            <h3>Zoom Integration</h3>
+            <p>Integrate sign language interpretation overlay into Zoom meetings:</p>
+
+            <pre><code>// Zoom App SDK Integration
+import { ZoomApp } from '@zoom/app-sdk';
+import { VoiceSignClient } from '@wia/voice-sign-client';
+
+const zoomApp = new ZoomApp();
+const signClient = new VoiceSignClient({
+  apiKey: process.env.WIA_API_KEY,
+  targetLanguage: 'ASL'
+});
+
+// Capture audio from Zoom
+zoomApp.on('audio', async (audioChunk) => {
+  // Send to Voice-Sign API
+  const result = await signClient.streamAudio(audioChunk);
+
+  // Display avatar overlay
+  if (result.pose) {
+    displayAvatarOverlay(result.pose);
+  }
+});
+
+// Render avatar in separate window or overlay
+function displayAvatarOverlay(poseData) {
+  // Render using Three.js, Babylon.js, or native rendering
+  avatarRenderer.updatePose(poseData);
+}</code></pre>
+
+            <h3>Microsoft Teams Integration</h3>
+            <pre><code>// Teams App Manifest
+{
+  "name": "WIA Sign Language Interpreter",
+  "version": "1.0.0",
+  "permissions": ["audio.receive", "video.send"],
+  "capabilities": {
+    "meeting": {
+      "audio": true,
+      "video": true
+    }
+  }
+}
+
+// Teams SDK Integration
+import * as microsoftTeams from "@microsoft/teams-js";
+import { VoiceSignClient } from '@wia/voice-sign-client';
+
+microsoftTeams.initialize();
+
+// Get meeting audio
+microsoftTeams.meeting.getAudioInputStream((stream) => {
+  const signClient = new VoiceSignClient({
+    apiKey: process.env.WIA_API_KEY
+  });
+
+  signClient.connectStream(stream, {
+    targetLanguage: 'ASL',
+    onPose: (pose) => {
+      // Send avatar video to meeting
+      microsoftTeams.meeting.shareVideo(renderAvatar(pose));
+    }
+  });
+});</code></pre>
+
+            <h3>WebRTC Direct Integration</h3>
+            <pre><code>// Generic WebRTC integration
+const peerConnection = new RTCPeerConnection(config);
+
+// Get audio track
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+const audioTrack = stream.getAudioTracks()[0];
+
+// Create Audio Context for processing
+const audioContext = new AudioContext();
+const source = audioContext.createMediaStreamSource(stream);
+const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+// Connect to Voice-Sign WebSocket
+const ws = new WebSocket('wss://api.wia.org/voice-sign/v1/stream');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'start',
+    config: {
+      target_language: 'ASL',
+      audio_format: 'pcm',
+      sample_rate: 16000
+    }
+  }));
+};
+
+// Process audio chunks
+processor.onaudioprocess = (e) => {
+  const audioData = e.inputBuffer.getChannelData(0);
+
+  // Convert to base64 and send
+  const base64Audio = arrayBufferToBase64(audioData);
+  ws.send(JSON.stringify({
+    type: 'audio_chunk',
+    audio_data: base64Audio
+  }));
+};
+
+// Receive pose data
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+
+  if (message.type === 'pose') {
+    updateAvatarPose(message.pose_frame);
+  }
+};</code></pre>
+
+            <h2>5.3 Education Platform Integration</h2>
+
+            <h3>Canvas LMS Integration</h3>
+            <pre><code>// Canvas LTI Integration
+{
+  "title": "WIA Sign Language",
+  "description": "Real-time sign language interpretation",
+  "oidc_initiation_url": "https://wia.org/lti/login",
+  "target_link_uri": "https://wia.org/lti/launch",
+  "scopes": [
+    "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem",
+    "https://purl.imsglobal.org/spec/lti-nrps/scope/contextmembership.readonly"
+  ]
+}
+
+// Video lecture processing
+app.post('/lti/launch', async (req, res) => {
+  const { video_url, language_preference } = req.body;
+
+  // Extract audio from lecture video
+  const audio = await extractAudio(video_url);
+
+  // Convert to sign language
+  const signData = await voiceSignClient.translate({
+    audio: audio,
+    target_language: language_preference || 'ASL',
+    output: {
+      include_transcript: true,
+      include_gloss: true,
+      include_pose: true,
+      include_render: true
+    }
+  });
+
+  // Create accessible video with sign language overlay
+  const accessibleVideo = await createOverlayVideo(video_url, signData.render);
+
+  res.json({
+    accessible_video_url: accessibleVideo,
+    transcript: signData.transcript,
+    srt_captions: generateCaptions(signData)
+  });
+});</code></pre>
+
+            <h3>Google Classroom Integration</h3>
+            <pre><code>// Google Classroom Add-on
+{
+  "addOnType": "CLASSROOM_ADDON",
+  "name": "WIA Sign Language",
+  "permissions": ["classroom.courses.readonly", "classroom.announcements"]
+}
+
+// Monitor class announcements
+async function processAnnouncement(announcement) {
+  // Convert text announcement to sign language
+  const signData = await voiceSignClient.translateText({
+    text: announcement.text,
+    target_language: 'ASL',
+    include_render: true
+  });
+
+  // Attach sign language video to announcement
+  await classroom.courses.announcements.addAttachment({
+    courseId: announcement.courseId,
+    id: announcement.id,
+    attachment: {
+      title: 'Sign Language Version',
+      alternateLink: signData.render.video_url,
+      driveFile: {
+        id: signData.render.drive_file_id,
+        title: 'announcement_sign.mp4'
+      }
+    }
+  });
+}</code></pre>
+
+            <h3>Real-Time Classroom Support</h3>
+            <pre><code>// Live lecture interpretation
+class LiveLectureInterpreter {
+  constructor(apiKey, targetLanguage = 'ASL') {
+    this.client = new VoiceSignClient({ apiKey });
+    this.targetLanguage = targetLanguage;
+    this.avatarWindow = null;
+  }
+
+  async start() {
+    // Open avatar display window
+    this.avatarWindow = window.open(
+      '/avatar-display',
+      'sign-interpreter',
+      'width=400,height=600'
+    );
+
+    // Capture classroom audio
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    // Connect to streaming API
+    await this.client.connectStream(stream, {
+      targetLanguage: this.targetLanguage,
+      onTranscript: (text) => {
+        this.displayTranscript(text);
+      },
+      onPose: (pose) => {
+        this.avatarWindow.postMessage({ type: 'pose', data: pose }, '*');
+      },
+      onError: (error) => {
+        console.error('Interpretation error:', error);
+        this.displayError(error);
+      }
+    });
+  }
+
+  displayTranscript(text) {
+    document.getElementById('transcript').textContent = text;
+  }
+
+  displayError(error) {
+    // Show error notification
+    alert(`Interpretation error: ${error.message}`);
+  }
+
+  stop() {
+    this.client.disconnect();
+    if (this.avatarWindow) {
+      this.avatarWindow.close();
+    }
+  }
+}</code></pre>
+
+            <h2>5.4 Emergency System Integration</h2>
+
+            <h3>911 Emergency Services</h3>
+            <pre><code>// Emergency call center integration
+class EmergencyCallHandler {
+  constructor() {
+    this.voiceSign = new VoiceSignClient({
+      apiKey: process.env.WIA_EMERGENCY_API_KEY,
+      priority: 'emergency'
+    });
+  }
+
+  async handleIncomingCall(call) {
+    // Check if caller needs sign language support
+    if (call.accessibility_needs?.includes('deaf') ||
+        call.accessibility_needs?.includes('hard_of_hearing')) {
+
+      // Activate sign language interpretation
+      const session = await this.voiceSign.startSession({
+        target_language: call.preferred_sign_language || 'ASL',
+        emergency_context: {
+          type: call.emergency_type,
+          location: call.location,
+          call_id: call.id
+        }
+      });
+
+      // Bidirectional interpretation
+      // Operator voice → Sign language for caller
+      session.on('operator_audio', async (audio) => {
+        const signData = await this.voiceSign.translate(audio, {
+          priority: 'emergency',
+          max_latency_ms: 100
+        });
+
+        // Send to caller's device
+        call.sendSignLanguageStream(signData.pose);
+      });
+
+      // Caller sign language → Text for operator
+      session.on('caller_video', async (video) => {
+        const text = await this.signToText(video);
+
+        // Display to operator
+        call.displayCallerMessage(text);
+      });
+
+      // Log for audit trail
+      this.logEmergencyInteraction(call, session);
+    }
+  }
+
+  async signToText(video) {
+    // Convert sign language video to text
+    // (Requires sign language recognition, complementary to voice-sign)
+    return await signRecognitionAPI.recognize(video);
+  }
+}</code></pre>
+
+            <h3>Public Emergency Alert System</h3>
+            <pre><code>// Emergency broadcast with sign language
+class EmergencyBroadcast {
+  async broadcastAlert(alert) {
+    // Text alert
+    const alertText = alert.message;
+
+    // Generate sign language version
+    const signData = await voiceSignClient.translateText({
+      text: alertText,
+      target_language: 'ASL',  // Generate for all supported languages
+      priority: 'emergency',
+      include_render: true,
+      render_settings: {
+        quality: 'high',
+        background: 'transparent',
+        avatar: 'emergency_uniform'
+      }
+    });
+
+    // Broadcast through multiple channels
+    await Promise.all([
+      // TV broadcast overlay
+      tvBroadcast.sendOverlay(signData.render.video_url),
+
+      // Mobile push notification
+      mobilePush.send({
+        title: 'Emergency Alert',
+        body: alertText,
+        video: signData.render.video_url,
+        priority: 'high'
+      }),
+
+      // Website emergency banner
+      website.showEmergencyBanner({
+        text: alertText,
+        signLanguageVideo: signData.render.video_url
+      }),
+
+      // Social media
+      socialMedia.post({
+        text: alertText,
+        video: signData.render.video_url,
+        tags: ['emergency', 'accessible']
+      })
+    ]);
+  }
+}</code></pre>
+
+            <h2>5.5 Healthcare Integration</h2>
+
+            <h3>Telehealth Platform</h3>
+            <pre><code>// Telehealth consultation with sign language
+class TelehealthConsultation {
+  constructor(patientId, providerId) {
+    this.patientId = patientId;
+    this.providerId = providerId;
+    this.signClient = null;
+  }
+
+  async startConsultation() {
+    // Check patient language preference
+    const patient = await getPatient(this.patientId);
+
+    if (patient.preferred_language_mode === 'sign') {
+      // Initialize sign language interpretation
+      this.signClient = new VoiceSignClient({
+        apiKey: process.env.WIA_HEALTHCARE_API_KEY,
+        targetLanguage: patient.sign_language || 'ASL',
+        hipaa_compliant: true,
+        data_retention: 'none'  // HIPAA compliance
+      });
+
+      // Provider speech → Sign language
+      const providerAudio = await this.captureProviderAudio();
+      this.signClient.on('pose', (pose) => {
+        this.sendToPatient(pose);
+      });
+
+      // Log consent
+      await this.logConsent(patient, 'sign_language_interpretation');
+    }
+  }
+
+  async logConsent(patient, service) {
+    await auditLog.record({
+      patient_id: patient.id,
+      service: service,
+      timestamp: new Date().toISOString(),
+      consent_obtained: true,
+      data_handling: 'ephemeral_processing_only'
+    });
+  }
+}</code></pre>
+
+            <h2>5.6 Public Service Kiosks</h2>
+
+            <pre><code>// Airport information kiosk
+class AccessibleKiosk {
+  async initializeSignLanguageMode() {
+    // Voice input from user
+    const userQuery = await this.captureVoice();
+
+    // Process query
+    const response = await this.processQuery(userQuery);
+
+    // Convert response to sign language
+    const signData = await voiceSignClient.translateText({
+      text: response,
+      target_language: 'ASL',
+      include_render: true,
+      avatar: 'airport_uniform'
+    });
+
+    // Display on kiosk screen
+    this.displayAvatar(signData.render);
+
+    // Also show text for additional clarity
+    this.displayText(response);
+  }
+}</code></pre>
+
+            <div class="info-box warning">
+                <strong>Compliance Requirements</strong>
+                When integrating with healthcare, emergency, or education systems, ensure compliance with:
+                <ul>
+                    <li>HIPAA (healthcare data protection)</li>
+                    <li>FERPA (education records privacy)</li>
+                    <li>ADA (accessibility requirements)</li>
+                    <li>Section 508 (federal accessibility)</li>
+                    <li>Local emergency communication regulations</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter4.html">← Previous: Protocol Specification</a>
+                <a href="chapter6.html">Next: Security & Privacy →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

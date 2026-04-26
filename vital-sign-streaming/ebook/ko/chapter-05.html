@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: Phase 2 - API 인터페이스 표준 - WIA-MED-003 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] WIA 생체신호 스트리밍 표준 전자책</a> | 제5장 (총 8장)</p>
+
+<hr>
+
+<h1>[MED-003] 제5장: Phase 2 - API 인터페이스 표준</h1>
+
+<blockquote>
+<p><strong>"좋은 API는 복잡함을 숨기고 단순함을 드러낸다"</strong></p>
+<p>Phase 2는 개발자가 생체신호 기기와 쉽게 통신할 수 있도록 표준 API를 제공합니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>5.1 코어 API 설계</h2>
+
+<h3>5.1.1 VitalSignStream 클래스</h3>
+
+<p>모든 WIA-MED-003 구현의 중심이 되는 클래스입니다:</p>
+
+<pre>
+class VitalSignStream {
+  // 생성자
+  constructor(config: StreamConfig)
+
+  // 장치 관리
+  async discoverDevices(filter?: DeviceFilter): Promise&lt;Device[]&gt;
+  async connect(deviceId: string): Promise&lt;Connection&gt;
+  async disconnect(deviceId: string): Promise&lt;void&gt;
+  getDeviceStatus(deviceId: string): DeviceStatus
+
+  // 데이터 스트리밍
+  async startStream(deviceId: string, config?: StreamOptions): Promise&lt;Stream&gt;
+  async stopStream(streamId: string): Promise&lt;void&gt;
+  onData(callback: (data: VitalSignData) => void): void
+  onError(callback: (error: Error) => void): void
+
+  // 데이터 저장 및 검색
+  async saveData(data: VitalSignData, storage?: StorageConfig): Promise&lt;string&gt;
+  async loadData(query: DataQuery): Promise&lt;VitalSignData[]&gt;
+  async exportData(format: ExportFormat, query: DataQuery): Promise&lt;Blob&gt;
+
+  // 알림 시스템
+  setAlert(config: AlertConfig): string
+  removeAlert(alertId: string): void
+  onAlert(callback: (alert: Alert) => void): void
+}
+</pre>
+
+<h3>5.1.2 TypeScript 예제</h3>
+
+<pre>
+import { VitalSignStream } from 'wia-med-003';
+
+// 1. 초기화
+const stream = new VitalSignStream({
+  apiKey: 'your-api-key',
+  cloudSync: true,
+  encryption: 'AES-256'
+});
+
+// 2. 장치 검색
+const devices = await stream.discoverDevices({
+  signalType: 'ECG',
+  manufacturer: 'AcmeMedical'
+});
+
+console.log(`발견된 기기: ${devices.length}개`);
+
+// 3. 연결
+const connection = await stream.connect(devices[0].id);
+console.log('연결 성공:', connection.deviceInfo);
+
+// 4. 스트리밍 시작
+const ecgStream = await stream.startStream(devices[0].id, {
+  signalType: 'ECG',
+  samplingRate: 512,
+  duration: 60  // 60초
+});
+
+// 5. 데이터 수신
+stream.onData((data) => {
+  console.log('ECG 데이터 수신:', data);
+
+  if (data.analysis?.heartRate) {
+    console.log(`심박수: ${data.analysis.heartRate} bpm`);
+  }
+});
+
+// 6. 오류 처리
+stream.onError((error) => {
+  console.error('스트림 오류:', error);
+});
+
+// 7. 알림 설정
+const alertId = stream.setAlert({
+  signalType: 'ECG',
+  condition: 'heartRate > 100 OR heartRate < 60',
+  callback: (alert) => {
+    console.warn('심박수 이상:', alert);
+    // 사용자에게 알림 전송
+  }
+});
+</pre>
+
+<h3>5.1.3 Python 예제</h3>
+
+<pre>
+from wia_med_003 import VitalSignStream
+
+# 1. 초기화
+stream = VitalSignStream(
+    api_key='your-api-key',
+    cloud_sync=True,
+    encryption='AES-256'
+)
+
+# 2. 장치 검색
+devices = stream.discover_devices(
+    signal_type='SPO2',
+    manufacturer='AcmeMedical'
+)
+
+print(f'발견된 기기: {len(devices)}개')
+
+# 3. 연결
+connection = stream.connect(devices[0].id)
+print(f'연결 성공: {connection.device_info}')
+
+# 4. 스트리밍 시작
+spo2_stream = stream.start_stream(
+    devices[0].id,
+    signal_type='SPO2',
+    sampling_rate=125
+)
+
+# 5. 데이터 수신
+@stream.on_data
+def handle_data(data):
+    print(f'SpO2: {data.measurement.spo2}%')
+    print(f'맥박: {data.measurement.pulse_rate} bpm')
+
+# 6. 알림 설정
+stream.set_alert(
+    signal_type='SPO2',
+    condition='spo2 < 95',
+    callback=lambda alert: print(f'경고: SpO2 낮음 {alert.value}%')
+)
+
+# 7. 데이터 저장
+stream.save_data(
+    data,
+    storage={
+        'type': 'cloud',
+        'provider': 'AWS-HealthLake'
+    }
+)
+</pre>
+
+<hr>
+
+<h2>5.2 장치 검색 및 연결</h2>
+
+<h3>5.2.1 장치 검색 프로토콜</h3>
+
+<p>WIA-MED-003 기기는 표준 발견 프로토콜을 따릅니다:</p>
+
+<pre>
+// Bluetooth LE 발견
+{
+  "protocol": "BLE",
+  "serviceUUID": "00001820-0000-1000-8000-00805f9b34fb",  // WIA-MED-003 서비스
+  "characteristicUUID": "00002a1e-0000-1000-8000-00805f9b34fb",
+  "advertisementData": {
+    "standard": "WIA-MED-003",
+    "version": "1.0.0",
+    "deviceType": "ECG",
+    "manufacturer": "AcmeMedical",
+    "model": "ECG-Pro-2000",
+    "batteryLevel": 85,
+    "capabilities": ["ECG", "HRV"]
+  }
+}
+
+// WiFi/mDNS 발견
+{
+  "protocol": "mDNS",
+  "serviceType": "_wia-med-003._tcp",
+  "name": "ECG-Device-12345",
+  "port": 8883,
+  "txtRecords": {
+    "standard=WIA-MED-003",
+    "version=1.0.0",
+    "type=ECG",
+    "secure=true"
+  }
+}
+</pre>
+
+<h3>5.2.2 연결 핸드셰이크</h3>
+
+<pre>
+단계 1: 클라이언트 → 장치
+{
+  "type": "connection_request",
+  "clientId": "app-client-789",
+  "protocol": "WIA-MED-003/1.0",
+  "encryption": {
+    "method": "TLS1.3",
+    "publicKey": "..."
+  }
+}
+
+단계 2: 장치 → 클라이언트
+{
+  "type": "connection_response",
+  "status": "accepted",
+  "deviceInfo": {
+    "deviceId": "ECG-12345",
+    "manufacturer": "AcmeMedical",
+    "model": "ECG-Pro-2000",
+    "firmwareVersion": "2.1.0",
+    "capabilities": ["ECG", "HRV"]
+  },
+  "sessionKey": "...",
+  "expiresAt": "2025-01-15T18:00:00.000Z"
+}
+
+단계 3: 보안 채널 확립
+- 종단간 암호화 활성화
+- 세션 토큰 교환
+- 데이터 전송 준비 완료
+</pre>
+
+<h3>5.2.3 장치 상태 모니터링</h3>
+
+<pre>
+interface DeviceStatus {
+  deviceId: string;
+  connectionState: 'connected' | 'disconnected' | 'connecting' | 'error';
+  signalQuality: 'poor' | 'fair' | 'good' | 'excellent';
+  batteryLevel: number;        // 0-100%
+  lastHeartbeat: string;        // ISO 8601 timestamp
+  activeStreams: string[];
+  errors: Error[];
+}
+
+// 실시간 상태 모니터링
+stream.onDeviceStatus((status) => {
+  console.log(`기기 ${status.deviceId}:`);
+  console.log(`- 연결: ${status.connectionState}`);
+  console.log(`- 배터리: ${status.batteryLevel}%`);
+  console.log(`- 신호 품질: ${status.signalQuality}`);
+
+  if (status.batteryLevel < 20) {
+    alert('기기 배터리가 부족합니다!');
+  }
+});
+</pre>
+
+<hr>
+
+<h2>5.3 실시간 데이터 스트리밍</h2>
+
+<h3>5.3.1 스트림 구성</h3>
+
+<pre>
+interface StreamOptions {
+  signalType: SignalType;
+  samplingRate?: number;       // Hz (기본값은 신호 유형별)
+  duration?: number;           // 초 (0 = 무한)
+  compression?: 'none' | 'gzip' | 'delta';
+  bufferSize?: number;         // 샘플 수
+  realtime?: boolean;          // true = 즉시 전송, false = 배치
+  filters?: {
+    lowpass?: number;          // Hz
+    highpass?: number;         // Hz
+    notch?: number;            // Hz (50/60Hz 제거)
+  };
+}
+
+// 예제: 고품질 ECG 스트리밍
+const ecgStream = await stream.startStream(deviceId, {
+  signalType: 'ECG',
+  samplingRate: 1000,          // 1000Hz
+  duration: 0,                 // 무한 스트리밍
+  compression: 'delta',
+  bufferSize: 100,
+  realtime: true,
+  filters: {
+    lowpass: 100,              // 100Hz 저역통과
+    highpass: 0.5,             // 0.5Hz 고역통과
+    notch: 60                  // 60Hz 노치 필터 (전원 노이즈 제거)
+  }
+});
+</pre>
+
+<h3>5.3.2 백프레셔 및 흐름 제어</h3>
+
+<p>네트워크 혼잡을 방지하기 위한 흐름 제어:</p>
+
+<pre>
+// 백프레셔 메커니즘
+class StreamController {
+  private buffer: VitalSignData[] = [];
+  private maxBufferSize = 1000;
+  private pauseThreshold = 800;
+  private resumeThreshold = 200;
+
+  onData(data: VitalSignData) {
+    this.buffer.push(data);
+
+    // 버퍼가 가득 차면 스트림 일시정지
+    if (this.buffer.length > this.pauseThreshold) {
+      this.pauseStream();
+    }
+
+    // 버퍼 처리
+    this.processBuffer();
+
+    // 버퍼가 비면 스트림 재개
+    if (this.buffer.length < this.resumeThreshold) {
+      this.resumeStream();
+    }
+  }
+
+  private pauseStream() {
+    // 장치에 PAUSE 신호 전송
+    this.sendControl({ command: 'PAUSE' });
+  }
+
+  private resumeStream() {
+    // 장치에 RESUME 신호 전송
+    this.sendControl({ command: 'RESUME' });
+  }
+}
+</pre>
+
+<h3>5.3.3 다중 신호 동시 스트리밍</h3>
+
+<pre>
+// 여러 생체신호 동시 모니터링
+const multiStream = await stream.startMultiStream(deviceId, [
+  { signalType: 'ECG', samplingRate: 512 },
+  { signalType: 'SPO2', samplingRate: 125 },
+  { signalType: 'BLOOD_PRESSURE', interval: 60 }  // 60초마다
+]);
+
+// 통합 데이터 수신
+stream.onData((data) => {
+  switch(data.signalType) {
+    case 'ECG':
+      updateECGChart(data);
+      break;
+    case 'SPO2':
+      updateSpO2Display(data);
+      break;
+    case 'BLOOD_PRESSURE':
+      updateBPDisplay(data);
+      break;
+  }
+});
+
+// 타임스탬프 동기화
+stream.onSyncedData((syncedData) => {
+  // 모든 신호가 같은 시간대로 정렬됨
+  const { ecg, spo2, bp } = syncedData;
+  analyzeCorrelation(ecg, spo2, bp);
+});
+</pre>
+
+<hr>
+
+<h2>5.4 데이터 저장 및 검색</h2>
+
+<h3>5.4.1 로컬 저장</h3>
+
+<pre>
+// IndexedDB를 사용한 브라우저 로컬 저장
+await stream.saveData(data, {
+  type: 'local',
+  database: 'vital-signs-db',
+  table: 'ecg_recordings',
+  encryption: true,
+  maxAge: 30 * 24 * 60 * 60 * 1000  // 30일
+});
+
+// SQLite를 사용한 모바일 로컬 저장
+await stream.saveData(data, {
+  type: 'sqlite',
+  path: '/data/health/vital_signs.db',
+  encryption: true
+});
+</pre>
+
+<h3>5.4.2 클라우드 저장</h3>
+
+<pre>
+// AWS HealthLake
+await stream.saveData(data, {
+  type: 'cloud',
+  provider: 'AWS-HealthLake',
+  region: 'us-east-1',
+  encryption: 'AES-256',
+  credentials: {
+    accessKeyId: '...',
+    secretAccessKey: '...'
+  },
+  fhir: {
+    resourceType: 'Observation',
+    category: 'vital-signs'
+  }
+});
+
+// Google Cloud Healthcare API
+await stream.saveData(data, {
+  type: 'cloud',
+  provider: 'GCP-Healthcare',
+  projectId: 'my-health-project',
+  datasetId: 'vital-signs-dataset',
+  fhirStoreId: 'vital-signs-store'
+});
+</pre>
+
+<h3>5.4.3 데이터 쿼리</h3>
+
+<pre>
+// 시간 범위로 검색
+const last7Days = await stream.loadData({
+  signalType: 'ECG',
+  startTime: '2025-01-08T00:00:00.000Z',
+  endTime: '2025-01-15T23:59:59.999Z',
+  patientId: 'patient-123'
+});
+
+// 조건부 검색
+const abnormalECG = await stream.loadData({
+  signalType: 'ECG',
+  filter: {
+    'analysis.abnormalities': { $exists: true, $not: { $size: 0 } }
+  },
+  sort: { timestamp: -1 },
+  limit: 10
+});
+
+// 집계 쿼리
+const stats = await stream.aggregateData({
+  signalType: 'BLOOD_PRESSURE',
+  startTime: '2025-01-01T00:00:00.000Z',
+  endTime: '2025-01-15T23:59:59.999Z',
+  aggregate: {
+    avgSystolic: { $avg: '$measurement.systolic' },
+    avgDiastolic: { $avg: '$measurement.diastolic' },
+    maxSystolic: { $max: '$measurement.systolic' },
+    minDiastolic: { $min: '$measurement.diastolic' }
+  }
+});
+
+console.log('평균 혈압:', stats.avgSystolic, '/', stats.avgDiastolic);
+</pre>
+
+<h3>5.4.4 데이터 내보내기</h3>
+
+<pre>
+// CSV 내보내기
+const csvBlob = await stream.exportData('CSV', {
+  signalType: 'BLOOD_PRESSURE',
+  startTime: '2025-01-01',
+  endTime: '2025-01-15'
+});
+downloadFile(csvBlob, 'blood-pressure-jan-2025.csv');
+
+// PDF 보고서 생성
+const pdfBlob = await stream.exportData('PDF', {
+  signalType: ['ECG', 'SPO2', 'BLOOD_PRESSURE'],
+  startTime: '2025-01-01',
+  endTime: '2025-01-15',
+  template: 'medical-report',
+  includeCharts: true,
+  language: 'ko'
+});
+
+// FHIR 형식 내보내기 (병원 통합용)
+const fhirBundle = await stream.exportData('FHIR', {
+  signalType: 'ECG',
+  resourceType: 'Observation',
+  includeDevice: true,
+  includePractitioner: true
+});
+</pre>
+
+<hr>
+
+<h2>5.5 알림 및 경고 시스템</h2>
+
+<h3>5.5.1 알림 규칙 정의</h3>
+
+<pre>
+interface AlertConfig {
+  id?: string;
+  name: string;
+  signalType: SignalType;
+  condition: string;           // 표현식 또는 함수
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  actions: AlertAction[];
+  enabled: boolean;
+  cooldown?: number;           // 재알림 방지 시간 (초)
+}
+
+// 예제 1: 심박수 이상
+stream.setAlert({
+  name: '심박수 이상',
+  signalType: 'ECG',
+  condition: 'heartRate > 120 OR heartRate < 50',
+  severity: 'high',
+  actions: [
+    { type: 'notification', message: '심박수 이상 감지!' },
+    { type: 'sound', sound: 'alert.mp3' },
+    { type: 'log', level: 'warn' }
+  ],
+  cooldown: 300  // 5분 동안 재알림 안 함
+});
+
+// 예제 2: SpO2 저하
+stream.setAlert({
+  name: 'SpO2 저하',
+  signalType: 'SPO2',
+  condition: 'spo2 < 92',
+  severity: 'critical',
+  actions: [
+    { type: 'notification', message: '산소포화도 위험 수준!' },
+    { type: 'emergency-contact', contact: 'doctor@example.com' },
+    { type: 'webhook', url: 'https://api.emergency-service.com/alert' }
+  ]
+});
+
+// 예제 3: 심방세동 감지
+stream.setAlert({
+  name: '심방세동',
+  signalType: 'ECG',
+  condition: (data) => {
+    return data.analysis?.rhythm === 'Atrial Fibrillation';
+  },
+  severity: 'high',
+  actions: [
+    { type: 'notification', message: '심방세동이 감지되었습니다.' },
+    { type: 'record-event', category: 'arrhythmia' }
+  ]
+});
+</pre>
+
+<h3>5.5.2 복합 알림 조건</h3>
+
+<pre>
+// 여러 신호를 결합한 복합 조건
+stream.setAlert({
+  name: '심부전 악화 징후',
+  signalType: ['ECG', 'SPO2', 'BLOOD_PRESSURE'],
+  condition: (signals) => {
+    const { ecg, spo2, bp } = signals;
+
+    // 복합 조건 평가
+    return (
+      ecg?.analysis?.heartRate > 100 &&
+      spo2?.measurement?.spo2 < 92 &&
+      bp?.measurement?.systolic > 160
+    );
+  },
+  severity: 'critical',
+  actions: [
+    { type: 'emergency-alert' },
+    { type: 'call-doctor' }
+  ]
+});
+
+// 트렌드 기반 알림
+stream.setAlert({
+  name: '혈압 상승 트렌드',
+  signalType: 'BLOOD_PRESSURE',
+  condition: async (data, history) => {
+    // 최근 7일 데이터 조회
+    const last7Days = await stream.loadData({
+      signalType: 'BLOOD_PRESSURE',
+      startTime: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    });
+
+    // 선형 회귀로 트렌드 계산
+    const trend = calculateTrend(last7Days.map(d => d.measurement.systolic));
+
+    // 상승 트렌드가 5mmHg/주 이상이면 알림
+    return trend.slope > 5 / 7;
+  },
+  severity: 'medium',
+  actions: [
+    { type: 'notification', message: '혈압이 지속적으로 상승하고 있습니다.' }
+  ]
+});
+</pre>
+
+<h3>5.5.3 알림 전달 채널</h3>
+
+<pre>
+// 푸시 알림 (모바일)
+{
+  type: 'push-notification',
+  platform: 'iOS',
+  token: 'device-fcm-token',
+  title: '건강 경고',
+  body: 'SpO2가 92%로 낮습니다.',
+  sound: 'default',
+  badge: 1
+}
+
+// 이메일
+{
+  type: 'email',
+  to: 'patient@example.com',
+  cc: ['doctor@example.com'],
+  subject: '[긴급] 생체신호 이상 감지',
+  template: 'alert-email',
+  data: { signalData, chartImage }
+}
+
+// SMS
+{
+  type: 'sms',
+  to: '+821012345678',
+  message: '[WIA Health] 혈압 이상 감지: 180/110 mmHg. 즉시 의사에게 연락하세요.'
+}
+
+// Webhook
+{
+  type: 'webhook',
+  url: 'https://api.telemedicine.com/alerts',
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ...',
+    'Content-Type': 'application/json'
+  },
+  body: {
+    patientId: '...',
+    alertType: 'high-blood-pressure',
+    data: '...'
+  }
+}
+</pre>
+
+<hr>
+
+<h2>5.6 오류 처리</h2>
+
+<h3>5.6.1 오류 유형</h3>
+
+<pre>
+enum ErrorCode {
+  // 연결 오류
+  DEVICE_NOT_FOUND = 1001,
+  CONNECTION_FAILED = 1002,
+  CONNECTION_LOST = 1003,
+  AUTHENTICATION_FAILED = 1004,
+
+  // 스트리밍 오류
+  STREAM_START_FAILED = 2001,
+  STREAM_INTERRUPTED = 2002,
+  BUFFER_OVERFLOW = 2003,
+  DATA_CORRUPTED = 2004,
+
+  // 데이터 오류
+  INVALID_DATA_FORMAT = 3001,
+  SCHEMA_VALIDATION_FAILED = 3002,
+  STORAGE_FAILED = 3003,
+  QUERY_FAILED = 3004,
+
+  // 시스템 오류
+  LOW_BATTERY = 4001,
+  SENSOR_FAILURE = 4002,
+  FIRMWARE_ERROR = 4003,
+  NETWORK_ERROR = 4004
+}
+
+interface WIAError extends Error {
+  code: ErrorCode;
+  message: string;
+  details?: any;
+  timestamp: string;
+  recoverable: boolean;
+}
+</pre>
+
+<h3>5.6.2 오류 처리 패턴</h3>
+
+<pre>
+// 자동 재연결
+stream.onError(async (error) => {
+  if (error.code === ErrorCode.CONNECTION_LOST && error.recoverable) {
+    console.log('연결 끊김. 재연결 시도 중...');
+
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        await stream.connect(deviceId);
+        console.log('재연결 성공!');
+        return;
+      } catch (e) {
+        console.log(`재연결 시도 ${attempt}/5 실패`);
+        await sleep(attempt * 1000);  // 지수 백오프
+      }
+    }
+
+    console.error('재연결 실패. 사용자 개입 필요.');
+    notifyUser('기기 연결이 끊겼습니다. 다시 연결해주세요.');
+  }
+});
+
+// 데이터 손실 방지
+stream.onError(async (error) => {
+  if (error.code === ErrorCode.BUFFER_OVERFLOW) {
+    // 버퍼 오버플로우 시 로컬 저장
+    console.warn('버퍼 오버플로우. 로컬 저장으로 전환.');
+    await stream.changeStorage({ type: 'local' });
+  }
+});
+
+// 센서 오류 감지
+stream.onError((error) => {
+  if (error.code === ErrorCode.SENSOR_FAILURE) {
+    console.error('센서 오류:', error.details);
+
+    // 사용자에게 안내
+    showError({
+      title: '센서 오류',
+      message: '센서를 다시 부착하거나 기기를 재시작해주세요.',
+      actions: [
+        { label: '재시작', onClick: () => stream.restart(deviceId) },
+        { label: '지원팀 연락', onClick: () => contactSupport() }
+      ]
+    });
+  }
+});
+</pre>
+
+<hr>
+
+<h2>5.7 장 요약</h2>
+
+<p>[OK] <strong>핵심 내용:</strong></p>
+
+<ol>
+    <li><strong>VitalSignStream 클래스:</strong> 모든 기능의 중심 API</li>
+    <li><strong>장치 관리:</strong> 검색, 연결, 상태 모니터링</li>
+    <li><strong>실시간 스트리밍:</strong> 다중 신호, 흐름 제어, 동기화</li>
+    <li><strong>데이터 저장:</strong> 로컬/클라우드, 쿼리, 내보내기</li>
+    <li><strong>알림 시스템:</strong> 규칙 기반, 복합 조건, 다중 채널</li>
+    <li><strong>오류 처리:</strong> 자동 복구, 사용자 알림</li>
+</ol>
+
+<hr>
+
+<h2>5.8 다음 장 미리보기</h2>
+
+<p>제6장에서는 Phase 3인 통신 프로토콜 표준을 다룹니다. Bluetooth LE, WiFi, MQTT, WebSocket 프로토콜의 세부 사항과 보안 구현을 학습합니다.</p>
+
+<hr>
+
+<p><a href="chapter-04.html">이전: 제4장</a> | <a href="chapter-06.html">다음: 제6장 - Phase 3: 통신 프로토콜</a></p>
+</body>
+</html>

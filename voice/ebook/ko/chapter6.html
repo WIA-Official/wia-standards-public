@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 보안 및 프라이버시 - WIA 음성-수화 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>제6장: 보안 및 프라이버시</h1>
+            <p class="subtitle">오디오/비디오 데이터 보호 및 동의 관리</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>보안 및 프라이버시</h1>
+
+            <h2>6.1 개요</h2>
+            <p>음성 및 비디오 데이터에는 매우 민감한 개인 정보가 포함됩니다. 이 장에서는 데이터 암호화, 동의 관리 및 규제 준수를 포함한 음성-수화 시스템에 대한 포괄적인 보안 및 프라이버시 보호를 정의합니다.</p>
+
+            <h2>6.2 데이터 분류</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>데이터 유형</th>
+                        <th>민감도</th>
+                        <th>기본 보존 기간</th>
+                        <th>암호화</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>오디오 녹음</td>
+                        <td>높음 (PII)</td>
+                        <td>세션만</td>
+                        <td>필수</td>
+                    </tr>
+                    <tr>
+                        <td>전사 텍스트</td>
+                        <td>높음 (PII)</td>
+                        <td>익명화</td>
+                        <td>필수</td>
+                    </tr>
+                    <tr>
+                        <td>수화 글로스</td>
+                        <td>중간</td>
+                        <td>익명화</td>
+                        <td>권장</td>
+                    </tr>
+                    <tr>
+                        <td>수화 포즈 데이터</td>
+                        <td>낮음</td>
+                        <td>세션만</td>
+                        <td>선택</td>
+                    </tr>
+                    <tr>
+                        <td>사용자 메타데이터</td>
+                        <td>중간</td>
+                        <td>사용자 제어</td>
+                        <td>필수</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6.3 암호화 요구사항</h2>
+
+            <h3>전송 중 데이터</h3>
+            <pre><code>// TLS 1.3 구성
+{
+  "protocol": "TLS 1.3",
+  "cipher_suites": [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_CHACHA20_POLY1305_SHA256"
+  ],
+  "min_version": "TLS 1.3",
+  "certificate_validation": "strict",
+  "hsts": {
+    "enabled": true,
+    "max_age": 31536000,
+    "include_subdomains": true,
+    "preload": true
+  }
+}</code></pre>
+
+            <h3>저장 중 데이터</h3>
+            <pre><code>// AES-256-GCM 암호화
+{
+  "algorithm": "AES-256-GCM",
+  "key_size": 256,
+  "key_derivation": {
+    "algorithm": "Argon2id",
+    "memory": "128MB",
+    "iterations": 4,
+    "parallelism": 2
+  },
+  "key_rotation": {
+    "frequency": "90_days",
+    "automatic": true
+  },
+  "key_storage": {
+    "method": "HSM",  // Hardware Security Module
+    "backup": "encrypted_cold_storage"
+  }
+}</code></pre>
+
+            <h2>6.4 동의 관리</h2>
+
+            <h3>동의 유형</h3>
+            <pre><code>interface ConsentPreferences {
+  // 필수 동의
+  required: {
+    data_processing: boolean;        // 서비스 사용 필수
+    privacy_policy: boolean;         // 서비스 사용 필수
+    terms_of_service: boolean;       // 서비스 사용 필수
+  };
+
+  // 선택적 동의
+  optional: {
+    save_history: boolean;           // 번역 기록 저장
+    improve_service: boolean;        // 모델 개선을 위한 데이터 사용
+    share_anonymous_usage: boolean;  // 익명화된 사용 데이터 공유
+    marketing: boolean;              // 마케팅 커뮤니케이션
+  };
+
+  // 특수 범주 동의
+  special: {
+    biometric_processing: boolean;   // 음성 지문 처리
+    health_data: boolean;            // 의료 애플리케이션용
+    children_data: boolean;          // 13세 미만 사용자 (COPPA)
+  };
+
+  // 데이터 처리 선호도
+  data_handling: {
+    audio_retention: 'none' | 'session' | '24h' | 'encrypted';
+    transcript_retention: 'none' | 'anonymized' | 'encrypted';
+    location_data: 'never' | 'emergency_only' | 'always';
+  };
+}</code></pre>
+
+            <h2>6.5 PII 탐지 및 편집</h2>
+
+            <h3>자동 PII 탐지</h3>
+            <pre><code>// 개인 식별 정보 탐지 및 편집
+class PIIDetector {
+  async detectAndRedact(transcript) {
+    const piiPatterns = {
+      ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
+      phone: /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g,
+      email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+      credit_card: /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g,
+      name: await this.detectNames(transcript),
+      address: await this.detectAddresses(transcript)
+    };
+
+    let redacted = transcript;
+    const detectedPII = [];
+
+    for (const [type, pattern] of Object.entries(piiPatterns)) {
+      const matches = transcript.match(pattern);
+      if (matches) {
+        detectedPII.push({ type, count: matches.length });
+        redacted = redacted.replace(pattern, `[${type.toUpperCase()}]`);
+      }
+    }
+
+    return {
+      original: transcript,
+      redacted: redacted,
+      pii_detected: detectedPII,
+      safe_for_storage: detectedPII.length === 0
+    };
+  }
+}</code></pre>
+
+            <h2>6.6 접근 제어</h2>
+
+            <h3>역할 기반 접근 제어 (RBAC)</h3>
+            <pre><code>const roles = {
+  user: {
+    permissions: [
+      'translate:own',
+      'history:read:own',
+      'consent:manage:own'
+    ]
+  },
+
+  support: {
+    permissions: [
+      'user:read',
+      'logs:read',
+      'tickets:manage'
+    ]
+  },
+
+  admin: {
+    permissions: [
+      'config:manage',
+      'users:manage',
+      'audit:read'
+    ]
+  },
+
+  dpo: {  // 데이터 보호 책임자
+    permissions: [
+      'privacy:manage',
+      'consent:audit',
+      'data:export',
+      'data:delete',
+      'breach:manage'
+    ]
+  }
+};</code></pre>
+
+            <h2>6.7 감사 로깅</h2>
+
+            <h3>감사 이벤트 구조</h3>
+            <pre><code>interface AuditEvent {
+  event_id: string;
+  timestamp: string;
+  event_type: 'access' | 'modification' | 'deletion' | 'export' | 'consent_change';
+
+  actor: {
+    user_id: string;
+    username: string;
+    role: string;
+    ip_address: string;
+    user_agent: string;
+  };
+
+  resource: {
+    type: string;
+    id: string;
+    sensitivity: 'public' | 'internal' | 'confidential' | 'restricted';
+  };
+
+  action: string;
+  outcome: 'success' | 'failure';
+
+  details: {
+    reason?: string;
+    changes?: Record<string, any>;
+    consent_id?: string;
+  };
+
+  compliance: {
+    gdpr?: boolean;
+    hipaa?: boolean;
+    coppa?: boolean;
+  };
+}</code></pre>
+
+            <h2>6.8 데이터 보존 및 삭제</h2>
+
+            <h3>보존 정책</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>데이터 유형</th>
+                        <th>기본 보존</th>
+                        <th>최대</th>
+                        <th>삭제 방법</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>원시 오디오</td>
+                        <td>없음 (즉시)</td>
+                        <td>24시간 (암호화)</td>
+                        <td>보안 삭제</td>
+                    </tr>
+                    <tr>
+                        <td>전사 (식별 가능)</td>
+                        <td>세션만</td>
+                        <td>사용자 제어</td>
+                        <td>보안 삭제</td>
+                    </tr>
+                    <tr>
+                        <td>전사 (익명화)</td>
+                        <td>90일</td>
+                        <td>365일</td>
+                        <td>표준 삭제</td>
+                    </tr>
+                    <tr>
+                        <td>포즈 데이터</td>
+                        <td>세션만</td>
+                        <td>7일</td>
+                        <td>표준 삭제</td>
+                    </tr>
+                    <tr>
+                        <td>감사 로그</td>
+                        <td>7년</td>
+                        <td>7년</td>
+                        <td>아카이빙</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6.9 규정 준수 프레임워크</h2>
+
+            <h3>GDPR 준수</h3>
+            <ul>
+                <li><strong>합법적 근거:</strong> 오디오 처리에 대한 명시적 동의</li>
+                <li><strong>데이터 최소화:</strong> 필요한 데이터만 수집</li>
+                <li><strong>목적 제한:</strong> 명시된 목적으로만 데이터 사용</li>
+                <li><strong>저장 제한:</strong> 더 이상 필요하지 않은 데이터 삭제</li>
+                <li><strong>무결성 및 기밀성:</strong> 강력한 암호화 및 접근 제어</li>
+                <li><strong>책임성:</strong> 포괄적인 감사 로깅</li>
+                <li><strong>데이터 주체 권리:</strong> 접근, 수정, 삭제, 이동성 지원</li>
+            </ul>
+
+            <h3>HIPAA 준수 (의료)</h3>
+            <ul>
+                <li><strong>관리적 보호:</strong> 보안 관리, 인력 교육</li>
+                <li><strong>물리적 보호:</strong> 시설 접근, 워크스테이션 보안</li>
+                <li><strong>기술적 보호:</strong> 암호화, 접근 제어, 감사 제어</li>
+                <li><strong>사업 제휴 계약:</strong> 제3자 처리업체 필수</li>
+                <li><strong>침해 통지:</strong> 60일 통지 규칙</li>
+            </ul>
+
+            <h3>COPPA 준수 (아동)</h3>
+            <ul>
+                <li><strong>부모 동의:</strong> 13세 미만 아동에 대한 검증 가능한 부모 동의</li>
+                <li><strong>데이터 최소화:</strong> 필요한 정보만 수집</li>
+                <li><strong>부모 권리:</strong> 아동 데이터 검토, 삭제</li>
+                <li><strong>기밀성:</strong> 아동 정보 보호</li>
+            </ul>
+
+            <div class="info-box warning">
+                <strong>프라이버시 바이 디자인</strong>
+                모든 음성-수화 시스템은 프라이버시 바이 디자인 원칙을 구현해야 합니다:
+                <ul>
+                    <li>사후 대응이 아닌 사전 대응</li>
+                    <li>기본 설정으로서의 프라이버시</li>
+                    <li>설계에 내장된 프라이버시</li>
+                    <li>완전한 기능성 (제로섬이 아닌 플러스섬)</li>
+                    <li>종단간 보안</li>
+                    <li>가시성 및 투명성</li>
+                    <li>사용자 프라이버시 존중</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter5.html">← 이전: 통합 가이드</a>
+                <a href="chapter7.html">다음: 구현 예제 →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

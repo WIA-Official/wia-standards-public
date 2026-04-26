@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 통합 가이드 - WIA 음성-수화 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>제5장: 통합 가이드</h1>
+            <p class="subtitle">비디오 플랫폼, 교육 및 긴급 시스템</p>
+        </div>
+    </header>
+    <div class="container">
+        <main>
+            <h1>통합 가이드</h1>
+            <h2>5.1 개요</h2>
+            <p>이 장에서는 화상 회의, 교육 시스템 및 긴급 서비스를 포함한 다양한 플랫폼 및 애플리케이션에 음성-수화 변환 기능을 통합하기 위한 실용적인 지침을 제공합니다.</p>
+            <h2>5.2 비디오 플랫폼 통합</h2>
+            <h3>Zoom 통합</h3>
+            <p>Zoom 회의에 수화 통역 오버레이를 통합합니다:</p>
+            <pre><code>import { ZoomApp } from '@zoom/app-sdk';
+import { VoiceSignClient } from '@wia/voice-sign-client';
+
+const zoomApp = new ZoomApp();
+const signClient = new VoiceSignClient({
+  apiKey: process.env.WIA_API_KEY,
+  targetLanguage: 'KSL'
+});
+
+// Zoom에서 오디오 캡처
+zoomApp.on('audio', async (audioChunk) => {
+  const result = await signClient.streamAudio(audioChunk);
+  if (result.pose) {
+    displayAvatarOverlay(result.pose);
+  }
+});</code></pre>
+            <h2>5.3 교육 플랫폼 통합</h2>
+            <h3>Canvas LMS 통합</h3>
+            <pre><code>// 비디오 강의 처리
+const signData = await voiceSignClient.translate({
+  audio: audio,
+  target_language: 'KSL',
+  output: {
+    include_transcript: true,
+    include_render: true
+  }
+});
+
+// 수화 오버레이가 있는 접근 가능한 비디오 생성
+const accessibleVideo = await createOverlayVideo(
+  video_url, 
+  signData.render
+);</code></pre>
+            <h3>실시간 강의실 지원</h3>
+            <pre><code>class LiveLectureInterpreter {
+  async start() {
+    // 강의실 오디오 캡처
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true
+      }
+    });
+
+    // 스트리밍 API에 연결
+    await this.client.connectStream(stream, {
+      targetLanguage: 'KSL',
+      onPose: (pose) => {
+        this.avatarWindow.postMessage(
+          { type: 'pose', data: pose }, 
+          '*'
+        );
+      }
+    });
+  }
+}</code></pre>
+            <h2>5.4 긴급 시스템 통합</h2>
+            <h3>119 긴급 서비스</h3>
+            <pre><code>class EmergencyCallHandler {
+  async handleIncomingCall(call) {
+    if (call.accessibility_needs?.includes('deaf')) {
+      const session = await this.voiceSign.startSession({
+        target_language: 'KSL',
+        emergency_context: {
+          type: call.emergency_type,
+          location: call.location
+        }
+      });
+
+      // 운영자 음성 → 발신자를 위한 수화
+      session.on('operator_audio', async (audio) => {
+        const signData = await this.voiceSign.translate(audio, {
+          priority: 'emergency',
+          max_latency_ms: 100
+        });
+        call.sendSignLanguageStream(signData.pose);
+      });
+    }
+  }
+}</code></pre>
+            <h3>공공 긴급 경보 시스템</h3>
+            <pre><code>class EmergencyBroadcast {
+  async broadcastAlert(alert) {
+    // 수화 버전 생성
+    const signData = await voiceSignClient.translateText({
+      text: alert.message,
+      target_language: 'KSL',
+      priority: 'emergency',
+      include_render: true
+    });
+
+    // 여러 채널을 통해 브로드캐스트
+    await Promise.all([
+      tvBroadcast.sendOverlay(signData.render.video_url),
+      mobilePush.send({
+        video: signData.render.video_url
+      }),
+      website.showEmergencyBanner({
+        signLanguageVideo: signData.render.video_url
+      })
+    ]);
+  }
+}</code></pre>
+            <h2>5.5 의료 통합</h2>
+            <h3>원격 의료 플랫폼</h3>
+            <pre><code>class TelehealthConsultation {
+  async startConsultation() {
+    const patient = await getPatient(this.patientId);
+    
+    if (patient.preferred_language_mode === 'sign') {
+      this.signClient = new VoiceSignClient({
+        apiKey: process.env.WIA_HEALTHCARE_API_KEY,
+        targetLanguage: patient.sign_language || 'KSL',
+        hipaa_compliant: true,
+        data_retention: 'none'  // HIPAA 준수
+      });
+    }
+  }
+}</code></pre>
+            <div class="info-box warning">
+                <strong>규정 준수 요구 사항</strong>
+                의료, 긴급 또는 교육 시스템과 통합할 때 다음 사항을 준수해야 합니다:
+                <ul>
+                    <li>HIPAA (의료 데이터 보호)</li>
+                    <li>FERPA (교육 기록 프라이버시)</li>
+                    <li>ADA (접근성 요구 사항)</li>
+                    <li>지역 긴급 통신 규정</li>
+                </ul>
+            </div>
+            <div class="navigation">
+                <a href="chapter4.html">← 이전: 프로토콜 사양</a>
+                <a href="chapter6.html">다음: 보안 및 프라이버시 →</a>
+            </div>
+        </main>
+        </div>
+</body>
+</html>

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: Phase 1 - 신호 형식 표준 - WIA-MED-003 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] WIA 생체신호 스트리밍 표준 전자책</a> | 제4장 (총 8장)</p>
+
+<hr>
+
+<h1>[MED-003] 제4장: Phase 1 - 신호 형식 표준</h1>
+
+<blockquote>
+<p><strong>"데이터의 언어를 통일하면 모든 기기가 대화할 수 있다"</strong></p>
+<p>Phase 1은 WIA-MED-003의 기초로, 모든 생체신호 데이터의 표준 형식을 정의합니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>4.1 기본 신호 구조</h2>
+
+<h3>4.1.1 공통 메타데이터</h3>
+
+<p>모든 WIA-MED-003 신호는 다음 공통 필드를 포함해야 합니다:</p>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "...",          // ECG, SPO2, BP, HRV 등
+  "deviceId": "...",             // 기기 고유 식별자
+  "deviceManufacturer": "...",   // 제조사 (선택)
+  "deviceModel": "...",          // 모델명 (선택)
+  "timestamp": "...",            // ISO 8601 형식
+  "patientId": "...",            // 환자 ID (선택, 익명화)
+  "sessionId": "...",            // 세션 ID (선택)
+  "data": { ... }                // 신호별 데이터
+}
+</pre>
+
+<h3>4.1.2 타임스탬프 형식</h3>
+
+<p>모든 시간 정보는 ISO 8601 형식을 사용합니다:</p>
+
+<pre>
+형식: YYYY-MM-DDTHH:mm:ss.sssZ
+
+예시:
+- UTC 시간: "2025-01-15T10:30:00.000Z"
+- 밀리초 정밀도: "2025-01-15T10:30:00.123Z"
+- 타임존 포함: "2025-01-15T10:30:00.000+09:00" (KST)
+
+권장사항:
+✅ 항상 UTC 사용
+✅ 밀리초 정밀도 유지
+✅ 'Z' 접미사로 UTC 명시
+</pre>
+
+<hr>
+
+<h2>4.2 ECG/EKG 신호 형식</h2>
+
+<h3>4.2.1 ECG 데이터 구조</h3>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "ECG",
+  "deviceId": "ECG-DEVICE-12345",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "sampling": {
+    "rate": 512,                 // Hz
+    "duration": 10,              // 초
+    "totalSamples": 5120
+  },
+  "leads": [
+    {
+      "name": "Lead I",
+      "data": [0.05, 0.12, 0.18, ...],
+      "unit": "mV",
+      "baseline": 0.0,
+      "gain": 1000
+    },
+    {
+      "name": "Lead II",
+      "data": [...],
+      "unit": "mV"
+    },
+    {
+      "name": "Lead III",
+      "data": [...],
+      "unit": "mV"
+    }
+  ],
+  "analysis": {
+    "heartRate": 72,             // bpm
+    "rhythm": "Sinus Rhythm",
+    "qrsWidth": 0.08,            // 초
+    "qtInterval": 0.40,          // 초
+    "prInterval": 0.16,          // 초
+    "abnormalities": []
+  },
+  "quality": {
+    "signalQuality": "good",     // poor, fair, good, excellent
+    "noiseLevel": 0.02,          // mV
+    "baselineWander": false,
+    "muscleArtifact": false
+  }
+}
+</pre>
+
+<h3>4.2.2 ECG 리드 시스템</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>리드 시스템</th>
+            <th>리드 수</th>
+            <th>리드 이름</th>
+            <th>용도</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>단일 리드</td>
+            <td>1</td>
+            <td>Lead I 또는 유사</td>
+            <td>웨어러블, 리듬 모니터링</td>
+        </tr>
+        <tr>
+            <td>3-리드</td>
+            <td>3</td>
+            <td>I, II, III</td>
+            <td>기본 모니터링</td>
+        </tr>
+        <tr>
+            <td>5-리드</td>
+            <td>5</td>
+            <td>I, II, III, aVR, aVL</td>
+            <td>중환자실</td>
+        </tr>
+        <tr>
+            <td>12-리드</td>
+            <td>12</td>
+            <td>I, II, III, aVR, aVL, aVF, V1-V6</td>
+            <td>진단용, 병원</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.2.3 ECG 이상 분류</h3>
+
+<p>표준 이상 코드:</p>
+
+<pre>
+{
+  "abnormalities": [
+    {
+      "type": "arrhythmia",
+      "subtype": "atrial_fibrillation",
+      "severity": "moderate",
+      "confidence": 0.95,
+      "timestamp": "2025-01-15T10:30:05.230Z"
+    },
+    {
+      "type": "morphology",
+      "subtype": "st_elevation",
+      "severity": "high",
+      "confidence": 0.87,
+      "leads": ["V1", "V2", "V3"]
+    }
+  ]
+}
+
+이상 유형:
+- arrhythmia: 부정맥 (AF, VT, VF, PVC 등)
+- morphology: 파형 이상 (ST 상승/하강, Q파 등)
+- conduction: 전도 장애 (AV block, BBB 등)
+- rate: 심박수 이상 (빈맥, 서맥)
+</pre>
+
+<hr>
+
+<h2>4.3 SpO2 신호 형식</h2>
+
+<h3>4.3.1 SpO2 데이터 구조</h3>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "SPO2",
+  "deviceId": "SPO2-DEVICE-67890",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "measurement": {
+    "spo2": 98,                  // %
+    "pulseRate": 72,             // bpm
+    "perfusionIndex": 5.2,       // %
+    "confidence": 0.98
+  },
+  "waveform": {
+    "ppg": {
+      "red": [125, 128, 132, ...],
+      "infrared": [142, 145, 148, ...],
+      "samplingRate": 125,        // Hz
+      "unit": "arbitrary units"
+    }
+  },
+  "quality": {
+    "signalStrength": "strong",   // weak, moderate, strong
+    "motionArtifact": false,
+    "lowPerfusion": false,
+    "probeOff": false
+  },
+  "alerts": [
+    {
+      "type": "low_spo2",
+      "value": 92,
+      "threshold": 95,
+      "timestamp": "2025-01-15T10:29:45.000Z"
+    }
+  ]
+}
+</pre>
+
+<h3>4.3.2 SpO2 경고 임계값</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>SpO2 범위</th>
+            <th>상태</th>
+            <th>경고 레벨</th>
+            <th>조치</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>95-100%</td>
+            <td>정상</td>
+            <td>없음</td>
+            <td>계속 모니터링</td>
+        </tr>
+        <tr>
+            <td>90-94%</td>
+            <td>경미한 저산소증</td>
+            <td>낮음</td>
+            <td>주의 관찰</td>
+        </tr>
+        <tr>
+            <td>85-89%</td>
+            <td>중등도 저산소증</td>
+            <td>중간</td>
+            <td>의료 상담 권장</td>
+        </tr>
+        <tr>
+            <td>&lt;85%</td>
+            <td>심각한 저산소증</td>
+            <td>높음</td>
+            <td>즉각 의료 개입</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>4.4 혈압 신호 형식</h2>
+
+<h3>4.4.1 혈압 데이터 구조</h3>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "BLOOD_PRESSURE",
+  "deviceId": "BP-DEVICE-11111",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "measurement": {
+    "systolic": 120,             // mmHg
+    "diastolic": 80,             // mmHg
+    "mean": 93,                  // MAP (평균 동맥압)
+    "pulseRate": 72,             // bpm
+    "unit": "mmHg"
+  },
+  "measurementMethod": {
+    "type": "oscillometric",     // auscultatory, oscillometric, continuous
+    "cuffSize": "adult",         // child, adult, large_adult
+    "armLocation": "left",       // left, right
+    "bodyPosition": "seated"     // seated, lying, standing
+  },
+  "quality": {
+    "reliability": "high",       // low, medium, high
+    "irregularHeartbeat": false,
+    "movementDetected": false,
+    "cuffFitProper": true
+  },
+  "classification": {
+    "category": "normal",        // normal, elevated, hypertension_1, hypertension_2, crisis
+    "needsAttention": false
+  }
+}
+</pre>
+
+<h3>4.4.2 연속 혈압 모니터링</h3>
+
+<p>연속 혈압 측정 (웨어러블 기기):</p>
+
+<pre>
+{
+  "signalType": "BLOOD_PRESSURE_CONTINUOUS",
+  "sampling": {
+    "rate": 1,                   // Hz (1초마다)
+    "interval": "1s"
+  },
+  "stream": [
+    {
+      "timestamp": "2025-01-15T10:30:00.000Z",
+      "systolic": 120,
+      "diastolic": 80,
+      "confidence": 0.85
+    },
+    {
+      "timestamp": "2025-01-15T10:30:01.000Z",
+      "systolic": 121,
+      "diastolic": 81,
+      "confidence": 0.87
+    },
+    // ... 연속 데이터
+  ],
+  "calibration": {
+    "lastCalibrated": "2025-01-15T08:00:00.000Z",
+    "method": "cuff_reference",
+    "nextCalibrationDue": "2025-01-15T14:00:00.000Z"
+  }
+}
+</pre>
+
+<hr>
+
+<h2>4.5 심박변이도 (HRV) 신호 형식</h2>
+
+<h3>4.5.1 HRV 데이터 구조</h3>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "HRV",
+  "deviceId": "HRV-DEVICE-22222",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "measurement": {
+    "duration": 300,             // 초 (5분 측정 권장)
+    "rrIntervals": [800, 820, 810, 825, ...],  // ms
+    "totalBeats": 360
+  },
+  "timeDomain": {
+    "meanRR": 815,               // ms
+    "sdnn": 50,                  // ms
+    "rmssd": 42,                 // ms
+    "pnn50": 15.2,               // %
+    "sdsd": 35                   // ms
+  },
+  "frequencyDomain": {
+    "vlf": 200,                  // ms² (Very Low Frequency: 0-0.04 Hz)
+    "lf": 450,                   // ms² (Low Frequency: 0.04-0.15 Hz)
+    "hf": 350,                   // ms² (High Frequency: 0.15-0.4 Hz)
+    "lfHfRatio": 1.29,
+    "totalPower": 1000           // ms²
+  },
+  "nonLinear": {
+    "sd1": 30,                   // Poincaré plot
+    "sd2": 70,
+    "sampEn": 1.2                // Sample Entropy
+  },
+  "interpretation": {
+    "stressLevel": "low",        // low, moderate, high
+    "autonomicBalance": "balanced",
+    "recovery": "good"
+  }
+}
+</pre>
+
+<h3>4.5.2 HRV 지표 해석</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>지표</th>
+            <th>의미</th>
+            <th>정상 범위</th>
+            <th>해석</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>SDNN</td>
+            <td>전체 변동성</td>
+            <td>50-100 ms</td>
+            <td>높을수록 좋은 건강</td>
+        </tr>
+        <tr>
+            <td>RMSSD</td>
+            <td>부교감신경 활동</td>
+            <td>20-50 ms</td>
+            <td>회복 능력 반영</td>
+        </tr>
+        <tr>
+            <td>LF/HF 비율</td>
+            <td>자율신경 균형</td>
+            <td>1.5-2.0</td>
+            <td>높으면 스트레스</td>
+        </tr>
+        <tr>
+            <td>pNN50</td>
+            <td>심박 변동 정도</td>
+            <td>5-20%</td>
+            <td>건강한 변동성</td>
+        </tr>
+    </tbody>
+</table>
+
+<hr>
+
+<h2>4.6 체온 신호 형식</h2>
+
+<h3>4.6.1 체온 데이터 구조</h3>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "TEMPERATURE",
+  "deviceId": "TEMP-DEVICE-33333",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "measurement": {
+    "value": 36.5,               // °C
+    "unit": "celsius",           // celsius, fahrenheit
+    "fahrenheit": 97.7           // 자동 변환 (선택)
+  },
+  "measurementSite": {
+    "location": "oral",          // oral, rectal, axillary, tympanic, forehead, wrist
+    "sensorType": "infrared"     // contact, infrared, wearable
+  },
+  "trend": {
+    "previous": 36.3,
+    "change": 0.2,
+    "direction": "increasing"    // increasing, decreasing, stable
+  },
+  "alerts": [
+    {
+      "type": "fever",
+      "threshold": 37.5,
+      "current": 38.2,
+      "severity": "moderate"
+    }
+  ]
+}
+</pre>
+
+<h3>4.6.2 연속 체온 모니터링 (웨어러블)</h3>
+
+<pre>
+{
+  "signalType": "TEMPERATURE_CONTINUOUS",
+  "sampling": {
+    "rate": 0.0167,              // Hz (1분마다)
+    "interval": "60s"
+  },
+  "stream": [
+    {
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "value": 36.4,
+      "skinTemperature": 33.2,
+      "ambient": 22.0
+    },
+    {
+      "timestamp": "2025-01-15T10:01:00.000Z",
+      "value": 36.5,
+      "skinTemperature": 33.3,
+      "ambient": 22.1
+    },
+    // ... 연속 데이터
+  ],
+  "circadianRhythm": {
+    "peakTime": "17:00",
+    "lowTime": "04:00",
+    "amplitude": 0.5             // °C
+  }
+}
+</pre>
+
+<hr>
+
+<h2>4.7 호흡수 신호 형식</h2>
+
+<h3>4.7.1 호흡수 데이터 구조</h3>
+
+<pre>
+{
+  "standard": "WIA-MED-003",
+  "version": "1.0.0",
+  "signalType": "RESPIRATORY_RATE",
+  "deviceId": "RESP-DEVICE-44444",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "measurement": {
+    "rate": 16,                  // 회/분
+    "regularity": "regular",     // regular, irregular
+    "pattern": "normal"          // normal, shallow, deep, labored
+  },
+  "waveform": {
+    "data": [...],               // 호흡 파형
+    "samplingRate": 25,          // Hz
+    "inspiratoryTime": 1.8,      // 초
+    "expiratoryTime": 2.2,       // 초
+    "ieRatio": 0.82              // I:E 비율
+  },
+  "volume": {
+    "tidalVolume": 500,          // mL (선택)
+    "minuteVentilation": 8000    // mL/min (선택)
+  }
+}
+</pre>
+
+<hr>
+
+<h2>4.8 JSON Schema 정의</h2>
+
+<h3>4.8.1 기본 스키마</h3>
+
+<pre>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA-MED-003 Base Signal",
+  "type": "object",
+  "required": ["standard", "version", "signalType", "deviceId", "timestamp"],
+  "properties": {
+    "standard": {
+      "type": "string",
+      "const": "WIA-MED-003"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "signalType": {
+      "type": "string",
+      "enum": ["ECG", "SPO2", "BLOOD_PRESSURE", "HRV", "TEMPERATURE", "RESPIRATORY_RATE"]
+    },
+    "deviceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+</pre>
+
+<h3>4.8.2 ECG 스키마 (확장)</h3>
+
+<pre>
+{
+  "allOf": [
+    { "$ref": "#/definitions/baseSignal" },
+    {
+      "properties": {
+        "signalType": { "const": "ECG" },
+        "sampling": {
+          "type": "object",
+          "required": ["rate"],
+          "properties": {
+            "rate": { "type": "number", "minimum": 100, "maximum": 2000 },
+            "duration": { "type": "number" },
+            "totalSamples": { "type": "integer" }
+          }
+        },
+        "leads": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "data", "unit"],
+            "properties": {
+              "name": { "type": "string" },
+              "data": { "type": "array", "items": { "type": "number" } },
+              "unit": { "type": "string", "const": "mV" }
+            }
+          }
+        }
+      },
+      "required": ["sampling", "leads"]
+    }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>4.9 데이터 압축 및 최적화</h2>
+
+<h3>4.9.1 압축 방법</h3>
+
+<p>대용량 생체신호 데이터의 효율적 전송:</p>
+
+<pre>
+1. 델타 인코딩:
+   원본: [100, 102, 104, 103, 105, 107]
+   델타: [100, +2, +2, -1, +2, +2]
+   압축률: ~40-60%
+
+2. Run-Length Encoding:
+   연속된 같은 값 압축
+   [95, 95, 95, 95, 96] → [95×4, 96×1]
+
+3. Gzip 압축:
+   JSON 전체를 gzip으로 압축
+   압축률: ~70-80%
+
+4. 다운샘플링 (품질 유지):
+   1000Hz → 500Hz (항-앨리어싱 필터 적용)
+   데이터 크기 50% 감소
+</pre>
+
+<h3>4.9.2 배치 전송</h3>
+
+<p>실시간성과 효율성 균형:</p>
+
+<pre>
+{
+  "batch": {
+    "batchId": "batch-123",
+    "startTime": "2025-01-15T10:00:00.000Z",
+    "endTime": "2025-01-15T10:05:00.000Z",
+    "signals": [
+      { /* 신호 1 */ },
+      { /* 신호 2 */ },
+      // ... 최대 100개 신호
+    ],
+    "compression": "gzip",
+    "totalSize": 245678,         // bytes (압축 전)
+    "compressedSize": 49135      // bytes (압축 후)
+  }
+}
+</pre>
+
+<hr>
+
+<h2>4.10 장 요약</h2>
+
+<p>[OK] <strong>핵심 내용:</strong></p>
+
+<ol>
+    <li><strong>공통 구조:</strong> 모든 신호는 표준 메타데이터 포함</li>
+    <li><strong>ECG:</strong> 다중 리드 지원, 파형 분석, 이상 감지</li>
+    <li><strong>SpO2:</strong> 산소포화도, PPG 파형, 품질 지표</li>
+    <li><strong>혈압:</strong> 수축기/이완기, 연속 모니터링 지원</li>
+    <li><strong>HRV:</strong> 시간/주파수 영역 분석, 스트레스 평가</li>
+    <li><strong>체온:</strong> 다양한 측정 위치, 연속 추적</li>
+    <li><strong>호흡수:</strong> 호흡 패턴, 파형 분석</li>
+    <li><strong>JSON Schema:</strong> 엄격한 데이터 검증</li>
+    <li><strong>최적화:</strong> 압축 및 배치 전송</li>
+</ol>
+
+<hr>
+
+<h2>4.11 복습 문제</h2>
+
+<ol>
+    <li>모든 WIA-MED-003 신호에 필수적으로 포함되어야 하는 공통 필드는 무엇인가요?</li>
+    <li>ECG 신호의 리드 시스템 차이점을 설명하세요 (1-리드 vs 12-리드).</li>
+    <li>SpO2 측정에서 PPG 파형이 어떻게 활용되나요?</li>
+    <li>HRV의 SDNN과 RMSSD 지표의 차이는 무엇인가요?</li>
+    <li>연속 혈압 모니터링에서 보정(calibration)이 왜 필요한가요?</li>
+    <li>데이터 압축 방법 3가지를 설명하고 각각의 장단점을 비교하세요.</li>
+</ol>
+
+<hr>
+
+<h2>4.12 다음 장 미리보기</h2>
+
+<p>제5장에서는 Phase 2인 API 인터페이스 표준을 다룹니다. VitalSignStream 클래스, 장치 검색, 실시간 스트리밍, 알림 시스템 등 실제 소프트웨어 구현에 필요한 API를 학습합니다.</p>
+
+<hr>
+
+<p><a href="chapter-03.html">이전: 제3장</a> | <a href="chapter-05.html">다음: 제5장 - Phase 2: API 인터페이스 표준</a></p>
+</body>
+</html>

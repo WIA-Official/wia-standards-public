@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 3: Phase 1 — Data Format — WIA Smart Breeding</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+h1, h2, h3 { color: #84CC16; }
+h1 { border-bottom: 3px solid #84CC16; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #84CC16; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #ffd700; font-size: 1.2em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">[smart-breeding] Standard Ebook</a> | Chapter 3 (of 8)</nav>
+
+<h1>Chapter 3: Phase 1 — Data Format</h1>
+
+<p>Phase 1 fixes the JSON shapes that every WIA Smart Breeding implementation must read and emit. The format is engineered to interoperate with the existing genomic toolchain (VCF, PLINK, HapMap, GFF3) while adding the breeding-specific structures that vendor platforms keep in private databases today.</p>
+
+<h2>3.1 Object Families</h2>
+
+<table>
+<thead><tr><th>Family</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>individual</code></td><td>One animal or plant with identifying metadata, pedigree pointers, and trait history</td></tr>
+<tr><td><code>genotype</code></td><td>SNP array, sequencing readout, or imputed genotype payload</td></tr>
+<tr><td><code>phenotype</code></td><td>Measured trait observation tied to an individual and a recording event</td></tr>
+<tr><td><code>gebv</code></td><td>Genomic Estimated Breeding Value for one trait, with reliability and method</td></tr>
+<tr><td><code>pedigree</code></td><td>Multi-generation ancestor graph + computed inbreeding coefficient</td></tr>
+<tr><td><code>population</code></td><td>Group of individuals with diversity metrics</td></tr>
+<tr><td><code>mating_plan</code></td><td>Recommended pairings with predicted offspring values</td></tr>
+</tbody>
+</table>
+
+<h2>3.2 Individual Record (worked example)</h2>
+
+<pre>
+{
+  "wia_smart_breeding_version": "1.0.0",
+  "type": "individual",
+  "individual_id": "BULL-2025-001",
+  "species": "Bos taurus",
+  "breed": "Holstein",
+  "sex": "M",
+  "birth_date": "2024-03-15",
+  "data": {
+    "registration_number": "USA-12345678",
+    "owner_id": "did:wia:breeder:09",
+    "pedigree_id": "ped_BULL-2025-001",
+    "genotype_ids": ["gt_BULL-2025-001-snp-50k"],
+    "phenotype_ids": ["ph_BULL-2025-001-2025-q4"]
+  },
+  "signature": { "alg": "Ed25519", "value": "AY3o..." }
+}
+</pre>
+
+<h2>3.3 Genotype Record</h2>
+
+<p>Genotype payloads ride either inline (small SNP panels) or by reference to a VCF / PLINK / HapMap object hosted out-of-band. Inline form:</p>
+
+<pre>
+{
+  "wia_smart_breeding_version": "1.0.0",
+  "type": "genotype",
+  "genotype_id": "gt_BULL-2025-001-snp-50k",
+  "individual_id": "BULL-2025-001",
+  "platform": "Illumina BovineSNP50 v3",
+  "marker_count": 53218,
+  "format": "vcf-inline",
+  "vcf_header_url": "https://refs.example/bovine-snp50-v3.vcf.header",
+  "calls": "data:application/x-vcf;base64,##fileformat=VCFv4.3...",
+  "captured_at": "2025-04-02T00:00:00Z",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+</pre>
+
+<p>External-reference form replaces <code>calls</code> with <code>vcf_url</code> and an integrity hash; receivers fetch and verify before use.</p>
+
+<h2>3.4 Phenotype Record</h2>
+
+<pre>
+{
+  "wia_smart_breeding_version": "1.0.0",
+  "type": "phenotype",
+  "phenotype_id": "ph_BULL-2025-001-2025-q4",
+  "individual_id": "BULL-2025-001",
+  "trait": "milk_yield_305d",
+  "value": 12450,
+  "unit": "kg",
+  "recorded_at": "2025-12-31",
+  "recording_protocol": "ICAR-2024",
+  "lactation_number": 1,
+  "contemporary_group_id": "cg_2024_holstein_q4",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+</pre>
+
+<p>The <code>contemporary_group_id</code> field anchors the observation to a comparable cohort so downstream BLUP / GEBV computation is not contaminated by herd-level confounders.</p>
+
+<h2>3.5 GEBV Record</h2>
+
+<pre>
+{
+  "wia_smart_breeding_version": "1.0.0",
+  "type": "gebv",
+  "individual_id": "BULL-2025-001",
+  "trait": "milk_yield_305d",
+  "estimated_breeding_value": 482.7,
+  "reliability": 0.78,
+  "method": "ssGBLUP",
+  "reference_population": "global-2026",
+  "computed_at": "2026-04-27T00:00:00Z",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+</pre>
+
+<h2>3.6 Encoding Rules</h2>
+
+<ul>
+<li>UTF-8 JSON per IETF RFC 8259, <code>snake_case</code> keys.</li>
+<li>Timestamps RFC 3339 in UTC, <code>Z</code> suffix.</li>
+<li>Identifiers URI-shaped or ULID where applicable.</li>
+<li>Numerical fields in IEEE 754 double precision.</li>
+<li>Genotype payloads MAY use base64url; integrity hash MUST accompany external references.</li>
+</ul>
+
+<h2>3.7 Conformance</h2>
+
+<p>A Phase 1 conformant implementation MUST round-trip every object family byte-identically through encode/decode, reject objects missing required fields per JSON Schema, treat unknown optional fields as non-fatal, and validate genotype integrity hashes when the payload rides as an external reference.</p>
+
+<footer>
+<div class="philosophy">弘益人間 · Benefit All Humanity</div>
+<div>WIA Smart Breeding Standard v1.0.0</div>
+</footer>
+</body>
+</html>

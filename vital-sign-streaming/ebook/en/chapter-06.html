@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Phase 3 - Communication Protocols</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] Standard Ebook</a> | Chapter 6 (of 8)</p>
+
+<h1>Chapter 6: Phase 3 - Communication Protocols</h1>
+
+<h2>6.1 Bluetooth LE Protocol</h2>
+<p><strong>Service UUID:</strong> 00001820-0000-1000-8000-00805f9b34fb</p>
+<p><strong>Characteristics:</strong></p>
+<ul>
+    <li>Device Info (Read)</li>
+    <li>Signal Config (Read/Write)</li>
+    <li>Data Stream (Notify)</li>
+    <li>Control Commands (Write)</li>
+    <li>Status (Notify)</li>
+</ul>
+
+<h2>6.2 WiFi/TCP Protocol</h2>
+<pre>
+// TLS Socket Connection
+const client = tls.connect(8883, deviceIP, {
+  ca: [caCertificate],
+  checkServerIdentity: verifyDeviceCertificate
+});
+
+client.on('data', (packet) => {
+  const data = decodeWIA(packet);
+  processVitalSignData(data);
+});
+</pre>
+
+<h2>6.3 MQTT Protocol</h2>
+<pre>
+Topic Structure:
+wia-med-003/
+  ├─ {deviceId}/
+  │   ├─ data/ecg
+  │   ├─ data/spo2
+  │   ├─ alerts
+  │   └─ control
+  └─ broadcast/discovery
+</pre>
+
+<h2>6.4 WebSocket Protocol</h2>
+<pre>
+const ws = new WebSocket('wss://api.example.com/stream');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    command: 'start',
+    signalType: 'ECG'
+  }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  updateECGChart(data);
+};
+</pre>
+
+<h2>6.5 Protocol Selection Guide</h2>
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Protocol</th>
+            <th>Best For</th>
+            <th>Pros</th>
+            <th>Cons</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>BLE</td>
+            <td>Wearables</td>
+            <td>Low power</td>
+            <td>Limited range</td>
+        </tr>
+        <tr>
+            <td>WiFi/TCP</td>
+            <td>Home devices</td>
+            <td>High bandwidth</td>
+            <td>Higher power</td>
+        </tr>
+        <tr>
+            <td>MQTT</td>
+            <td>IoT devices</td>
+            <td>Lightweight</td>
+            <td>Needs broker</td>
+        </tr>
+        <tr>
+            <td>WebSocket</td>
+            <td>Web apps</td>
+            <td>Browser support</td>
+            <td>Firewall issues</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>6.6 Security Requirements</h2>
+<ul>
+    <li><strong>Encryption:</strong> TLS 1.3, AES-256</li>
+    <li><strong>Authentication:</strong> OAuth 2.0, FIDO2</li>
+    <li><strong>Compliance:</strong> HIPAA, GDPR</li>
+</ul>
+
+<h2>6.7 Federation Across Hosts</h2>
+<p>Multiple WIA Vital Sign Streaming hosts (a hospital ICU, an ambulance, a remote monitoring service) federate so a patient's signal can follow the patient across care boundaries without re-instrumentation. The roles and handshake state machine are defined in the Phase 3 specification; this chapter walks through how those mechanics surface to integrators.</p>
+
+<h3>6.7.1 Roles</h3>
+<ul>
+  <li><strong>Producer</strong> — holds the device-side stream and signs frames.</li>
+  <li><strong>Consumer</strong> — subscribes to one or more streams (clinician dashboard, EHR bridge, alert routing service).</li>
+  <li><strong>Custodian</strong> — holds the patient's consent envelope and authorises which consumers may subscribe.</li>
+  <li><strong>Auditor</strong> — holds the audit log of every subscription and replay request.</li>
+</ul>
+
+<h3>6.7.2 Patient Consent Envelope</h3>
+<pre>
+{
+  "wia_vital_sign_streaming_version": "1.0.0",
+  "type": "patient_consent",
+  "patient_id": "did:wia:patient:01HXY",
+  "custodian_id": "did:wia:custodian:hospital-A",
+  "scope": ["icu", "remote_monitoring"],
+  "valid_from": "2026-04-27T00:00:00Z",
+  "valid_until": "2026-05-27T00:00:00Z",
+  "consent_artefact_url": "https://omni.example/consent/01HXY/2026-04-27.pdf",
+  "signature": { "alg": "Ed25519", "value": "AY3o..." }
+}
+</pre>
+<p>Producers and consumers MUST refuse subscription requests whose patient identifier lacks an active consent envelope from the custodian, except in declared emergency scope (<code>scope = ["emergency"]</code>) which auto-expires after 24 hours and triggers a mandatory custodian review.</p>
+
+<h2>6.8 Replay Defence</h2>
+<p>Each signed envelope (frame, descriptor, alert, subscribe, replay request) carries a 96-bit nonce and an RFC 3339 timestamp. Receivers MUST reject envelopes with skew &gt; ±300 s, reject envelopes whose <code>(signer, nonce)</code> tuple has been seen within the last 600 s, and maintain the seen-nonce cache for at least 600 s. For high-rate frame streams the cache MAY be a Bloom filter; false positives MUST trigger a replay-segment fetch rather than a silent drop.</p>
+
+<h2>6.9 Audience Controls</h2>
+<table border="1" cellpadding="10">
+  <thead>
+    <tr><th>Audience</th><th>Visibility</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>clinician</code></td><td>full waveform + identifying metadata</td></tr>
+    <tr><td><code>nurse_station</code></td><td>full waveform, redacted identifier</td></tr>
+    <tr><td><code>ehr_bridge</code></td><td>summary samples (per-minute aggregates)</td></tr>
+    <tr><td><code>research</code></td><td>de-identified waveform per HIPAA Safe Harbor §164.514(b)(2)</td></tr>
+    <tr><td><code>family</code></td><td>snapshot only (most recent value per channel)</td></tr>
+    <tr><td><code>emergency_service</code></td><td>full waveform + identifying metadata under emergency consent</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

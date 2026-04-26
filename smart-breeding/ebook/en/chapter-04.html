@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 4: Phase 2 — API Interface — WIA Smart Breeding</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+h1, h2, h3 { color: #84CC16; }
+h1 { border-bottom: 3px solid #84CC16; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #84CC16; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #ffd700; font-size: 1.2em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">[smart-breeding] Standard Ebook</a> | Chapter 4 (of 8)</nav>
+
+<h1>Chapter 4: Phase 2 — API Interface</h1>
+
+<p>Phase 2 specifies the HTTP surface that a host (typically a breeding cooperative or a national herd-book) exposes for the data families defined in Phase 1.</p>
+
+<h2>4.1 Transport</h2>
+<ul>
+<li>HTTPS only, TLS 1.3 (IETF RFC 8446) or later.</li>
+<li>HTTP/2 RECOMMENDED, HTTP/1.1 SHALL be supported as fallback.</li>
+<li><code>Strict-Transport-Security</code> per IETF RFC 6797.</li>
+<li>Compression: <code>gzip</code>, <code>br</code>.</li>
+</ul>
+
+<h2>4.2 Discovery</h2>
+
+<pre>
+GET https://&lt;host&gt;/.well-known/wia-smart-breeding
+
+{
+  "wia_smart_breeding_version": "1.0.0",
+  "operator_id": "did:wia:operator:herdbook-A",
+  "endpoints": {
+    "individual": "https://breed.example/sb/individual",
+    "genotype":   "https://breed.example/sb/genotype",
+    "phenotype":  "https://breed.example/sb/phenotype",
+    "gebv":       "https://breed.example/sb/gebv",
+    "pedigree":   "https://breed.example/sb/pedigree",
+    "population": "https://breed.example/sb/population",
+    "mating":     "https://breed.example/sb/mating"
+  },
+  "supported_signatures": ["Ed25519"],
+  "supported_species": ["Bos taurus", "Sus scrofa", "Gallus gallus", "Triticum aestivum"],
+  "rate_limits": {
+    "anonymous":     { "rps": 1,  "burst": 5 },
+    "authenticated": { "rps": 30, "burst": 100 }
+  }
+}
+</pre>
+
+<h2>4.3 Individual Endpoints</h2>
+
+<pre>
+GET    /sb/individual/{individual_id}
+PUT    /sb/individual/{individual_id}    (signed)
+DELETE /sb/individual/{individual_id}    (signed; tombstone, audit retention)
+GET    /sb/individual?species=Bos+taurus&breed=Holstein&since={cursor}
+</pre>
+
+<h2>4.4 Genotype Endpoints</h2>
+
+<pre>
+POST /sb/genotype                   (submit; large payloads MAY use chunked transfer)
+GET  /sb/genotype/{genotype_id}
+GET  /sb/genotype?individual_id={id}
+</pre>
+
+<p>Genotype payloads larger than 100 MiB MUST use the external-reference form per Phase 1 §3.3.</p>
+
+<h2>4.5 Phenotype, GEBV, Pedigree, Population, Mating</h2>
+
+<p>The remaining endpoint families follow the same shape: POST/GET/PATCH on <code>/sb/{family}/{id}</code>. PATCH on a phenotype is forbidden (corrections append a new envelope referencing the original). PATCH on a GEBV is permitted only when the method changes (e.g. annual reference population refresh).</p>
+
+<h2>4.6 Authentication</h2>
+
+<p>Writes require HTTP Message Signatures per IETF RFC 9421 covering method, target URI, <code>Date</code>, <code>Content-Digest</code>, and <code>Content-Length</code>. Reads MAY be anonymous subject to the discovery rate limit; PII-bearing reads (owner identifiers) MUST be authenticated.</p>
+
+<h2>4.7 Errors</h2>
+
+<p>Errors follow IETF RFC 9457 problem details. Reserved error types live under <code>https://wiastandards.com/smart-breeding/errors/</code>.</p>
+
+<h2>4.8 Conformance</h2>
+
+<p>A Phase 2 conformant host MUST publish discovery, implement individual / genotype / phenotype / GEBV / pedigree routes, honour <code>Idempotency-Key</code> on all writes, and emit problem-detail JSON for 4xx/5xx responses.</p>
+
+<footer>
+<div class="philosophy">弘益人間 · Benefit All Humanity</div>
+<div>WIA Smart Breeding Standard v1.0.0</div>
+</footer>
+</body>
+</html>

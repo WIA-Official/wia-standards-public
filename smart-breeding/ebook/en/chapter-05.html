@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 5: Phase 3 — Federation Protocol — WIA Smart Breeding</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; line-height: 1.8; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+h1, h2, h3 { color: #84CC16; }
+h1 { border-bottom: 3px solid #84CC16; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #84CC16; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #ffd700; font-size: 1.2em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">[smart-breeding] Standard Ebook</a> | Chapter 5 (of 8)</nav>
+
+<h1>Chapter 5: Phase 3 — Federation Protocol</h1>
+
+<p>Phase 3 specifies how independent breeding organisations exchange data over time without merging into a central database. Federation matters because national herd-books, breeding cooperatives, AI/ET service providers, and academic genetic-evaluation centres each hold portions of the picture, and each is bound by different sharing agreements with their members.</p>
+
+<h2>5.1 Roles</h2>
+
+<table>
+<thead><tr><th>Role</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><strong>Origin</strong></td><td>Holds the canonical record (individual, genotype, phenotype) for animals it owns / registers</td></tr>
+<tr><td><strong>Cooperative</strong></td><td>Aggregates phenotype records from members for joint genetic evaluation</td></tr>
+<tr><td><strong>Evaluation centre</strong></td><td>Computes GEBV from federated genotype + phenotype data</td></tr>
+<tr><td><strong>AI/ET service</strong></td><td>Subscribes to mating plans for semen / embryo distribution</td></tr>
+<tr><td><strong>Auditor</strong></td><td>Holds the audit log of every data exchange</td></tr>
+</tbody>
+</table>
+
+<h2>5.2 Federation Handshake</h2>
+
+<pre>
+   IDLE
+     │ peer presents credential + ephemeral key
+     ▼
+   PENDING (origin verifies signature)
+     │ valid
+     ▼
+   ACCEPTED (origin issues federation receipt; both sides persist)
+     │ optional revocation
+     ▼
+   REVOKED
+</pre>
+
+<p>Receipts persist for at least 30 years per typical herd-book retention norms.</p>
+
+<h2>5.3 Replay Defence</h2>
+
+<p>Every signed envelope carries a 96-bit nonce and an RFC 3339 timestamp. Receivers MUST reject envelopes with skew &gt; ±300 s, reject envelopes whose <code>(signer, nonce)</code> tuple has been seen within the last 600 s, and maintain the seen-nonce cache for at least 600 s. For high-volume cooperative aggregations the cache MAY be persistent across restarts.</p>
+
+<h2>5.4 Owner Consent</h2>
+
+<p>Animal-owner consent is the gating control on cross-organisation data sharing. Consent envelopes are signed by the owner and reference specific scopes (cooperative aggregation, public publication, commercial valuation, research). Origins MUST refuse cross-organisation reads whose owner consent does not cover the requested scope.</p>
+
+<pre>
+{
+  "wia_smart_breeding_version": "1.0.0",
+  "type": "owner_consent",
+  "owner_id": "did:wia:breeder:09",
+  "individual_ids": ["BULL-2025-001", "BULL-2025-002"],
+  "scopes": ["cooperative_aggregation", "research"],
+  "valid_from": "2026-01-01T00:00:00Z",
+  "valid_until": "2027-12-31T23:59:59Z",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}
+</pre>
+
+<h2>5.5 Audience Controls</h2>
+
+<table>
+<thead><tr><th>Audience</th><th>Visibility</th></tr></thead>
+<tbody>
+<tr><td><code>public</code></td><td>Aggregate breed-level statistics only</td></tr>
+<tr><td><code>cooperative</code></td><td>Member-level genotype + phenotype, no identifying owner data</td></tr>
+<tr><td><code>evaluation</code></td><td>Full genotype + phenotype + pedigree for the evaluated trait</td></tr>
+<tr><td><code>commercial</code></td><td>Per-individual GEBV with owner identifier</td></tr>
+<tr><td><code>research</code></td><td>De-identified genotype + phenotype subject to data-use agreement</td></tr>
+</tbody>
+</table>
+
+<h2>5.6 Cryptographic Suite</h2>
+
+<table>
+<thead><tr><th>Use</th><th>Algorithm</th></tr></thead>
+<tbody>
+<tr><td>Identity signing</td><td>Ed25519 (IETF RFC 8032)</td></tr>
+<tr><td>HTTP message signing</td><td>Ed25519 over RFC 9421</td></tr>
+<tr><td>Hashing</td><td>SHA-256 (FIPS 180-4)</td></tr>
+<tr><td>Transport</td><td>TLS 1.3 (IETF RFC 8446)</td></tr>
+</tbody>
+</table>
+
+<h2>5.7 Conformance</h2>
+
+<p>A Phase 3 conformant implementation MUST implement the handshake state machine, honour replay-defence bounds, enforce owner consent before serving any non-public data, apply audience-based read controls, and maintain an append-only audit log of every cross-organisation read.</p>
+
+<footer>
+<div class="philosophy">弘益人間 · Benefit All Humanity</div>
+<div>WIA Smart Breeding Standard v1.0.0</div>
+</footer>
+</body>
+</html>

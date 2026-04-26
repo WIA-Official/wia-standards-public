@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5: Phase 2 - API Interface Standard</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] Standard Ebook</a> | Chapter 5 (of 8)</p>
+
+<h1>Chapter 5: Phase 2 - API Interface Standard</h1>
+
+<h2>5.1 VitalSignStream Class</h2>
+<pre>
+class VitalSignStream {
+  // Device Management
+  async discoverDevices(filter?)
+  async connect(deviceId)
+  async disconnect(deviceId)
+  
+  // Data Streaming
+  async startStream(deviceId, config?)
+  async stopStream(streamId)
+  onData(callback)
+  
+  // Data Storage
+  async saveData(data, storage?)
+  async loadData(query)
+  async exportData(format, query)
+  
+  // Alerts
+  setAlert(config)
+  removeAlert(alertId)
+  onAlert(callback)
+}
+</pre>
+
+<h2>5.2 TypeScript Example</h2>
+<pre>
+import { VitalSignStream } from 'wia-med-003';
+
+const stream = new VitalSignStream({
+  apiKey: 'your-api-key'
+});
+
+// Discover devices
+const devices = await stream.discoverDevices({
+  signalType: 'ECG'
+});
+
+// Connect and stream
+await stream.connect(devices[0].id);
+await stream.startStream(devices[0].id);
+
+stream.onData((data) => {
+  console.log('ECG:', data.analysis?.heartRate, 'bpm');
+});
+
+// Set alert
+stream.setAlert({
+  signalType: 'ECG',
+  condition: 'heartRate > 100 OR heartRate < 60',
+  severity: 'high'
+});
+</pre>
+
+<h2>5.3 Python Example</h2>
+<pre>
+from wia_med_003 import VitalSignStream
+
+stream = VitalSignStream(api_key='your-key')
+
+devices = stream.discover_devices(signal_type='SPO2')
+stream.connect(devices[0].id)
+stream.start_stream(devices[0].id)
+
+@stream.on_data
+def handle_data(data):
+    print(f'SpO2: {data.measurement.spo2}%')
+</pre>
+
+<h2>5.4 HTTP Surface — Discovery</h2>
+<p>In addition to the in-process SDK, every WIA Vital Sign Streaming host exposes an HTTP surface so that non-SDK consumers (clinical dashboards, EHR bridges, conformance test runners) can subscribe and replay without depending on a vendor SDK.</p>
+
+<pre>
+GET https://&lt;host&gt;/.well-known/wia-vital-sign-streaming
+
+{
+  "wia_vital_sign_streaming_version": "1.0.0",
+  "operator_id": "did:wia:operator:icu-A",
+  "endpoints": {
+    "stream":   "https://stream.example/vss/stream",
+    "snapshot": "https://stream.example/vss/snapshot",
+    "replay":   "https://stream.example/vss/replay",
+    "alert":    "https://stream.example/vss/alert"
+  },
+  "supported_signatures": ["Ed25519"],
+  "supported_channels": ["ecg","ppg","spo2","hr","sbp","dbp","map","temp","rr","etco2"],
+  "rate_limits": {
+    "anonymous":     { "rps": 1,  "burst": 5 },
+    "authenticated": { "rps": 50, "burst": 200 }
+  }
+}
+</pre>
+
+<h2>5.5 Stream Subscribe (Server-Sent Events)</h2>
+<pre>
+GET /vss/stream/{stream_id}?since={cursor}
+Accept: text/event-stream
+Authorization: WIA-Sig keyid="...",signature="..."
+</pre>
+
+<p>Each event payload is a Phase 1 frame envelope. Reconnecting subscribers pass the most recent event id as <code>Last-Event-Id</code> per WHATWG HTML §9.2.</p>
+
+<h2>5.6 Snapshot</h2>
+<pre>
+GET /vss/snapshot/{stream_id}
+</pre>
+<p>Returns the most recent value per channel for low-rate clinical dashboards that do not need full waveform.</p>
+
+<h2>5.7 Replay</h2>
+<pre>
+GET /vss/replay/{stream_id}?from={ts}&amp;to={ts}
+Accept: application/json
+</pre>
+<p>Returns historical frames within the requested window. Hosts MUST return a cursor when the window is too large for one response, with <code>next_cursor</code> in the body.</p>
+
+<h2>5.8 Alert Routing</h2>
+<pre>
+POST /vss/alert
+Content-Type: application/json
+Authorization: WIA-Sig keyid="...",signature="..."
+</pre>
+<p>Body is a signed alert envelope; the host fans out to subscribed consumers (nurse station, on-call mobile, EHR notification queue).</p>
+
+<h2>5.9 Authentication and Errors</h2>
+<p>Writes (alert submissions, replay if private) require HTTP Message Signatures per IETF RFC 9421. Reads MAY be anonymous subject to the discovery rate limit; PHI-bearing reads MUST be authenticated. Errors follow IETF RFC 9457 problem details.</p>
+
+<h2>5.10 Conformance</h2>
+<p>A Phase 2 conformant host MUST publish discovery, implement stream subscribe over SSE with <code>Last-Event-Id</code> recovery, implement snapshot and replay endpoints, honour <code>Idempotency-Key</code> for alert submissions, and emit problem-detail JSON for 4xx/5xx.</p>
+
+<h2>5.11 Reference Subscribe / Reconnect Walkthrough</h2>
+<p>The most common failure case for SSE-based clinical streams is the wandering Wi-Fi link. The standard's design accommodates it with cursor-based recovery; the receiver does not lose data as long as the host honours its replay window.</p>
+
+<pre>
+GET /vss/stream/stream-001?since=fr_AAAA HTTP/1.1
+Host: stream.example
+Accept: text/event-stream
+Authorization: WIA-Sig keyid="...",signature="..."
+
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-store
+
+id: fr_AAAB
+event: frame
+data: { "wia_vital_sign_streaming_version":"1.0.0", "type":"frame", "channel":"ecg", "..." }
+
+id: fr_AAAC
+event: frame
+data: { "wia_vital_sign_streaming_version":"1.0.0", "type":"frame", "channel":"ecg", "..." }
+</pre>
+
+<p>If the link drops after <code>fr_AAAC</code>, the receiver reconnects with <code>Last-Event-Id: fr_AAAC</code>. The host resumes streaming from <code>fr_AAAD</code> if available, or from the closest later cursor it still holds and emits a <code>gap_marker</code> for the missing range.</p>
+
+</body>
+</html>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: Phase 4 - 생태계 통합 - WIA-MED-003 표준 전자책</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-003] WIA 생체신호 스트리밍 표준 전자책</a> | 제7장 (총 8장)</p>
+
+<hr>
+
+<h1>[MED-003] 제7장: Phase 4 - 생태계 통합</h1>
+
+<blockquote>
+<p><strong>"진정한 힘은 연결에서 나온다"</strong></p>
+<p>Phase 4는 WIA-MED-003을 기존 의료 생태계와 완벽하게 통합합니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>7.1 전자건강기록 (EHR/EMR) 통합</h2>
+
+<h3>7.1.1 FHIR 리소스 매핑</h3>
+
+<pre>
+// WIA-MED-003 → FHIR Observation
+{
+  "resourceType": "Observation",
+  "id": "vital-sign-ecg-123",
+  "status": "final",
+  "category": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+      "code": "vital-signs",
+      "display": "Vital Signs"
+    }]
+  }],
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "8867-4",
+      "display": "Heart rate"
+    }]
+  },
+  "subject": {
+    "reference": "Patient/patient-123"
+  },
+  "effectiveDateTime": "2025-01-15T10:30:00Z",
+  "valueQuantity": {
+    "value": 72,
+    "unit": "beats/minute",
+    "system": "http://unitsofmeasure.org",
+    "code": "/min"
+  },
+  "device": {
+    "reference": "Device/ecg-device-12345"
+  },
+  "component": [{
+    "code": {
+      "coding": [{
+        "system": "http://loinc.org",
+        "code": "8889-8",
+        "display": "Heart rate variability"
+      }]
+    },
+    "valueQuantity": {
+      "value": 50,
+      "unit": "ms",
+      "system": "http://unitsofmeasure.org",
+      "code": "ms"
+    }
+  }]
+}
+</pre>
+
+<h3>7.1.2 주요 EHR 시스템 연동</h3>
+
+<p><strong>Epic 연동:</strong></p>
+
+<pre>
+// Epic FHIR API
+const epicClient = new FHIRClient({
+  baseUrl: 'https://fhir.epic.com/interconnect-fhir-oauth',
+  clientId: 'your-client-id',
+  redirectUri: 'https://yourapp.com/callback'
+});
+
+// WIA-MED-003 데이터를 Epic으로 전송
+async function sendToEpic(vitalSignData) {
+  // 1. 인증
+  const token = await epicClient.authenticate();
+
+  // 2. FHIR Observation으로 변환
+  const observation = convertToFHIR(vitalSignData);
+
+  // 3. Epic에 전송
+  const result = await epicClient.create('Observation', observation);
+
+  console.log('Epic에 저장됨:', result.id);
+}
+</pre>
+
+<p><strong>Cerner 연동:</strong></p>
+
+<pre>
+// Cerner FHIR API
+const cernerClient = new FHIRClient({
+  baseUrl: 'https://fhir.cerner.com/r4/your-tenant-id',
+  authorization: 'Bearer ' + accessToken
+});
+
+// 환자의 최근 생체신호 조회
+const observations = await cernerClient.search('Observation', {
+  patient: 'patient-123',
+  category: 'vital-signs',
+  date: 'ge2025-01-01'
+});
+
+// WIA-MED-003 형식으로 변환
+const wiaData = observations.entry.map(e => convertFromFHIR(e.resource));
+</pre>
+
+<h3>7.1.3 양방향 동기화</h3>
+
+<pre>
+class EHRSync {
+  async syncToEHR(vitalSignData) {
+    // WIA → EHR
+    const observation = convertToFHIR(vitalSignData);
+    await ehrClient.create('Observation', observation);
+
+    // 동기화 기록
+    await this.recordSync({
+      direction: 'to-ehr',
+      wiaId: vitalSignData.id,
+      fhirId: observation.id,
+      timestamp: new Date()
+    });
+  }
+
+  async syncFromEHR(patientId, startDate) {
+    // EHR → WIA
+    const observations = await ehrClient.search('Observation', {
+      patient: patientId,
+      category: 'vital-signs',
+      date: `ge${startDate}`
+    });
+
+    for (const obs of observations.entry) {
+      const wiaData = convertFromFHIR(obs.resource);
+      await vitalSignStream.saveData(wiaData);
+    }
+  }
+
+  async bidirectionalSync() {
+    // 양방향 동기화 (충돌 해결 포함)
+    const wiaData = await vitalSignStream.loadData({ unsynced: true });
+    const ehrData = await ehrClient.search('Observation', { ... });
+
+    const conflicts = detectConflicts(wiaData, ehrData);
+
+    for (const conflict of conflicts) {
+      // 최신 데이터 우선 (Last Write Wins)
+      const resolved = resolveConflict(conflict, 'latest-wins');
+      await this.applyResolution(resolved);
+    }
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.2 원격의료 플랫폼 통합</h2>
+
+<h3>7.2.1 화상 진료 중 실시간 모니터링</h3>
+
+<pre>
+// Twilio Video + WIA-MED-003
+const twilioRoom = await client.video.rooms.create({
+  uniqueName: 'consultation-patient-123',
+  type: 'group',
+  statusCallback: 'https://yourapp.com/video-status'
+});
+
+// 환자의 생체신호를 의사에게 실시간 전송
+vitalSignStream.onData((data) => {
+  // WebRTC Data Channel로 전송
+  twilioRoom.localDataTrack.send(JSON.stringify({
+    type: 'vital-sign',
+    data: data
+  }));
+});
+
+// 의사 측에서 수신
+twilioRoom.on('trackSubscribed', (track, participant) => {
+  if (track.kind === 'data') {
+    track.on('message', (message) => {
+      const { type, data } = JSON.parse(message);
+
+      if (type === 'vital-sign') {
+        updateVitalSignDisplay(data);
+      }
+    });
+  }
+});
+</pre>
+
+<h3>7.2.2 원격 환자 모니터링 (RPM)</h3>
+
+<pre>
+class RemotePatientMonitoring {
+  constructor(patientId) {
+    this.patientId = patientId;
+    this.alerts = [];
+    this.devices = [];
+  }
+
+  async startMonitoring() {
+    // 환자의 모든 WIA-MED-003 기기 검색
+    this.devices = await vitalSignStream.discoverDevices({
+      patientId: this.patientId
+    });
+
+    // 각 기기에서 데이터 수집
+    for (const device of this.devices) {
+      const stream = await vitalSignStream.startStream(device.id);
+
+      stream.onData(async (data) => {
+        // 클라우드에 저장
+        await this.saveToCloud(data);
+
+        // 이상 감지
+        const alerts = await this.detectAnomalies(data);
+
+        if (alerts.length > 0) {
+          await this.notifyProvider(alerts);
+        }
+      });
+    }
+  }
+
+  async notifyProvider(alerts) {
+    // 의사에게 알림
+    await sendNotification({
+      to: 'doctor@example.com',
+      subject: `[긴급] 환자 ${this.patientId} 이상 감지`,
+      body: alertSummary(alerts),
+      sms: true,  // SMS도 함께 전송
+      priority: 'high'
+    });
+
+    // 대시보드 업데이트
+    await updateProviderDashboard(this.patientId, alerts);
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.3 웨어러블 기기 통합</h2>
+
+<h3>7.3.1 Apple HealthKit 통합</h3>
+
+<pre>
+// Swift (iOS)
+import HealthKit
+
+class WIAHealthKitBridge {
+  let healthStore = HKHealthStore()
+
+  func saveToHealthKit(vitalSignData: VitalSignData) {
+    switch vitalSignData.signalType {
+    case .ecg:
+      let heartRate = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()),
+                                  doubleValue: vitalSignData.analysis.heartRate)
+      let sample = HKQuantitySample(type: HKQuantityType.quantityType(forIdentifier: .heartRate)!,
+                                    quantity: heartRate,
+                                    start: vitalSignData.timestamp,
+                                    end: vitalSignData.timestamp)
+
+      healthStore.save(sample) { success, error in
+        if success {
+          print("HealthKit에 저장됨")
+        }
+      }
+
+    case .spo2:
+      let spo2 = HKQuantity(unit: HKUnit.percent(),
+                            doubleValue: vitalSignData.measurement.spo2)
+      let sample = HKQuantitySample(type: HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!,
+                                    quantity: spo2,
+                                    start: vitalSignData.timestamp,
+                                    end: vitalSignData.timestamp)
+
+      healthStore.save(sample) { success, error in ... }
+
+    // 기타 신호 유형...
+    }
+  }
+
+  func loadFromHealthKit(completion: @escaping ([VitalSignData]) -> Void) {
+    let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+    let query = HKSampleQuery(sampleType: heartRateType,
+                              predicate: nil,
+                              limit: HKObjectQueryNoLimit,
+                              sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]) {
+      query, samples, error in
+
+      let vitalSignData = samples?.compactMap { sample in
+        convertFromHealthKit(sample)
+      }
+
+      completion(vitalSignData ?? [])
+    }
+
+    healthStore.execute(query)
+  }
+}
+</pre>
+
+<h3>7.3.2 Google Fit 통합</h3>
+
+<pre>
+// Kotlin (Android)
+class WIAGoogleFitBridge(private val context: Context) {
+  private val googleSignInAccount = GoogleSignIn.getLastSignedInAccount(context)
+  private val fitnessOptions = FitnessOptions.builder()
+    .addDataType(DataType.TYPE_HEART_RATE_BPM, FitnessOptions.ACCESS_WRITE)
+    .addDataType(DataType.TYPE_OXYGEN_SATURATION, FitnessOptions.ACCESS_WRITE)
+    .build()
+
+  fun saveToGoogleFit(vitalSignData: VitalSignData) {
+    val dataSource = DataSource.Builder()
+      .setAppPackageName(context.packageName)
+      .setDataType(when (vitalSignData.signalType) {
+        "ECG" -> DataType.TYPE_HEART_RATE_BPM
+        "SPO2" -> DataType.TYPE_OXYGEN_SATURATION
+        else -> return
+      })
+      .setType(DataSource.TYPE_RAW)
+      .build()
+
+    val dataPoint = DataPoint.builder(dataSource)
+      .setTimestamp(vitalSignData.timestamp.time, TimeUnit.MILLISECONDS)
+      .setField(when (vitalSignData.signalType) {
+        "ECG" -> Field.FIELD_BPM
+        "SPO2" -> Field.FIELD_PERCENTAGE
+        else -> return
+      }, vitalSignData.getValue())
+      .build()
+
+    val dataSet = DataSet.builder(dataSource)
+      .add(dataPoint)
+      .build()
+
+    Fitness.getHistoryClient(context, googleSignInAccount!!)
+      .insertData(dataSet)
+      .addOnSuccessListener {
+        Log.i("WIA", "Google Fit에 저장됨")
+      }
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.4 AI/ML 분석 통합</h2>
+
+<h3>7.4.1 이상 감지 모델</h3>
+
+<pre>
+// TensorFlow.js를 사용한 ECG 이상 감지
+import * as tf from '@tensorflow/tfjs';
+
+class ECGAnomalyDetector {
+  model: tf.LayersModel;
+
+  async loadModel() {
+    this.model = await tf.loadLayersModel('https://models.wia.live/ecg-anomaly/model.json');
+  }
+
+  async detectAnomalies(ecgData: ECGData): Promise<Anomaly[]> {
+    // 전처리
+    const preprocessed = this.preprocess(ecgData);
+
+    // 예측
+    const tensor = tf.tensor2d([preprocessed]);
+    const prediction = this.model.predict(tensor) as tf.Tensor;
+    const probabilities = await prediction.data();
+
+    // 결과 해석
+    const anomalies: Anomaly[] = [];
+    const classes = ['normal', 'afib', 'vt', 'vf', 'pvc'];
+
+    probabilities.forEach((prob, idx) => {
+      if (idx > 0 && prob > 0.7) {  // 정상(idx=0) 제외, 70% 이상 신뢰도
+        anomalies.push({
+          type: classes[idx],
+          probability: prob,
+          timestamp: ecgData.timestamp,
+          severity: this.calculateSeverity(classes[idx], prob)
+        });
+      }
+    });
+
+    return anomalies;
+  }
+}
+
+// 사용
+const detector = new ECGAnomalyDetector();
+await detector.loadModel();
+
+vitalSignStream.onData(async (data) => {
+  if (data.signalType === 'ECG') {
+    const anomalies = await detector.detectAnomalies(data);
+
+    if (anomalies.length > 0) {
+      console.warn('이상 감지:', anomalies);
+      await notifyPatient(anomalies);
+    }
+  }
+});
+</pre>
+
+<h3>7.4.2 예측 분석</h3>
+
+<pre>
+// 혈압 트렌드 예측
+class BloodPressurePredictor {
+  async predictNextWeek(patientId: string): Promise<Prediction[]> {
+    // 과거 데이터 로드
+    const historicalData = await vitalSignStream.loadData({
+      signalType: 'BLOOD_PRESSURE',
+      patientId: patientId,
+      startTime: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() // 90일
+    });
+
+    // 시계열 데이터 준비
+    const timeSeries = historicalData.map(d => ({
+      date: new Date(d.timestamp),
+      systolic: d.measurement.systolic,
+      diastolic: d.measurement.diastolic
+    }));
+
+    // ARIMA 모델로 예측
+    const model = new ARIMAModel(timeSeries, { p: 1, d: 1, q: 1 });
+    const predictions = model.forecast(7); // 7일 예측
+
+    return predictions.map(pred => ({
+      date: pred.date,
+      systolic: pred.systolic,
+      diastolic: pred.diastolic,
+      confidence: pred.confidence,
+      risk: this.assessRisk(pred)
+    }));
+  }
+
+  assessRisk(prediction: any): string {
+    if (prediction.systolic > 140 || prediction.diastolic > 90) {
+      return 'high';
+    } else if (prediction.systolic > 130 || prediction.diastolic > 80) {
+      return 'moderate';
+    }
+    return 'low';
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.5 클라우드 스토리지 통합</h2>
+
+<h3>7.5.1 AWS HealthLake</h3>
+
+<pre>
+// AWS HealthLake 클라이언트
+const AWS = require('aws-sdk');
+const healthlake = new AWS.HealthLake({ region: 'us-east-1' });
+
+async function saveToHealthLake(vitalSignData) {
+  // FHIR Bundle 생성
+  const bundle = {
+    resourceType: 'Bundle',
+    type: 'transaction',
+    entry: [{
+      fullUrl: `urn:uuid:${uuidv4()}`,
+      resource: convertToFHIR(vitalSignData),
+      request: {
+        method: 'POST',
+        url: 'Observation'
+      }
+    }]
+  };
+
+  // HealthLake에 저장
+  const params = {
+    DatastoreId: 'your-datastore-id',
+    InputDataConfig: {
+      S3Uri: await uploadToS3(bundle)  // S3 경유
+    }
+  };
+
+  const job = await healthlake.startFHIRImportJob(params).promise();
+
+  console.log('HealthLake 저장 작업 시작:', job.JobId);
+}
+</pre>
+
+<h3>7.5.2 Azure Health Data Services</h3>
+
+<pre>
+// Azure FHIR API
+const { DefaultAzureCredential } = require('@azure/identity');
+const axios = require('axios');
+
+class AzureFHIRClient {
+  constructor(fhirUrl) {
+    this.fhirUrl = fhirUrl;
+    this.credential = new DefaultAzureCredential();
+  }
+
+  async getAccessToken() {
+    const tokenResponse = await this.credential.getToken('https://azurehealthcareapis.com/.default');
+    return tokenResponse.token;
+  }
+
+  async createObservation(vitalSignData) {
+    const token = await this.getAccessToken();
+    const observation = convertToFHIR(vitalSignData);
+
+    const response = await axios.post(
+      `${this.fhirUrl}/Observation`,
+      observation,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/fhir+json'
+        }
+      }
+    );
+
+    return response.data;
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.6 완전한 통합 예제</h2>
+
+<pre>
+// 종합 헬스케어 플랫폼
+class IntegratedHealthPlatform {
+  constructor(config) {
+    this.vitalSignStream = new VitalSignStream(config.wia);
+    this.ehrClient = new FHIRClient(config.ehr);
+    this.telemedicine = new TelemedicineClient(config.telemedicine);
+    this.ml = new MLAnalytics(config.ml);
+    this.cloud = new CloudStorage(config.cloud);
+  }
+
+  async startPatientMonitoring(patientId) {
+    // 1. 기기 연결
+    const devices = await this.vitalSignStream.discoverDevices({ patientId });
+    await Promise.all(devices.map(d => this.vitalSignStream.connect(d.id)));
+
+    // 2. 실시간 모니터링 시작
+    for (const device of devices) {
+      const stream = await this.vitalSignStream.startStream(device.id);
+
+      stream.onData(async (data) => {
+        // 병렬 처리
+        await Promise.all([
+          // EHR에 저장
+          this.ehrClient.create('Observation', convertToFHIR(data)),
+
+          // 클라우드 백업
+          this.cloud.save(data),
+
+          // ML 분석
+          this.analyzeAndAlert(data),
+
+          // 실시간 대시보드 업데이트
+          this.updateDashboard(patientId, data)
+        ]);
+      });
+    }
+
+    // 3. 알림 설정
+    this.setupAlerts(patientId);
+
+    // 4. 화상 진료 준비
+    await this.telemedicine.prepareRoom(patientId);
+  }
+
+  async analyzeAndAlert(data) {
+    // AI/ML 분석
+    const analysis = await this.ml.analyze(data);
+
+    if (analysis.anomalies.length > 0) {
+      // 심각도에 따라 다른 조치
+      for (const anomaly of analysis.anomalies) {
+        if (anomaly.severity === 'critical') {
+          // 긴급 연락
+          await this.emergencyAlert(anomaly);
+        } else if (anomaly.severity === 'high') {
+          // 의사에게 알림
+          await this.notifyDoctor(anomaly);
+        } else {
+          // 환자에게 알림
+          await this.notifyPatient(anomaly);
+        }
+      }
+    }
+  }
+}
+
+// 사용
+const platform = new IntegratedHealthPlatform({
+  wia: { apiKey: '...' },
+  ehr: { baseUrl: 'https://fhir.epic.com/...' },
+  telemedicine: { provider: 'twilio' },
+  ml: { modelEndpoint: 'https://ml.wia.live/...' },
+  cloud: { provider: 'aws-healthlake' }
+});
+
+await platform.startPatientMonitoring('patient-123');
+</pre>
+
+<hr>
+
+<h2>7.7 장 요약</h2>
+
+<p>[OK] <strong>핵심 내용:</strong></p>
+
+<ol>
+    <li><strong>EHR/EMR 통합:</strong> FHIR 표준, Epic/Cerner 연동</li>
+    <li><strong>원격의료:</strong> 화상 진료, RPM, 실시간 모니터링</li>
+    <li><strong>웨어러블:</strong> HealthKit, Google Fit 양방향 동기화</li>
+    <li><strong>AI/ML:</strong> 이상 감지, 예측 분석</li>
+    <li><strong>클라우드:</strong> AWS HealthLake, Azure FHIR</li>
+    <li><strong>통합 플랫폼:</strong> 모든 구성요소의 조화로운 작동</li>
+</ol>
+
+<hr>
+
+<h2>7.8 다음 장 미리보기</h2>
+
+<p>제8장에서는 WIA-MED-003의 실제 구현 방법을 다룹니다. 단계별 구현 가이드, 테스트 방법, 인증 절차, 모범 사례를 학습합니다.</p>
+
+<hr>
+
+<p><a href="chapter-06.html">이전: 제6장</a> | <a href="chapter-08.html">다음: 제8장 - 구현 가이드 및 인증</a></p>
+</body>
+</html>

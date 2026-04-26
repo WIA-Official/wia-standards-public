@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Schema - WIA Voice-Sign Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 2: Data Schema</h1>
+            <p class="subtitle">Core Data Types and Structures</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>Data Schema</h1>
+
+            <h2>2.1 Overview</h2>
+            <p>The Voice-Sign conversion system uses a structured data pipeline where each stage produces specific data types that serve as input for the next stage. This chapter defines the core data schemas for AudioInput, TranscriptionResult, SignGloss, and SignPose.</p>
+
+            <h2>2.2 AudioInput</h2>
+            <p>The AudioInput schema captures audio data and associated metadata for speech recognition processing.</p>
+
+            <pre><code>interface AudioInput {
+  // Unique identifier
+  audio_id: string;
+
+  // Timestamps
+  timestamp: string;  // ISO 8601
+
+  // Audio properties
+  format: AudioFormat;
+  sample_rate: number;    // Hz (16000, 44100, 48000)
+  channels: number;       // 1 = mono, 2 = stereo
+  bit_depth: number;      // 16, 24, 32
+  duration_ms: number;
+
+  // Optional metadata
+  source?: AudioSource;
+  language_hint?: string;  // ISO 639-1
+
+  // Data (base64 or reference)
+  data?: string;           // base64 encoded
+  data_url?: string;       // URL reference
+}
+
+type AudioFormat =
+  | "wav"
+  | "pcm"
+  | "flac"
+  | "ogg"
+  | "mp3"
+  | "webm";</code></pre>
+
+            <h3>Key Properties</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Description</th>
+                        <th>Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>audio_id</code></td>
+                        <td>Unique identifier for tracking through the pipeline</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>timestamp</code></td>
+                        <td>ISO 8601 formatted timestamp of audio capture</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>sample_rate</code></td>
+                        <td>Audio sampling frequency in Hz (typically 16000 for speech)</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>format</code></td>
+                        <td>Audio codec format (WAV, PCM, FLAC, etc.)</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>language_hint</code></td>
+                        <td>Expected spoken language to improve ASR accuracy</td>
+                        <td>No</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2.3 TranscriptionResult</h2>
+            <p>The TranscriptionResult contains the output from the Automatic Speech Recognition (ASR) engine, including word-level timing and confidence scores.</p>
+
+            <pre><code>interface TranscriptionResult {
+  // Reference to audio
+  audio_id: string;
+
+  // Result metadata
+  transcription_id: string;
+  timestamp: string;
+
+  // Recognition results
+  language: string;           // ISO 639-1 detected language
+  confidence: number;         // 0.0 - 1.0
+
+  // Full text
+  text: string;
+
+  // Word-level details
+  words: TranscribedWord[];
+
+  // Alternative hypotheses
+  alternatives?: TranscriptionAlternative[];
+
+  // Processing info
+  model: string;
+  processing_time_ms: number;
+}
+
+interface TranscribedWord {
+  word: string;
+  start_ms: number;
+  end_ms: number;
+  confidence: number;
+
+  // Linguistic annotations
+  pos?: PartOfSpeech;        // Part of speech
+  lemma?: string;            // Base form
+}</code></pre>
+
+            <h3>Example</h3>
+            <pre><code>{
+  "audio_id": "aud_001",
+  "transcription_id": "tr_001",
+  "timestamp": "2025-01-15T10:30:00.200Z",
+  "language": "en",
+  "confidence": 0.95,
+  "text": "Hello, how are you?",
+  "words": [
+    {"word": "Hello", "start_ms": 100, "end_ms": 500, "confidence": 0.98},
+    {"word": "how", "start_ms": 600, "end_ms": 800, "confidence": 0.95},
+    {"word": "are", "start_ms": 850, "end_ms": 950, "confidence": 0.94},
+    {"word": "you", "start_ms": 1000, "end_ms": 1200, "confidence": 0.96}
+  ],
+  "model": "whisper-large-v3",
+  "processing_time_ms": 180
+}</code></pre>
+
+            <h2>2.4 SignGloss</h2>
+            <p>SignGloss represents the intermediate sign language notation between text and physical poses. It captures the semantic and syntactic structure of sign language.</p>
+
+            <pre><code>interface SignGlossSequence {
+  // References
+  transcription_id: string;
+
+  // Sequence metadata
+  gloss_id: string;
+  timestamp: string;
+
+  // Target sign language
+  sign_language: SignLanguageCode;
+
+  // Gloss entries
+  glosses: SignGloss[];
+
+  // Sentence-level info
+  sentence_type: SentenceType;
+
+  // Translation confidence
+  confidence: number;
+
+  // Processing info
+  translation_model: string;
+  processing_time_ms: number;
+}
+
+interface SignGloss {
+  // Gloss identifier
+  gloss: string;              // e.g., "HELLO", "THANK-YOU"
+
+  // Timing
+  start_ms: number;
+  end_ms: number;
+  duration_ms: number;
+
+  // Sign details
+  sign_type: SignType;
+
+  // Notation representations
+  hamnosys?: string;          // HamNoSys notation
+  sigml?: string;             // SiGML XML
+  signwriting?: string;       // SignWriting FSW
+
+  // Modifiers
+  modifiers?: GlossModifier[];
+
+  // Spatial reference
+  spatial_ref?: SpatialReference;
+
+  // Confidence
+  confidence: number;
+}</code></pre>
+
+            <h3>Sign Types</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>lexical</strong></td>
+                        <td>Standard dictionary signs</td>
+                        <td>HELLO, THANK-YOU, HELP</td>
+                    </tr>
+                    <tr>
+                        <td><strong>fingerspell</strong></td>
+                        <td>Manual alphabet spelling</td>
+                        <td>W-I-A, B-O-B</td>
+                    </tr>
+                    <tr>
+                        <td><strong>classifier</strong></td>
+                        <td>Handshape representing categories</td>
+                        <td>Vehicle-moves, Person-walks</td>
+                    </tr>
+                    <tr>
+                        <td><strong>depicting</strong></td>
+                        <td>Visual-spatial description</td>
+                        <td>Size-shape, Location</td>
+                    </tr>
+                    <tr>
+                        <td><strong>pointing</strong></td>
+                        <td>Indexing and reference</td>
+                        <td>YOU, ME, THERE</td>
+                    </tr>
+                    <tr>
+                        <td><strong>number</strong></td>
+                        <td>Numerical signs</td>
+                        <td>ONE, TEN, HUNDRED</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Gloss Modifiers</h3>
+            <p>Modifiers indicate variations in how signs are performed:</p>
+            <ul>
+                <li><strong>Intensity:</strong> Sign performed larger (loud) or smaller (quiet)</li>
+                <li><strong>Speed:</strong> Faster (urgent) or slower (careful)</li>
+                <li><strong>Repetition:</strong> Sign repeated multiple times</li>
+                <li><strong>Negation:</strong> Negative head shake or sign modification</li>
+                <li><strong>Question:</strong> Raised eyebrows for yes/no questions</li>
+                <li><strong>Aspect:</strong> Continuous, habitual, or completed actions</li>
+            </ul>
+
+            <h2>2.5 SignPose</h2>
+            <p>SignPose contains 3D skeletal animation data representing the physical execution of sign language. This data can be rendered by avatar systems.</p>
+
+            <pre><code>interface SignPoseSequence {
+  // Reference
+  gloss_id: string;
+
+  // Sequence metadata
+  pose_sequence_id: string;
+  timestamp: string;
+
+  // Animation properties
+  frame_rate: number;        // FPS (30, 60)
+  total_frames: number;
+  duration_ms: number;
+
+  // Skeleton definition
+  skeleton: SkeletonDefinition;
+
+  // Frame data
+  frames: PoseFrame[];
+
+  // Blend shapes for face (optional)
+  blend_shapes?: BlendShapeTrack[];
+}
+
+interface PoseFrame {
+  frame_index: number;
+  timestamp_ms: number;
+
+  // Joint positions/rotations
+  joints: JointPose[];
+
+  // Hand details (higher resolution)
+  left_hand?: HandPose;
+  right_hand?: HandPose;
+
+  // Facial landmarks (optional)
+  face?: FacePose;
+}
+
+interface JointPose {
+  joint_id: number;
+
+  // Position in 3D space (meters from root)
+  position: Vector3;
+
+  // Rotation (quaternion)
+  rotation: Quaternion;
+
+  // Confidence (from pose estimation)
+  confidence?: number;
+}</code></pre>
+
+            <h3>Skeleton Standards</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Standard</th>
+                        <th>Description</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>MediaPipe Holistic</strong></td>
+                        <td>Google's full-body pose estimation</td>
+                        <td>Web and mobile applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OpenPose</strong></td>
+                        <td>CMU's real-time pose detection</td>
+                        <td>Research and development</td>
+                    </tr>
+                    <tr>
+                        <td><strong>WIA Sign Skeleton</strong></td>
+                        <td>Optimized for sign language</td>
+                        <td>Production systems</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Custom</strong></td>
+                        <td>User-defined skeleton</td>
+                        <td>Specialized applications</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2.6 Hand Pose Details</h2>
+            <p>Hand poses use 21 landmarks per hand following the MediaPipe standard:</p>
+
+            <pre><code>interface HandPose {
+  // 21 landmarks per hand (MediaPipe standard)
+  landmarks: HandLandmark[];
+}
+
+interface HandLandmark {
+  id: number;  // 0-20
+  name: HandLandmarkName;
+  position: Vector3;
+  confidence?: number;
+}
+
+type HandLandmarkName =
+  | "wrist"
+  | "thumb_cmc" | "thumb_mcp" | "thumb_ip" | "thumb_tip"
+  | "index_mcp" | "index_pip" | "index_dip" | "index_tip"
+  | "middle_mcp" | "middle_pip" | "middle_dip" | "middle_tip"
+  | "ring_mcp" | "ring_pip" | "ring_dip" | "ring_tip"
+  | "pinky_mcp" | "pinky_pip" | "pinky_dip" | "pinky_tip";</code></pre>
+
+            <h2>2.7 Non-Manual Components</h2>
+            <p>Non-manual components (facial expressions, head movements, body posture) are critical for sign language grammar and meaning:</p>
+
+            <pre><code>interface NonManualComponent {
+  // Facial expression
+  facial?: FacialExpression;
+
+  // Mouth shape/movement
+  mouth?: MouthComponent;
+
+  // Eye behavior
+  eyes?: EyeComponent;
+
+  // Head movement
+  head?: HeadComponent;
+
+  // Body posture
+  body?: BodyComponent;
+}</code></pre>
+
+            <h3>Facial Expressions in Sign Language</h3>
+            <ul>
+                <li><strong>Raised Brows:</strong> Yes/no questions</li>
+                <li><strong>Furrowed Brows:</strong> WH-questions (who, what, where, when, why)</li>
+                <li><strong>Wide Eyes:</strong> Emphasis or surprise</li>
+                <li><strong>Squint:</strong> Concentration or negation</li>
+                <li><strong>Smile/Frown:</strong> Emotional content</li>
+                <li><strong>Pursed Lips:</strong> Intensity or carefulness</li>
+            </ul>
+
+            <h2>2.8 Data Flow Example</h2>
+            <p>Complete example showing data transformation through the pipeline:</p>
+
+            <div class="info-box">
+                <strong>Audio Input</strong>
+                User speaks: "Hello, how are you?"<br>
+                Duration: 2 seconds<br>
+                Format: WAV, 16kHz, mono
+            </div>
+
+            <div class="info-box">
+                <strong>Transcription Result</strong>
+                Text: "Hello, how are you?"<br>
+                Confidence: 95%<br>
+                Words: 4 with timing information
+            </div>
+
+            <div class="info-box">
+                <strong>Sign Gloss Sequence</strong>
+                Glosses: HELLO, HOW, YOU<br>
+                Target: ASL<br>
+                Sentence Type: Interrogative
+            </div>
+
+            <div class="info-box success">
+                <strong>Sign Pose Sequence</strong>
+                Frames: 60 (2 seconds at 30 FPS)<br>
+                Skeleton: MediaPipe Holistic<br>
+                Includes: Hand poses, facial expressions
+            </div>
+
+            <h2>2.9 Schema Validation</h2>
+            <p>All data types include validation rules to ensure data integrity:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Constraint</th>
+                        <th>Rule</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Confidence values</td>
+                        <td>0.0 to 1.0 (inclusive)</td>
+                    </tr>
+                    <tr>
+                        <td>Sample rates</td>
+                        <td>8000, 16000, 22050, 44100, or 48000 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>Frame rates</td>
+                        <td>24, 25, 30, 50, or 60 FPS</td>
+                    </tr>
+                    <tr>
+                        <td>Timestamps</td>
+                        <td>ISO 8601 format with timezone</td>
+                    </tr>
+                    <tr>
+                        <td>Duration</td>
+                        <td>0 to 3,600,000 ms (1 hour maximum)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="navigation">
+                <a href="chapter1.html">← Previous: Introduction</a>
+                <a href="chapter3.html">Next: API Endpoints →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

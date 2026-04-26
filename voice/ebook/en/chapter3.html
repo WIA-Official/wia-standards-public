@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA Voice-Sign Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 3: API Endpoints</h1>
+            <p class="subtitle">Audio Input, Transcription, Sign Generation, and Avatar Control</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>API Endpoints</h1>
+
+            <h2>3.1 Overview</h2>
+            <p>The Voice-Sign API provides RESTful endpoints for synchronous requests and WebSocket connections for real-time streaming. All endpoints require authentication via API keys or OAuth 2.0 tokens.</p>
+
+            <h3>Base URL</h3>
+            <pre><code>https://api.wia.org/voice-sign/v1</code></pre>
+
+            <h2>3.2 Translation Endpoint</h2>
+            <p>The primary endpoint for converting audio to sign language representation.</p>
+
+            <h3>Full Translation</h3>
+            <pre><code>POST /translate
+
+Content-Type: multipart/form-data
+Authorization: Bearer {token}
+
+Request:
+{
+  "audio": &lt;audio file or base64&gt;,
+  "target_language": "ASL",
+  "output": {
+    "include_transcript": true,
+    "include_gloss": true,
+    "include_pose": true,
+    "include_render": false
+  },
+  "options": {
+    "language_detection": true,
+    "streaming": false
+  }
+}
+
+Response (200 OK):
+{
+  "request_id": "req_123",
+  "response_id": "res_456",
+  "status": "success",
+  "transcript": {
+    "text": "Hello, how are you?",
+    "language": "en",
+    "confidence": 0.95,
+    "words": [...]
+  },
+  "gloss": {
+    "sign_language": "ASL",
+    "glosses": [
+      {"gloss": "HELLO", "start_ms": 0, "end_ms": 600},
+      {"gloss": "HOW", "start_ms": 650, "end_ms": 1000},
+      {"gloss": "YOU", "start_ms": 1050, "end_ms": 1400}
+    ],
+    "confidence": 0.91
+  },
+  "pose": {
+    "frame_rate": 30,
+    "total_frames": 60,
+    "frames": [...]
+  },
+  "processing": {
+    "total_time_ms": 450,
+    "asr_time_ms": 180,
+    "translation_time_ms": 150,
+    "pose_generation_time_ms": 120
+  }
+}</code></pre>
+
+            <h2>3.3 Audio Processing Endpoints</h2>
+
+            <h3>Audio Upload</h3>
+            <pre><code>POST /audio/upload
+
+Content-Type: multipart/form-data
+
+Request:
+- audio: (binary file)
+- format: "wav"
+- sample_rate: 16000
+- language_hint: "en"
+
+Response (201 Created):
+{
+  "audio_id": "aud_789",
+  "duration_ms": 2000,
+  "format": "wav",
+  "sample_rate": 16000,
+  "status": "ready"
+}</code></pre>
+
+            <h3>Audio Preprocessing</h3>
+            <pre><code>POST /audio/{audio_id}/preprocess
+
+Request:
+{
+  "noise_reduction": true,
+  "voice_activity_detection": true,
+  "normalization": true
+}
+
+Response (200 OK):
+{
+  "audio_id": "aud_789_processed",
+  "processing_applied": ["noise_reduction", "vad", "normalization"],
+  "speech_ratio": 0.75,
+  "quality_score": 0.88
+}</code></pre>
+
+            <h2>3.4 Transcription Endpoints</h2>
+
+            <h3>Speech Recognition</h3>
+            <pre><code>POST /transcribe
+
+Request:
+{
+  "audio_id": "aud_789",
+  "language": "en",
+  "model": "whisper-v3",
+  "word_timestamps": true
+}
+
+Response (200 OK):
+{
+  "transcription_id": "tr_012",
+  "audio_id": "aud_789",
+  "text": "Hello, how are you?",
+  "language": "en",
+  "confidence": 0.95,
+  "words": [
+    {
+      "word": "Hello",
+      "start_ms": 100,
+      "end_ms": 500,
+      "confidence": 0.98,
+      "pos": "interjection"
+    },
+    {
+      "word": "how",
+      "start_ms": 600,
+      "end_ms": 800,
+      "confidence": 0.95,
+      "pos": "adverb"
+    }
+  ],
+  "processing_time_ms": 180
+}</code></pre>
+
+            <h2>3.5 Sign Language Translation Endpoints</h2>
+
+            <h3>Text to Sign Gloss</h3>
+            <pre><code>POST /sign/translate
+
+Request:
+{
+  "text": "Hello, how are you?",
+  "source_language": "en",
+  "target_language": "ASL",
+  "formality": "neutral"
+}
+
+Response (200 OK):
+{
+  "gloss_id": "gl_345",
+  "sign_language": "ASL",
+  "glosses": [
+    {
+      "gloss": "HELLO",
+      "sign_type": "lexical",
+      "confidence": 0.92,
+      "hamnosys": "hamfinger2,hamextfingeru,hampalml"
+    },
+    {
+      "gloss": "HOW",
+      "sign_type": "lexical",
+      "confidence": 0.88
+    },
+    {
+      "gloss": "YOU",
+      "sign_type": "pointing",
+      "confidence": 0.95,
+      "spatial_ref": {"x": 0.0, "y": 0.0, "z": 0.5}
+    }
+  ],
+  "sentence_type": "interrogative",
+  "confidence": 0.91
+}</code></pre>
+
+            <h3>Gloss to Pose</h3>
+            <pre><code>POST /sign/pose
+
+Request:
+{
+  "gloss_id": "gl_345",
+  "skeleton": "mediapipe_holistic",
+  "frame_rate": 30,
+  "include_face": true,
+  "include_hands": true
+}
+
+Response (200 OK):
+{
+  "pose_sequence_id": "ps_678",
+  "gloss_id": "gl_345",
+  "frame_rate": 30,
+  "total_frames": 60,
+  "duration_ms": 2000,
+  "skeleton": {
+    "standard": "mediapipe_holistic",
+    "joints": [...]
+  },
+  "frames": [
+    {
+      "frame_index": 0,
+      "timestamp_ms": 0,
+      "joints": [...],
+      "left_hand": {...},
+      "right_hand": {...},
+      "face": {...}
+    }
+  ]
+}</code></pre>
+
+            <h2>3.6 Avatar Rendering Endpoints</h2>
+
+            <h3>Render Avatar Video</h3>
+            <pre><code>POST /avatar/render
+
+Request:
+{
+  "pose_sequence_id": "ps_678",
+  "avatar_id": "avatar_default_asl",
+  "resolution": {"width": 1920, "height": 1080},
+  "frame_rate": 30,
+  "format": "mp4",
+  "style": "realistic"
+}
+
+Response (202 Accepted):
+{
+  "render_id": "rnd_901",
+  "status": "processing",
+  "estimated_time_ms": 5000,
+  "status_url": "/avatar/render/rnd_901/status"
+}
+
+Status Check (GET /avatar/render/{render_id}/status):
+{
+  "render_id": "rnd_901",
+  "status": "completed",
+  "progress": 100,
+  "result": {
+    "video_url": "https://cdn.wia.org/renders/rnd_901.mp4",
+    "duration_ms": 2000,
+    "file_size_bytes": 1048576
+  }
+}</code></pre>
+
+            <h3>Real-time Avatar Stream</h3>
+            <pre><code>POST /avatar/stream/start
+
+Request:
+{
+  "avatar_id": "avatar_default_asl",
+  "quality": "medium",
+  "target_bitrate": 2000000
+}
+
+Response (200 OK):
+{
+  "stream_id": "strm_234",
+  "websocket_url": "wss://stream.wia.org/avatar/strm_234",
+  "status": "ready"
+}</code></pre>
+
+            <h2>3.7 Streaming API (WebSocket)</h2>
+
+            <h3>Connection</h3>
+            <pre><code>WebSocket: wss://api.wia.org/voice-sign/v1/stream
+
+Connection Headers:
+Authorization: Bearer {token}
+Sec-WebSocket-Protocol: voice-sign-v1</code></pre>
+
+            <h3>Client Messages</h3>
+            <pre><code>// Start streaming
+{
+  "type": "start",
+  "config": {
+    "target_language": "ASL",
+    "audio_format": "pcm",
+    "sample_rate": 16000,
+    "output_preferences": {
+      "include_transcript": true,
+      "include_gloss": true,
+      "include_pose": true
+    }
+  }
+}
+
+// Audio chunk
+{
+  "type": "audio_chunk",
+  "audio_data": "base64_encoded_audio",
+  "sequence_number": 1
+}
+
+// Stop streaming
+{
+  "type": "stop"
+}</code></pre>
+
+            <h3>Server Messages</h3>
+            <pre><code>// Transcript delta
+{
+  "type": "transcript",
+  "transcript_delta": {
+    "text": "Hello",
+    "is_final": false,
+    "confidence": 0.85
+  },
+  "latency_ms": 120
+}
+
+// Gloss delta
+{
+  "type": "gloss",
+  "gloss_delta": {
+    "gloss": {
+      "gloss": "HELLO",
+      "sign_type": "lexical",
+      "confidence": 0.92
+    },
+    "is_final": true
+  },
+  "latency_ms": 150
+}
+
+// Pose frame
+{
+  "type": "pose",
+  "pose_frame": {
+    "frame_index": 0,
+    "timestamp_ms": 0,
+    "joints": [...]
+  },
+  "latency_ms": 180
+}
+
+// Error
+{
+  "type": "error",
+  "error": {
+    "code": "AUDIO_QUALITY_LOW",
+    "message": "Audio quality is too low for accurate transcription"
+  }
+}</code></pre>
+
+            <h2>3.8 Health and Status Endpoints</h2>
+
+            <h3>Health Check</h3>
+            <pre><code>GET /health
+
+Response (200 OK):
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "components": {
+    "asr_model": {
+      "status": "healthy",
+      "model_version": "whisper-v3"
+    },
+    "translation_model": {
+      "status": "healthy",
+      "languages_loaded": ["ASL", "BSL", "KSL"]
+    },
+    "renderer": {
+      "status": "healthy",
+      "queue_depth": 3
+    }
+  }
+}</code></pre>
+
+            <h3>Service Status</h3>
+            <pre><code>GET /status
+
+Response (200 OK):
+{
+  "service": "voice-sign-api",
+  "version": "1.0.0",
+  "uptime_seconds": 86400,
+  "metrics": {
+    "requests_per_minute": 150,
+    "average_latency_ms": 450,
+    "error_rate": 0.01
+  },
+  "capacity": {
+    "current_load": 45,
+    "max_capacity": 1000,
+    "available": true
+  }
+}</code></pre>
+
+            <h2>3.9 Rate Limiting</h2>
+            <p>API endpoints are rate-limited to ensure fair usage and system stability.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Requests/Minute</th>
+                        <th>Concurrent Streams</th>
+                        <th>Audio Minutes/Day</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Free</td>
+                        <td>10</td>
+                        <td>1</td>
+                        <td>60</td>
+                    </tr>
+                    <tr>
+                        <td>Basic</td>
+                        <td>60</td>
+                        <td>3</td>
+                        <td>500</td>
+                    </tr>
+                    <tr>
+                        <td>Pro</td>
+                        <td>300</td>
+                        <td>10</td>
+                        <td>5000</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise</td>
+                        <td>Custom</td>
+                        <td>Custom</td>
+                        <td>Unlimited</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Rate Limit Headers</h3>
+            <pre><code>X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 1642262400
+
+Response (429 Too Many Requests):
+{
+  "error": "rate_limit_exceeded",
+  "message": "Rate limit exceeded. Please retry after 60 seconds.",
+  "retry_after": 60
+}</code></pre>
+
+            <h2>3.10 Error Responses</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status Code</th>
+                        <th>Error</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>400</td>
+                        <td>Bad Request</td>
+                        <td>Invalid request format or parameters</td>
+                    </tr>
+                    <tr>
+                        <td>401</td>
+                        <td>Unauthorized</td>
+                        <td>Missing or invalid authentication</td>
+                    </tr>
+                    <tr>
+                        <td>403</td>
+                        <td>Forbidden</td>
+                        <td>Insufficient permissions</td>
+                    </tr>
+                    <tr>
+                        <td>404</td>
+                        <td>Not Found</td>
+                        <td>Resource not found</td>
+                    </tr>
+                    <tr>
+                        <td>429</td>
+                        <td>Too Many Requests</td>
+                        <td>Rate limit exceeded</td>
+                    </tr>
+                    <tr>
+                        <td>500</td>
+                        <td>Internal Server Error</td>
+                        <td>Server-side processing error</td>
+                    </tr>
+                    <tr>
+                        <td>503</td>
+                        <td>Service Unavailable</td>
+                        <td>Service temporarily unavailable</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box warning">
+                <strong>Best Practices</strong>
+                <ul>
+                    <li>Implement exponential backoff for retry logic</li>
+                    <li>Monitor rate limit headers to avoid throttling</li>
+                    <li>Use streaming endpoints for real-time applications</li>
+                    <li>Cache frequently requested translations</li>
+                    <li>Compress audio before upload to reduce bandwidth</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter2.html">← Previous: Data Schema</a>
+                <a href="chapter4.html">Next: Protocol Specification →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>

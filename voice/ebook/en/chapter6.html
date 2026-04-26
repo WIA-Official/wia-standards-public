@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA Voice-Sign Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chapter 6: Security & Privacy</h1>
+            <p class="subtitle">Audio/Video Data Protection and Consent Management</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <h1>Security & Privacy</h1>
+
+            <h2>6.1 Overview</h2>
+            <p>Voice and video data contain highly sensitive personal information. This chapter defines comprehensive security and privacy protections for Voice-Sign systems, covering data encryption, consent management, and regulatory compliance.</p>
+
+            <h2>6.2 Data Classification</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>Sensitivity</th>
+                        <th>Default Retention</th>
+                        <th>Encryption</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Audio Recording</td>
+                        <td>High (PII)</td>
+                        <td>Session Only</td>
+                        <td>Required</td>
+                    </tr>
+                    <tr>
+                        <td>Transcript Text</td>
+                        <td>High (PII)</td>
+                        <td>Anonymized</td>
+                        <td>Required</td>
+                    </tr>
+                    <tr>
+                        <td>Sign Gloss</td>
+                        <td>Medium</td>
+                        <td>Anonymized</td>
+                        <td>Recommended</td>
+                    </tr>
+                    <tr>
+                        <td>Sign Pose Data</td>
+                        <td>Low</td>
+                        <td>Session Only</td>
+                        <td>Optional</td>
+                    </tr>
+                    <tr>
+                        <td>User Metadata</td>
+                        <td>Medium</td>
+                        <td>User Controlled</td>
+                        <td>Required</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>6.3 Encryption Requirements</h2>
+
+            <h3>Data in Transit</h3>
+            <pre><code>// TLS 1.3 Configuration
+{
+  "protocol": "TLS 1.3",
+  "cipher_suites": [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_CHACHA20_POLY1305_SHA256"
+  ],
+  "min_version": "TLS 1.3",
+  "certificate_validation": "strict",
+  "hsts": {
+    "enabled": true,
+    "max_age": 31536000,
+    "include_subdomains": true,
+    "preload": true
+  }
+}</code></pre>
+
+            <h3>Data at Rest</h3>
+            <pre><code>// AES-256-GCM Encryption
+{
+  "algorithm": "AES-256-GCM",
+  "key_size": 256,
+  "key_derivation": {
+    "algorithm": "Argon2id",
+    "memory": "128MB",
+    "iterations": 4,
+    "parallelism": 2
+  },
+  "key_rotation": {
+    "frequency": "90_days",
+    "automatic": true
+  },
+  "key_storage": {
+    "method": "HSM",  // Hardware Security Module
+    "backup": "encrypted_cold_storage"
+  }
+}</code></pre>
+
+            <h3>End-to-End Encryption (Optional)</h3>
+            <pre><code>// E2E encryption for maximum privacy
+class E2EEncryptedSession {
+  async initiate(recipientPublicKey) {
+    // Generate ephemeral key pair
+    const keyPair = await crypto.subtle.generateKey(
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveBits", "deriveKey"]
+    );
+
+    // Derive shared secret
+    const sharedSecret = await crypto.subtle.deriveKey(
+      { name: "ECDH", public: recipientPublicKey },
+      keyPair.privateKey,
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+
+    return { publicKey: keyPair.publicKey, sharedSecret };
+  }
+
+  async encryptAudio(audioData, sharedSecret) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: iv },
+      sharedSecret,
+      audioData
+    );
+
+    return { encrypted, iv };
+  }
+}</code></pre>
+
+            <h2>6.4 Consent Management</h2>
+
+            <h3>Consent Types</h3>
+            <pre><code>interface ConsentPreferences {
+  // Required consents
+  required: {
+    data_processing: boolean;        // Must be true to use service
+    privacy_policy: boolean;         // Must be true to use service
+    terms_of_service: boolean;       // Must be true to use service
+  };
+
+  // Optional consents
+  optional: {
+    save_history: boolean;           // Save translation history
+    improve_service: boolean;        // Use data for model improvement
+    share_anonymous_usage: boolean;  // Share anonymized usage data
+    marketing: boolean;              // Marketing communications
+  };
+
+  // Special category consents
+  special: {
+    biometric_processing: boolean;   // Voice fingerprint processing
+    health_data: boolean;            // For healthcare applications
+    children_data: boolean;          // For users under 13 (COPPA)
+  };
+
+  // Data handling preferences
+  data_handling: {
+    audio_retention: 'none' | 'session' | '24h' | 'encrypted';
+    transcript_retention: 'none' | 'anonymized' | 'encrypted';
+    location_data: 'never' | 'emergency_only' | 'always';
+  };
+}</code></pre>
+
+            <h3>Consent UI Example</h3>
+            <pre><code>// Privacy-first consent flow
+async function showConsentDialog() {
+  const consent = await showDialog({
+    title: "Privacy & Data Usage",
+    sections: [
+      {
+        type: "required",
+        items: [
+          {
+            id: "data_processing",
+            label: "Process audio for sign language translation",
+            description: "We will convert your audio to sign language",
+            required: true
+          }
+        ]
+      },
+      {
+        type: "optional",
+        items: [
+          {
+            id: "save_history",
+            label: "Save translation history (encrypted)",
+            description: "Access your past translations",
+            default: false
+          },
+          {
+            id: "improve_service",
+            label: "Help improve service quality",
+            description: "Anonymous data for model training",
+            default: false
+          }
+        ]
+      },
+      {
+        type: "data_handling",
+        items: [
+          {
+            id: "audio_retention",
+            label: "Audio data handling",
+            options: [
+              { value: "none", label: "Delete immediately (most private)" },
+              { value: "session", label: "Keep for session only" },
+              { value: "24h", label: "Keep encrypted for 24 hours" }
+            ],
+            default: "none"
+          }
+        ]
+      }
+    ],
+    buttons: ["Accept Selected", "Decline All"]
+  });
+
+  // Store consent preferences
+  await storeConsent(consent);
+  return consent;
+}</code></pre>
+
+            <h2>6.5 PII Detection and Redaction</h2>
+
+            <h3>Automatic PII Detection</h3>
+            <pre><code>// Detect and redact personally identifiable information
+class PIIDetector {
+  async detectAndRedact(transcript) {
+    const piiPatterns = {
+      ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
+      phone: /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g,
+      email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+      credit_card: /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g,
+      name: await this.detectNames(transcript),
+      address: await this.detectAddresses(transcript)
+    };
+
+    let redacted = transcript;
+    const detectedPII = [];
+
+    for (const [type, pattern] of Object.entries(piiPatterns)) {
+      const matches = transcript.match(pattern);
+      if (matches) {
+        detectedPII.push({ type, count: matches.length });
+        redacted = redacted.replace(pattern, `[${type.toUpperCase()}]`);
+      }
+    }
+
+    return {
+      original: transcript,
+      redacted: redacted,
+      pii_detected: detectedPII,
+      safe_for_storage: detectedPII.length === 0
+    };
+  }
+
+  async detectNames(text) {
+    // Use NER (Named Entity Recognition) model
+    const entities = await nerModel.extract(text, { types: ['PERSON'] });
+    return entities.map(e => e.text);
+  }
+
+  async detectAddresses(text) {
+    // Pattern matching for addresses
+    const addressPattern = /\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|boulevard|blvd)/gi;
+    return text.match(addressPattern) || [];
+  }
+}</code></pre>
+
+            <h2>6.6 Access Control</h2>
+
+            <h3>Role-Based Access Control (RBAC)</h3>
+            <pre><code>const roles = {
+  user: {
+    permissions: [
+      'translate:own',
+      'history:read:own',
+      'consent:manage:own'
+    ]
+  },
+
+  support: {
+    permissions: [
+      'user:read',
+      'logs:read',
+      'tickets:manage'
+    ]
+  },
+
+  analyst: {
+    permissions: [
+      'analytics:read',
+      'metrics:read',
+      'reports:generate'
+    ]
+  },
+
+  admin: {
+    permissions: [
+      'config:manage',
+      'users:manage',
+      'audit:read'
+    ]
+  },
+
+  dpo: {  // Data Protection Officer
+    permissions: [
+      'privacy:manage',
+      'consent:audit',
+      'data:export',
+      'data:delete',
+      'breach:manage'
+    ]
+  }
+};</code></pre>
+
+            <h3>Authentication</h3>
+            <pre><code>// Multi-factor authentication
+{
+  "authentication": {
+    "primary": "password",
+    "mfa": {
+      "required": true,
+      "methods": ["totp", "sms", "email", "biometric"],
+      "minimum_factors": 2
+    },
+    "session": {
+      "timeout": "8h",
+      "idle_timeout": "30m",
+      "max_concurrent": 3
+    },
+    "password_policy": {
+      "min_length": 12,
+      "require_uppercase": true,
+      "require_lowercase": true,
+      "require_numbers": true,
+      "require_special": true,
+      "max_age_days": 90,
+      "history_count": 5
+    }
+  }
+}</code></pre>
+
+            <h2>6.7 Audit Logging</h2>
+
+            <h3>Audit Event Structure</h3>
+            <pre><code>interface AuditEvent {
+  event_id: string;
+  timestamp: string;
+  event_type: 'access' | 'modification' | 'deletion' | 'export' | 'consent_change';
+
+  actor: {
+    user_id: string;
+    username: string;
+    role: string;
+    ip_address: string;
+    user_agent: string;
+  };
+
+  resource: {
+    type: string;
+    id: string;
+    sensitivity: 'public' | 'internal' | 'confidential' | 'restricted';
+  };
+
+  action: string;
+  outcome: 'success' | 'failure';
+
+  details: {
+    reason?: string;
+    changes?: Record<string, any>;
+    consent_id?: string;
+  };
+
+  compliance: {
+    gdpr?: boolean;
+    hipaa?: boolean;
+    coppa?: boolean;
+  };
+}</code></pre>
+
+            <h3>Audit Log Example</h3>
+            <pre><code>{
+  "event_id": "evt_789",
+  "timestamp": "2025-01-15T10:30:00.123Z",
+  "event_type": "access",
+  "actor": {
+    "user_id": "usr_456",
+    "username": "john.doe@example.com",
+    "role": "user",
+    "ip_address": "192.168.1.100",
+    "user_agent": "Mozilla/5.0..."
+  },
+  "resource": {
+    "type": "translation",
+    "id": "tr_123",
+    "sensitivity": "confidential"
+  },
+  "action": "view_transcript",
+  "outcome": "success",
+  "details": {
+    "consent_verified": true,
+    "data_anonymized": false
+  },
+  "compliance": {
+    "gdpr": true,
+    "hipaa": false
+  }
+}</code></pre>
+
+            <h2>6.8 Data Retention and Deletion</h2>
+
+            <h3>Retention Policies</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>Default Retention</th>
+                        <th>Maximum</th>
+                        <th>Deletion Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Raw Audio</td>
+                        <td>None (immediate)</td>
+                        <td>24 hours (encrypted)</td>
+                        <td>Secure wipe</td>
+                    </tr>
+                    <tr>
+                        <td>Transcripts (identifiable)</td>
+                        <td>Session only</td>
+                        <td>User-controlled</td>
+                        <td>Secure deletion</td>
+                    </tr>
+                    <tr>
+                        <td>Transcripts (anonymized)</td>
+                        <td>90 days</td>
+                        <td>365 days</td>
+                        <td>Standard deletion</td>
+                    </tr>
+                    <tr>
+                        <td>Pose data</td>
+                        <td>Session only</td>
+                        <td>7 days</td>
+                        <td>Standard deletion</td>
+                    </tr>
+                    <tr>
+                        <td>Audit logs</td>
+                        <td>7 years</td>
+                        <td>7 years</td>
+                        <td>Archival</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Right to Deletion</h3>
+            <pre><code>// GDPR/CCPA compliant deletion
+async function processDataDeletionRequest(userId) {
+  // Verify user identity
+  await verifyIdentity(userId);
+
+  // Delete user data
+  await Promise.all([
+    deleteAudioData(userId),
+    deleteTranscripts(userId),
+    deletePoseData(userId),
+    deleteUserProfile(userId),
+    deleteConsentRecords(userId),
+    removeFromAnalytics(userId)
+  ]);
+
+  // Retain audit logs (legal requirement)
+  await auditLog.record({
+    event_type: 'data_deletion',
+    user_id: userId,
+    timestamp: new Date().toISOString(),
+    scope: 'complete',
+    retention_exception: 'audit_logs_only'
+  });
+
+  // Send confirmation
+  await sendDeletionConfirmation(userId);
+
+  return {
+    status: 'completed',
+    timestamp: new Date().toISOString(),
+    data_deleted: true,
+    audit_retained: true
+  };
+}</code></pre>
+
+            <h2>6.9 Breach Response</h2>
+
+            <h3>Incident Response Plan</h3>
+            <pre><code>class SecurityIncidentResponse {
+  async handleBreach(incident) {
+    // 1. Immediate containment
+    await this.containBreach(incident);
+
+    // 2. Assess scope
+    const impact = await this.assessImpact(incident);
+
+    // 3. Notification timeline
+    const notifications = {
+      // GDPR: 72 hours to authority
+      gdpr_authority: impact.gdpr_applicable ? '72h' : null,
+
+      // Users: without undue delay if high risk
+      affected_users: impact.user_risk === 'high' ? 'immediate' : '30d',
+
+      // HIPAA: 60 days
+      hhs: impact.hipaa_applicable ? '60d' : null
+    };
+
+    // 4. Execute notifications
+    if (impact.gdpr_applicable) {
+      await this.notifyDataProtectionAuthority(incident, impact);
+    }
+
+    if (impact.user_risk === 'high') {
+      await this.notifyAffectedUsers(incident, impact);
+    }
+
+    // 5. Remediation
+    await this.implementRemediation(incident);
+
+    // 6. Post-incident review
+    await this.conductPostMortem(incident);
+
+    return {
+      incident_id: incident.id,
+      contained: true,
+      notifications_sent: true,
+      remediation_complete: true
+    };
+  }
+
+  async notifyAffectedUsers(incident, impact) {
+    const notification = {
+      subject: "Security Incident Notification",
+      body: `
+        We are writing to inform you of a security incident that may have
+        affected your personal data.
+
+        Nature of Incident: ${incident.description}
+        Data Affected: ${impact.data_types.join(', ')}
+        Date of Incident: ${incident.timestamp}
+
+        Actions Taken:
+        ${impact.remediation_steps.join('\n')}
+
+        What You Should Do:
+        ${impact.user_recommendations.join('\n')}
+
+        Contact: privacy@wia.org
+      `
+    };
+
+    await emailService.send(impact.affected_users, notification);
+  }
+}</code></pre>
+
+            <h2>6.10 Compliance Frameworks</h2>
+
+            <h3>GDPR Compliance</h3>
+            <ul>
+                <li><strong>Lawful Basis:</strong> Explicit consent for audio processing</li>
+                <li><strong>Data Minimization:</strong> Only collect necessary data</li>
+                <li><strong>Purpose Limitation:</strong> Use data only for stated purpose</li>
+                <li><strong>Storage Limitation:</strong> Delete data when no longer needed</li>
+                <li><strong>Integrity & Confidentiality:</strong> Strong encryption and access controls</li>
+                <li><strong>Accountability:</strong> Comprehensive audit logging</li>
+                <li><strong>Data Subject Rights:</strong> Support for access, rectification, erasure, portability</li>
+            </ul>
+
+            <h3>HIPAA Compliance (Healthcare)</h3>
+            <ul>
+                <li><strong>Administrative Safeguards:</strong> Security management, workforce training</li>
+                <li><strong>Physical Safeguards:</strong> Facility access, workstation security</li>
+                <li><strong>Technical Safeguards:</strong> Encryption, access controls, audit controls</li>
+                <li><strong>Business Associate Agreement:</strong> Required for third-party processors</li>
+                <li><strong>Breach Notification:</strong> 60-day notification rule</li>
+            </ul>
+
+            <h3>COPPA Compliance (Children)</h3>
+            <ul>
+                <li><strong>Parental Consent:</strong> Verifiable parental consent for children under 13</li>
+                <li><strong>Data Minimization:</strong> Collect only necessary information</li>
+                <li><strong>Parental Rights:</strong> Review, delete child's data</li>
+                <li><strong>Confidentiality:</strong> Protect children's information</li>
+            </ul>
+
+            <div class="info-box warning">
+                <strong>Privacy by Design</strong>
+                All Voice-Sign systems must implement Privacy by Design principles:
+                <ul>
+                    <li>Proactive not reactive</li>
+                    <li>Privacy as the default setting</li>
+                    <li>Privacy embedded in design</li>
+                    <li>Full functionality (positive-sum, not zero-sum)</li>
+                    <li>End-to-end security</li>
+                    <li>Visibility and transparency</li>
+                    <li>Respect for user privacy</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter5.html">← Previous: Integration Guide</a>
+                <a href="chapter7.html">Next: Implementation Examples →</a>
+            </div>
+        </main>
+
+        </div>
+</body>
+</html>
