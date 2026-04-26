@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Tracking and Trajectory Prediction - WIA-DEF-015</title>
+    <style>
+        :root {
+--primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --primary-light: #A78BFA;
+            --background: #0F172A;
+            --surface: #1E293B;
+            --surface-light: #334155;
+            --text: #E2E8F0;
+            --text-dim: #94A3B8;
+            --border: #475569;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.8; color: var(--text); background: var(--background); padding: 20px; max-width: 1200px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); padding: 40px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3); }
+        h1 { font-size: 2.5em; margin-bottom: 10px; color: white; }
+        h2 { color: var(--primary-light); margin: 30px 0 15px 0; font-size: 1.8em; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+        h3 { color: var(--primary-light); margin: 25px 0 12px 0; font-size: 1.4em; }
+        p { margin-bottom: 15px; text-align: justify; }
+        .subtitle { color: var(--primary-light); font-size: 1.2em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: var(--surface); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        th { background: var(--primary); color: white; padding: 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); }
+        tr:hover { background: var(--surface-light); }
+        .code-block { background: var(--surface); border-left: 4px solid var(--primary); padding: 20px; margin: 20px 0; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        .info-box { background: var(--surface); border-left: 4px solid var(--primary); padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        .key-takeaways { background: var(--surface); padding: 25px; border-radius: 12px; margin: 30px 0; border: 2px solid var(--primary); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        .key-takeaways h3 { color: var(--primary); margin-top: 0; }
+        .key-takeaways ul { margin-left: 20px; }
+        .key-takeaways li { margin: 10px 0; line-height: 1.6; }
+        .review-questions { background: var(--surface); padding: 25px; border-radius: 12px; margin: 30px 0; border: 2px solid var(--primary-dark); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        .review-questions h3 { color: var(--primary); margin-top: 0; }
+        .review-questions ol { margin-left: 20px; }
+        .review-questions li { margin: 12px 0; line-height: 1.6; }
+        .navigation { display: flex; justify-content: space-between; margin: 40px 0; gap: 20px; }
+        .nav-button { flex: 1; padding: 15px 30px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; text-align: center; transition: all 0.3s ease; font-weight: 600; box-shadow: 0 4px 6px rgba(139, 92, 246, 0.3); }
+        .nav-button:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 6px 12px rgba(139, 92, 246, 0.4); }
+        ul, ol { margin: 15px 0 15px 30px; }
+        li { margin: 8px 0; }
+        strong { color: var(--primary-light); }
+        .formula { background: var(--surface); padding: 15px; margin: 15px 0; border-radius: 8px; font-family: 'Courier New', monospace; text-align: center; border: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Chapter 3: Tracking and Trajectory Prediction</h1>
+        <p class="subtitle">Kalman Filtering and Ballistic Trajectory Mathematics</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>3.1 The Extended Kalman Filter</h2>
+            <p>
+                Once a ballistic missile is detected, the tracking system must continuously estimate its position, velocity, and acceleration despite noisy sensor measurements. The Extended Kalman Filter (EKF) provides the optimal solution to this state estimation problem by recursively combining sensor measurements with predictions from kinematic models of missile motion.
+            </p>
+
+            <h3>3.1.1 State Vector Representation</h3>
+            <p>
+                The complete state of a ballistic missile at any instant is represented by a nine-dimensional state vector containing position, velocity, and acceleration components in three-dimensional space:
+            </p>
+
+            <div class="formula">
+                X = [x, y, z, vx, vy, vz, ax, ay, az]ᵀ
+            </div>
+
+            <div class="code-block">
+<strong>State Vector Components:</strong>
+
+Position (meters):
+  x  = East position in Earth-Centered Fixed (ECF) frame
+  y  = North position in ECF frame
+  z  = Up position (altitude above reference ellipsoid)
+
+Velocity (meters/second):
+  vx = East velocity component
+  vy = North velocity component
+  vz = Vertical velocity component (positive = ascending)
+
+Acceleration (meters/second²):
+  ax = East acceleration component
+  ay = North acceleration component
+  az = Vertical acceleration (includes gravity + drag)
+
+<strong>Example State Vector at T+30 seconds:</strong>
+Position:    [45,000 m, 12,000 m, 85,000 m]
+Velocity:    [2,500 m/s, 1,800 m/s, -3,200 m/s]
+Acceleration:[0 m/s², 0 m/s², -9.81 m/s²]  (ballistic flight, gravity only)
+            </div>
+
+            <h3>3.1.2 Kalman Filter Equations</h3>
+            <p>
+                The Kalman filter operates in two steps: prediction and update. During prediction, the current state estimate is propagated forward in time using the missile's equations of motion. During update, new sensor measurements are incorporated to refine the state estimate.
+            </p>
+
+            <div class="code-block">
+<strong>Prediction Step (Time Update):</strong>
+
+State Prediction:
+  X̂(k|k-1) = F·X(k-1|k-1) + G·u(k)
+
+Error Covariance Prediction:
+  P(k|k-1) = F·P(k-1|k-1)·Fᵀ + Q
+
+where:
+  X̂(k|k-1) = Predicted state at time k given measurements through k-1
+  F         = State transition matrix (9×9)
+  G         = Control input matrix (9×3)
+  u(k)      = Known inputs (e.g., gravity)
+  P         = Error covariance matrix (9×9)
+  Q         = Process noise covariance (9×9)
+
+<strong>Update Step (Measurement Update):</strong>
+
+Kalman Gain:
+  K(k) = P(k|k-1)·Hᵀ·[H·P(k|k-1)·Hᵀ + R]⁻¹
+
+State Update:
+  X̂(k|k) = X̂(k|k-1) + K(k)·[Z(k) - H·X̂(k|k-1)]
+
+Error Covariance Update:
+  P(k|k) = [I - K(k)·H]·P(k|k-1)
+
+where:
+  Z(k) = Sensor measurement at time k
+  H    = Observation matrix (maps state to measurement)
+  R    = Measurement noise covariance
+  I    = Identity matrix
+  K    = Kalman gain matrix
+
+<strong>Innovation (Measurement Residual):</strong>
+  ν(k) = Z(k) - H·X̂(k|k-1)
+
+This represents the "surprise" in the measurement—how much it differs
+from what we predicted. Large innovations indicate:
+  - Sensor malfunction
+  - Maneuver by target
+  - Incorrect kinematic model
+            </code-block>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Matrix</th>
+                        <th>Dimension</th>
+                        <th>Physical Meaning</th>
+                        <th>Typical Update Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>F (State Transition)</td>
+                        <td>9×9</td>
+                        <td>How state evolves over time</td>
+                        <td>1-100 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>Q (Process Noise)</td>
+                        <td>9×9</td>
+                        <td>Uncertainty in motion model</td>
+                        <td>Constant or adaptive</td>
+                    </tr>
+                    <tr>
+                        <td>H (Observation)</td>
+                        <td>3×9 to 6×9</td>
+                        <td>Maps state to measurements</td>
+                        <td>Per measurement</td>
+                    </tr>
+                    <tr>
+                        <td>R (Measurement Noise)</td>
+                        <td>3×3 to 6×6</td>
+                        <td>Sensor accuracy</td>
+                        <td>Per measurement</td>
+                    </tr>
+                    <tr>
+                        <td>P (Error Covariance)</td>
+                        <td>9×9</td>
+                        <td>Estimate uncertainty</td>
+                        <td>1-100 Hz</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3.2 Ballistic Trajectory Physics</h2>
+            <p>
+                Understanding the physics of ballistic missile flight is essential for accurate trajectory prediction. A ballistic trajectory consists of three distinct phases, each governed by different forces and requiring different modeling approaches.
+            </p>
+
+            <h3>3.2.1 Boost Phase (Powered Flight)</h3>
+            <p>
+                During boost phase, the missile's rocket motor provides thrust, causing continuous acceleration. The trajectory is highly observable due to the bright infrared signature, but the acceleration complicates prediction since thrust varies with propellant consumption and staging events.
+            </p>
+
+            <div class="code-block">
+<strong>Boost Phase Characteristics:</strong>
+
+Duration: 30-300 seconds (depending on missile type)
+  SRBM: 30-90 seconds
+  MRBM: 90-180 seconds
+  ICBM: 180-300 seconds (multi-stage)
+
+Thrust-to-Weight Ratio:
+  Initial: 1.2-2.0 (just sufficient to overcome gravity)
+  Burnout: 3.0-8.0 (as propellant is consumed, mass decreases)
+
+Acceleration Profile:
+  a(t) = [F_thrust(t) - m(t)·g] / m(t)
+
+where:
+  F_thrust(t) = Thrust force (time-varying)
+  m(t)        = Instantaneous mass (decreasing as propellant burns)
+  g           = Gravitational acceleration (9.81 m/s² at sea level)
+
+Velocity at Burnout (Tsiolkovsky Rocket Equation):
+  Δv = v_exhaust · ln(m_initial / m_final)
+
+Typical values:
+  v_exhaust ≈ 2,500-3,500 m/s (specific impulse = 250-350 seconds)
+  Mass ratio (m_initial/m_final) ≈ 4-10 (single stage)
+  Δv ≈ 3,500-8,000 m/s (depending on staging)
+            </div>
+
+            <h3>3.2.2 Midcourse Phase (Ballistic Flight)</h3>
+            <p>
+                After engine burnout, the missile follows a ballistic trajectory determined solely by its burnout velocity and the gravitational field. For theater ballistic missiles, the trajectory approximates a parabola. For ICBMs reaching altitudes above 1,000 km, orbital mechanics must be considered.
+            </p>
+
+            <div class="formula">
+                r(t) = r₀ + v₀·t + ½·g·t²<br>
+                v(t) = v₀ + g·t
+            </div>
+
+            <div class="code-block">
+<strong>Ballistic Flight Equations:</strong>
+
+For sub-orbital trajectories (altitude < 200 km):
+Position:
+  x(t) = x₀ + vx₀·t
+  y(t) = y₀ + vy₀·t
+  z(t) = z₀ + vz₀·t - ½·g·t²
+
+Velocity:
+  vz(t) = vz₀ - g·t  (vertical component decreases linearly)
+
+Maximum Altitude (Apogee):
+  h_max = h₀ + (vz₀²) / (2·g)
+
+Range (flat Earth approximation):
+  R = (v₀² · sin(2θ)) / g
+
+where θ = launch elevation angle
+
+For ICBM trajectories (altitude > 200 km):
+Must use orbital mechanics (Kepler's laws):
+  r(t)·v(t) = constant (angular momentum conservation)
+  E = ½v² - μ/r = constant (energy conservation)
+  where μ = GM = 3.986×10¹⁴ m³/s² (Earth's gravitational parameter)
+
+Earth Rotation Effects:
+Must account for Coriolis and centrifugal forces in rotating frame:
+  a_Coriolis = -2·ω × v
+  a_centrifugal = -ω × (ω × r)
+  where ω = 7.2921×10⁻⁵ rad/s (Earth's rotation rate)
+
+These effects cause eastward-fired missiles to have ~15% greater range
+than westward-fired missiles at same burnout velocity.
+            </div>
+
+            <h3>3.2.3 Terminal Phase (Atmospheric Reentry)</h3>
+            <p>
+                As the warhead reenters the atmosphere (typically below 100 km altitude), aerodynamic drag becomes significant and must be included in trajectory predictions. The drag force is proportional to the square of velocity and increases exponentially with decreasing altitude as air density rises.
+            </p>
+
+            <div class="code-block">
+<strong>Atmospheric Drag Model:</strong>
+
+Drag Force:
+  F_drag = -½ · ρ(h) · v² · C_D · A
+
+Drag Acceleration:
+  a_drag = -½ · ρ(h) · v² · C_D · A / m
+
+where:
+  ρ(h)  = Air density at altitude h (kg/m³)
+  v     = Velocity magnitude (m/s)
+  C_D   = Drag coefficient (0.2-0.5 for missiles)
+  A     = Cross-sectional area (m²)
+  m     = Mass (kg)
+
+Atmospheric Density Model (Exponential):
+  ρ(h) = ρ₀ · exp(-h / H)
+
+where:
+  ρ₀ = 1.225 kg/m³ (sea level density)
+  H  = 8,500 m (scale height)
+
+Ballistic Coefficient:
+  β = m / (C_D · A)  (kg/m²)
+
+Higher β → less drag deceleration (harder to defend against)
+  Typical warhead: β = 10,000-30,000 kg/m²
+  Typical decoy: β = 100-1,000 kg/m² (lower mass)
+
+Reentry Velocity:
+  SRBM: 2-3 km/s (Mach 6-9)
+  MRBM: 3-5 km/s (Mach 9-15)
+  ICBM: 6-8 km/s (Mach 18-24)
+
+Reentry Heating:
+  q = 0.5 · ρ · v³  (watts/m²)
+  At v = 7 km/s, ρ = 0.1 kg/m³:
+  q ≈ 17 MW/m² (ablative heat shield required!)
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Flight Phase</th>
+                        <th>Duration</th>
+                        <th>Dominant Forces</th>
+                        <th>Prediction Challenge</th>
+                        <th>Update Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Boost</td>
+                        <td>30-300 sec</td>
+                        <td>Thrust, Gravity</td>
+                        <td>Unknown thrust profile</td>
+                        <td>1 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>Midcourse</td>
+                        <td>5-25 min</td>
+                        <td>Gravity only</td>
+                        <td>Earth rotation, perturbations</td>
+                        <td>0.1 Hz</td>
+                    </tr>
+                    <tr>
+                        <td>Terminal</td>
+                        <td>30-120 sec</td>
+                        <td>Gravity, Drag</td>
+                        <td>Atmospheric density variations</td>
+                        <td>10 Hz</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3.3 Impact Point Prediction</h2>
+            <p>
+                The ultimate goal of trajectory tracking is to predict where the missile will impact if not intercepted. This information drives threat assessment (which assets are at risk) and engagement planning (which interceptor battery should respond).
+            </p>
+
+            <h3>3.3.1 Impact Point Calculation</h3>
+            <div class="code-block">
+<strong>Impact Point Prediction Algorithm:</strong>
+
+1. Extrapolate trajectory to altitude = 0:
+   Given current state [x, y, z, vx, vy, vz, ax, ay, az]
+   Solve for time t when z(t) = 0:
+
+   If ballistic (no drag):
+     0 = z + vz·t + ½·az·t²
+     t = [-vz ± √(vz² - 2·az·z)] / az
+     (take positive root)
+
+   If including drag (numerical integration required):
+     Iterate: t_impact = t when z(t) ≈ 0
+
+2. Calculate impact coordinates:
+   x_impact = x + vx·t_impact + ½·ax·t_impact²
+   y_impact = y + vy·t_impact + ½·ay·t_impact²
+
+3. Convert to latitude/longitude:
+   lat = atan2(y_impact, x_impact)
+   lon = atan2(z_impact, √(x_impact² + y_impact²))
+
+4. Calculate uncertainty ellipse:
+   σ_impact = √(σ_x² + σ_y²)
+   From error covariance matrix P(k|k)
+
+<strong>Typical Impact Prediction Accuracy:</strong>
+At T+30 seconds into flight:
+  CEP (Circular Error Probable) = 500-1000 m
+
+At T+180 seconds (midcourse):
+  CEP = 100-300 m
+
+At T-30 seconds before impact:
+  CEP = 50-100 m
+
+Accuracy improves as more measurements are processed and flight time increases.
+            </div>
+
+            <h2>3.4 Track Quality Metrics</h2>
+            <p>
+                Not all track solutions are equally reliable. The missile defense system must assess track quality in real-time to determine when a track is sufficiently accurate to support engagement decisions.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Formula</th>
+                        <th>Good Value</th>
+                        <th>Poor Value</th>
+                        <th>Use</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Position Error</td>
+                        <td>σ_pos = √(σ_x² + σ_y² + σ_z²)</td>
+                        <td>< 50 m</td>
+                        <td>> 500 m</td>
+                        <td>Impact prediction accuracy</td>
+                    </tr>
+                    <tr>
+                        <td>Velocity Error</td>
+                        <td>σ_vel = √(σ_vx² + σ_vy² + σ_vz²)</td>
+                        <td>< 10 m/s</td>
+                        <td>> 100 m/s</td>
+                        <td>Intercept geometry planning</td>
+                    </tr>
+                    <tr>
+                        <td>Innovation Magnitude</td>
+                        <td>||ν(k)|| = ||Z(k) - H·X̂(k|k-1)||</td>
+                        <td>< 3σ</td>
+                        <td>> 5σ</td>
+                        <td>Detect maneuvers or sensor errors</td>
+                    </tr>
+                    <tr>
+                        <td>Track Age</td>
+                        <td>t_track = Current_time - Init_time</td>
+                        <td>> 10 sec</td>
+                        <td>< 3 sec</td>
+                        <td>Confidence in state estimate</td>
+                    </tr>
+                    <tr>
+                        <td>Measurement Count</td>
+                        <td>N_meas</td>
+                        <td>> 20</td>
+                        <td>< 5</td>
+                        <td>Statistical confidence</td>
+                    </tr>
+                </tbody>
+            </table>
+
+        </section>
+
+        <div class="key-takeaways">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Kalman Filter Optimality:</strong> The EKF provides mathematically optimal state estimation by combining sensor measurements with physics-based predictions, achieving better accuracy than either alone.</li>
+                <li><strong>Nine-Dimensional State:</strong> Complete trajectory tracking requires estimating position (3D), velocity (3D), and acceleration (3D) simultaneously—9 parameters total that must be updated each measurement cycle.</li>
+                <li><strong>Three Distinct Phases:</strong> Ballistic missile flight consists of boost (powered), midcourse (ballistic), and terminal (reentry) phases, each requiring different mathematical models due to changing dominant forces.</li>
+                <li><strong>Drag Discrimination:</strong> Atmospheric drag during reentry causes lightweight decoys to decelerate much faster than heavy warheads (10× difference in deceleration), enabling discrimination based on trajectory alone.</li>
+                <li><strong>Accuracy Improves with Time:</strong> Impact point prediction uncertainty decreases from ~1000m at detection to ~50m at late midcourse as more measurements refine the trajectory estimate.</li>
+                <li><strong>Earth Rotation Matters:</strong> For ICBM trajectories, Coriolis effects from Earth's rotation can change the range by 15%, making it essential to compute trajectories in Earth-Centered Inertial frames, not rotating frames.</li>
+            </ul>
+        </div>
+
+        <div class="review-questions">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>Explain the two-step process of the Kalman filter (prediction and update). Why are both steps necessary rather than just using sensor measurements directly?</li>
+                <li>A missile at altitude 85 km has vertical velocity vz = -3200 m/s and vertical acceleration az = -9.81 m/s². Assuming purely ballistic flight, calculate the time until impact. Show your work.</li>
+                <li>Why does the ballistic coefficient β = m/(CD·A) differ so dramatically between warheads (~20,000 kg/m²) and decoys (~500 kg/m²)? What physical properties cause this difference?</li>
+                <li>Calculate the maximum altitude reached by a missile launched with vertical velocity vz0 = 4000 m/s from sea level. Assume g = 9.81 m/s² constant.</li>
+                <li>Explain why ICBM trajectories must account for Earth's rotation but SRBM trajectories typically do not. At what range does this effect become significant?</li>
+                <li>If the measurement innovation ||ν(k)|| suddenly jumps from 2σ to 7σ, what are three possible explanations for this anomaly? How should the tracking system respond?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="en-chapter2.html" class="nav-button">← Previous: Detection Systems</a>
+            <a href="en-chapter4.html" class="nav-button">Next: Intercept Calculations →</a>
+        </div>
+    </main>
+
+    <footer style="margin-top: 40px; padding: 20px; border-top: 1px solid var(--border); text-align: center; color: var(--text-dim);">
+        <p><strong>WIA-DEF-015 Missile Defense Specification v1.0</strong></p>
+        <p>弘益人間 · Benefit All Humanity</p>
+        <p>© 2025 World Industry Association. MIT License.</p>
+    </footer>
+</body>
+</html>

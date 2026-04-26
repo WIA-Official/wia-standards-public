@@ -1,899 +1,241 @@
-# Phase 1: Pet Health Passport Data Format Specification
+# WIA-pet-health-passport PHASE 1 — DATA-FORMAT Specification
 
-## WIA-PET-HEALTH-PASSPORT Data Format Standard
+**Standard:** WIA-pet-health-passport
+**Phase:** 1 — DATA-FORMAT
+**Version:** 1.0
+**Status:** Stable
 
-**Version**: 1.0.0
-**Date**: 2025-12-16
-**Status**: Draft
-**Standard ID**: WIA-PET-HEALTH-PASSPORT-PHASE1-001
+This document defines the canonical DATA-FORMAT layer for WIA-pet-health-passport (Pet Health Passport).
 
----
-
-## 1. 개요
-
-WIA-PET-HEALTH-PASSPORT는 전 세계 어디서든 인정되는 반려동물 건강 기록 표준입니다.
-백신, 수술, 알레르기, 유전자 정보를 포함하며, 국경 통과 시 자동 검역 인증을 지원합니다.
-
-### 1.1 목적
-
-- 글로벌 반려동물 건강 기록 호환성 확보
-- 국경 통과 시 검역 절차 간소화
-- 응급 상황 시 수의사 즉시 접근 가능
-- 반려동물 복지 향상 및 학대 이력 추적
-
-### 1.2 적용 범위
-
-- 개, 고양이, 토끼, 햄스터 등 모든 반려동물
-- 수의사, 보호소, 검역소, 반려동물 보호자
-- 193개국 검역 규정 호환
-
-### 1.3 철학
-
-**홍익인간 (弘益人間)** - 인류와 동물 모두를 이롭게 하라
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 2. Pet Identity Format
-
-### 2.1 기본 신원 정보
-
-```typescript
-interface PetIdentity {
-  // 고유 식별자
-  passportId: string;           // UUID v7 (시간순 정렬)
-  microchipId?: string;         // ISO 11784/11785 마이크로칩 ID (15자리)
-  tattooId?: string;            // 문신 ID (일부 국가)
-
-  // 기본 정보
-  species: PetSpecies;          // 종
-  breed: string;                // 품종
-  breedVerified: boolean;       // DNA 검증 여부
-
-  // 개체 정보
-  name: string;                 // 이름
-  dateOfBirth: ISO8601;         // 생년월일
-  dateOfBirthEstimated: boolean; // 추정 여부
-  sex: 'male' | 'female' | 'neutered_male' | 'spayed_female';
-
-  // 외형
-  color: string;                // 모색
-  markings: string[];           // 특징적 무늬
-  weight: {
-    value: number;              // kg
-    measuredAt: ISO8601;
-  };
-
-  // 사진 (해시로 무결성 검증)
-  photos: PetPhoto[];
-}
-
-enum PetSpecies {
-  DOG = 'dog',
-  CAT = 'cat',
-  RABBIT = 'rabbit',
-  HAMSTER = 'hamster',
-  BIRD = 'bird',
-  REPTILE = 'reptile',
-  FISH = 'fish',
-  OTHER = 'other'
-}
-
-interface PetPhoto {
-  photoHash: string;            // SHA-256
-  capturedAt: ISO8601;
-  photoType: 'face' | 'full_body' | 'marking' | 'other';
-  storageUri?: string;          // 분산 저장소 URI
-}
-```
-
-### 2.2 마이크로칩 정보
-
-```typescript
-interface MicrochipInfo {
-  // ISO 11784/11785 표준
-  chipNumber: string;           // 15자리 숫자
-
-  // 제조사 코드 (첫 3자리)
-  manufacturerCode: string;     // 국가/제조사
-
-  // 등록 정보
-  registeredAt: ISO8601;
-  registryName: string;         // 등록 기관
-  registryCountry: ISO3166Alpha2;
-
-  // 칩 상태
-  status: 'active' | 'replaced' | 'removed' | 'lost';
-
-  // 위치
-  implantLocation: 'left_neck' | 'right_neck' | 'between_shoulders' | 'other';
-  implantedBy: VeterinarianRef;
-  implantedAt: ISO8601;
-}
-```
-
-### 2.3 보호자 정보
-
-```typescript
-interface GuardianInfo {
-  guardianId: string;           // WIA-DID
-
-  // 기본 정보
-  name: string;
-  contactPhone: string;
-  contactEmail: string;
-
-  // 주소
-  address: {
-    country: ISO3166Alpha2;
-    postalCode: string;
-    city: string;
-    addressLine1: string;
-    addressLine2?: string;
-  };
-
-  // 소유권
-  ownershipType: 'owner' | 'guardian' | 'foster' | 'shelter';
-  ownershipStartDate: ISO8601;
-
-  // 비상 연락처
-  emergencyContacts: EmergencyContact[];
-
-  // 이전 보호자 이력 (프라이버시 보호)
-  previousGuardians?: {
-    count: number;
-    transferDates: ISO8601[];
-  };
-}
-
-interface EmergencyContact {
-  name: string;
-  relationship: string;
-  phone: string;
-  email?: string;
-}
-```
-
----
-
-## 3. Medical Records Format
-
-### 3.1 백신 기록
-
-```typescript
-interface VaccinationRecord {
-  recordId: string;             // UUID
-
-  // 백신 정보
-  vaccine: {
-    name: string;               // 백신명
-    manufacturer: string;       // 제조사
-    lotNumber: string;          // 로트 번호
-    serialNumber?: string;      // 시리얼 번호
-  };
-
-  // 접종 대상 질병
-  targetDiseases: VaccineDisease[];
-
-  // 접종 정보
-  administeredAt: ISO8601;
-  administeredBy: VeterinarianRef;
-  clinic: ClinicRef;
-
-  // 유효 기간
-  validFrom: ISO8601;
-  validUntil: ISO8601;
-
-  // 접종 차수
-  doseNumber: number;           // 1, 2, 3...
-  totalDoses: number;           // 총 필요 차수
-
-  // 부작용 기록
-  adverseReactions?: AdverseReaction[];
-
-  // 검증
-  verified: boolean;
-  verificationMethod: 'clinic' | 'blockchain' | 'government';
-  digitalSignature?: string;
-}
-
-enum VaccineDisease {
-  // 개
-  RABIES = 'rabies',
-  DISTEMPER = 'distemper',
-  PARVOVIRUS = 'parvovirus',
-  HEPATITIS = 'hepatitis',
-  PARAINFLUENZA = 'parainfluenza',
-  LEPTOSPIROSIS = 'leptospirosis',
-  BORDETELLA = 'bordetella',
-  LYME = 'lyme',
-  CANINE_INFLUENZA = 'canine_influenza',
-
-  // 고양이
-  FELINE_PANLEUKOPENIA = 'feline_panleukopenia',
-  FELINE_HERPESVIRUS = 'feline_herpesvirus',
-  FELINE_CALICIVIRUS = 'feline_calicivirus',
-  FELINE_LEUKEMIA = 'feline_leukemia',
-  FELINE_IMMUNODEFICIENCY = 'feline_immunodeficiency',
-
-  // 기타
-  OTHER = 'other'
-}
-
-interface AdverseReaction {
-  reactionType: 'mild' | 'moderate' | 'severe';
-  symptoms: string[];
-  onset: ISO8601;
-  duration: string;             // ISO 8601 duration
-  treatment?: string;
-}
-```
-
-### 3.2 수술 및 시술 기록
-
-```typescript
-interface SurgeryRecord {
-  recordId: string;
-
-  // 수술 정보
-  procedureType: ProcedureType;
-  procedureName: string;
-  description: string;
-
-  // 일시
-  performedAt: ISO8601;
-  duration: number;             // 분
-
-  // 수의사/병원
-  surgeon: VeterinarianRef;
-  assistants?: VeterinarianRef[];
-  clinic: ClinicRef;
-
-  // 마취 정보
-  anesthesia?: {
-    type: 'general' | 'local' | 'sedation' | 'none';
-    agents: string[];
-    duration: number;           // 분
-    complications?: string[];
-  };
-
-  // 결과
-  outcome: 'success' | 'partial' | 'complications' | 'failed';
-  complications?: string[];
-  followUpRequired: boolean;
-  followUpDate?: ISO8601;
-
-  // 회복 지침
-  recoveryInstructions?: string;
-  restrictions?: string[];
-  restrictionEndDate?: ISO8601;
-}
-
-enum ProcedureType {
-  SPAY = 'spay',
-  NEUTER = 'neuter',
-  DENTAL = 'dental',
-  ORTHOPEDIC = 'orthopedic',
-  TUMOR_REMOVAL = 'tumor_removal',
-  EMERGENCY = 'emergency',
-  DIAGNOSTIC = 'diagnostic',
-  COSMETIC = 'cosmetic',
-  OTHER = 'other'
-}
-```
-
-### 3.3 진단 및 검사 기록
-
-```typescript
-interface DiagnosticRecord {
-  recordId: string;
-
-  // 검사 유형
-  testType: DiagnosticTestType;
-  testName: string;
-
-  // 일시/장소
-  performedAt: ISO8601;
-  performedBy: VeterinarianRef;
-  clinic: ClinicRef;
-  laboratory?: string;
-
-  // 결과
-  results: DiagnosticResult[];
-  interpretation: string;
-
-  // 첨부 파일
-  attachments?: {
-    type: 'image' | 'pdf' | 'raw_data';
-    hash: string;
-    uri: string;
-  }[];
-}
-
-enum DiagnosticTestType {
-  BLOOD_PANEL = 'blood_panel',
-  URINALYSIS = 'urinalysis',
-  FECAL = 'fecal',
-  XRAY = 'xray',
-  ULTRASOUND = 'ultrasound',
-  MRI = 'mri',
-  CT_SCAN = 'ct_scan',
-  BIOPSY = 'biopsy',
-  ALLERGY_TEST = 'allergy_test',
-  GENETIC_TEST = 'genetic_test',
-  HEARTWORM = 'heartworm',
-  TICK_BORNE = 'tick_borne',
-  OTHER = 'other'
-}
-
-interface DiagnosticResult {
-  parameter: string;            // 검사 항목
-  value: string | number;       // 결과값
-  unit?: string;                // 단위
-  referenceRange?: {
-    min: number;
-    max: number;
-  };
-  status: 'normal' | 'low' | 'high' | 'abnormal';
-  notes?: string;
-}
-```
-
-### 3.4 알레르기 및 질환 기록
-
-```typescript
-interface AllergyRecord {
-  recordId: string;
-
-  // 알레르기 정보
-  allergen: string;
-  allergenType: AllergenType;
-
-  // 반응
-  reactionSeverity: 'mild' | 'moderate' | 'severe' | 'life_threatening';
-  symptoms: string[];
-
-  // 진단
-  diagnosedAt: ISO8601;
-  diagnosedBy: VeterinarianRef;
-  diagnosisMethod: 'clinical' | 'test' | 'elimination_diet' | 'owner_report';
-
-  // 관리
-  avoidanceInstructions: string;
-  emergencyTreatment?: string;
-
-  // 상태
-  status: 'active' | 'resolved' | 'suspected';
-}
-
-enum AllergenType {
-  FOOD = 'food',
-  ENVIRONMENTAL = 'environmental',
-  MEDICATION = 'medication',
-  INSECT = 'insect',
-  CONTACT = 'contact',
-  OTHER = 'other'
-}
-
-interface ChronicCondition {
-  conditionId: string;
-
-  // 질환 정보
-  conditionName: string;
-  icdCode?: string;             // ICD-11 코드
-
-  // 진단
-  diagnosedAt: ISO8601;
-  diagnosedBy: VeterinarianRef;
-
-  // 상태
-  severity: 'mild' | 'moderate' | 'severe';
-  status: 'active' | 'managed' | 'remission' | 'resolved';
-
-  // 관리
-  managementPlan: string;
-  medications: MedicationRecord[];
-  monitoringSchedule?: string;
-
-  // 예후
-  prognosis?: string;
-}
-```
-
-### 3.5 투약 기록
-
-```typescript
-interface MedicationRecord {
-  recordId: string;
-
-  // 약물 정보
-  medication: {
-    name: string;
-    genericName: string;
-    manufacturer?: string;
-    ndc?: string;               // National Drug Code
-  };
-
-  // 처방
-  prescribedAt: ISO8601;
-  prescribedBy: VeterinarianRef;
-
-  // 용법
-  dosage: {
-    amount: number;
-    unit: string;               // mg, ml, etc.
-    frequency: string;          // BID, TID, etc.
-    route: 'oral' | 'injection' | 'topical' | 'inhalation' | 'other';
-  };
-
-  // 기간
-  startDate: ISO8601;
-  endDate?: ISO8601;
-  asNeeded: boolean;
-
-  // 목적
-  indication: string;           // 투약 이유
-  relatedCondition?: string;
-
-  // 주의사항
-  warnings?: string[];
-  interactions?: string[];
-}
-```
-
----
-
-## 4. Genetic Information Format
-
-### 4.1 유전자 검사 결과
-
-```typescript
-interface GeneticProfile {
-  profileId: string;
-
-  // 검사 정보
-  testDate: ISO8601;
-  laboratory: string;
-  testKit?: string;
-
-  // 품종 분석
-  breedComposition: BreedComponent[];
-
-  // 유전 질환 위험도
-  healthMarkers: GeneticHealthMarker[];
-
-  // 형질
-  traits: GeneticTrait[];
-
-  // 혈통
-  ancestry?: {
-    maternalHaplogroup?: string;
-    paternalHaplogroup?: string;
-  };
-
-  // 원시 데이터 (선택적)
-  rawDataHash?: string;
-  rawDataUri?: string;
-}
-
-interface BreedComponent {
-  breed: string;
-  percentage: number;           // 0-100
-  confidence: number;           // 0-1
-}
-
-interface GeneticHealthMarker {
-  marker: string;               // 유전자 마커명
-  gene: string;                 // 유전자
-  condition: string;            // 관련 질환
-
-  // 결과
-  genotype: string;             // AA, Aa, aa 등
-  riskLevel: 'clear' | 'carrier' | 'at_risk';
-
-  // 상세
-  description: string;
-  inheritance: 'autosomal_dominant' | 'autosomal_recessive' | 'x_linked' | 'complex';
-  actionRequired?: string;
-}
-
-interface GeneticTrait {
-  trait: string;                // 형질명
-  gene: string;
-  genotype: string;
-  phenotype: string;            // 예상 표현형
-  confidence: number;
-}
-```
-
----
-
-## 5. Travel & Quarantine Format
-
-### 5.1 여행 기록
-
-```typescript
-interface TravelRecord {
-  recordId: string;
-
-  // 여행 정보
-  departureCountry: ISO3166Alpha2;
-  arrivalCountry: ISO3166Alpha2;
-
-  departureDate: ISO8601;
-  arrivalDate: ISO8601;
-
-  // 운송
-  transportMethod: 'air' | 'land' | 'sea';
-  carrier?: string;             // 항공사/선사 등
-
-  // 검역
-  quarantine?: QuarantineRecord;
-
-  // 필요 서류 상태
-  requiredDocuments: TravelDocument[];
-
-  // 승인
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  approvalAuthority?: string;
-}
-
-interface QuarantineRecord {
-  facilityName: string;
-  facilityCountry: ISO3166Alpha2;
-
-  startDate: ISO8601;
-  endDate: ISO8601;
-  durationDays: number;
-
-  // 검역 중 검사
-  testsPerformed: DiagnosticRecord[];
-
-  // 결과
-  outcome: 'released' | 'extended' | 'denied_entry';
-  notes?: string;
-}
-
-interface TravelDocument {
-  documentType: 'health_certificate' | 'import_permit' | 'rabies_titer' | 'parasite_treatment' | 'other';
-  documentNumber?: string;
-  issuedAt: ISO8601;
-  validUntil: ISO8601;
-  issuingAuthority: string;
-  status: 'valid' | 'expired' | 'pending';
-}
-```
-
-### 5.2 검역 요구사항 (국가별)
-
-```typescript
-interface CountryRequirements {
-  country: ISO3166Alpha2;
-  lastUpdated: ISO8601;
-
-  // 기본 요구사항
-  requirements: {
-    // 마이크로칩
-    microchipRequired: boolean;
-    microchipStandard: 'ISO11784' | 'ISO11785' | 'AVID' | 'any';
-
-    // 광견병
-    rabiesVaccination: {
-      required: boolean;
-      minimumAge: number;        // 개월
-      waitPeriod: number;        // 일 (접종 후 대기)
-      validityPeriod: number;    // 개월
-      titerTestRequired: boolean;
-      minimumTiter: number;      // IU/ml
-    };
-
-    // 기타 백신
-    otherVaccinations: {
-      disease: VaccineDisease;
-      required: boolean;
-      waitPeriod?: number;
-    }[];
-
-    // 기생충 치료
-    parasiteTreatment?: {
-      type: 'tapeworm' | 'tick' | 'other';
-      required: boolean;
-      timingBeforeEntry: number; // 시간
-    };
-
-    // 검역
-    quarantine?: {
-      required: boolean;
-      duration: number;         // 일
-      homeQuarantineAllowed: boolean;
-    };
-
-    // 금지 품종
-    bannedBreeds?: string[];
-
-    // 수입 허가
-    importPermitRequired: boolean;
-
-    // 건강 증명서
-    healthCertificateRequired: boolean;
-    healthCertificateValidDays: number;
-  };
-
-  // 예외 국가 (간소화된 요구사항)
-  exemptCountries?: ISO3166Alpha2[];
-}
-```
-
----
-
-## 6. Passport Document Format
-
-### 6.1 여권 메인 구조
-
-```typescript
-interface PetHealthPassport {
-  // 헤더
-  header: {
-    magic: 'WIAPET';
-    version: [1, 0, 0];
-    standard: 'WIA-PET-HEALTH-PASSPORT';
-    createdAt: ISO8601;
-    lastUpdated: ISO8601;
-  };
-
-  // 신원
-  identity: PetIdentity;
-  microchip?: MicrochipInfo;
-  guardian: GuardianInfo;
-
-  // 의료 기록
-  medicalRecords: {
-    vaccinations: VaccinationRecord[];
-    surgeries: SurgeryRecord[];
-    diagnostics: DiagnosticRecord[];
-    allergies: AllergyRecord[];
-    conditions: ChronicCondition[];
-    medications: MedicationRecord[];
-  };
-
-  // 유전자 정보
-  genetics?: GeneticProfile;
-
-  // 여행 기록
-  travel: {
-    history: TravelRecord[];
-    currentDocuments: TravelDocument[];
-  };
-
-  // 검증
-  verification: {
-    issuingAuthority: string;
-    digitalSignature: string;
-    certificateChain: string[];
-  };
-
-  // 메타데이터
-  metadata: {
-    qrCodeData: string;         // 빠른 조회용
-    lastSyncedAt?: ISO8601;
-    syncStatus: 'synced' | 'pending' | 'conflict';
-  };
-}
-```
-
-### 6.2 QR 코드 데이터 형식
-
-```typescript
-interface QRCodePayload {
-  version: number;
-
-  // 최소 정보 (빠른 스캔용)
-  mini: {
-    passportId: string;
-    microchipId?: string;
-    petName: string;
-    species: PetSpecies;
-
-    // 광견병 백신 상태
-    rabiesValid: boolean;
-    rabiesExpiry?: ISO8601;
-
-    // 긴급 연락처
-    emergencyPhone: string;
-  };
-
-  // 검증
-  signature: string;            // 전자 서명
-  timestamp: ISO8601;
-
-  // 전체 조회 URL
-  fullDataUrl: string;
-}
-```
-
----
-
-## 7. Binary Format
-
-### 7.1 컴팩트 바이너리 형식 (.wiapet)
-
-```
-┌────────────────────────────────────────────────────┐
-│ Header (32 bytes)                                  │
-├────────────────────────────────────────────────────┤
-│ Magic       │ Version │ Flags  │ Timestamp        │
-│ 6 bytes     │ 3 bytes │ 1 byte │ 8 bytes          │
-│ 'WIAPET'    │ 1.0.0   │        │ Unix timestamp   │
-├────────────────────────────────────────────────────┤
-│ DataLength  │ Reserved                             │
-│ 4 bytes     │ 10 bytes                             │
-├────────────────────────────────────────────────────┤
-│ Identity Section (variable)                        │
-├────────────────────────────────────────────────────┤
-│ Medical Records Section (variable)                 │
-├────────────────────────────────────────────────────┤
-│ Genetics Section (variable, optional)              │
-├────────────────────────────────────────────────────┤
-│ Travel Section (variable)                          │
-├────────────────────────────────────────────────────┤
-│ Signature (64 bytes)                               │
-├────────────────────────────────────────────────────┤
-│ Checksum (4 bytes) - CRC32                         │
-└────────────────────────────────────────────────────┘
-```
-
-### 7.2 섹션 인코딩
-
-```typescript
-interface BinarySectionHeader {
-  sectionType: u8;              // 섹션 유형
-  sectionLength: u32;           // 바이트 길이
-  compression: u8;              // 0: none, 1: lz4, 2: zstd
-  encrypted: u8;                // 0: no, 1: AES-256-GCM
-}
-
-enum SectionType {
-  IDENTITY = 0x01,
-  MICROCHIP = 0x02,
-  GUARDIAN = 0x03,
-  VACCINATION = 0x10,
-  SURGERY = 0x11,
-  DIAGNOSTIC = 0x12,
-  ALLERGY = 0x13,
-  CONDITION = 0x14,
-  MEDICATION = 0x15,
-  GENETICS = 0x20,
-  TRAVEL = 0x30,
-  SIGNATURE = 0xFF
-}
-```
-
----
-
-## 8. JSON Schema
-
-### 8.1 메인 스키마
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wiastandards.com/schemas/pet-health-passport/v1.json",
-  "title": "WIA Pet Health Passport",
-  "type": "object",
-  "required": ["header", "identity", "guardian", "medicalRecords", "verification"],
-  "properties": {
-    "header": {
-      "type": "object",
-      "required": ["magic", "version", "standard", "createdAt"],
-      "properties": {
-        "magic": { "const": "WIAPET" },
-        "version": {
-          "type": "array",
-          "items": { "type": "integer" },
-          "minItems": 3,
-          "maxItems": 3
-        },
-        "standard": { "const": "WIA-PET-HEALTH-PASSPORT" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "identity": {
-      "$ref": "#/definitions/PetIdentity"
-    },
-    "medicalRecords": {
-      "$ref": "#/definitions/MedicalRecords"
-    }
-  },
-  "definitions": {
-    "PetIdentity": {
-      "type": "object",
-      "required": ["passportId", "species", "name", "sex"],
-      "properties": {
-        "passportId": { "type": "string", "format": "uuid" },
-        "microchipId": {
-          "type": "string",
-          "pattern": "^[0-9]{15}$"
-        },
-        "species": {
-          "enum": ["dog", "cat", "rabbit", "hamster", "bird", "reptile", "fish", "other"]
-        },
-        "breed": { "type": "string" },
-        "name": { "type": "string", "minLength": 1 },
-        "dateOfBirth": { "type": "string", "format": "date" },
-        "sex": {
-          "enum": ["male", "female", "neutered_male", "spayed_female"]
-        }
-      }
-    },
-    "MedicalRecords": {
-      "type": "object",
-      "properties": {
-        "vaccinations": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/VaccinationRecord" }
-        }
-      }
-    },
-    "VaccinationRecord": {
-      "type": "object",
-      "required": ["recordId", "vaccine", "targetDiseases", "administeredAt"],
-      "properties": {
-        "recordId": { "type": "string", "format": "uuid" },
-        "vaccine": {
-          "type": "object",
-          "required": ["name"],
-          "properties": {
-            "name": { "type": "string" },
-            "manufacturer": { "type": "string" },
-            "lotNumber": { "type": "string" }
-          }
-        },
-        "administeredAt": { "type": "string", "format": "date-time" },
-        "validUntil": { "type": "string", "format": "date-time" }
-      }
-    }
-  }
-}
-```
-
----
-
-## 9. 호환성
-
-### 9.1 기존 표준과의 매핑
-
-| 기존 표준 | WIA 매핑 |
-|-----------|----------|
-| EU Pet Passport | 완전 호환 |
-| USDA APHIS Form 7001 | 변환 가능 |
-| ISO 11784/11785 (마이크로칩) | 직접 호환 |
-| IATA Live Animal Regulations | 여행 섹션 매핑 |
-| OIE Terrestrial Animal Health Code | 질병 코드 매핑 |
-
-### 9.2 버전 호환성
-
-| 버전 | 호환 |
-|------|------|
-| 1.0.x | 완전 호환 |
-| 1.x.x | 상위 호환 |
-| 2.x.x | 마이그레이션 필요 |
-
----
-
-## 10. 성능 요구사항
-
-| 지표 | 요구사항 | 목표 |
-|------|----------|------|
-| QR 코드 스캔 | < 500ms | < 200ms |
-| 전체 여권 로드 | < 2s | < 500ms |
-| 검역 검증 | < 1s | < 300ms |
-| 오프라인 검증 | 지원 | 지원 |
-| 최대 파일 크기 | 5MB | 1MB |
-
----
-
-**Document ID**: WIA-PET-HEALTH-PASSPORT-PHASE1-001
-**Version**: 1.0.0
-**Last Updated**: 2025-12-16
-**Copyright**: © 2025 WIA - MIT License
-
-**홍익인간 (弘益人間)** - 인류와 동물 모두를 이롭게 하라
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pet-health-passport
+standard. It addresses the data-format layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-health-passport"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-health-passport`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-health-passport` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

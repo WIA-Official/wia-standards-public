@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제3장: API 엔드포인트 - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제3장: API 엔드포인트</h1>
+            <p class="subtitle">통합 게이트웨이, 프로토콜 변환 & 버전 조화</p>
+        </header>
+
+        <div class="content">
+            <h2>3.1 통합 게이트웨이 아키텍처</h2>
+
+            <p>
+                WIA-OMNI-API는 기본 프로토콜에 관계없이 모든 API 요청에 대한 단일 진입점을 제공합니다.
+                이 통합 게이트웨이는 모든 클라이언트를 환영하고 요청을 적절하게 라우팅하는 "어머니" 역할을 합니다.
+            </p>
+
+            <h3>단일 엔드포인트 설계</h3>
+            <pre><code>// 모든 요청은 동일한 기본 URL로
+const gateway = "https://api.example.com/omni"
+
+// REST 스타일
+GET https://api.example.com/omni/users/123
+
+// GraphQL 스타일
+POST https://api.example.com/omni
+{ "query": "{ user(id: 123) { name } }" }
+
+// 의도 스타일 (권장)
+POST https://api.example.com/omni
+{ "intent": "사용자 123 가져와" }
+
+// 어머니가 자동으로 최적 백엔드로 라우팅</code></pre>
+
+            <h2>3.2 프로토콜 변환 엔드포인트</h2>
+
+            <p>
+                게이트웨이는 프로토콜 간 자동 변환을 수행하여, 클라이언트가 선호하는 프로토콜을
+                사용하면서 백엔드가 자체 프로토콜을 사용할 수 있게 합니다.
+            </p>
+
+            <h3>REST에서 GraphQL 브리지</h3>
+            <pre><code>// 클라이언트가 REST 요청 전송
+GET /api/users/123?fields=name,email,orders
+
+// 어머니가 내부적으로 GraphQL로 변환
+query {
+  user(id: 123) {
+    name
+    email
+    orders {
+      id
+      total
+    }
+  }
+}
+
+// 장점:
+// - N+1 쿼리 문제 없음
+// - 정확한 필드 선택
+// - 단일 네트워크 요청
+// - 클라이언트가 GraphQL 알 필요 없음</code></pre>
+
+            <h2>3.3 버전 조화</h2>
+
+            <p>
+                버전 조화기는 API 진화가 기존 클라이언트를 절대 손상시키지 않도록 보장합니다.
+                이것이 WIA-OMNI-API의 신성한 약속입니다.
+            </p>
+
+            <div class="info-box">
+                <strong>보장:</strong> 일단 API 계약이 수립되면 영원히 지원됩니다. 버전 1.0을 사용하는
+                클라이언트는 API가 버전 10.0에 도달해도 계속 작동합니다.
+            </div>
+
+            <h3>스키마 변경 처리</h3>
+
+            <h4>필드 추가 (중단 없음)</h4>
+            <pre><code>// 버전 1.0 스키마
+{
+  "id": 123,
+  "name": "김민준"
+}
+
+// 버전 2.0 스키마 (필드 추가)
+{
+  "id": 123,
+  "name": "김민준",
+  "email": "kim@example.com",  // 새로운
+  "phone": "+82-10-1234-5678"  // 새로운
+}
+
+// 버전 1.0 클라이언트는 v1 스키마 수신
+// 버전 2.0 클라이언트는 v2 스키마 수신
+// 자동적이고 투명함</code></pre>
+
+            <h2>3.4 지능형 라우팅</h2>
+
+            <p>
+                게이트웨이는 여러 요인을 기반으로 최적의 백엔드로 요청을 라우팅하며,
+                시간이 지남에 따라 학습하고 개선합니다.
+            </p>
+
+            <h3>라우팅 기준</h3>
+            <ul>
+                <li><strong>클라이언트 능력</strong>: 브라우저 vs. 고성능 서비스</li>
+                <li><strong>네트워크 상태</strong>: 대역폭, 지연 시간, 신뢰성</li>
+                <li><strong>요청 유형</strong>: 쿼리 vs. 변경 vs. 구독</li>
+                <li><strong>성능 요구사항</strong>: 속도 vs. 정확도 vs. 비용</li>
+                <li><strong>데이터 신선도</strong>: 실시간 vs. 캐시 가능</li>
+                <li><strong>부하 분산</strong>: 백엔드 가용성 및 부하</li>
+            </ul>
+
+            <h2>3.5 엔드포인트 검색</h2>
+
+            <p>
+                클라이언트는 사용 가능한 엔드포인트와 그 기능을 자동으로 검색할 수 있으며,
+                AI로 강화된 HATEOAS 원칙을 따릅니다.
+            </p>
+
+            <h3>HATEOAS 링크</h3>
+            <pre><code>GET /api/users/123
+
+응답:
+{
+  "id": 123,
+  "name": "김민준",
+  "_links": {
+    "self": "/api/users/123",
+    "orders": "/api/users/123/orders",
+    "preferences": "/api/users/123/preferences",
+    "avatar": "/api/users/123/avatar"
+  },
+  "_actions": {
+    "update": {
+      "method": "PUT",
+      "href": "/api/users/123",
+      "fields": ["name", "email", "phone"]
+    },
+    "delete": {
+      "method": "DELETE",
+      "href": "/api/users/123",
+      "confirm": true
+    }
+  }
+}</code></pre>
+
+            <div class="success-box">
+                <strong>성능 향상:</strong> 자동 배치 및 예측 번들링은 클라이언트 변경 없이
+                네트워크 요청을 50-80% 줄일 수 있습니다.
+            </div>
+
+            <div class="navigation">
+                <a href="chapter2.html">← 이전: 데이터 스키마</a>
+                <a href="chapter4.html">다음: 프로토콜 사양 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

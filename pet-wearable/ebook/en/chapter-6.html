@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Battery and Power Management - WIA-PET-007</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 3rem; border-radius: 1rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        h1 { color: #F59E0B; font-size: 2.5rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 3px solid #F59E0B; }
+        h2 { color: #fbbf24; font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: #fcd34d; font-size: 1.4rem; margin: 1.5rem 0 1rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .ascii-table { background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Courier New', monospace; font-size: 0.9rem; line-height: 1.4; }
+        .code-block { background: #0f172a; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #F59E0B; overflow-x: auto; margin: 1.5rem 0; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+        .info-box { background: #1e3a8a; border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0.5rem; }
+        .warning-box { background: #7f1d1d; border-left: 4px solid #ef4444; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0.5rem; }
+        .summary-box { background: #064e3b; border-left: 4px solid #10b981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        strong { color: #F59E0B; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #334155; }
+        .nav-btn { background: #F59E0B; color: #0f172a; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: bold; transition: all 0.3s ease; }
+        .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #334155; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Battery and Power Management</h1>
+
+        <h2>6.1 Battery Life Requirements</h2>
+
+        <p>Battery life is one of the most critical factors in pet wearable adoption. Frequent charging frustrates users and reduces device effectiveness. The WIA-PET-007 standard establishes minimum battery life requirements while acknowledging the trade-offs between features, size, and longevity.</p>
+
+        <h3>6.1.1 Minimum Battery Life by Device Category</h3>
+
+        <div class="ascii-table">
++-------------------+------------------+------------------+---------------------------+
+| Device Size       | Min Battery Life | Typical Usage    | Features Active           |
++-------------------+------------------+------------------+---------------------------+
+| XS (< 5kg pets)   | 5-7 days         | Indoor cat,      | Activity, BLE sync 4x/day |
+|                   |                  | light activity   | No GPS                    |
++-------------------+------------------+------------------+---------------------------+
+| Small (5-10kg)    | 7-10 days        | Small dog,       | Activity, periodic GPS    |
+|                   |                  | moderate active  | BLE sync 4x/day           |
++-------------------+------------------+------------------+---------------------------+
+| Medium (10-25kg)  | 10-14 days       | Medium dog,      | Activity, GPS 2x/day      |
+|                   |                  | daily walks      | Health monitoring         |
++-------------------+------------------+------------------+---------------------------+
+| Large (25-45kg)   | 12-18 days       | Large dog,       | Full features, active GPS |
+|                   |                  | active lifestyle |                           |
++-------------------+------------------+------------------+---------------------------+
+| XL (> 45kg)       | 14-21 days       | XL dog, working  | Full features, continuous |
+|                   |                  | dogs             | monitoring                |
++-------------------+------------------+------------------+---------------------------+
+        </div>
+
+        <h3>6.1.2 Power Budget Analysis</h3>
+
+        <p>Understanding where power is consumed enables optimization:</p>
+
+        <div class="code-block">
+{
+  "powerBudget": {
+    "totalBudget_mWh": 400,
+    "targetDays": 10,
+    "averagePower_mW": 1.67,
+    "componentBreakdown": {
+      "gps": {
+        "power_mW": 75,
+        "dutyCycle": 0.10,
+        "averagePower_mW": 7.5,
+        "percentTotal": 45
+      },
+      "ble": {
+        "power_mW": 5,
+        "dutyCycle": 0.08,
+        "averagePower_mW": 0.4,
+        "percentTotal": 24
+      },
+      "accelerometer": {
+        "power_mW": 0.15,
+        "dutyCycle": 1.0,
+        "averagePower_mW": 0.15,
+        "percentTotal": 9
+      },
+      "heartRateSensor": {
+        "power_mW": 12,
+        "dutyCycle": 0.05,
+        "averagePower_mW": 0.6,
+        "percentTotal": 36
+      },
+      "mcu": {
+        "power_mW": 3,
+        "dutyCycle": 0.30,
+        "averagePower_mW": 0.9,
+        "percentTotal": 54
+      }
+    }
+  }
+}
+        </div>
+
+        <h2>6.2 Power Optimization Strategies</h2>
+
+        <h3>6.2.1 Intelligent Sensor Scheduling</h3>
+
+        <p>Sensors consume power differently based on operating mode. Smart scheduling maximizes battery life without sacrificing data quality:</p>
+
+        <ul>
+            <li><strong>Motion-Triggered Sampling:</strong> Heart rate sensor activates only when movement detected</li>
+            <li><strong>Adaptive GPS:</strong> High-frequency updates during walks, low-frequency when stationary</li>
+            <li><strong>Sleep Mode Detection:</strong> Minimal sensor activity during nighttime rest periods</li>
+            <li><strong>Geofence-Aware GPS:</strong> Disable GPS when confirmed inside safe zone via Wi-Fi</li>
+            <li><strong>Activity-Based Acceleration:</strong> Sample accelerometer at higher rates during activity, lower during rest</li>
+        </ul>
+
+        <h3>6.2.2 Power Modes</h3>
+
+        <div class="ascii-table">
++-------------------+----------------------+---------------------+---------------------+
+| Power Mode        | Features Active      | Battery Life Impact | Use Case            |
++-------------------+----------------------+---------------------+---------------------+
+| Ultra Power Save  | Activity tracking,   | +200%               | Indoor pets, lost   |
+|                   | BLE sync 1x/day      | (28+ days possible) | device recovery     |
++-------------------+----------------------+---------------------+---------------------+
+| Power Saver       | Activity, health 2x/ | +100%               | Low-activity pets,  |
+|                   | day, GPS off         | (20-30 days)        | extended trips      |
++-------------------+----------------------+---------------------+---------------------+
+| Balanced          | All features,        | Baseline            | Normal daily use    |
+| (Default)         | smart scheduling     | (10-14 days)        |                     |
++-------------------+----------------------+---------------------+---------------------+
+| Performance       | Continuous health,   | -50%                | Training, health    |
+|                   | frequent GPS         | (5-7 days)          | monitoring          |
++-------------------+----------------------+---------------------+---------------------+
+| Real-Time Track   | GPS every 10-30 sec, | -80%                | Lost pet, active    |
+|                   | live updates         | (1-2 days)          | tracking            |
++-------------------+----------------------+---------------------+---------------------+
+        </div>
+
+        <h3>6.2.3 Dynamic Power Management</h3>
+
+        <div class="code-block">
+{
+  "dynamicPowerManagement": {
+    "adaptiveScheduling": {
+      "learningPeriod": "14 days to establish pet's routine",
+      "optimization": "Predict high/low activity periods",
+      "example": "Disable GPS during known nap times (2-4 PM daily)"
+    },
+    "batteryLevelAdaptation": {
+      "above50": "Normal operation, all features",
+      "30to50": "Reduce GPS frequency by 25%, extend BLE sync intervals",
+      "15to30": "Power Saver mode automatically engaged",
+      "below15": "Ultra Power Save mode, essential features only"
+    },
+    "environmentalFactors": {
+      "temperature": "Reduce sensor sampling in extreme cold (< -10°C)",
+      "connectivity": "Minimize reconnection attempts in poor signal areas",
+      "chargerProximity": "More aggressive features when charger detected nearby"
+    }
+  }
+}
+        </div>
+
+        <h2>6.3 Charging Technologies</h2>
+
+        <h3>6.3.1 USB-C Charging</h3>
+
+        <p>USB-C is the recommended wired charging standard for pet wearables:</p>
+
+        <ul>
+            <li><strong>Connector:</strong> USB Type-C (reversible, durable)</li>
+            <li><strong>Power Delivery:</strong> 5V at 0.5-1A (2.5-5W)</li>
+            <li><strong>Charging Speed:</strong> 0-80% in < 2 hours, full charge in < 3 hours</li>
+            <li><strong>Waterproofing:</strong> IP67-rated USB-C port with protective cap or gasket</li>
+            <li><strong>Safety:</strong> Over-current, over-voltage, over-temperature protection</li>
+            <li><strong>Data Transfer:</strong> Optional USB 2.0 data capability for firmware updates</li>
+        </ul>
+
+        <h3>6.3.2 Wireless Charging (Qi Standard)</h3>
+
+        <p>Wireless charging eliminates port wear and simplifies waterproofing:</p>
+
+        <div class="ascii-table">
++---------------------+-------------------------+--------------------------------+
+| Specification       | Requirement             | Notes                          |
++---------------------+-------------------------+--------------------------------+
+| Standard            | Qi 1.2.4 or higher      | WPC (Wireless Power Consortium |
++---------------------+-------------------------+--------------------------------+
+| Power Level         | 5W minimum              | BPP (Baseline Power Profile)   |
++---------------------+-------------------------+--------------------------------+
+| Coil Alignment      | ±5mm tolerance          | Magnetic alignment recommended |
++---------------------+-------------------------+--------------------------------+
+| Foreign Object Det. | Required                | Safety: detect metal objects   |
++---------------------+-------------------------+--------------------------------+
+| Efficiency          | > 70%                   | Minimize heat generation       |
++---------------------+-------------------------+--------------------------------+
+| Charging Position   | Lying flat preferred    | Device design consideration    |
++---------------------+-------------------------+--------------------------------+
+        </div>
+
+        <h3>6.3.3 Charging Time Standards</h3>
+
+        <div class="code-block">
+{
+  "chargingPerformance": {
+    "wiredCharging": {
+      "0to50percent": "< 45 minutes",
+      "0to80percent": "< 90 minutes",
+      "0to100percent": "< 180 minutes",
+      "trickleChargeCutoff": "80% (transition to low current)"
+    },
+    "wirelessCharging": {
+      "0to50percent": "< 60 minutes",
+      "0to80percent": "< 120 minutes",
+      "0to100percent": "< 240 minutes"
+    },
+    "chargingAlgorithm": {
+      "phase1": "Constant current (CC) to 80%",
+      "phase2": "Constant voltage (CV) 80-100%",
+      "termination": "Current drops below C/20 (20-hour rate)"
+    }
+  }
+}
+        </div>
+
+        <h2>6.4 Battery Health and Longevity</h2>
+
+        <h3>6.4.1 Cycle Life Requirements</h3>
+
+        <p>Battery degradation over time must be minimized:</p>
+
+        <ul>
+            <li><strong>Minimum Cycles:</strong> 500 full charge cycles to 80% capacity retention</li>
+            <li><strong>Typical Lifespan:</strong> 2-3 years of daily use before noticeable degradation</li>
+            <li><strong>End-of-Life:</strong> Device should function at reduced battery life (5-7 days) even at 70% capacity</li>
+        </ul>
+
+        <h3>6.4.2 Battery Health Monitoring</h3>
+
+        <div class="code-block">
+{
+  "batteryHealthMetrics": {
+    "stateOfHealth": {
+      "calculation": "(currentFullChargeCapacity / designCapacity) * 100",
+      "reporting": "Monthly report to user",
+      "threshold": "Alert when SoH drops below 80%"
+    },
+    "chargeC cycles": {
+      "tracking": "Count full discharge/charge cycles",
+      "display": "Show in device info section",
+      "warranty": "Track cycles for warranty claims"
+    },
+    "impedance": {
+      "monitoring": "Internal resistance increases with age",
+      "indication": "High impedance indicates cell degradation",
+      "action": "Recommend replacement when impedance > 2x nominal"
+    },
+    "selfDischarge": {
+      "rate": "< 5% per month when powered off",
+      "testing": "Measure capacity after 30 days storage",
+      "passFailCriteria": "> 90% capacity retained"
+    }
+  }
+}
+        </div>
+
+        <h3>6.4.3 Battery Protection Mechanisms</h3>
+
+        <ul>
+            <li><strong>Overcharge Protection:</strong> Hardware cutoff at 4.2V per cell, software monitoring</li>
+            <li><strong>Over-discharge Protection:</strong> Shutdown at 2.8V per cell to prevent damage</li>
+            <li><strong>Temperature Monitoring:</strong> Suspend charging if battery > 45°C or < 0°C</li>
+            <li><strong>Current Limiting:</strong> Maximum 1C charge rate (1x battery capacity)</li>
+            <li><strong>Cell Balancing:</strong> Ensure balanced charging in multi-cell configurations</li>
+            <li><strong>Voltage Monitoring:</strong> Continuous monitoring of cell voltage during operation</li>
+        </ul>
+
+        <div class="warning-box">
+            <strong>⚠️ Safety Critical:</strong> Battery safety mechanisms must be implemented in hardware with redundant software protections. Lithium battery failures can result in fire or injury to pets and people.
+        </div>
+
+        <h2>6.5 Low Battery Behaviors</h2>
+
+        <h3>6.5.1 Low Battery Alerts</h3>
+
+        <div class="ascii-table">
++----------------+------------------+------------------------------------+
+| Battery Level  | Alert Type       | Device Behavior                    |
++----------------+------------------+------------------------------------+
+| 20%            | In-app notice    | Normal operation, reminder to      |
+|                |                  | charge soon                        |
++----------------+------------------+------------------------------------+
+| 15%            | Push notification| Auto-enable Power Saver mode       |
+|                | + device LED     | (unless user overrides)            |
++----------------+------------------+------------------------------------+
+| 10%            | Push + SMS       | Reduce GPS frequency, disable      |
+|                | (if configured)  | non-essential features             |
++----------------+------------------+------------------------------------+
+| 5%             | Critical alert   | GPS for location only, disable     |
+|                | every 30 min     | continuous health monitoring       |
++----------------+------------------+------------------------------------+
+| 2%             | Final alert      | Send current location, prepare     |
+|                |                  | for shutdown                       |
++----------------+------------------+------------------------------------+
+| 0%             | Graceful shutdown| Save final GPS location to flash,  |
+|                |                  | orderly power-down                 |
++----------------+------------------+------------------------------------+
+        </div>
+
+        <h3>6.5.2 Emergency Reserve Power</h3>
+
+        <p>Reserve capacity for critical functions even after "0%" battery:</p>
+
+        <ul>
+            <li><strong>Reserve Capacity:</strong> 2-5% battery reserved for emergency use</li>
+            <li><strong>Location Beacon:</strong> Transmit GPS location every 4 hours for 24-48 hours</li>
+            <li><strong>BLE Advertisement:</strong> Low-power BLE beacon for close-range detection</li>
+            <li><strong>RTC Maintenance:</strong> Keep real-time clock running for accurate timestamps on restart</li>
+        </ul>
+
+        <h2>6.6 Power Consumption Testing</h2>
+
+        <h3>6.6.1 Standardized Test Procedures</h3>
+
+        <p>Manufacturers must test battery life using standardized protocols:</p>
+
+        <div class="code-block">
+{
+  "batteryLifeTest": {
+    "testProfile": {
+      "activity": "Simulate typical daily routine",
+      "schedule": {
+        "06:00-07:00": "Morning walk (GPS active, high activity)",
+        "07:00-12:00": "Indoor rest (GPS off, periodic health checks)",
+        "12:00-13:00": "Midday walk (GPS active)",
+        "13:00-17:00": "Afternoon rest",
+        "17:00-18:30": "Evening walk (GPS active)",
+        "18:30-22:00": "Indoor activity",
+        "22:00-06:00": "Sleep (minimal sensors)"
+      },
+      "syncFrequency": "4 BLE syncs per day",
+      "ambientTemp": "25°C ±2°C"
+    },
+    "passCriteria": {
+      "measurement": "Average of 5 devices",
+      "requirement": "Must achieve claimed battery life ±10%",
+      "documentation": "Publish test methodology and results"
+    }
+  }
+}
+        </div>
+
+        <h3>6.6.2 Real-World vs. Laboratory Performance</h3>
+
+        <p>Actual battery life varies based on usage patterns:</p>
+
+        <div class="ascii-table">
++------------------------+----------------+----------------+--------------------+
+| Usage Pattern          | Lab Test       | Real-World     | Factors            |
++------------------------+----------------+----------------+--------------------+
+| Indoor cat, low        | 21 days        | 18-25 days     | Minimal GPS, low   |
+| activity               |                |                | sync frequency     |
++------------------------+----------------+----------------+--------------------+
+| Suburban dog, moderate | 12 days        | 10-14 days     | Daily walks, some  |
+| activity               |                |                | GPS usage          |
++------------------------+----------------+----------------+--------------------+
+| Active dog, outdoor    | 8 days         | 6-9 days       | Frequent GPS,      |
+| adventures             |                |                | continuous health  |
++------------------------+----------------+----------------+--------------------+
+| Working dog, intensive | 5 days         | 4-6 days       | Continuous track,  |
+| monitoring             |                |                | all features active|
++------------------------+----------------+----------------+--------------------+
+        </div>
+
+        <h2>6.7 Environmental Impact of Batteries</h2>
+
+        <h3>6.7.1 Sustainable Battery Practices</h3>
+
+        <ul>
+            <li><strong>Replaceable Batteries:</strong> Design allows battery replacement (tools may be required)</li>
+            <li><strong>Recycling Programs:</strong> Manufacturers provide free battery recycling</li>
+            <li><strong>Responsible Sourcing:</strong> Conflict-free minerals, ethical cobalt sourcing</li>
+            <li><strong>Battery Passport:</strong> Documentation of battery composition for recycling</li>
+            <li><strong>Extended Lifespan:</strong> Over-engineer cycle life to delay replacement</li>
+        </ul>
+
+        <h3>6.7.2 Disposal and Recycling</h3>
+
+        <div class="code-block">
+{
+  "batteryRecycling": {
+    "regulations": {
+      "EU": "Battery Directive 2006/66/EC (collection and recycling)",
+      "USA": "State-specific regulations (CA, NY strict requirements)",
+      "global": "Basel Convention on hazardous waste"
+    },
+    "recyclingProgram": {
+      "mailIn": "Free prepaid shipping label for battery return",
+      "dropOff": "Partner with electronics retailers for drop-off",
+      "replacement": "Trade-in credit when replacing battery",
+      "materials": "Recover lithium, cobalt, nickel for reuse"
+    },
+    "labeling": {
+      "crossedBin": "WEEE crossed-out wheelie bin symbol required",
+      "chemistry": "Label with 'Li-ion' or 'Li-Po'",
+      "capacity": "Mark capacity in mAh and Wh"
+    }
+  }
+}
+        </div>
+
+        <h2>6.8 Firmware Optimization for Power Efficiency</h2>
+
+        <h3>6.8.1 Sleep Modes and Wake-Up Events</h3>
+
+        <p>Microcontroller sleep modes dramatically reduce power consumption:</p>
+
+        <div class="ascii-table">
++------------------+------------------+--------------------+-------------------------+
+| Sleep Mode       | Power Draw       | Wake-Up Time       | Peripherals Active      |
++------------------+------------------+--------------------+-------------------------+
+| Active           | 10-20 mA         | N/A                | All peripherals         |
++------------------+------------------+--------------------+-------------------------+
+| Idle             | 5-8 mA           | < 1 µs             | RTC, interrupts, RAM    |
++------------------+------------------+--------------------+-------------------------+
+| Light Sleep      | 1-2 mA           | < 10 µs            | RTC, RAM retained       |
++------------------+------------------+--------------------+-------------------------+
+| Deep Sleep       | 50-200 µA        | 1-10 ms            | RTC only, RAM lost      |
++------------------+------------------+--------------------+-------------------------+
+| Ultra-Deep Sleep | 5-20 µA          | 10-100 ms          | RTC only, reinitialize  |
++------------------+------------------+--------------------+-------------------------+
+        </div>
+
+        <h3>6.8.2 Interrupt-Driven Architecture</h3>
+
+        <p>Efficient firmware minimizes active CPU time:</p>
+
+        <ul>
+            <li><strong>Motion Interrupt:</strong> Accelerometer wakes MCU on movement detection</li>
+            <li><strong>Timer Interrupts:</strong> RTC schedules sensor sampling without continuous polling</li>
+            <li><strong>BLE Events:</strong> Bluetooth stack wakes CPU only for connection events</li>
+            <li><strong>GPIO Interrupts:</strong> Button presses, external events trigger wake-up</li>
+            <li><strong>DMA Transfers:</strong> Direct Memory Access for sensor data without CPU involvement</li>
+        </ul>
+
+        <h2>6.9 User Education and Best Practices</h2>
+
+        <h3>6.9.1 Maximizing Battery Life - User Guide</h3>
+
+        <p>Educate users on practices that extend battery life:</p>
+
+        <ul>
+            <li><strong>Regular Charging:</strong> Don't wait for full depletion; charge at 15-20%</li>
+            <li><strong>Avoid Extreme Temperatures:</strong> Don't leave device in hot car or freezing cold</li>
+            <li><strong>Update Firmware:</strong> Software updates often include power optimizations</li>
+            <li><strong>Adjust Sync Frequency:</strong> Reduce BLE sync to 2x daily if possible</li>
+            <li><strong>Use Power Modes:</strong> Enable Power Saver mode during travel or low-activity periods</li>
+            <li><strong>Disable Unused Features:</strong> Turn off continuous heart rate if not needed</li>
+        </ul>
+
+        <h3>6.9.2 Battery Lifespan Extension</h3>
+
+        <ul>
+            <li><strong>Avoid Full Discharges:</strong> Keeping battery between 20-80% extends cycle life</li>
+            <li><strong>Charge at Moderate Speed:</strong> Slow charging (0.5C) better for longevity than fast charging</li>
+            <li><strong>Storage:</strong> If not using for extended period, store at 40-60% charge</li>
+            <li><strong>Temperature:</strong> Charge and store in moderate temperatures (15-25°C)</li>
+        </ul>
+
+        <h2>6.10 Future Battery Technologies</h2>
+
+        <h3>6.10.1 Emerging Technologies</h3>
+
+        <p>Next-generation batteries may revolutionize pet wearables:</p>
+
+        <ul>
+            <li><strong>Solid-State Batteries:</strong> Higher energy density, safer (no liquid electrolyte), longer life</li>
+            <li><strong>Silicon Anodes:</strong> 3-10x capacity increase over current graphite anodes</li>
+            <li><strong>Lithium-Sulfur:</strong> Theoretical 5x energy density of Li-ion, lower cost</li>
+            <li><strong>Energy Harvesting:</strong> Solar, kinetic, or thermal energy to supplement battery</li>
+            <li><strong>Wireless Power Transfer:</strong> Far-field RF charging (charge while walking nearby base station)</li>
+        </ul>
+
+        <h3>6.10.2 Energy Harvesting Feasibility</h3>
+
+        <div class="code-block">
+{
+  "energyHarvesting": {
+    "kineticEnergy": {
+      "source": "Pet movement converted to electrical energy",
+      "potential": "5-15 µW average for active dog",
+      "challenge": "Low power, insufficient for GPS but can extend standby",
+      "viability": "Supplemental power, extend battery 10-20%"
+    },
+    "solarPower": {
+      "source": "Small solar panel on collar",
+      "potential": "50-200 µW in full sun",
+      "challenge": "Pet fur blocks panel, unreliable for indoor pets",
+      "viability": "Outdoor working dogs, extend battery 20-40%"
+    },
+    "thermoelectric": {
+      "source": "Pet body heat vs. ambient temperature",
+      "potential": "1-5 µW per square cm",
+      "challenge": "Small temperature differential, low efficiency",
+      "viability": "Not practical with current technology"
+    }
+  }
+}
+        </div>
+
+        <div class="info-box">
+            <strong>🔋 Future Vision:</strong> By 2030, solid-state batteries could enable 30-60 day battery life in compact pet wearables, while energy harvesting provides indefinite battery life for low-power tracking devices.
+        </div>
+
+        <div class="summary-box">
+            <h3>Chapter Summary: Key Takeaways</h3>
+            <ol>
+                <li><strong>Minimum Battery Life Standards:</strong> 5-21 days depending on device size, with strict requirements for power budget allocation across components (GPS 45%, health sensors 36%, MCU 54%, etc.).</li>
+                <li><strong>Intelligent Power Management:</strong> Dynamic adaptation based on battery level, learned pet routines, and environmental factors extends practical battery life by 50-200%.</li>
+                <li><strong>Dual Charging Options:</strong> USB-C (2-3 hour charge time) and Qi wireless (3-4 hours) with comprehensive safety protections and IP67 waterproofing.</li>
+                <li><strong>Battery Health Monitoring:</strong> Track state-of-health, charge cycles, and impedance; require 500+ cycles to 80% capacity retention for 2-3 year lifespan.</li>
+                <li><strong>Sustainable Practices:</strong> Replaceable batteries, manufacturer recycling programs, conflict-free sourcing, and battery passports minimize environmental impact.</li>
+            </ol>
+        </div>
+
+        <div class="summary-box">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>What are the minimum battery life requirements for each device size category? Why do larger devices have longer battery life requirements?</li>
+                <li>Describe the power budget breakdown for a typical pet wearable. Which component consumes the most power and why?</li>
+                <li>Explain the five power modes defined by WIA-PET-007. When would each mode be most appropriate?</li>
+                <li>What are the key differences between USB-C and Qi wireless charging? What are the advantages and disadvantages of each?</li>
+                <li>How does the standard protect battery health and longevity? List at least four protection mechanisms.</li>
+                <li>Describe the low battery behavior escalation from 20% to 0%. Why is emergency reserve power important?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

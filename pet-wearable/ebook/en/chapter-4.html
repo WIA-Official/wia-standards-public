@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Activity and Location Tracking - WIA-PET-007</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 3rem; border-radius: 1rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        h1 { color: #F59E0B; font-size: 2.5rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 3px solid #F59E0B; }
+        h2 { color: #fbbf24; font-size: 1.8rem; margin: 2rem 0 1rem 0; }
+        h3 { color: #fcd34d; font-size: 1.4rem; margin: 1.5rem 0 1rem 0; }
+        p { margin: 1rem 0; color: #cbd5e1; }
+        .ascii-table { background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: 'Courier New', monospace; font-size: 0.9rem; line-height: 1.4; }
+        .code-block { background: #0f172a; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #F59E0B; overflow-x: auto; margin: 1.5rem 0; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+        .info-box { background: #1e3a8a; border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0.5rem; }
+        .warning-box { background: #7f1d1d; border-left: 4px solid #ef4444; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0.5rem; }
+        .summary-box { background: #064e3b; border-left: 4px solid #10b981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin: 0.5rem 0; }
+        strong { color: #F59E0B; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #334155; }
+        .nav-btn { background: #F59E0B; color: #0f172a; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: bold; transition: all 0.3s ease; }
+        .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #334155; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Activity and Location Tracking</h1>
+
+        <h2>4.1 Activity Recognition and Classification</h2>
+
+        <p>Accurate activity tracking enables fitness monitoring, behavioral analysis, and health insights. The WIA-PET-007 standard defines requirements for detecting and classifying various pet activities using accelerometer data and machine learning algorithms.</p>
+
+        <h3>4.1.1 Activity Categories</h3>
+
+        <div class="ascii-table">
++------------------+----------------------------+----------------------------------+
+| Activity Type    | Detection Method           | Validation Criteria              |
++------------------+----------------------------+----------------------------------+
+| Resting/Sleeping | Low movement variance,     | >80% accuracy vs. video          |
+|                  | prolonged stillness        | validation                       |
++------------------+----------------------------+----------------------------------+
+| Standing         | Vertical orientation,      | >75% accuracy                    |
+|                  | minimal movement           |                                  |
++------------------+----------------------------+----------------------------------+
+| Walking          | Rhythmic movement,         | >85% accuracy, ±5% step count    |
+|                  | moderate frequency         |                                  |
++------------------+----------------------------+----------------------------------+
+| Running          | High-frequency movement,   | >80% accuracy                    |
+|                  | elevated intensity         |                                  |
++------------------+----------------------------+----------------------------------+
+| Playing          | Irregular, high-energy     | >70% accuracy (high variability) |
+|                  | movements                  |                                  |
++------------------+----------------------------+----------------------------------+
+| Scratching       | Rapid, localized vibration | >75% accuracy                    |
++------------------+----------------------------+----------------------------------+
+| Eating/Drinking  | Head-down position,        | >70% accuracy                    |
+|                  | rhythmic movements         |                                  |
++------------------+----------------------------+----------------------------------+
+        </div>
+
+        <h3>4.1.2 Step Counting Algorithm</h3>
+
+        <p>Pedometer functionality requires species-specific algorithms to account for different gait patterns:</p>
+
+        <div class="code-block">
+{
+  "stepDetection": {
+    "algorithm": {
+      "method": "Peak detection in vertical acceleration",
+      "filtering": "Band-pass filter 0.5-5 Hz (dogs), 1-8 Hz (cats)",
+      "threshold": "Dynamic threshold based on rolling average",
+      "validation": "Remove false positives from scratching, shaking"
+    },
+    "accuracy": {
+      "walking": "±5% vs. manual count",
+      "running": "±8% vs. manual count",
+      "mixedActivity": "±10% vs. manual count"
+    },
+    "calibration": {
+      "default": "Species and breed-specific defaults",
+      "personalized": "Optional user calibration via test walk",
+      "adaptive": "Algorithm improves over time with usage"
+    },
+    "edgeCases": {
+      "riding": "Detect and exclude vehicle travel",
+      "carrying": "Detect when pet is being carried",
+      "shaking": "Exclude shake-offs from step count"
+    }
+  }
+}
+        </div>
+
+        <h3>4.1.3 Distance and Speed Calculation</h3>
+
+        <p>Converting steps to distance requires accounting for stride length variation:</p>
+
+        <ul>
+            <li><strong>Stride Length Estimation:</strong> Based on breed, size, leg length</li>
+            <li><strong>Gait Detection:</strong> Walk vs. run vs. trot (different stride lengths)</li>
+            <li><strong>GPS Enhancement:</strong> GPS data improves distance accuracy when available</li>
+            <li><strong>Terrain Adjustment:</strong> Uphill/downhill affects stride length and energy expenditure</li>
+        </ul>
+
+        <div class="ascii-table">
++------------------+----------------------+----------------------+----------------------+
+| Dog Size         | Walking Stride       | Trotting Stride      | Running Stride       |
++------------------+----------------------+----------------------+----------------------+
+| Small (< 10kg)   | 30-40 cm             | 40-60 cm             | 60-100 cm            |
+| Medium (10-25kg) | 50-65 cm             | 65-90 cm             | 90-150 cm            |
+| Large (25-45kg)  | 70-90 cm             | 90-130 cm            | 130-200 cm           |
+| XL (> 45kg)      | 85-110 cm            | 110-160 cm           | 160-250 cm           |
++------------------+----------------------+----------------------+----------------------+
+        </div>
+
+        <h2>4.2 GPS and Location Services</h2>
+
+        <h3>4.2.1 GPS Performance Requirements</h3>
+
+        <p>Location tracking is critical for pet safety. The standard defines stringent GPS performance criteria:</p>
+
+        <div class="code-block">
+{
+  "gpsRequirements": {
+    "accuracy": {
+      "openSky": "2.5m CEP (Circular Error Probable) 50%",
+      "urbanCanyon": "10m CEP 50%",
+      "indoorDetection": "Device must recognize GPS unavailability"
+    },
+    "acquisitionTime": {
+      "hotStart": "< 5 seconds (with recent almanac)",
+      "warmStart": "< 30 seconds (recent position known)",
+      "coldStart": "< 60 seconds (no prior information)",
+      "aGPS": "< 2 seconds with assisted GPS"
+    },
+    "updateRate": {
+      "powerSaver": "Every 5-10 minutes",
+      "balanced": "Every 1-2 minutes",
+      "realTime": "Every 10-30 seconds",
+      "tracking": "1-5 Hz during active tracking"
+    },
+    "sensitivity": {
+      "tracking": "-165 dBm minimum",
+      "reacquisition": "-160 dBm minimum",
+      "coldStart": "-148 dBm minimum"
+    }
+  }
+}
+        </div>
+
+        <h3>4.2.2 Multi-GNSS Support</h3>
+
+        <p>Supporting multiple Global Navigation Satellite Systems improves accuracy and reliability:</p>
+
+        <ul>
+            <li><strong>GPS (USA):</strong> 31 satellites, global coverage</li>
+            <li><strong>GLONASS (Russia):</strong> 24 satellites, enhanced high-latitude coverage</li>
+            <li><strong>Galileo (EU):</strong> 30 satellites (when fully deployed), high accuracy</li>
+            <li><strong>BeiDou (China):</strong> 35 satellites, global and regional services</li>
+            <li><strong>Benefit:</strong> Using multiple systems increases satellite visibility by 50-100%</li>
+        </ul>
+
+        <h3>4.2.3 Assisted GPS (A-GPS)</h3>
+
+        <p>A-GPS dramatically reduces time-to-first-fix by downloading satellite data via cellular or Wi-Fi:</p>
+
+        <ul>
+            <li>Satellite almanac and ephemeris data pre-loaded</li>
+            <li>Approximate location from cell tower triangulation</li>
+            <li>Reduces cold start from 60s to under 5s</li>
+            <li>Lower power consumption due to faster acquisition</li>
+        </ul>
+
+        <h2>4.3 Geofencing and Safe Zones</h2>
+
+        <h3>4.3.1 Geofence Types</h3>
+
+        <div class="ascii-table">
++-------------------+---------------------------+----------------------------------+
+| Geofence Type     | Description               | Use Case                         |
++-------------------+---------------------------+----------------------------------+
+| Circular          | Radius around center      | Home safe zone, park boundaries  |
+|                   | point                     |                                  |
++-------------------+---------------------------+----------------------------------+
+| Polygon           | Custom-shaped area        | Irregular yards, specific routes |
++-------------------+---------------------------+----------------------------------+
+| Corridor          | Path with width tolerance | Walking routes, hiking trails    |
++-------------------+---------------------------+----------------------------------+
+| Time-Based        | Active during specific    | Daytime yard, nighttime indoor   |
+|                   | hours                     |                                  |
++-------------------+---------------------------+----------------------------------+
+| Dynamic           | Follows user location     | Keep pet within X meters of      |
+|                   |                           | owner                            |
++-------------------+---------------------------+----------------------------------+
+        </div>
+
+        <h3>4.3.2 Geofence Alert Logic</h3>
+
+        <p>Intelligent alert management prevents false alarms while ensuring timely notifications:</p>
+
+        <div class="code-block">
+{
+  "geofenceAlerts": {
+    "entryExit": {
+      "dwellTime": "Minimum 30 seconds outside fence before alert",
+      "hysteresis": "5-10 meter buffer zone to prevent flutter",
+      "confidence": "Only alert if GPS accuracy < 15 meters"
+    },
+    "escalation": {
+      "initialAlert": "In-app notification + sound",
+      "30seconds": "Push notification to all registered devices",
+      "2minutes": "SMS to primary contact",
+      "5minutes": "Email + SMS to secondary contacts",
+      "ongoing": "Location updates every 30 seconds"
+    },
+    "smartFeatures": {
+      "scheduledDisable": "Auto-disable during vet visits, grooming",
+      "knownLocations": "Suppress alerts at dog park, boarding facility",
+      "velocityCheck": "Different rules if traveling in vehicle",
+      "batteryProtection": "Reduce update frequency if battery < 15%"
+    }
+  }
+}
+        </div>
+
+        <h2>4.4 Indoor Positioning</h2>
+
+        <h3>4.4.1 Indoor Location Technologies</h3>
+
+        <p>GPS signals don't penetrate buildings effectively. Alternative methods for indoor tracking:</p>
+
+        <ul>
+            <li><strong>Wi-Fi Triangulation:</strong> Determine position based on visible Wi-Fi access points and signal strength</li>
+            <li><strong>Bluetooth Beacons:</strong> Small BLE beacons placed around home provide proximity detection</li>
+            <li><strong>Inertial Navigation:</strong> Dead reckoning using accelerometer and gyroscope when GPS unavailable</li>
+            <li><strong>Barometric Altitude:</strong> Determine floor level in multi-story buildings</li>
+        </ul>
+
+        <h3>4.4.2 Room-Level Detection</h3>
+
+        <p>For indoor activity analysis, room-level accuracy is often sufficient:</p>
+
+        <div class="code-block">
+{
+  "indoorPositioning": {
+    "methods": {
+      "beaconNetwork": {
+        "technology": "BLE 5.1 direction finding",
+        "accuracy": "1-3 meters",
+        "latency": "< 1 second",
+        "cost": "Requires beacon installation"
+      },
+      "wifiFingerprinting": {
+        "technology": "RSSI mapping of Wi-Fi networks",
+        "accuracy": "3-5 meters",
+        "latency": "2-5 seconds",
+        "cost": "No additional hardware required"
+      },
+      "hybrid": {
+        "technology": "Combine Wi-Fi, BLE, inertial sensors",
+        "accuracy": "2-4 meters",
+        "latency": "< 2 seconds",
+        "cost": "Moderate (optional beacons)"
+      }
+    }
+  }
+}
+        </div>
+
+        <h2>4.5 Activity Goals and Recommendations</h2>
+
+        <h3>4.5.1 Personalized Activity Targets</h3>
+
+        <p>Activity recommendations should account for multiple factors:</p>
+
+        <div class="ascii-table">
++---------------------+--------------------+--------------------+--------------------+
+| Factor              | Low Activity       | Moderate Activity  | High Activity      |
++---------------------+--------------------+--------------------+--------------------+
+| Age (years)         | Puppy/Kitten,      | Adult (2-7 years)  | Young adult        |
+|                     | Senior (>10)       |                    | (1-3 years)        |
++---------------------+--------------------+--------------------+--------------------+
+| Breed Energy Level  | Low (Bulldog,      | Medium (Beagle,    | High (Border       |
+|                     | Basset Hound)      | Poodle)            | Collie, Husky)     |
++---------------------+--------------------+--------------------+--------------------+
+| Health Status       | Arthritis,         | Healthy, no        | Excellent health,  |
+|                     | obesity, heart     | restrictions       | athletic           |
+|                     | conditions         |                    |                    |
++---------------------+--------------------+--------------------+--------------------+
+| Daily Step Goal     | 3,000-6,000        | 8,000-12,000       | 15,000-25,000      |
++---------------------+--------------------+--------------------+--------------------+
+| Active Minutes Goal | 20-40 minutes      | 60-90 minutes      | 120-180 minutes    |
++---------------------+--------------------+--------------------+--------------------+
+        </div>
+
+        <h3>4.5.2 Adaptive Goal Adjustment</h3>
+
+        <p>Goals should evolve based on pet's progress and capabilities:</p>
+
+        <ul>
+            <li><strong>Progressive Increase:</strong> Gradually increase goals as fitness improves (max 10% per week)</li>
+            <li><strong>Weather Adaptation:</strong> Lower goals during extreme heat or cold</li>
+            <li><strong>Recovery Periods:</strong> Reduced goals post-surgery or during illness</li>
+            <li><strong>Seasonal Variation:</strong> Account for decreased outdoor activity in winter</li>
+        </ul>
+
+        <h2>4.6 Location History and Analytics</h2>
+
+        <h3>4.6.1 Location Data Storage</h3>
+
+        <p>Efficient storage of location history while respecting privacy:</p>
+
+        <div class="code-block">
+{
+  "locationStorage": {
+    "onDevice": {
+      "retention": "Last 7 days of GPS breadcrumbs",
+      "resolution": "1 point per minute during movement",
+      "compression": "Ramer-Douglas-Peucker algorithm for path simplification"
+    },
+    "cloudStorage": {
+      "retention": "90 days full data, then aggregated monthly summary",
+      "privacy": "Encrypted at rest and in transit",
+      "deletion": "User can delete history at any time"
+    },
+    "storageOptimization": {
+      "clustering": "Aggregate stationary periods to single point",
+      "rounding": "Round coordinates to reduce precision when not needed",
+      "deltaEncoding": "Store movement deltas, not absolute coordinates"
+    }
+  }
+}
+        </div>
+
+        <h3>4.6.2 Location Analytics and Insights</h3>
+
+        <p>Deriving valuable insights from location data:</p>
+
+        <ul>
+            <li><strong>Favorite Places:</strong> Identify most-visited locations (park, friend's house, vet clinic)</li>
+            <li><strong>Activity Heatmaps:</strong> Visualize where pet is most active</li>
+            <li><strong>Territory Mapping:</strong> Track changes in roaming area over time</li>
+            <li><strong>Route Optimization:</strong> Suggest efficient walking routes based on history</li>
+            <li><strong>Social Connections:</strong> If multiple pets with trackers, identify when/where they meet</li>
+        </ul>
+
+        <h2>4.7 Lost Pet Recovery Features</h2>
+
+        <h3>4.7.1 Lost Pet Mode</h3>
+
+        <p>Dedicated mode to maximize recovery chances when pet goes missing:</p>
+
+        <ul>
+            <li><strong>Continuous Tracking:</strong> GPS updates every 10-30 seconds (overriding power-save mode)</li>
+            <li><strong>Extended Battery:</strong> Disable non-essential features to maximize tracking time</li>
+            <li><strong>Community Alerts:</strong> Notify nearby users with app installed to watch for pet</li>
+            <li><strong>Audible Beacon:</strong> Remote trigger of loud beeping to help locate pet</li>
+            <li><strong>LED Flash:</strong> Activate bright LED flashing for nighttime visibility</li>
+        </ul>
+
+        <h3>4.7.2 Community-Assisted Search</h3>
+
+        <div class="code-block">
+{
+  "communityFeatures": {
+    "lostPetAlert": {
+      "radiusNotification": "Alert all app users within 5km radius",
+      "publicListing": "Post to lost pet database with photo, description",
+      "rewardPosting": "Optional reward offer for safe return",
+      "sightingReports": "Users can report sightings with location and photo"
+    },
+    "safetyFeatures": {
+      "privacy": "Full address not shared, approximate area only",
+      "verification": "Ownership verified before pet handoff",
+      "meetingAssistance": "In-app messaging for coordination",
+      "authorities": "One-click contact animal control, police"
+    }
+  }
+}
+        </div>
+
+        <h2>4.8 Activity Sharing and Social Features</h2>
+
+        <h3>4.8.1 Activity Challenges</h3>
+
+        <p>Gamification to encourage regular exercise:</p>
+
+        <ul>
+            <li><strong>Daily Streaks:</strong> Consecutive days meeting activity goals</li>
+            <li><strong>Leaderboards:</strong> Compare activity with friends, breed averages</li>
+            <li><strong>Badges and Achievements:</strong> Unlock rewards for milestones (100 miles walked, etc.)</li>
+            <li><strong>Group Challenges:</strong> Team competitions with other pet owners</li>
+        </ul>
+
+        <h3>4.8.2 Privacy Controls</h3>
+
+        <p>Users must have granular control over what information is shared:</p>
+
+        <div class="ascii-table">
++----------------------+---------------------------+------------------------------+
+| Data Type            | Sharing Options           | Default Setting              |
++----------------------+---------------------------+------------------------------+
+| Real-Time Location   | Private / Friends /       | Private                      |
+|                      | Public                    |                              |
++----------------------+---------------------------+------------------------------+
+| Activity Stats       | Private / Friends /       | Friends only                 |
+|                      | Public                    |                              |
++----------------------+---------------------------+------------------------------+
+| Health Metrics       | Private / Vet Only /      | Private                      |
+|                      | Friends                   |                              |
++----------------------+---------------------------+------------------------------+
+| Photos & Updates     | Private / Friends /       | Friends only                 |
+|                      | Public                    |                              |
++----------------------+---------------------------+------------------------------+
+| Aggregate Analytics  | Anonymous / Opt-out       | Anonymous (for research)     |
++----------------------+---------------------------+------------------------------+
+        </div>
+
+        <h2>4.9 Calibration and Accuracy Validation</h2>
+
+        <h3>4.9.1 User Calibration Procedures</h3>
+
+        <p>Optional calibration can improve accuracy for individual pets:</p>
+
+        <ul>
+            <li><strong>Step Calibration:</strong> User counts steps during a 5-minute walk, device adjusts algorithm</li>
+            <li><strong>GPS Calibration:</strong> Mark home location, favorite park for improved geofencing accuracy</li>
+            <li><strong>Activity Calibration:</strong> Label activities during training period (e.g., "playing," "eating")</li>
+        </ul>
+
+        <h3>4.9.2 Accuracy Reporting</h3>
+
+        <p>Transparency in measurement accuracy builds user trust:</p>
+
+        <div class="code-block">
+{
+  "accuracyReporting": {
+    "stepCount": {
+      "estimatedAccuracy": "±5-10% depending on activity type",
+      "confidenceInterval": "Provided with daily totals",
+      "methodology": "Validated against video observation studies"
+    },
+    "gpsLocation": {
+      "currentAccuracy": "Displayed in real-time (e.g., '±5 meters')",
+      "factors": "Satellite count, HDOP, signal strength shown",
+      "qualityIndicator": "Visual cue (green/yellow/red) for GPS quality"
+    },
+    "activityClassification": {
+      "overallAccuracy": "~80% across all activity types",
+      "perActivityAccuracy": "Detailed breakdown in settings"
+    }
+  }
+}
+        </div>
+
+        <h2>4.10 Power Optimization for Location Services</h2>
+
+        <h3>4.10.1 Intelligent GPS Scheduling</h3>
+
+        <p>GPS is the most power-hungry component. Smart scheduling extends battery life:</p>
+
+        <ul>
+            <li><strong>Motion-Triggered:</strong> GPS activates when significant movement detected</li>
+            <li><strong>Geofence Monitoring:</strong> Infrequent checks when pet is inside safe zone, frequent when near boundary</li>
+            <li><strong>Adaptive Sampling:</strong> Higher frequency during walks, lower during rest periods</li>
+            <li><strong>Wi-Fi Offloading:</strong> Use Wi-Fi location when at home, GPS only when away</li>
+        </ul>
+
+        <h3>4.10.2 Low-Power Tracking Modes</h3>
+
+        <div class="ascii-table">
++-------------------+------------------+-------------------+-------------------------+
+| Mode              | Update Frequency | Battery Life      | Use Case                |
++-------------------+------------------+-------------------+-------------------------+
+| Ultra Power Save  | Every 15-30 min  | 20-30 days        | Indoor pets, occasional |
+|                   |                  |                   | outdoor supervised      |
++-------------------+------------------+-------------------+-------------------------+
+| Balanced          | Every 2-5 min    | 7-14 days         | Typical daily use       |
++-------------------+------------------+-------------------+-------------------------+
+| Active Tracking   | Every 30-60 sec  | 2-5 days          | Outdoor adventures,     |
+|                   |                  |                   | training sessions       |
++-------------------+------------------+-------------------+-------------------------+
+| Lost Pet Mode     | Every 10-30 sec  | 12-48 hours       | Emergency only          |
++-------------------+------------------+-------------------+-------------------------+
+        </div>
+
+        <div class="info-box">
+            <strong>🔋 Power Tip:</strong> Combining GPS with accelerometer-based dead reckoning can reduce GPS activations by 50-70% while maintaining accurate location tracking, effectively doubling battery life.
+        </div>
+
+        <div class="summary-box">
+            <h3>Chapter Summary: Key Takeaways</h3>
+            <ol>
+                <li><strong>Multi-Modal Activity Recognition:</strong> WIA-PET-007 requires accurate detection of 7+ activity types with 70-85% accuracy, using accelerometer data and species-specific machine learning algorithms.</li>
+                <li><strong>GPS Performance Standards:</strong> 2.5m accuracy in open sky, < 60s cold start, multi-GNSS support (GPS, GLONASS, Galileo, BeiDou) for improved reliability.</li>
+                <li><strong>Intelligent Geofencing:</strong> Multiple geofence types (circular, polygon, time-based, dynamic) with smart alert escalation and false-positive prevention.</li>
+                <li><strong>Indoor Positioning:</strong> Wi-Fi triangulation, BLE beacons, and inertial navigation provide room-level accuracy when GPS is unavailable.</li>
+                <li><strong>Power Optimization:</strong> Adaptive GPS sampling, motion-triggered activation, and multiple tracking modes balance accuracy with 7-30 day battery life.</li>
+            </ol>
+        </div>
+
+        <div class="summary-box">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>What are the accuracy requirements for step counting in walking vs. running conditions? Why is running less accurate?</li>
+                <li>Explain the difference between hot start, warm start, and cold start GPS acquisition. What is A-GPS and how does it help?</li>
+                <li>Describe the geofence alert escalation system. How does it prevent false alarms while ensuring timely notifications?</li>
+                <li>What technologies can be used for indoor positioning when GPS is unavailable? Compare their accuracy and cost.</li>
+                <li>How should activity goals be personalized for different pets? List at least four factors that should influence goal setting.</li>
+                <li>Explain the power optimization strategies for GPS tracking. How can battery life be extended without sacrificing functionality?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA-INTENT v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="wia-badge">WIA Standard</div>
+                <div class="version">Version 1.0</div>
+            </div>
+            <h1>Chapter 7: Implementation Examples</h1>
+            <p class="subtitle">Python, TypeScript, and Bash for Intent Language</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>7.1 Python Implementation</h2>
+                <p>
+                    A reference implementation showing how to build a WIA-INTENT interpreter in Python.
+                </p>
+
+                <h3>Basic Intent Parser</h3>
+                <pre><code>from dataclasses import dataclass
+from typing import Any, Dict, Optional, List
+import openai
+
+@dataclass
+class Intent:
+    name: str
+    given: Optional[Dict[str, Any]] = None
+    want: Optional[str] = None
+    constraints: Optional[Dict[str, Any]] = None
+    certainty: float = 0.0
+    fallback: Optional[Dict[str, Any]] = None
+    evolve: Optional[Dict[str, Any]] = None
+
+class IntentRunner:
+    def __init__(self, ai_model: str = "gpt-4"):
+        self.ai_model = ai_model
+        self.execution_history = []
+
+    def parse_intent(self, intent_code: str) → Intent:
+        """Parse WIA-INTENT code into Intent object"""
+        # Simplified parser - production would use proper lexer/parser
+        # This example shows the concept
+        pass
+
+    def resolve_intent(self, intent: Intent, inputs: Dict[str, Any]) → Any:
+        """Resolve intent using AI"""
+        prompt = f"""
+        Given this intent:
+        Name: {intent.name}
+        Want: {intent.want}
+        Constraints: {intent.constraints}
+        Inputs: {inputs}
+
+        Generate Python code that fulfills this intent while
+        respecting all constraints.
+        """
+
+        # Use AI to generate solution
+        response = openai.chat.completions.create(
+            model=self.ai_model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        generated_code = response.choices[0].message.content
+
+        # Verify constraints
+        if self.verify_constraints(generated_code, intent.constraints):
+            return self.execute_safe(generated_code, inputs)
+        else:
+            return self.handle_fallback(intent, inputs)
+
+    def verify_constraints(
+        self,
+        code: str,
+        constraints: Dict[str, Any]
+    ) → bool:
+        """Verify generated code meets constraints"""
+        # Static analysis, resource estimation, etc.
+        pass
+
+    def execute_safe(self, code: str, inputs: Dict[str, Any]) → Any:
+        """Execute code in sandboxed environment"""
+        # Use restricted execution environment
+        import RestrictedPython
+
+        # Compile with restrictions
+        compiled = RestrictedPython.compile_restricted(
+            code,
+            filename='&lt;intent&gt;',
+            mode='exec'
+        )
+
+        # Execute with limited globals
+        safe_globals = {
+            '__builtins__': RestrictedPython.safe_builtins,
+            'inputs': inputs
+        }
+
+        exec(compiled, safe_globals)
+        return safe_globals.get('result')
+
+    def handle_fallback(
+        self,
+        intent: Intent,
+        inputs: Dict[str, Any]
+    ) → Any:
+        """Handle fallback when intent cannot be fulfilled"""
+        if intent.fallback:
+            # Execute fallback logic
+            pass
+        else:
+            raise IntentResolutionError(
+                f"Cannot fulfill intent {intent.name}"
+            )
+</code></pre>
+
+                <h3>Example Usage</h3>
+                <pre><code>runner = IntentRunner()
+
+intent_code = """
+intent ProcessItems {
+  given: items
+  want: each item processed
+  constraints {
+    order: any
+    completeness: all
+  }
+  certainty: &gt;= 0.9
+}
+"""
+
+result = runner.execute(
+    intent_code,
+    inputs={'items': [1, 2, 3, 4, 5]}
+)
+
+print(f"Result: {result.value}")
+print(f"Certainty: {result.certainty}")
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.2 TypeScript Implementation</h2>
+                <p>
+                    A TypeScript/JavaScript implementation for web and Node.js environments.
+                </p>
+
+                <h3>Core Types</h3>
+                <pre><code>// types.ts
+export interface Intent {
+  name: string;
+  given?: Record&lt;string, any&gt;;
+  want?: string;
+  constraints?: Record&lt;string, any&gt;;
+  certainty?: number;
+  fallback?: Record&lt;string, any&gt;;
+  evolve?: Record&lt;string, any&gt;;
+}
+
+export interface ExecutionResult&lt;T&gt; {
+  value: T;
+  certainty: number;
+  executionTime: number;
+  metrics: ExecutionMetrics;
+}
+
+export interface ExecutionMetrics {
+  cpuTime: number;
+  memoryUsed: number;
+  optimizationsApplied: string[];
+}
+</code></pre>
+
+                <h3>Intent Runner</h3>
+                <pre><code>// intent-runner.ts
+import { Intent, ExecutionResult } from './types';
+import OpenAI from 'openai';
+
+export class IntentRunner {
+  private openai: OpenAI;
+  private executionHistory: ExecutionResult&lt;any&gt;[] = [];
+
+  constructor(apiKey: string) {
+    this.openai = new OpenAI({ apiKey });
+  }
+
+  async execute&lt;T&gt;(
+    intentCode: string,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;ExecutionResult&lt;T&gt;&gt; {
+    const startTime = Date.now();
+
+    // Parse intent
+    const intent = this.parseIntent(intentCode);
+
+    // Resolve using AI
+    const solution = await this.resolveIntent(intent, inputs);
+
+    // Verify constraints
+    if (!this.verifyConstraints(solution, intent.constraints)) {
+      return this.handleFallback(intent, inputs);
+    }
+
+    // Execute
+    const result = await this.executeSafe&lt;T&gt;(solution, inputs);
+
+    const executionTime = Date.now() - startTime;
+
+    return {
+      value: result,
+      certainty: this.calculateCertainty(intent, result),
+      executionTime,
+      metrics: this.collectMetrics()
+    };
+  }
+
+  private parseIntent(code: string): Intent {
+    // Simplified parser
+    // Production: use proper parser generator
+    const lines = code.split('\n');
+    const intent: Intent = { name: '' };
+
+    // Parse intent structure
+    // ... parsing logic ...
+
+    return intent;
+  }
+
+  private async resolveIntent(
+    intent: Intent,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;string&gt; {
+    const prompt = `
+      Given this intent:
+      Name: ${intent.name}
+      Want: ${intent.want}
+      Constraints: ${JSON.stringify(intent.constraints)}
+      Inputs: ${JSON.stringify(inputs)}
+
+      Generate TypeScript code that fulfills this intent.
+    `;
+
+    const response = await this.openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    return response.choices[0].message.content || '';
+  }
+
+  private verifyConstraints(
+    code: string,
+    constraints?: Record&lt;string, any&gt;
+  ): boolean {
+    if (!constraints) return true;
+
+    // Verify time constraints
+    if (constraints.time) {
+      // Estimate execution time
+    }
+
+    // Verify resource constraints
+    if (constraints.memory) {
+      // Estimate memory usage
+    }
+
+    return true;
+  }
+
+  private async executeSafe&lt;T&gt;(
+    code: string,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;T&gt; {
+    // Use VM for sandboxed execution
+    const vm = require('vm');
+
+    const sandbox = {
+      inputs,
+      console,
+      result: null
+    };
+
+    const script = new vm.Script(code);
+    const context = vm.createContext(sandbox);
+
+    script.runInContext(context, {
+      timeout: 30000, // 30 second timeout
+      breakOnSigint: true
+    });
+
+    return sandbox.result;
+  }
+
+  private calculateCertainty(
+    intent: Intent,
+    result: any
+  ): number {
+    // Calculate certainty based on various factors
+    // This is a simplified version
+    return 0.95;
+  }
+
+  private collectMetrics(): ExecutionMetrics {
+    return {
+      cpuTime: 0,
+      memoryUsed: 0,
+      optimizationsApplied: []
+    };
+  }
+
+  private handleFallback&lt;T&gt;(
+    intent: Intent,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;ExecutionResult&lt;T&gt;&gt; {
+    throw new Error(`Cannot fulfill intent: ${intent.name}`);
+  }
+}
+</code></pre>
+
+                <h3>Usage Example</h3>
+                <pre><code>// main.ts
+import { IntentRunner } from './intent-runner';
+
+const runner = new IntentRunner(process.env.OPENAI_API_KEY!);
+
+const intentCode = `
+  intent FetchUserData {
+    given: user_id
+    want: user_profile
+    constraints {
+      time: &lt;= 500.milliseconds
+      privacy: respect
+    }
+  }
+`;
+
+const result = await runner.execute(intentCode, {
+  user_id: '12345'
+});
+
+console.log('Result:', result.value);
+console.log('Certainty:', result.certainty);
+console.log('Execution time:', result.executionTime, 'ms');
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.3 Bash Integration</h2>
+                <p>
+                    Using WIA-INTENT from shell scripts for system automation.
+                </p>
+
+                <h3>CLI Tool</h3>
+                <pre><code>#!/bin/bash
+# wia-intent - Command-line tool for WIA-INTENT
+
+set -euo pipefail
+
+INTENT_FILE=""
+INPUTS_FILE=""
+OUTPUT_FILE=""
+VERBOSE=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -i|--intent)
+      INTENT_FILE="$2"
+      shift 2
+      ;;
+    -d|--data)
+      INPUTS_FILE="$2"
+      shift 2
+      ;;
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    -v|--verbose)
+      VERBOSE=true
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+# Validate inputs
+if [[ -z "$INTENT_FILE" ]]; then
+  echo "Error: Intent file required (-i)"
+  exit 1
+fi
+
+# Read intent
+INTENT_CODE=$(&lt; "$INTENT_FILE")
+
+# Read inputs if provided
+INPUTS="{}"
+if [[ -n "$INPUTS_FILE" ]]; then
+  INPUTS=$(&lt; "$INPUTS_FILE")
+fi
+
+# Execute intent via API
+RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/execute \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"intent\": $(jq -Rs . &lt;&lt;&lt; "$INTENT_CODE"),
+    \"inputs\": $INPUTS
+  }")
+
+# Extract result
+RESULT=$(echo "$RESPONSE" | jq -r '.result.value')
+CERTAINTY=$(echo "$RESPONSE" | jq -r '.metrics.certainty')
+
+if [[ "$VERBOSE" == true ]]; then
+  echo "Certainty: $CERTAINTY"
+  echo "Execution time: $(echo "$RESPONSE" | jq -r '.metrics.execution_time_ms')ms"
+fi
+
+# Output result
+if [[ -n "$OUTPUT_FILE" ]]; then
+  echo "$RESULT" &gt; "$OUTPUT_FILE"
+else
+  echo "$RESULT"
+fi
+</code></pre>
+
+                <h3>Example Usage</h3>
+                <pre><code>#!/bin/bash
+# backup-system.sh - System backup using WIA-INTENT
+
+# Define intent
+cat &gt; backup-intent.wia &lt;&lt;'EOF'
+intent BackupSystem {
+  given: source_dirs, backup_destination
+  want: backup completed
+
+  constraints {
+    compression: gzip
+    encryption: aes256
+    verification: checksum
+    time: &lt;= 1.hour
+  }
+
+  fallback {
+    if disk_full:
+      cleanup_old_backups
+      retry
+    if network_error:
+      use_local_backup
+  }
+}
+EOF
+
+# Define inputs
+cat &gt; backup-data.json &lt;&lt;EOF
+{
+  "source_dirs": ["/etc", "/home", "/var/www"],
+  "backup_destination": "/backup/$(date +%Y%m%d)"
+}
+EOF
+
+# Execute intent
+wia-intent \
+  --intent backup-intent.wia \
+  --data backup-data.json \
+  --output backup-result.json \
+  --verbose
+
+# Check result
+if jq -e '.status == "success"' backup-result.json &gt; /dev/null; then
+  echo "Backup completed successfully"
+  # Send notification
+  notify-send "Backup Complete" "System backup finished"
+else
+  echo "Backup failed"
+  exit 1
+fi
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.4 Real-World Example: E-commerce Recommendation System</h2>
+
+                <pre><code>intent RecommendProducts {
+  given {
+    user: current_user
+    context: browsing_history, time, device
+    catalog: available_products
+  }
+
+  want {
+    recommendations: list&lt;Product&gt;
+    count: 5..10
+    relevance: high
+  }
+
+  constraints {
+    diversity: ensure         // 다양한 카테고리
+    freshness: prefer_new     // 새 상품 선호
+    stock: in_stock_only      // 재고 있는 것만
+    personalization: respect_preferences
+    time: &lt;= 200.milliseconds
+  }
+
+  certainty: &gt;= 0.7
+
+  ethics {
+    no_manipulation: true
+    explain_why: when_asked
+    respect_budget: user.stated_budget
+    no_dark_patterns: true
+  }
+
+  evolve {
+    learn_from: click_through_rate, purchases, returns
+    improve: recommendation_quality
+    never: exploit_vulnerabilities
+
+    metrics {
+      track: conversion_rate, user_satisfaction
+      optimize_for: long_term_value
+    }
+  }
+
+  fallback {
+    if insufficient_data:
+      show_popular_items
+    if error:
+      show_curated_collection
+    if low_certainty:
+      show_diverse_options with explanation
+  }
+
+  implementation {
+    // Optional: provide implementation hints
+    consider {
+      collaborative_filtering
+      content_based_filtering
+      hybrid_approach
+    }
+
+    optimize_for {
+      speed: high_priority
+      personalization: high_priority
+      diversity: medium_priority
+    }
+  }
+}
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.5 Testing the Implementation</h2>
+
+                <h3>Unit Tests (Python)</h3>
+                <pre><code>import unittest
+from intent_runner import IntentRunner, Intent
+
+class TestIntentRunner(unittest.TestCase):
+    def setUp(self):
+        self.runner = IntentRunner()
+
+    def test_simple_intent(self):
+        intent_code = """
+        intent DoubleNumbers {
+          given: numbers
+          want: each number doubled
+        }
+        """
+
+        result = self.runner.execute(
+            intent_code,
+            inputs={'numbers': [1, 2, 3]}
+        )
+
+        self.assertEqual(result.value, [2, 4, 6])
+        self.assertGreaterEqual(result.certainty, 0.9)
+
+    def test_constraint_violation(self):
+        intent_code = """
+        intent SlowOperation {
+          want: result
+          constraints {
+            time: &lt;= 1.milliseconds
+          }
+        }
+        """
+
+        with self.assertRaises(ConstraintViolationError):
+            self.runner.execute(intent_code, inputs={})
+
+    def test_fallback(self):
+        intent_code = """
+        intent RiskyOperation {
+          want: result
+          certainty: &gt;= 0.99
+          fallback {
+            if certainty &lt; 0.99:
+              return "fallback_result"
+          }
+        }
+        """
+
+        result = self.runner.execute(intent_code, inputs={})
+        self.assertEqual(result.value, "fallback_result")
+
+if __name__ == '__main__':
+    unittest.main()
+</code></pre>
+            </section>
+
+            </main>
+
+        </div>
+</body>
+</html>

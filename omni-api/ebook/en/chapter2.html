@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Schema - WIA OMNI-API Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 2: Data Schema</h1>
+
+        <section>
+            <h2>2.1 Request/Response Normalization</h2>
+            <p>One of OMNI-API's core functions is normalizing requests and responses across different protocols. Regardless of whether a client sends a REST call, GraphQL query, or gRPC invocation, the gateway transforms it into a unified internal format.</p>
+
+            <h3>Unified Request Schema</h3>
+            <div class="code-header">omni-request.schema.json</div>
+            <pre><code>{
+  "omniapiVersion": "1.0",
+  "requestId": "uuid-v4",
+  "timestamp": "ISO-8601",
+  "client": {
+    "id": "client-identifier",
+    "protocol": "REST|GraphQL|gRPC|WebSocket|MQTT|Intent",
+    "version": "client-version",
+    "capabilities": ["streaming", "compression", "..."]
+  },
+  "intent": {
+    "action": "read|create|update|delete|execute",
+    "resource": "resource-type",
+    "resourceId": "optional-id",
+    "parameters": {},
+    "naturalLanguage": "optional human-readable intent"
+  },
+  "authentication": {
+    "type": "Bearer|OAuth2|API-Key|JWT|Certificate",
+    "credentials": "encrypted-credentials"
+  },
+  "preferences": {
+    "responseFormat": "JSON|XML|Protobuf|MessagePack",
+    "compression": true|false,
+    "fields": ["selective", "field", "list"],
+    "locale": "en-US|ko-KR|..."
+  }
+}</code></pre>
+
+            <h3>Unified Response Schema</h3>
+            <div class="code-header">omni-response.schema.json</div>
+            <pre><code>{
+  "omniapiVersion": "1.0",
+  "requestId": "matching-request-id",
+  "timestamp": "ISO-8601",
+  "status": {
+    "code": 200,
+    "message": "Success",
+    "details": "optional-details"
+  },
+  "data": {
+    "type": "resource-type",
+    "version": "schema-version",
+    "content": {}
+  },
+  "metadata": {
+    "processingTime": "milliseconds",
+    "cacheStatus": "hit|miss|bypass",
+    "translationPath": ["REST", "Internal", "GraphQL"],
+    "optimizations": ["bundled", "prefetched", "compressed"]
+  },
+  "links": {
+    "self": "canonical-url",
+    "related": ["related-resources"],
+    "next": "optional-pagination"
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.2 Protocol-Specific Transformations</h2>
+            <p>The gateway performs intelligent transformations based on the source and target protocols.</p>
+
+            <h3>REST to Internal Transformation</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>REST Element</th>
+                        <th>Internal Mapping</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>HTTP Method</strong></td>
+                        <td>intent.action</td>
+                        <td>GET → "read", POST → "create"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>URL Path</strong></td>
+                        <td>intent.resource + resourceId</td>
+                        <td>/users/123 → resource:"user", id:"123"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Query Params</strong></td>
+                        <td>intent.parameters</td>
+                        <td>?filter=active → {filter: "active"}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Headers</strong></td>
+                        <td>authentication + preferences</td>
+                        <td>Accept: application/json → format:"JSON"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Request Body</strong></td>
+                        <td>data.content</td>
+                        <td>JSON payload → normalized object</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>GraphQL to Internal Transformation</h3>
+            <div class="code-header">GraphQL Query Example</div>
+            <pre><code>query GetUserWithOrders {
+  user(id: "123") {
+    name
+    email
+    orders(limit: 10) {
+      id
+      total
+      items {
+        product
+        quantity
+      }
+    }
+  }
+}</code></pre>
+
+            <div class="code-header">Internal Representation</div>
+            <pre><code>{
+  "intent": {
+    "action": "read",
+    "resource": "user",
+    "resourceId": "123",
+    "parameters": {
+      "include": ["orders"],
+      "orders.limit": 10
+    }
+  },
+  "preferences": {
+    "fields": ["name", "email", "orders.id", "orders.total", 
+               "orders.items.product", "orders.items.quantity"]
+  }
+}</code></pre>
+
+            <h3>gRPC to Internal Transformation</h3>
+            <div class="code-header">gRPC Proto Definition</div>
+            <pre><code>service UserService {
+  rpc GetUser (UserRequest) returns (UserResponse);
+}
+
+message UserRequest {
+  string id = 1;
+  repeated string fields = 2;
+}
+
+message UserResponse {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}</code></pre>
+
+            <div class="code-header">Internal Representation</div>
+            <pre><code>{
+  "client": {
+    "protocol": "gRPC",
+    "service": "UserService",
+    "method": "GetUser"
+  },
+  "intent": {
+    "action": "read",
+    "resource": "user",
+    "resourceId": "from-UserRequest.id",
+    "parameters": {}
+  },
+  "preferences": {
+    "fields": "from-UserRequest.fields",
+    "responseFormat": "Protobuf"
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.3 Schema Evolution & Versioning</h2>
+            <p>One of OMNI-API's sacred promises is absolute backward compatibility. This requires sophisticated schema versioning.</p>
+
+            <h3>Schema Version Management</h3>
+            <div class="card">
+                <h3>Version Strategy</h3>
+                <ul>
+                    <li><strong>Additive Changes:</strong> New fields can be added without version bump</li>
+                    <li><strong>Default Values:</strong> New required fields must have sensible defaults</li>
+                    <li><strong>Deprecation Tags:</strong> Old fields marked deprecated but never removed</li>
+                    <li><strong>Automatic Migration:</strong> Gateway translates between all versions</li>
+                </ul>
+            </div>
+
+            <h3>Multi-Version Support Example</h3>
+            <div class="code-header">Version 1.0 (2020) - User Schema</div>
+            <pre><code>{
+  "id": "string",
+  "name": "string",
+  "email": "string"
+}</code></pre>
+
+            <div class="code-header">Version 2.0 (2023) - Extended Schema</div>
+            <pre><code>{
+  "id": "string",
+  "name": "string",
+  "email": "string",
+  "avatar": "string",          // New field
+  "createdAt": "timestamp",    // New field
+  "preferences": {             // New nested object
+    "language": "string",
+    "timezone": "string"
+  }
+}</code></pre>
+
+            <div class="code-header">Version 3.0 (2025) - Current Schema</div>
+            <pre><code>{
+  "id": "string",
+  "fullName": "string",        // Renamed from "name"
+  "name": "string",            // Deprecated but still supported
+  "email": "string",
+  "avatar": "string",
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp",    // New field
+  "preferences": {
+    "language": "string",
+    "timezone": "string",
+    "theme": "string"          // New nested field
+  },
+  "metadata": {                // New section
+    "lastLogin": "timestamp",
+    "loginCount": "integer"
+  }
+}</code></pre>
+
+            <div class="alert alert-success">
+                <strong>The Mother's Promise:</strong> A client using v1.0 schema from 2020 will continue to work perfectly in 2025, receiving only the fields it expects. A v3.0 client gets all the latest features.
+            </div>
+        </section>
+
+        <section>
+            <h2>2.4 Format-Agnostic Design</h2>
+            <p>OMNI-API internally uses a format-agnostic representation that can be serialized to any format.</p>
+
+            <h3>Supported Formats</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Format</th>
+                        <th>Use Case</th>
+                        <th>Advantages</th>
+                        <th>Auto-Conversion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>JSON</strong></td>
+                        <td>Web APIs, JavaScript</td>
+                        <td>Human-readable, universal</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td><strong>XML</strong></td>
+                        <td>Legacy systems, SOAP</td>
+                        <td>Schema validation, widespread</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Protobuf</strong></td>
+                        <td>gRPC, high-performance</td>
+                        <td>Compact, fast, type-safe</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MessagePack</strong></td>
+                        <td>Binary efficiency</td>
+                        <td>Smaller than JSON, fast</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td><strong>YAML</strong></td>
+                        <td>Configuration, human editing</td>
+                        <td>Very readable, comments</td>
+                        <td>✓</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CBOR</strong></td>
+                        <td>IoT, constrained devices</td>
+                        <td>Compact, low overhead</td>
+                        <td>✓</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Format Transformation Example</h3>
+            <div class="code-header">Same Data, Different Formats</div>
+            <pre><code>// JSON
+{
+  "id": 123,
+  "name": "John Doe",
+  "active": true
+}
+
+// XML
+&lt;user&gt;
+  &lt;id&gt;123&lt;/id&gt;
+  &lt;name&gt;John Doe&lt;/name&gt;
+  &lt;active&gt;true&lt;/active&gt;
+&lt;/user&gt;
+
+// YAML
+id: 123
+name: John Doe
+active: true
+
+// All automatically converted by OMNI-API!</code></pre>
+        </section>
+
+        <section>
+            <h2>2.5 Nested Resources & Relationships</h2>
+            <p>OMNI-API provides a standardized way to represent resource relationships and nested data.</p>
+
+            <h3>Relationship Patterns</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Embedded</strong></td>
+                        <td>Full nested object included</td>
+                        <td>user.orders[...full order objects]</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Reference</strong></td>
+                        <td>ID or URL reference only</td>
+                        <td>user.orderIds: ["o1", "o2"]</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hybrid</strong></td>
+                        <td>Summary + reference</td>
+                        <td>user.orders: [{id, total, _link}]</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deferred</strong></td>
+                        <td>Available on request</td>
+                        <td>_links.orders: "/users/123/orders"</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-header">Comprehensive Resource Example</div>
+            <pre><code>{
+  "id": "123",
+  "name": "John Doe",
+  "email": "john@example.com",
+  
+  // Embedded relationship
+  "profile": {
+    "bio": "Software engineer",
+    "location": "Seoul, Korea"
+  },
+  
+  // Reference relationship
+  "companyId": "company-456",
+  
+  // Hybrid relationship (summary + reference)
+  "recentOrders": [
+    {
+      "id": "order-789",
+      "total": 99.99,
+      "status": "shipped",
+      "_link": "/orders/order-789"
+    }
+  ],
+  
+  // Deferred relationships
+  "_links": {
+    "self": "/users/123",
+    "company": "/companies/company-456",
+    "allOrders": "/users/123/orders",
+    "payments": "/users/123/payments"
+  }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.6 Validation & Type Safety</h2>
+            <p>OMNI-API enforces type safety and validation across all protocols, even those that don't natively support it.</p>
+
+            <h3>Validation Rules</h3>
+            <div class="card">
+                <h3>Type System</h3>
+                <ul>
+                    <li><strong>Primitive Types:</strong> string, number, integer, boolean, null</li>
+                    <li><strong>Complex Types:</strong> object, array, enum, union</li>
+                    <li><strong>Custom Types:</strong> email, url, uuid, timestamp, currency</li>
+                    <li><strong>Optional/Required:</strong> Explicit marking with defaults</li>
+                </ul>
+            </div>
+
+            <div class="code-header">Validation Schema Example</div>
+            <pre><code>{
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "required": true
+    },
+    "age": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 150
+    },
+    "role": {
+      "type": "string",
+      "enum": ["admin", "user", "guest"],
+      "default": "user"
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}</code></pre>
+
+            <div class="alert alert-warning">
+                <strong>Validation Errors:</strong> When validation fails, OMNI-API returns clear, actionable error messages in the client's preferred format and language.
+            </div>
+        </section>
+
+        </main>
+</body>
+</html>

@@ -1,369 +1,241 @@
-# WIA-DATA-009: Master Data Management Standard
-## PHASE 3: Protocol Specification
+# WIA-master-data-management PHASE 3 — PROTOCOL Specification
 
-**Version:** 1.0.0  
-**Status:** Draft  
-**Last Updated:** 2025-12-26
+**Standard:** WIA-master-data-management
+**Phase:** 3 — PROTOCOL
+**Version:** 1.0
+**Status:** Stable
+
+This document defines the canonical PROTOCOL layer for WIA-master-data-management (Master Data Management).
+
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## Overview
-
-This phase defines communication protocols, data synchronization mechanisms, and integration patterns for MDM systems.
-
-## 1. Communication Protocols
-
-### 1.1 Supported Protocols
-
-- **HTTPS**: Primary protocol for all API communications
-- **WebSocket**: Real-time bidirectional communication
-- **gRPC**: High-performance RPC for internal services
-- **AMQP**: Message queue integration (RabbitMQ, Azure Service Bus)
-- **Kafka**: Event streaming platform integration
-
-### 1.2 Protocol Selection Guidelines
-
-| Use Case | Recommended Protocol | Rationale |
-|----------|---------------------|-----------|
-| CRUD Operations | HTTPS REST | Standard, widely supported |
-| Real-time Updates | WebSocket | Bidirectional, low latency |
-| Service-to-Service | gRPC | High performance, type safety |
-| Event Broadcasting | Kafka | Scalable, durable, replay capability |
-| Job Queuing | AMQP | Reliable message delivery |
-
-## 2. Data Synchronization Patterns
-
-### 2.1 Real-Time Synchronization
-
-**Change Data Capture (CDC) Pattern:**
-
-```
-Source System → CDC Agent → MDM Hub → Event Bus → Target Systems
-```
-
-**Implementation:**
-- Database triggers capture changes
-- CDC agent publishes change events
-- MDM hub processes and enriches data
-- Target systems subscribe to relevant events
-
-**Event Format:**
-```json
-{
-  "eventId": "uuid",
-  "eventType": "entity.created | entity.updated | entity.deleted",
-  "timestamp": "ISO8601",
-  "entityType": "customer",
-  "entityId": "uuid",
-  "changes": {
-    "before": {},
-    "after": {}
-  }
-}
-```
-
-### 2.2 Batch Synchronization
-
-**ETL Pattern:**
-```
-Source Systems → Extract → Transform → MDM Hub → Load → Target Systems
-```
-
-**Schedule Options:**
-- **Hourly**: Near real-time for critical data
-- **Daily**: Standard for most master data
-- **Weekly**: Reference data and historical archives
-
-**Batch File Format:**
-```json
-{
-  "batchId": "uuid",
-  "batchType": "full | incremental",
-  "timestamp": "ISO8601",
-  "entities": [...]
-}
-```
-
-### 2.3 Hybrid Synchronization
-
-Combines real-time for critical changes with batch for bulk updates:
-
-- **Real-time**: Customer contact updates, product pricing
-- **Batch**: Historical data, bulk imports, analytics sync
-
-## 3. Event-Driven Architecture
-
-### 3.1 Event Types
-
-| Event Type | Description | Trigger |
-|------------|-------------|---------|
-| `entity.created` | New entity created | POST /entities |
-| `entity.updated` | Entity modified | PUT /entities/{id} |
-| `entity.deleted` | Entity soft/hard deleted | DELETE /entities/{id} |
-| `entity.merged` | Multiple entities merged | POST /entities/merge |
-| `entity.split` | Entity split into multiple | POST /entities/split |
-| `entity.matched` | Match candidate identified | Matching algorithm |
-| `quality.issue.detected` | Quality rule violation | Validation |
-| `quality.issue.resolved` | Quality issue fixed | Steward action |
-
-### 3.2 Event Publishing
-
-**Kafka Topic Structure:**
-```
-mdm.{entityType}.{eventType}
-
-Examples:
-- mdm.customer.created
-- mdm.product.updated
-- mdm.supplier.deleted
-```
-
-**Event Message:**
-```json
-{
-  "eventId": "uuid",
-  "eventType": "entity.updated",
-  "timestamp": "2025-12-26T10:30:00Z",
-  "source": "mdm-hub",
-  "entityType": "customer",
-  "entityId": "a1b2c3d4...",
-  "version": 2,
-  "payload": {
-    "changes": [...]
-  },
-  "metadata": {
-    "correlationId": "uuid",
-    "causationId": "uuid",
-    "userId": "user@example.com"
-  }
-}
-```
-
-### 3.3 Event Consumption
-
-**Consumer Groups:**
-- CRM systems subscribe to customer events
-- E-commerce subscribes to product events
-- Analytics subscribes to all events
-
-**At-Least-Once Delivery:**
-- Consumers must be idempotent
-- Use message deduplication based on eventId
-
-## 4. Data Integration Patterns
-
-### 4.1 Hub-and-Spoke Pattern
-
-```
-     ┌─────────┐
-     │   CRM   │─────┐
-     └─────────┘     │
-                     ▼
-     ┌─────────┐  ┌──────┐  ┌─────────┐
-     │   ERP   │─▶│ MDM  │◀─│E-Commerce│
-     └─────────┘  │ Hub  │  └─────────┘
-                  └──────┘
-                     ▲
-     ┌─────────┐     │
-     │Analytics│─────┘
-     └─────────┘
-```
-
-**Benefits:**
-- Centralized data management
-- Simplified integration (N systems = N connections, not N²)
-- Single source of truth
-
-### 4.2 Publish-Subscribe Pattern
-
-```
-MDM Hub → Event Bus (Kafka) → Multiple Subscribers
-```
-
-**Benefits:**
-- Decoupled systems
-- Scalable event distribution
-- Event replay capability
-
-### 4.3 API Gateway Pattern
-
-```
-Client Apps → API Gateway → MDM Services
-                  ↓
-          [Auth, Rate Limit, Cache]
-```
-
-**Benefits:**
-- Centralized authentication
-- Rate limiting and throttling
-- Response caching
-- Request/response transformation
-
-## 5. Conflict Resolution
-
-### 5.1 Conflict Detection
-
-Conflicts occur when:
-- Same entity updated in multiple systems simultaneously
-- Offline systems synchronize stale data
-- Manual overrides conflict with automated processes
-
-### 5.2 Resolution Strategies
-
-| Strategy | Description | Use Case |
-|----------|-------------|----------|
-| Last Write Wins | Most recent timestamp wins | Low-value attributes |
-| Highest Quality Source | Trust score determines winner | Critical data fields |
-| Manual Review | Queue for steward resolution | High-value conflicts |
-| Merge | Combine non-conflicting changes | Complementary updates |
-| Version Vector | Track causality | Distributed systems |
-
-### 5.3 Conflict Event
-
-```json
-{
-  "conflictId": "uuid",
-  "entityId": "uuid",
-  "conflictType": "concurrent_update",
-  "detectedAt": "ISO8601",
-  "conflictingVersions": [
-    {
-      "source": "CRM",
-      "timestamp": "2025-12-26T10:30:00Z",
-      "changes": {...}
-    },
-    {
-      "source": "ERP",
-      "timestamp": "2025-12-26T10:30:01Z",
-      "changes": {...}
-    }
-  ],
-  "resolutionStrategy": "manual_review",
-  "assignedTo": "data.steward@example.com"
-}
-```
-
-## 6. Data Transformation
-
-### 6.1 Transformation Pipeline
-
-```
-Source Data → Validation → Standardization → Enrichment → MDM Format
-```
-
-**Validation:**
-- Schema validation
-- Business rule validation
-- Data type checking
-
-**Standardization:**
-- Address standardization (USPS, Canada Post)
-- Phone number formatting (E.164)
-- Name parsing and standardization
-
-**Enrichment:**
-- Append missing data from third-party sources
-- Geocoding addresses
-- Firmographic data append
-
-### 6.2 Transformation Rules
-
-```json
-{
-  "ruleId": "uuid",
-  "ruleName": "Standardize Phone Numbers",
-  "sourceField": "phone",
-  "targetField": "phoneE164",
-  "transformation": {
-    "type": "format",
-    "format": "E.164",
-    "defaultCountryCode": "+82"
-  }
-}
-```
-
-## 7. Security Protocols
-
-### 7.1 Transport Security
-
-- **TLS 1.3**: All data in transit encrypted
-- **Certificate Pinning**: Mobile apps pin MDM certificates
-- **mTLS**: Mutual TLS for service-to-service communication
-
-### 7.2 Data Encryption
-
-- **At Rest**: AES-256 encryption for sensitive fields
-- **In Transit**: TLS 1.3
-- **Key Management**: Azure Key Vault / AWS KMS / HashiCorp Vault
-
-### 7.3 Access Control
-
-```json
-{
-  "userId": "user@example.com",
-  "roles": ["data_steward"],
-  "permissions": {
-    "customer": ["read", "write"],
-    "product": ["read"],
-    "supplier": ["read", "write"]
-  },
-  "dataScope": {
-    "regions": ["APAC", "NA"],
-    "businessUnits": ["retail"]
-  }
-}
-```
-
-## 8. Protocol Compliance
-
-### 8.1 Data Formats
-
-- **JSON**: Default for REST APIs
-- **Protocol Buffers**: gRPC services
-- **Avro**: Kafka messages
-
-### 8.2 Standards Compliance
-
-- **ISO 8601**: Date/time formats
-- **RFC 5322**: Email addresses
-- **E.164**: Phone numbers
-- **ISO 3166**: Country codes
-- **ISO 4217**: Currency codes
-
-## 9. Performance Optimization
-
-### 9.1 Caching Strategy
-
-```
-Client → CDN → API Gateway → Cache (Redis) → MDM Services
-```
-
-**Cache Policies:**
-- **Reference Data**: 24 hour TTL
-- **Master Data**: 1 hour TTL
-- **Golden Records**: 5 minute TTL
-
-### 9.2 Connection Pooling
-
-- **HTTP**: Keep-alive connections
-- **Database**: Connection pool size = (cores × 2) + 1
-- **Kafka**: Reuse producer/consumer instances
-
-## 10. Monitoring and Observability
-
-### 10.1 Metrics to Track
-
-- **Throughput**: Messages/sec, Requests/sec
-- **Latency**: p50, p95, p99 response times
-- **Error Rate**: 4xx, 5xx error percentages
-- **Data Quality**: Quality scores, issue counts
-
-### 10.2 Distributed Tracing
-
-- **OpenTelemetry**: Standard for tracing
-- **Trace Context**: Propagate across service boundaries
-- **Correlation IDs**: Track request flows
-
-## Summary
-
-This protocol specification ensures reliable, secure, and efficient communication and data synchronization across MDM implementations.
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-master-data-management
+standard. It addresses the protocol layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "master-data-management"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/master-data-management`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `master-data-management` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

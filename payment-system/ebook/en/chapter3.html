@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 3: API Endpoints - WIA-FIN-012</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">CHAPTER 3</div>
+    <h1>API Endpoints</h1>
+    <p class="subtitle">Payment Processing & Authorization APIs</p>
+  </header>
+
+  <section>
+    <h2>3.1 Payment API Overview</h2>
+
+    <p>Modern payment systems expose RESTful APIs that enable merchants, payment gateways, and financial applications to process transactions programmatically. This chapter covers the standard API endpoints for payment processing.</p>
+
+    <h3>API Architecture Principles</h3>
+    <ul>
+      <li><strong>RESTful Design:</strong> HTTP methods (GET, POST, PUT, DELETE) for resource operations</li>
+      <li><strong>Stateless:</strong> Each request contains all necessary information</li>
+      <li><strong>Idempotency:</strong> Repeated requests produce same result</li>
+      <li><strong>Versioning:</strong> API version in URL or header (v1, v2, etc.)</li>
+      <li><strong>JSON Payload:</strong> Standard data format for requests/responses</li>
+      <li><strong>HTTPS Only:</strong> TLS 1.2+ encryption mandatory</li>
+      <li><strong>Authentication:</strong> API keys, OAuth 2.0, or JWT tokens</li>
+      <li><strong>Rate Limiting:</strong> Prevent abuse and ensure fairness</li>
+    </ul>
+
+    <h2>3.2 Authorization Endpoint</h2>
+
+    <h3>POST /v1/payments/authorize</h3>
+
+    <p>Authorizes a payment without immediately capturing funds. Used in two-step payment flows.</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/payments/authorize
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "amount": 10000,
+  "currency": "USD",
+  "payment_method": {
+    "type": "card",
+    "card": {
+      "number": "4532123456789010",
+      "exp_month": 12,
+      "exp_year": 2025,
+      "cvc": "123",
+      "name": "John Doe"
+    }
+  },
+  "billing_details": {
+    "address": {
+      "line1": "123 Main St",
+      "city": "San Francisco",
+      "state": "CA",
+      "postal_code": "94102",
+      "country": "US"
+    }
+  },
+  "merchant_id": "merch_7h3k2m9p",
+  "order_id": "ORDER-2025-001",
+  "description": "Premium subscription",
+  "metadata": {
+    "customer_id": "cust_987xyz",
+    "invoice_id": "INV-2025-001"
+  },
+  "three_d_secure": {
+    "enabled": true,
+    "challenge_preference": "no_preference"
+  }
+}
+</code></pre>
+
+    <h4>Response (Success)</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "auth_9x7k3m2n",
+  "object": "authorization",
+  "amount": 10000,
+  "amount_authorized": 10000,
+  "currency": "USD",
+  "status": "succeeded",
+  "auth_code": "A7B9C3",
+  "payment_method_id": "pm_4h8k2x9z",
+  "created": "2025-01-15T10:30:45Z",
+  "expires_at": "2025-01-22T10:30:45Z",
+  "merchant_id": "merch_7h3k2m9p",
+  "order_id": "ORDER-2025-001",
+  "card": {
+    "brand": "visa",
+    "last4": "9010",
+    "exp_month": 12,
+    "exp_year": 2025,
+    "fingerprint": "fp_7x3k8m2p",
+    "funding": "credit",
+    "country": "US"
+  },
+  "three_d_secure": {
+    "authenticated": true,
+    "version": "2.2.0",
+    "transaction_id": "3ds_9k7x2m3n",
+    "eci": "05"
+  },
+  "risk_score": 12,
+  "network_transaction_id": "txn_visa_7h3k2m9p",
+  "metadata": {
+    "customer_id": "cust_987xyz",
+    "invoice_id": "INV-2025-001"
+  }
+}
+</code></pre>
+
+    <h4>Response (Declined)</h4>
+    <pre><code>HTTP/1.1 402 Payment Required
+Content-Type: application/json
+
+{
+  "error": {
+    "type": "card_error",
+    "code": "card_declined",
+    "message": "Your card was declined.",
+    "decline_code": "insufficient_funds",
+    "param": "payment_method"
+  },
+  "id": "auth_declined_9x7k3m2n",
+  "status": "failed",
+  "failure_message": "The card has insufficient funds."
+}
+</code></pre>
+
+    <h2>3.3 Capture Endpoint</h2>
+
+    <h3>POST /v1/payments/{authorization_id}/capture</h3>
+
+    <p>Captures funds from a previously authorized payment. Must be done within authorization expiry window (typically 7 days).</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/payments/auth_9x7k3m2n/capture
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "amount": 10000,
+  "final": true,
+  "statement_descriptor": "ACME CORP PURCHASE"
+}
+</code></pre>
+
+    <h4>Response</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "cap_5k8x3m7n",
+  "object": "capture",
+  "authorization_id": "auth_9x7k3m2n",
+  "amount": 10000,
+  "amount_captured": 10000,
+  "currency": "USD",
+  "status": "succeeded",
+  "created": "2025-01-15T14:20:30Z",
+  "settlement_date": "2025-01-17",
+  "network_transaction_id": "txn_visa_5k8x3m7n"
+}
+</code></pre>
+
+    <h2>3.4 Direct Charge Endpoint</h2>
+
+    <h3>POST /v1/payments/charge</h3>
+
+    <p>Combines authorization and capture in a single step. Funds are immediately captured.</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/payments/charge
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "amount": 5000,
+  "currency": "USD",
+  "payment_method_id": "pm_4h8k2x9z",
+  "merchant_id": "merch_7h3k2m9p",
+  "description": "Coffee purchase",
+  "statement_descriptor": "COFFEE SHOP",
+  "receipt_email": "customer@example.com"
+}
+</code></pre>
+
+    <h2>3.5 Refund Endpoint</h2>
+
+    <h3>POST /v1/payments/{payment_id}/refund</h3>
+
+    <p>Refunds a captured payment, either in full or partial amount.</p>
+
+    <h4>Request (Full Refund)</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/payments/pay_9x7k3m2n/refund
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "reason": "requested_by_customer",
+  "metadata": {
+    "refund_reason": "Product defective"
+  }
+}
+</code></pre>
+
+    <h4>Request (Partial Refund)</h4>
+    <pre><code>{
+  "amount": 2500,
+  "reason": "partial_return",
+  "metadata": {
+    "items_returned": "1 of 2 items"
+  }
+}
+</code></pre>
+
+    <h4>Response</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "ref_3k7x9m2n",
+  "object": "refund",
+  "payment_id": "pay_9x7k3m2n",
+  "amount": 5000,
+  "currency": "USD",
+  "status": "succeeded",
+  "reason": "requested_by_customer",
+  "created": "2025-01-16T09:15:20Z",
+  "estimated_arrival": "2025-01-23",
+  "network_transaction_id": "txn_visa_ref_3k7x9m2n"
+}
+</code></pre>
+
+    <h2>3.6 Void/Cancel Endpoint</h2>
+
+    <h3>POST /v1/payments/{authorization_id}/void</h3>
+
+    <p>Cancels an authorized but not yet captured payment. No funds movement occurs.</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/payments/auth_9x7k3m2n/void
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "reason": "duplicate_transaction"
+}
+</code></pre>
+
+    <h4>Response</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "void_2k9x7m3n",
+  "object": "void",
+  "authorization_id": "auth_9x7k3m2n",
+  "status": "succeeded",
+  "created": "2025-01-15T11:45:10Z",
+  "reason": "duplicate_transaction"
+}
+</code></pre>
+
+    <h2>3.7 3D Secure Authentication</h2>
+
+    <h3>POST /v1/3ds/authenticate</h3>
+
+    <p>Initiates 3D Secure authentication flow for enhanced security on online transactions.</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/3ds/authenticate
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "payment_method_id": "pm_4h8k2x9z",
+  "amount": 10000,
+  "currency": "USD",
+  "return_url": "https://merchant.com/payment/callback",
+  "browser_info": {
+    "user_agent": "Mozilla/5.0...",
+    "language": "en-US",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "color_depth": 24,
+    "timezone_offset": -480,
+    "accept_header": "text/html,application/xhtml+xml",
+    "javascript_enabled": true,
+    "java_enabled": false
+  }
+}
+</code></pre>
+
+    <h4>Response</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "3ds_9k7x2m3n",
+  "object": "three_d_secure",
+  "status": "requires_action",
+  "redirect_url": "https://acs.issuer-bank.com/3ds-auth?session=xyz789",
+  "version": "2.2.0",
+  "challenge_required": true
+}
+</code></pre>
+
+    <h2>3.8 Tokenization Endpoints</h2>
+
+    <h3>POST /v1/tokens</h3>
+
+    <p>Creates a reusable token from card details, enabling secure storage for recurring payments.</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/tokens
+Content-Type: application/json
+Authorization: Bearer pk_live_xyz789abc123
+
+{
+  "card": {
+    "number": "4532123456789010",
+    "exp_month": 12,
+    "exp_year": 2025,
+    "cvc": "123",
+    "name": "John Doe"
+  }
+}
+</code></pre>
+
+    <h4>Response</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "tok_7h3k2m9p4x1q",
+  "object": "token",
+  "type": "card",
+  "card": {
+    "id": "card_9x7k3m2n",
+    "brand": "visa",
+    "last4": "9010",
+    "exp_month": 12,
+    "exp_year": 2025,
+    "fingerprint": "fp_7x3k8m2p",
+    "funding": "credit",
+    "country": "US"
+  },
+  "created": "2025-01-15T10:00:00Z",
+  "livemode": true,
+  "used": false
+}
+</code></pre>
+
+    <h2>3.9 Recurring Billing</h2>
+
+    <h3>POST /v1/subscriptions</h3>
+
+    <p>Creates a recurring billing subscription for automatic periodic charges.</p>
+
+    <h4>Request</h4>
+    <pre><code>POST https://api.payment-gateway.com/v1/subscriptions
+Content-Type: application/json
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME
+
+{
+  "customer_id": "cust_987xyz",
+  "payment_method_id": "pm_4h8k2x9z",
+  "plan": {
+    "amount": 2999,
+    "currency": "USD",
+    "interval": "month",
+    "interval_count": 1
+  },
+  "trial_period_days": 14,
+  "description": "Premium Plan Subscription"
+}
+</code></pre>
+
+    <h4>Response</h4>
+    <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "sub_5k8x3m7n",
+  "object": "subscription",
+  "status": "trialing",
+  "customer_id": "cust_987xyz",
+  "plan": {
+    "amount": 2999,
+    "currency": "USD",
+    "interval": "month"
+  },
+  "current_period_start": "2025-01-15T10:30:45Z",
+  "current_period_end": "2025-01-29T10:30:45Z",
+  "trial_end": "2025-01-29T10:30:45Z",
+  "next_billing_date": "2025-01-29",
+  "created": "2025-01-15T10:30:45Z"
+}
+</code></pre>
+
+    <h2>3.10 Webhooks</h2>
+
+    <p>Webhooks enable real-time notifications when payment events occur.</p>
+
+    <h3>Webhook Event Types</h3>
+    <ul>
+      <li><code>payment.succeeded</code> - Payment successfully processed</li>
+      <li><code>payment.failed</code> - Payment declined or failed</li>
+      <li><code>payment.refunded</code> - Refund processed</li>
+      <li><code>payment.disputed</code> - Chargeback initiated</li>
+      <li><code>subscription.created</code> - New subscription created</li>
+      <li><code>subscription.updated</code> - Subscription modified</li>
+      <li><code>subscription.deleted</code> - Subscription canceled</li>
+      <li><code>invoice.payment_succeeded</code> - Invoice paid</li>
+      <li><code>invoice.payment_failed</code> - Invoice payment failed</li>
+    </ul>
+
+    <h3>Webhook Payload Example</h3>
+    <pre><code>POST https://merchant.com/webhooks/payment
+Content-Type: application/json
+X-Signature: sha256=7h3k2m9p4x1q8n5w...
+
+{
+  "id": "evt_9x7k3m2n",
+  "type": "payment.succeeded",
+  "created": "2025-01-15T10:30:45Z",
+  "data": {
+    "object": {
+      "id": "pay_9x7k3m2n",
+      "amount": 10000,
+      "currency": "USD",
+      "status": "succeeded",
+      "merchant_id": "merch_7h3k2m9p",
+      "created": "2025-01-15T10:30:00Z"
+    }
+  },
+  "livemode": true
+}
+</code></pre>
+
+    <h3>Webhook Security</h3>
+    <ul>
+      <li><strong>Signature Verification:</strong> Validate X-Signature header using shared secret</li>
+      <li><strong>HTTPS Only:</strong> Webhook endpoints must use TLS</li>
+      <li><strong>Idempotency:</strong> Handle duplicate webhook deliveries</li>
+      <li><strong>Timeout:</strong> Respond within 5 seconds to avoid retries</li>
+      <li><strong>Retry Logic:</strong> Failed webhooks retry with exponential backoff</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>API Best Practices</h4>
+      <ul>
+        <li>Always use idempotency keys for payment operations</li>
+        <li>Implement proper error handling and retry logic</li>
+        <li>Store payment IDs for reconciliation and support</li>
+        <li>Use webhooks for asynchronous event processing</li>
+        <li>Never log full card numbers or sensitive data</li>
+        <li>Implement rate limiting to prevent abuse</li>
+        <li>Use API versioning for backward compatibility</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="navigation">
+    <a href="chapter2.html" class="nav-button">← Previous: Data Schema</a>
+    <a href="chapter4.html" class="nav-button next">Next: Protocol Specification →</a>
+  </div>
+</body>
+</html>

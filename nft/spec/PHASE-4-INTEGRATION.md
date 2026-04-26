@@ -1,568 +1,241 @@
-# WIA-FIN-009: NFT Standard - Phase 4: Integration
-
-## Overview
-
-Phase 4 defines integration patterns with marketplaces, wallets, metaverse platforms, and enterprise systems for comprehensive NFT ecosystem connectivity.
-
-## Marketplace Integration
-
-### OpenSea Integration
-
-#### Contract Metadata
-
-```solidity
-contract OpenSeaCompatible is ERC721 {
-    function contractURI() public pure returns (string memory) {
-        return "ipfs://QmCollectionMetadata...";
-    }
-
-    // Gasless listing support
-    function isApprovedForAll(address owner, address operator)
-        public view override returns (bool)
-    {
-        // OpenSea proxy registry
-        if (operator == openSeaProxyRegistry) {
-            return true;
-        }
-        return super.isApprovedForAll(owner, operator);
-    }
-}
-```
-
-#### Collection Metadata
-
-```json
-{
-  "name": "Collection Name",
-  "description": "Collection description",
-  "image": "ipfs://QmImage...",
-  "external_link": "https://project.com",
-  "seller_fee_basis_points": 750,
-  "fee_recipient": "0xCreator..."
-}
-```
-
-### Rarible Integration
-
-```javascript
-import { RaribleSdk } from "@rarible/sdk";
-
-const sdk = RaribleSdk.create({
-    connector: walletConnector,
-    environment: "mainnet"
-});
-
-// Create sell order
-const order = await sdk.order.sell({
-    itemId: `ETHEREUM:${contractAddress}:${tokenId}`,
-    amount: 1,
-    price: "1.5",
-    currency: "ETH"
-});
-```
-
-### Blur Integration
-
-```javascript
-// Blur API integration
-const listing = await fetch('https://api.blur.io/v1/listings', {
-    method: 'POST',
-    headers: {
-        'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-        contractAddress,
-        tokenId,
-        price: "1.5 ETH"
-    })
-});
-```
-
-## Wallet Integration
-
-### MetaMask
-
-```javascript
-import Web3 from 'web3';
-
-// Connect wallet
-const web3 = new Web3(window.ethereum);
-await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-// Mint NFT
-const contract = new web3.eth.Contract(ABI, contractAddress);
-const receipt = await contract.methods.mint(recipient, tokenURI).send({
-    from: userAddress,
-    value: web3.utils.toWei('0.08', 'ether')
-});
-```
-
-### WalletConnect
-
-```javascript
-import WalletConnect from "@walletconnect/client";
-
-const connector = new WalletConnect({
-    bridge: "https://bridge.walletconnect.org",
-    qrcodeModal: QRCodeModal
-});
-
-// Connect
-if (!connector.connected) {
-    await connector.createSession();
-}
-
-// Send transaction
-const result = await connector.sendTransaction({
-    from: address,
-    to: contractAddress,
-    data: mintData,
-    value: "0x..."
-});
-```
-
-### Coinbase Wallet
-
-```javascript
-import CoinbaseWalletSDK from '@coinbase/wallet-sdk';
-
-const coinbaseWallet = new CoinbaseWalletSDK({
-    appName: 'My NFT App',
-    appLogoUrl: 'https://...'
-});
-
-const provider = coinbaseWallet.makeWeb3Provider();
-await provider.request({ method: 'eth_requestAccounts' });
-```
-
-## Metaverse Integration
-
-### Decentraland
-
-```javascript
-// Wearable NFT metadata
-{
-  "id": "urn:decentraland:ethereum:collections-v2:0x...:1",
-  "name": "Sneakers",
-  "description": "Limited edition sneakers",
-  "i18n": {
-    "en": { "name": "Sneakers" },
-    "es": { "name": "Zapatillas" }
-  },
-  "data": {
-    "replaces": [],
-    "hides": [],
-    "tags": ["footwear", "sneakers"],
-    "category": "feet",
-    "representations": [{
-      "bodyShapes": ["urn:decentraland:off-chain:base-avatars:BaseFemale"],
-      "mainFile": "model.glb",
-      "contents": ["model.glb", "texture.png"]
-    }]
-  }
-}
-```
-
-### The Sandbox
-
-```javascript
-// LAND metadata for The Sandbox
-{
-  "name": "Premium LAND",
-  "description": "Prime location near center",
-  "image": "ipfs://...",
-  "attributes": [{
-    "trait_type": "Size",
-    "value": "3x3"
-  }, {
-    "trait_type": "District",
-    "value": "Center"
-  }],
-  "properties": {
-    "coordinates": "100,150",
-    "elevation": "10"
-  }
-}
-```
-
-### VRChat
-
-```csharp
-// Unity integration for VRChat
-public class NFTAvatar : MonoBehaviour
-{
-    private string nftContractAddress;
-    private string tokenId;
-
-    async void LoadNFT()
-    {
-        var metadata = await NFTClient.GetMetadata(nftContractAddress, tokenId);
-        var texture = await LoadTextureFromIPFS(metadata.image);
-        ApplyTextureToAvatar(texture);
-    }
-}
-```
-
-## Gaming Integration
-
-### Unity SDK
-
-```csharp
-using WIA.NFT;
-
-public class NFTInventory : MonoBehaviour
-{
-    private NFTClient nftClient;
-
-    void Start()
-    {
-        nftClient = new NFTClient("your-api-key");
-    }
-
-    public async Task<List<NFT>> GetPlayerNFTs(string walletAddress)
-    {
-        return await nftClient.GetNFTsByOwner(walletAddress);
-    }
-
-    public async Task UseNFTItem(string tokenId)
-    {
-        var nft = await nftClient.GetNFT(contractAddress, tokenId);
-        ApplyNFTBoost(nft.attributes);
-    }
-}
-```
-
-### Unreal Engine
-
-```cpp
-// Unreal Engine C++ integration
-#include "NFTClient.h"
-
-void APlayerCharacter::LoadNFTSkin(FString TokenId)
-{
-    UNFTClient* Client = UNFTClient::Create();
-    Client->GetNFT(ContractAddress, TokenId,
-        [this](FNFTMetadata Metadata) {
-            LoadTextureFromURL(Metadata.Image);
-        }
-    );
-}
-```
-
-### Web3.js Gaming
-
-```javascript
-class GameNFT {
-    constructor(web3, contractAddress) {
-        this.contract = new web3.eth.Contract(ABI, contractAddress);
-    }
-
-    async equipItem(tokenId) {
-        const metadata = await this.contract.methods
-            .tokenURI(tokenId)
-            .call();
-        const stats = await this.parseStats(metadata);
-        this.applyStats(stats);
-    }
-}
-```
-
-## Social Media Integration
-
-### Twitter NFT Verification
-
-```html
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="NFT Title">
-<meta name="twitter:image" content="ipfs://...">
-<meta property="eth:nft:collection" content="0x...">
-<meta property="eth:nft:contract_address" content="0x...">
-<meta property="eth:nft:token_id" content="1">
-<meta property="eth:nft:chain" content="ethereum">
-```
-
-### Instagram NFT Support
-
-```json
-{
-  "platform": "instagram",
-  "nft": {
-    "contract_address": "0x...",
-    "token_id": "1",
-    "chain": "ethereum",
-    "creator": "@username"
-  }
-}
-```
-
-## Enterprise Integration
-
-### ERP Systems
-
-```javascript
-// SAP integration example
-class NFTInventoryModule {
-    async syncWithSAP(nftData) {
-        await sapClient.post('/inventory/create', {
-            material_number: nftData.tokenId,
-            description: nftData.metadata.name,
-            value: nftData.lastSalePrice,
-            blockchain_ref: {
-                contract: nftData.contract,
-                tokenId: nftData.tokenId,
-                network: 'ethereum'
-            }
-        });
-    }
-}
-```
-
-### CRM Integration
-
-```javascript
-// Salesforce integration
-const createNFTOwnerRecord = async (ownerAddress, nfts) => {
-    await sfClient.sobject('NFT_Owner__c').create({
-        Wallet_Address__c: ownerAddress,
-        NFT_Count__c: nfts.length,
-        Total_Value__c: calculateTotalValue(nfts),
-        Collection_Names__c: getCollectionNames(nfts)
-    });
-};
-```
-
-### Supply Chain
-
-```solidity
-// Supply chain tracking with NFTs
-contract SupplyChainNFT is ERC721 {
-    struct ProductJourney {
-        string origin;
-        uint256 manufactureDate;
-        string[] checkpoints;
-        mapping(string => uint256) timestamps;
-    }
-
-    mapping(uint256 => ProductJourney) public journeys;
-
-    function addCheckpoint(uint256 tokenId, string memory checkpoint)
-        external
-    {
-        journeys[tokenId].checkpoints.push(checkpoint);
-        journeys[tokenId].timestamps[checkpoint] = block.timestamp;
-    }
-}
-```
-
-## Analytics Integration
-
-### Google Analytics
-
-```javascript
-// Track NFT events
-gtag('event', 'nft_mint', {
-    'contract_address': contractAddress,
-    'token_id': tokenId,
-    'price': mintPrice,
-    'currency': 'ETH'
-});
-
-gtag('event', 'nft_sale', {
-    'contract_address': contractAddress,
-    'token_id': tokenId,
-    'sale_price': salePrice,
-    'marketplace': 'OpenSea'
-});
-```
-
-### Dune Analytics
-
-```sql
--- Custom SQL query for NFT analytics
-SELECT
-    date_trunc('day', evt_block_time) as day,
-    COUNT(*) as daily_mints,
-    SUM(value) as total_volume
-FROM nft_mints
-WHERE contract_address = '0x...'
-GROUP BY day
-ORDER BY day DESC;
-```
-
-## Payment Integration
-
-### Stripe
-
-```javascript
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-// Create payment intent for NFT purchase
-const paymentIntent = await stripe.paymentIntents.create({
-    amount: nftPrice * 100, // Convert to cents
-    currency: 'usd',
-    metadata: {
-        contractAddress: '0x...',
-        tokenId: '1',
-        buyer: buyerEmail
-    }
-});
-```
-
-### Crypto Payment Processors
-
-```javascript
-// Coinbase Commerce integration
-import { Client } from 'coinbase-commerce-node';
-
-const client = Client.init(process.env.COINBASE_API_KEY);
-
-const charge = await client.charges.create({
-    name: 'NFT Purchase',
-    description: `Token #${tokenId}`,
-    pricing_type: 'fixed_price',
-    local_price: {
-        amount: '1.5',
-        currency: 'ETH'
-    },
-    metadata: {
-        tokenId,
-        contractAddress
-    }
-});
-```
-
-## Email & Notification Integration
-
-### SendGrid
-
-```javascript
-const sendMintConfirmation = async (email, nftData) => {
-    await sgMail.send({
-        to: email,
-        from: 'noreply@mynft.com',
-        subject: 'NFT Minted Successfully!',
-        html: `
-            <h1>Congratulations!</h1>
-            <p>You've minted NFT #${nftData.tokenId}</p>
-            <img src="${nftData.image}" alt="Your NFT">
-            <a href="https://opensea.io/assets/${contractAddress}/${tokenId}">
-                View on OpenSea
-            </a>
-        `
-    });
-};
-```
-
-### Push Notifications
-
-```javascript
-// OneSignal integration
-const notifyNFTSale = async (userId, saleData) => {
-    await OneSignal.createNotification({
-        contents: {
-            en: `Your NFT sold for ${saleData.price} ETH!`
-        },
-        include_player_ids: [userId],
-        data: {
-            type: 'nft_sale',
-            tokenId: saleData.tokenId,
-            price: saleData.price
-        }
-    });
-};
-```
-
-## IPFS Pinning Services
-
-### Pinata
-
-```javascript
-import pinataSDK from '@pinata/sdk';
-
-const pinata = pinataSDK(apiKey, apiSecret);
-
-// Upload to IPFS
-const result = await pinata.pinJSONToIPFS({
-    name: "NFT Metadata",
-    description: "...",
-    image: "ipfs://..."
-});
-
-console.log(`ipfs://${result.IpfsHash}`);
-```
-
-### NFT.Storage
-
-```javascript
-import { NFTStorage, File } from 'nft.storage';
-
-const client = new NFTStorage({ token: apiKey });
-
-// Store NFT data
-const metadata = await client.store({
-    name: 'My NFT',
-    description: '...',
-    image: new File([imageData], 'image.png', { type: 'image/png' })
-});
-```
-
-## Testing & Monitoring
-
-### E2E Testing
-
-```javascript
-describe('Full NFT Flow', () => {
-    it('should complete mint to sale journey', async () => {
-        // Mint
-        const mintTx = await nft.mint(user.address, metadata);
-        await mintTx.wait();
-
-        // List on marketplace
-        await marketplace.list(nft.address, tokenId, price);
-
-        // Purchase
-        await marketplace.buy(listingId, { value: price });
-
-        // Verify transfer
-        expect(await nft.ownerOf(tokenId)).to.equal(buyer.address);
-    });
-});
-```
-
-### Monitoring
-
-```javascript
-// Datadog integration
-const dd = require('dd-trace').init();
-
-dd.trace('nft.mint', async (span) => {
-    span.setTag('contract', contractAddress);
-    span.setTag('tokenId', tokenId);
-
-    const result = await mintNFT();
-
-    span.setTag('gasUsed', result.gasUsed);
-    return result;
-});
-```
-
-## Best Practices
-
-1. **Error Handling**: Implement comprehensive error handling
-2. **Rate Limiting**: Respect API rate limits
-3. **Caching**: Cache NFT metadata appropriately
-4. **Webhooks**: Use webhooks over polling
-5. **Security**: Validate all external data
-6. **Testing**: Test integrations in sandbox environments
-7. **Documentation**: Maintain integration documentation
-8. **Monitoring**: Set up alerts for integration failures
+# WIA-nft PHASE 4 — INTEGRATION Specification
+
+**Standard:** WIA-nft
+**Phase:** 4 — INTEGRATION
+**Version:** 1.0
+**Status:** Stable
+
+This document defines the canonical INTEGRATION layer for WIA-nft (Nft).
+
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-**Status**: Draft
-**Version**: 1.0.0
-**Last Updated**: 2025-01-15
+## §1 Scope
 
-© 2025 SmileStory Inc. / WIA
+This PHASE document is one of four that together define the WIA-nft
+standard. It addresses the integration layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "nft"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/nft`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `nft` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

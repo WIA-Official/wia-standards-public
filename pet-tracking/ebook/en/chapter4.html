@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Battery Optimization & Power Management | WIA-PET-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(245, 158, 11, 0.2); padding: 1.5rem 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.25rem; font-weight: 800; color: #F59E0B; text-decoration: none; }
+        .nav-links { display: flex; gap: 1rem; }
+        .nav-links a { color: #94a3b8; text-decoration: none; padding: 0.5rem 1rem; border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; transition: all 0.3s ease; }
+        .nav-links a:hover { border-color: #F59E0B; color: #F59E0B; }
+        .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        h2 { font-size: 2rem; font-weight: 700; color: #F59E0B; margin: 3rem 0 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(245, 158, 11, 0.2); }
+        h3 { font-size: 1.5rem; font-weight: 600; color: #F59E0B; margin: 2rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1.5rem; font-size: 1.125rem; }
+        .highlight { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #F59E0B; padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        ul { margin: 1rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.75rem; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        .code-block pre { margin: 0; color: #e2e8f0; font-family: 'Courier New', monospace; }
+        .chapter-nav { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(245, 158, 11, 0.2); }
+        .chapter-nav a { color: #F59E0B; text-decoration: none; padding: 0.75rem 1.5rem; border: 1px solid #F59E0B; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="index.html" class="logo">📍 WIA-PET-008</a>
+            <div class="nav-links"><a href="index.html">← Contents</a><a href="../../index.html">Home</a></div>
+        </div>
+    </header>
+    <div class="container">
+        <h1>Chapter 4: Battery Optimization & Power Management</h1>
+        <div class="highlight"><p><strong>In this chapter:</strong> Master power consumption analysis, implement adaptive tracking intervals, optimize cellular connectivity, design ultra-low-power modes, and achieve 30-day battery life targets.</p></div>
+
+        <h2>4.1 Power Consumption Analysis</h2>
+        <p>Pet tracker battery life is the #1 user complaint and feature request. Understanding power consumption patterns is essential for designing long-lasting devices.</p>
+
+        <h3>Component Power Draw</h3>
+        <p>Typical power consumption for pet tracker components:</p>
+        <ul>
+            <li><strong>GPS Active:</strong> 30-50mA (highest consumer)</li>
+            <li><strong>Cellular Transmit:</strong> 200-500mA peak, 20-40mA average</li>
+            <li><strong>Cellular Idle:</strong> 2-5mA (connected to network)</li>
+            <li><strong>Accelerometer:</strong> 0.05-0.2mA (always-on motion detection)</li>
+            <li><strong>CPU Active:</strong> 10-30mA</li>
+            <li><strong>CPU Sleep:</strong> 0.1-1mA</li>
+            <li><strong>LED Indicators:</strong> 2-20mA per LED</li>
+        </ul>
+
+        <h3>Battery Capacity and Runtime</h3>
+        <p>Common battery sizes for pet trackers:</p>
+        <ul>
+            <li><strong>Small Collar (cats, small dogs):</strong> 200-400mAh</li>
+            <li><strong>Medium Collar (medium dogs):</strong> 500-800mAh</li>
+            <li><strong>Large Collar (large dogs):</strong> 1000-1500mAh</li>
+        </ul>
+        <p>Example calculation: 500mAh battery with average 5mA consumption = 100 hours (4.2 days) runtime. Target: Reduce average to 0.7mA for 30-day battery life.</p>
+
+        <h2>4.2 Adaptive Tracking Strategies</h2>
+        <p>The key to long battery life: GPS and cellular radios spend most time OFF, only activating when needed.</p>
+
+        <h3>Motion-Based Wake-Up</h3>
+        <div class="code-block"><pre>// Accelerometer monitors movement at 0.1mA
+// GPS/Cellular stay OFF until movement detected
+
+const STATIONARY_THRESHOLD = 0.05; // g-force
+const MOTION_TIMEOUT = 300; // seconds
+
+function onAccelerometerReading(acceleration) {
+  const magnitude = Math.sqrt(
+    acceleration.x² + acceleration.y² + acceleration.z²
+  );
+  
+  if (magnitude > STATIONARY_THRESHOLD) {
+    wakeGPS();
+    lastMotionTime = Date.now();
+  } else if (Date.now() - lastMotionTime > MOTION_TIMEOUT * 1000) {
+    enterSleepMode(); // No movement for 5 minutes
+  }
+}
+</pre></div>
+
+        <h3>Context-Aware Tracking Intervals</h3>
+        <ul>
+            <li><strong>At Home (geofence):</strong> 5-10 minute GPS updates</li>
+            <li><strong>Walking (moderate motion):</strong> 30-60 second updates</li>
+            <li><strong>Running (high motion):</strong> 10-20 second updates</li>
+            <li><strong>Vehicle (very high speed):</strong> Continuous GPS, may indicate theft</li>
+            <li><strong>Stationary:</strong> 10-30 minute updates or motion-triggered only</li>
+            <li><strong>Low Battery (&lt;20%):</strong> 10-30 minute updates regardless of activity</li>
+        </ul>
+
+        <h2>4.3 Cellular Connectivity Optimization</h2>
+        <p>Cellular transmission is extremely power-hungry. Minimize connections while maintaining responsiveness.</p>
+
+        <h3>Data Batching</h3>
+        <p>Instead of transmitting every GPS fix individually (expensive), batch multiple fixes and send together:</p>
+        <ul>
+            <li>Collect 5-10 location points locally</li>
+            <li>Connect to cellular network once</li>
+            <li>Upload all points in single transmission</li>
+            <li>Disconnect immediately</li>
+            <li>Result: 5-10x reduction in cellular power consumption</li>
+        </ul>
+
+        <h3>Intelligent Connection Management</h3>
+        <div class="code-block"><pre>class CellularOptimizer {
+  constructor() {
+    this.buffer = [];
+    this.maxBufferSize = 10;
+    this.forceUploadInterval = 300000; // 5 minutes max delay
+  }
+
+  addLocation(location) {
+    this.buffer.push(location);
+
+    // Immediate upload for critical events
+    if (location.isGeofenceAlert || location.isLowBattery) {
+      return this.uploadNow();
+    }
+
+    // Batch upload when buffer full or timeout
+    if (this.buffer.length >= this.maxBufferSize || 
+        Date.now() - this.lastUpload > this.forceUploadInterval) {
+      return this.uploadBatch();
+    }
+  }
+
+  async uploadBatch() {
+    if (this.buffer.length === 0) return;
+
+    await connectCellular();
+    await uploadData(this.buffer);
+    await disconnectCellular();
+
+    this.buffer = [];
+    this.lastUpload = Date.now();
+  }
+}
+</pre></div>
+
+        <h2>4.4 Ultra-Low-Power Sleep Modes</h2>
+        <p>When pet is stationary at home overnight, device should enter deep sleep consuming &lt;0.5mA.</p>
+
+        <h3>Sleep Mode Configuration</h3>
+        <ul>
+            <li><strong>GPS:</strong> Completely OFF</li>
+            <li><strong>Cellular:</strong> Detached from network (saves 2-5mA vs. idle)</li>
+            <li><strong>CPU:</strong> Deep sleep, wake on accelerometer interrupt</li>
+            <li><strong>Accelerometer:</strong> Ultra-low-power mode, sampling at 1Hz</li>
+            <li><strong>RTC:</strong> Keep-alive for scheduled wake-ups</li>
+        </ul>
+
+        <h3>Smart Wake Conditions</h3>
+        <ul>
+            <li>Motion detected (accelerometer interrupt)</li>
+            <li>Scheduled GPS check (e.g., every 4 hours)</li>
+            <li>Remote wake command from server</li>
+            <li>Low battery threshold for final location report</li>
+        </ul>
+
+        <h2>4.5 Battery State Monitoring</h2>
+        <p>Accurate battery monitoring allows intelligent power management decisions.</p>
+
+        <h3>Battery Level Estimation</h3>
+        <div class="code-block"><pre>function estimateBatteryLife(currentLevel, averagePower) {
+  const batteryCapacity = 500; // mAh
+  const remainingCapacity = batteryCapacity * (currentLevel / 100);
+  const hoursRemaining = remainingCapacity / averagePower;
+  const daysRemaining = hoursRemaining / 24;
+  
+  return {
+    percentage: currentLevel,
+    hoursRemaining: Math.round(hoursRemaining),
+    daysRemaining: Math.round(daysRemaining * 10) / 10,
+    recommendation: daysRemaining < 2 ? 'charge_soon' : 'ok'
+  };
+}
+</pre></div>
+
+        <h3>Progressive Power Saving</h3>
+        <ul>
+            <li><strong>100-50%:</strong> Normal operation, all features enabled</li>
+            <li><strong>50-30%:</strong> Reduce GPS accuracy, increase update intervals by 50%</li>
+            <li><strong>30-20%:</strong> Disable non-essential features, double update intervals</li>
+            <li><strong>20-10%:</strong> Critical mode - geofence monitoring only, 5-minute updates</li>
+            <li><strong>10-5%:</strong> Emergency mode - position updates every 15 minutes</li>
+            <li><strong>&lt;5%:</strong> Final position broadcast, then shutdown to preserve battery</li>
+        </ul>
+
+        <div class="highlight">
+            <p><strong>💡 Key Takeaway:</strong> Achieving 30-day battery life requires aggressive power management: motion-based GPS activation, data batching, deep sleep modes, and context-aware tracking. Every component must be optimized. The difference between 3-day and 30-day battery life is not hardware - it's intelligent software power management following WIA-PET-008 best practices.</p>
+        </div>
+
+        </div>
+</body>
+</html>

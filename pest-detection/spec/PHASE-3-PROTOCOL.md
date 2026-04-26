@@ -1,547 +1,241 @@
-# WIA-AGRI-013: Pest Detection Standard
-## Phase 3: Alert Protocol Specification
-
-### 3.1 Overview
-
-Phase 3 defines the standardized protocols for pest outbreak alerts, early warning systems, and regional coordination mechanisms. This phase ensures timely communication of pest threats to farmers, extension services, and agricultural authorities.
-
-**Duration**: 4-6 months
-**Key Outcome**: Operational alert broadcasting system with multi-channel delivery
-
-### 3.2 Alert Classification System
-
-#### 3.2.1 Alert Levels
-
-| Level | Code | Description | Response Time | Notification Channels |
-|-------|------|-------------|---------------|----------------------|
-| **Info** | L1 | Pest detected below economic threshold | 24-48 hours | App, Email |
-| **Advisory** | L2 | Population approaching threshold | 12-24 hours | App, Email, SMS |
-| **Warning** | L3 | Economic threshold exceeded | 6-12 hours | All channels + Voice |
-| **Critical** | L4 | Widespread outbreak, immediate action required | 1-2 hours | All channels + Emergency broadcast |
-
-#### 3.2.2 Alert Priority Matrix
-
-```
-Priority = f(Severity, Spread, Economic_Impact, Timing)
-
-Where:
-- Severity: [1-10] pest population density vs threshold
-- Spread: [1-10] geographic distribution
-- Economic_Impact: [1-10] potential crop loss
-- Timing: [1-10] urgency based on pest life cycle
-```
-
-### 3.3 Alert Message Format
-
-#### 3.3.1 Standard Alert Structure
-
-```json
-{
-  "alert_id": "string (UUID)",
-  "standard_version": "WIA-AGRI-013-v1.0",
-  "alert_type": "enum [detection, outbreak, treatment, all_clear]",
-  "priority": "enum [info, advisory, warning, critical]",
-  "issue_timestamp": "ISO 8601 datetime",
-  "effective_timestamp": "ISO 8601 datetime",
-  "expires_timestamp": "ISO 8601 datetime",
-  "issuer": {
-    "organization": "string",
-    "department": "string",
-    "issuer_id": "string",
-    "contact": {
-      "phone": "string",
-      "email": "string",
-      "website": "string"
-    }
-  },
-  "pest_information": {
-    "species": "string (scientific name)",
-    "common_name": {
-      "en": "string",
-      "ko": "string",
-      "local": "string"
-    },
-    "pest_type": "enum [insect, fungal, bacterial, viral]",
-    "life_stage": "string",
-    "population_density": "number",
-    "severity_level": "enum [low, medium, high, critical]"
-  },
-  "geographic_scope": {
-    "alert_region": "string",
-    "affected_areas": [
-      {
-        "region_code": "string",
-        "region_name": "string",
-        "area_ha": "number",
-        "center_coordinates": {
-          "latitude": "number",
-          "longitude": "number"
-        },
-        "radius_km": "number",
-        "boundary_polygon": "GeoJSON polygon"
-      }
-    ],
-    "total_affected_area_ha": "number",
-    "estimated_farmers_affected": "number"
-  },
-  "crop_impact": {
-    "crops_affected": ["array of crop types"],
-    "growth_stages_vulnerable": ["array of stages"],
-    "estimated_yield_loss_percent": "number",
-    "economic_impact_usd": "number"
-  },
-  "recommended_actions": {
-    "immediate": ["array of action items"],
-    "short_term": ["array of action items"],
-    "preventive": ["array of action items"]
-  },
-  "message": {
-    "headline": {
-      "en": "string (max 140 chars)",
-      "ko": "string (max 140 chars)"
-    },
-    "description": {
-      "en": "string",
-      "ko": "string"
-    },
-    "instruction": {
-      "en": "string",
-      "ko": "string"
-    }
-  },
-  "contact_info": {
-    "hotline": "string (phone number)",
-    "emergency_contact": "string",
-    "extension_office": "string",
-    "website": "string"
-  },
-  "metadata": {
-    "language": ["array of ISO 639-1 codes"],
-    "category": ["array of categories"],
-    "references": ["array of related alert IDs"]
-  }
-}
-```
-
-#### 3.3.2 Example Critical Alert
-
-```json
-{
-  "alert_id": "WIA-PEST-2025-0615-001",
-  "standard_version": "WIA-AGRI-013-v1.0",
-  "alert_type": "outbreak",
-  "priority": "critical",
-  "issue_timestamp": "2025-06-15T14:30:00+09:00",
-  "effective_timestamp": "2025-06-15T14:30:00+09:00",
-  "expires_timestamp": "2025-06-22T23:59:59+09:00",
-  "issuer": {
-    "organization": "Rural Development Administration",
-    "department": "농촌진흥청 병해충예찰팀",
-    "issuer_id": "RDA-KR",
-    "contact": {
-      "phone": "1544-8572",
-      "email": "pest@rda.go.kr",
-      "website": "ncpms.rda.go.kr"
-    }
-  },
-  "pest_information": {
-    "species": "Nilaparvata lugens",
-    "common_name": {
-      "en": "Rice Planthopper",
-      "ko": "벼멸구",
-      "local": "멸구"
-    },
-    "pest_type": "insect",
-    "life_stage": "adult",
-    "population_density": 125,
-    "severity_level": "critical"
-  },
-  "geographic_scope": {
-    "alert_region": "Jeonbuk Province",
-    "affected_areas": [
-      {
-        "region_code": "JB-01",
-        "region_name": "김제시 (Gimje City)",
-        "area_ha": 8500,
-        "center_coordinates": {
-          "latitude": 35.8019,
-          "longitude": 126.8806
-        },
-        "radius_km": 25
-      },
-      {
-        "region_code": "JB-02",
-        "region_name": "정읍시 (Jeongeup City)",
-        "area_ha": 6200,
-        "center_coordinates": {
-          "latitude": 35.5697,
-          "longitude": 126.8561
-        },
-        "radius_km": 20
-      }
-    ],
-    "total_affected_area_ha": 14700,
-    "estimated_farmers_affected": 2840
-  },
-  "crop_impact": {
-    "crops_affected": ["rice"],
-    "growth_stages_vulnerable": ["tillering", "panicle_initiation", "heading"],
-    "estimated_yield_loss_percent": 45,
-    "economic_impact_usd": 8500000
-  },
-  "recommended_actions": {
-    "immediate": [
-      "Conduct field surveys within 24 hours",
-      "Deploy pheromone traps for population monitoring",
-      "Prepare spray equipment and pesticides",
-      "Contact local extension office for guidance"
-    ],
-    "short_term": [
-      "Apply registered insecticides if threshold exceeded (>10 adults per sweep)",
-      "Monitor fields every 2-3 days during outbreak period",
-      "Coordinate treatment timing with neighboring farmers",
-      "Report treatment results to extension service"
-    ],
-    "preventive": [
-      "Use resistant rice varieties in next season",
-      "Maintain proper water management",
-      "Avoid excessive nitrogen fertilization",
-      "Preserve natural enemy populations"
-    ]
-  },
-  "message": {
-    "headline": {
-      "en": "CRITICAL: Rice Planthopper Outbreak in Jeonbuk Province",
-      "ko": "긴급: 전북지역 벼멸구 대발생 경보"
-    },
-    "description": {
-      "en": "Severe rice planthopper infestation detected across 14,700 hectares in Gimje and Jeongeup areas. Population density exceeds economic threshold by 6x. Immediate treatment required to prevent significant yield losses.",
-      "ko": "김제, 정읍 지역 14,700ha에서 벼멸구 심각한 발생이 확인되었습니다. 개체밀도가 경제적 피해 수준의 6배를 초과하였으며, 수확량 손실 방지를 위해 즉시 방제가 필요합니다."
-    },
-    "instruction": {
-      "en": "1) Scout fields immediately, 2) Apply registered insecticides within 48 hours if threshold exceeded, 3) Contact extension office at 1544-8572 for technical support, 4) Report treatment to local authorities.",
-      "ko": "1) 즉시 논 조사 실시, 2) 피해수준 초과시 48시간 내 등록약제 방제, 3) 기술지원은 1544-8572로 문의, 4) 방제실시 결과를 관할 기관에 보고하시기 바랍니다."
-    }
-  },
-  "contact_info": {
-    "hotline": "1544-8572",
-    "emergency_contact": "063-238-1234 (전북농업기술원)",
-    "extension_office": "각 시군 농업기술센터",
-    "website": "ncpms.rda.go.kr"
-  },
-  "metadata": {
-    "language": ["en", "ko"],
-    "category": ["agriculture", "crop_protection", "insect_pest"],
-    "references": []
-  }
-}
-```
-
-### 3.4 Alert Distribution Channels
-
-#### 3.4.1 Channel Specifications
-
-**1. SMS (Short Message Service)**
-- Character limit: 160 chars (Korean), 70 chars (Unicode)
-- Delivery time: < 60 seconds
-- Priority: Warning and Critical alerts
-- Format: Shortened URL for full details
-
-```
-[긴급] 벼멸구 대발생 김제/정읍 지역
-즉시 논 조사 및 방제 필요
-상세정보: https://wia.ag/p/WIA-001
-문의: 1544-8572
-```
-
-**2. Mobile App Push Notifications**
-- Title: 60 chars max
-- Body: 240 chars max
-- Delivery time: < 10 seconds
-- Priority: All alert levels
-- Rich media: Images, action buttons
-
-**3. Email**
-- Subject: 78 chars max
-- Body: Full HTML with images
-- Delivery time: < 5 minutes
-- Priority: All alert levels
-- Attachments: PDF reports, treatment guides
-
-**4. Voice Call (Critical Only)**
-- Automated voice message
-- Duration: 30-60 seconds
-- Language: Korean, English
-- Delivery time: < 2 minutes
-- Callback number provided
-
-**5. Web Portal**
-- Real-time alert dashboard
-- Interactive map of affected areas
-- Filterable by region, crop, pest
-- Export to CSV, PDF
-
-**6. IoT Device Display**
-- LED warning lights on smart farms
-- Digital signage at extension offices
-- Alert tones for different priorities
-
-### 3.5 Alert Workflow
-
-#### 3.5.1 Detection to Alert Process
-
-```
-[Detection] → [Validation] → [Risk Assessment] → [Alert Generation] → [Distribution] → [Confirmation] → [Follow-up]
-
-Timeline:
-Detection (T+0): Pest detected via AI/manual inspection
-Validation (T+15min): Expert verification or AI confidence check
-Risk Assessment (T+30min): Calculate severity and priority
-Alert Generation (T+45min): Create standardized alert message
-Distribution (T+60min): Send via all applicable channels
-Confirmation (T+90min): Track delivery status
-Follow-up (T+24hrs): Monitor response and effectiveness
-```
-
-#### 3.5.2 Alert Escalation Protocol
-
-```python
-if population_density > threshold * 5:
-    priority = "critical"
-    channels = ["sms", "voice", "app", "email", "iot"]
-    response_time = "1-2 hours"
-elif population_density > threshold * 2:
-    priority = "warning"
-    channels = ["sms", "app", "email"]
-    response_time = "6-12 hours"
-elif population_density > threshold:
-    priority = "advisory"
-    channels = ["app", "email"]
-    response_time = "12-24 hours"
-else:
-    priority = "info"
-    channels = ["app"]
-    response_time = "24-48 hours"
-```
-
-### 3.6 Regional Coordination
-
-#### 3.6.1 Multi-Jurisdictional Alerts
-
-When pest outbreak spans multiple administrative regions:
-
-1. **Primary Issuer**: Organization with jurisdiction over epicenter
-2. **Co-issuers**: Adjacent regional authorities
-3. **Coordination**: Unified message with regional-specific instructions
-4. **Contact Points**: Each region provides local hotline
-
-Example:
-```json
-{
-  "alert_id": "WIA-PEST-2025-0615-001",
-  "issuer": {
-    "primary": "Jeonbuk Agricultural Technology Center",
-    "co_issuers": ["Jeonnam ATC", "Chungnam ATC"]
-  },
-  "regional_instructions": {
-    "JB": "Contact 063-238-1234",
-    "JN": "Contact 061-330-1234",
-    "CN": "Contact 041-635-1234"
-  }
-}
-```
-
-#### 3.6.2 Cross-Border Coordination
-
-For pests that may spread internationally:
-- Notify national plant protection organizations (NPPO)
-- Share data with neighboring countries via IPPC
-- Coordinate with FAO regional offices
-
-### 3.7 Alert Verification and Authentication
-
-#### 3.7.1 Digital Signatures
-
-All alerts MUST be digitally signed:
-
-```json
-{
-  "signature": {
-    "algorithm": "ES256",
-    "issuer_public_key": "did:wia:rda-korea#key-1",
-    "signature_value": "base64_encoded_signature",
-    "timestamp": "2025-06-15T14:30:00Z"
-  }
-}
-```
-
-#### 3.7.2 Alert Verification Endpoint
-
-**POST /alerts/verify**
-
-Request:
-```json
-{
-  "alert_id": "WIA-PEST-2025-0615-001",
-  "signature": "base64_signature"
-}
-```
-
-Response:
-```json
-{
-  "valid": true,
-  "issuer_verified": true,
-  "timestamp_valid": true,
-  "not_tampered": true,
-  "issuer_info": {
-    "organization": "RDA Korea",
-    "verified_issuer": true,
-    "trust_level": "government_authority"
-  }
-}
-```
-
-### 3.8 Alert Metrics and Reporting
-
-#### 3.8.1 Key Performance Indicators
-
-- **Alert Delivery Rate**: % of intended recipients reached
-- **Delivery Time**: Time from issue to receipt
-- **Response Rate**: % of farmers taking recommended action
-- **False Positive Rate**: % of alerts not requiring action
-- **Effectiveness**: Reduction in crop loss vs. no-alert scenario
-
-#### 3.8.2 Alert Analytics
-
-```json
-{
-  "alert_id": "WIA-PEST-2025-0615-001",
-  "analytics": {
-    "distribution": {
-      "intended_recipients": 2840,
-      "sms_delivered": 2701,
-      "app_push_delivered": 1653,
-      "email_delivered": 2398,
-      "total_reach": 2748,
-      "delivery_rate": 0.968
-    },
-    "engagement": {
-      "alert_opened": 2103,
-      "open_rate": 0.765,
-      "link_clicks": 1247,
-      "click_through_rate": 0.593
-    },
-    "response": {
-      "farmers_surveyed": 487,
-      "action_taken": 421,
-      "action_rate": 0.865,
-      "treatment_applied": 398,
-      "monitoring_increased": 443
-    },
-    "outcome": {
-      "estimated_yield_saved_percent": 38,
-      "economic_benefit_usd": 6200000,
-      "roi": 15.4
-    }
-  }
-}
-```
-
-### 3.9 Alert Updates and Cancellations
-
-#### 3.9.1 Alert Update
-
-```json
-{
-  "update_id": "WIA-PEST-2025-0615-001-U1",
-  "original_alert_id": "WIA-PEST-2025-0615-001",
-  "update_type": "severity_change",
-  "update_timestamp": "2025-06-17T10:00:00Z",
-  "changes": {
-    "severity_level": {
-      "old": "critical",
-      "new": "warning"
-    },
-    "population_density": {
-      "old": 125,
-      "new": 45
-    },
-    "reason": "Successful treatment reduced population density"
-  }
-}
-```
-
-#### 3.9.2 Alert Cancellation
-
-```json
-{
-  "cancellation_id": "WIA-PEST-2025-0615-001-C1",
-  "original_alert_id": "WIA-PEST-2025-0615-001",
-  "cancellation_timestamp": "2025-06-20T14:00:00Z",
-  "reason": "Pest outbreak successfully controlled, population below threshold",
-  "all_clear": true
-}
-```
-
-### 3.10 Internationalization (i18n)
-
-#### 3.10.1 Supported Languages
-
-- English (en)
-- Korean (ko)
-- Japanese (ja) - for export coordination
-- Chinese (zh) - for regional coordination
-- Spanish (es) - for technical references
-
-#### 3.10.2 Korean Localization (한국화)
-
-**Alert Terminology Mapping:**
-
-| English | Korean (한글) | Notes |
-|---------|------------|-------|
-| Critical Alert | 긴급경보 | Highest priority |
-| Warning | 경보 | High priority |
-| Advisory | 주의보 | Medium priority |
-| Info | 정보 | Low priority |
-| Outbreak | 대발생 | Severe infestation |
-| Economic Threshold | 경제적 피해수준 | Action level |
-| Treatment | 방제 | Control measures |
-| Monitoring | 예찰 | Surveillance |
-| Extension Service | 농업기술센터 | Support office |
-
-### 3.11 Compliance and Legal Requirements
-
-#### 3.11.1 Korean Regulations
-
-Compliance with:
-- 식물방역법 (Plant Protection Act)
-- 농약관리법 (Pesticide Control Act)
-- 농촌진흥법 (Rural Development Act)
-- 개인정보보호법 (Personal Information Protection Act)
-
-#### 3.11.2 Data Privacy
-
-- Opt-in for SMS/voice alerts
-- Right to unsubscribe
-- Location data protection
-- Farmer identity confidentiality
-
-### 3.12 Testing and Validation
-
-#### 3.12.1 Alert System Testing
-
-- Monthly test alerts (clearly marked as TEST)
-- Annual full-scale drill
-- Channel redundancy verification
-- Failover testing
-
-#### 3.12.2 Alert Message Validation
-
-Required checks before sending:
-- ✓ Valid alert structure (JSON schema)
-- ✓ Digital signature present and valid
-- ✓ Geographic coordinates valid
-- ✓ Contact information current
-- ✓ All required languages present
-- ✓ No broken links in message
+# WIA-pest-detection PHASE 3 — PROTOCOL Specification
+
+**Standard:** WIA-pest-detection
+**Phase:** 3 — PROTOCOL
+**Version:** 1.0
+**Status:** Stable
+
+This document defines the canonical PROTOCOL layer for WIA-pest-detection (Pest Detection).
+
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
+
+---
+
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pest-detection
+standard. It addresses the protocol layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pest-detection"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pest-detection`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pest-detection` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

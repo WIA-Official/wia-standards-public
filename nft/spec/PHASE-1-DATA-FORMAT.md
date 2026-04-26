@@ -1,362 +1,241 @@
-# WIA-FIN-009: NFT Standard - Phase 1: Data Format
-
-## Overview
-
-Phase 1 defines the foundational data structures, metadata schemas, and token format specifications for NFT implementation. This phase establishes the core standards that enable interoperability across platforms, marketplaces, and applications.
-
-## Token Standards
-
-### ERC-721: Non-Fungible Token Standard
-
-ERC-721 is the foundational standard for non-fungible tokens on Ethereum, defining the minimum interface required for unique, indivisible tokens.
-
-#### Core Interface
-
-```solidity
-interface IERC721 {
-    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
-    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
-
-    function balanceOf(address owner) external view returns (uint256 balance);
-    function ownerOf(uint256 tokenId) external view returns (address owner);
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external;
-    function safeTransferFrom(address from, address to, uint256 tokenId) external;
-    function transferFrom(address from, address to, uint256 tokenId) external;
-    function approve(address to, uint256 tokenId) external;
-    function setApprovalForAll(address operator, bool approved) external;
-    function getApproved(uint256 tokenId) external view returns (address operator);
-    function isApprovedForAll(address owner, address operator) external view returns (bool);
-}
-```
-
-#### Token Properties
-
-- **Uniqueness**: Each token has a unique uint256 identifier within the contract
-- **Indivisibility**: Tokens cannot be divided into fractional amounts
-- **Ownership**: Single address owns each token at any given time
-- **Transferability**: Tokens can be transferred between addresses with proper authorization
-
-### ERC-1155: Multi-Token Standard
-
-ERC-1155 enables efficient management of multiple token types (both fungible and non-fungible) within a single contract.
-
-#### Core Interface
-
-```solidity
-interface IERC1155 {
-    event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
-    event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
-    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
-    event URI(string value, uint256 indexed id);
-
-    function balanceOf(address account, uint256 id) external view returns (uint256);
-    function balanceOfBatch(address[] calldata accounts, uint256[] calldata ids) external view returns (uint256[] memory);
-    function setApprovalForAll(address operator, bool approved) external;
-    function isApprovedForAll(address account, address operator) external view returns (bool);
-    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes calldata data) external;
-    function safeBatchTransferFrom(address from, address to, uint256[] calldata ids, uint256[] calldata amounts, bytes calldata data) external;
-}
-```
-
-#### Advantages
-
-- **Gas Efficiency**: Batch operations reduce transaction costs significantly
-- **Flexibility**: Support for both fungible and non-fungible tokens in single contract
-- **Simplified Management**: One contract handles entire token ecosystem
-
-## Metadata Schema
-
-### Standard Metadata Format
-
-NFT metadata follows JSON schema for maximum compatibility:
-
-```json
-{
-  "name": "Token Name",
-  "description": "Detailed description supporting markdown",
-  "image": "ipfs://QmHash.../image.png",
-  "external_url": "https://project.com/token/1",
-  "attributes": [
-    {
-      "trait_type": "Background",
-      "value": "Blue"
-    },
-    {
-      "trait_type": "Rarity",
-      "value": "Legendary"
-    },
-    {
-      "trait_type": "Power",
-      "value": 95,
-      "max_value": 100,
-      "display_type": "boost_percentage"
-    }
-  ],
-  "animation_url": "ipfs://QmHash.../animation.mp4",
-  "background_color": "0066FF",
-  "properties": {
-    "created": "2025-01-15T10:30:00Z",
-    "creator": "0x123...",
-    "edition": "1/100"
-  }
-}
-```
-
-### Field Specifications
-
-#### Required Fields
-
-- **name** (string): Token title displayed in wallets and marketplaces
-- **image** (URI): Primary visual representation (IPFS, HTTP, or data URI)
-- **description** (string): Detailed description, supports markdown formatting
-
-#### Optional Fields
-
-- **external_url** (URI): Link to view item on project website
-- **animation_url** (URI): Multimedia content (video, audio, 3D models)
-- **background_color** (hex): Six-character hex color without '#' prefix
-- **attributes** (array): Array of trait objects for filtering/display
-- **properties** (object): Additional custom metadata
-
-### Attribute Schema
-
-```json
-{
-  "trait_type": "string",
-  "value": "string | number",
-  "display_type": "boost_number | boost_percentage | number | date",
-  "max_value": 100,
-  "trait_count": 42
-}
-```
-
-#### Display Types
-
-- **boost_number**: Numeric boost (e.g., +10)
-- **boost_percentage**: Percentage boost (e.g., +5%)
-- **number**: Standard numeric value
-- **date**: Unix timestamp for date display
-
-## IPFS Integration
-
-### Content Addressing
-
-IPFS (InterPlanetary File System) uses content-based addressing rather than location-based URLs:
-
-```
-ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG
-```
-
-### Best Practices
-
-1. **Pinning**: Use pinning services (Pinata, NFT.Storage, Infura) to ensure permanence
-2. **CID Version**: Use CIDv1 for better compatibility
-3. **Directory Structure**: Organize metadata and assets in logical directories
-4. **Redundancy**: Pin content on multiple services for reliability
-
-### Example Structure
-
-```
-/collection
-  /metadata
-    /1.json
-    /2.json
-    ...
-  /images
-    /1.png
-    /2.png
-    ...
-  /animations
-    /1.mp4
-    /2.mp4
-    ...
-```
-
-## URI Schemes
-
-### Supported Protocols
-
-- **IPFS**: `ipfs://QmHash...` - Decentralized content addressing
-- **HTTPS**: `https://domain.com/path` - Traditional web hosting
-- **Data URI**: `data:image/svg+xml;base64,...` - Inline encoded data
-- **Arweave**: `ar://Hash...` - Permanent storage blockchain
-
-### URI Construction
-
-For ERC-721:
-```solidity
-function tokenURI(uint256 tokenId) public view returns (string memory) {
-    return string(abi.encodePacked(baseURI, tokenId.toString(), ".json"));
-}
-```
-
-For ERC-1155:
-```solidity
-function uri(uint256 tokenId) public view returns (string memory) {
-    return string(abi.encodePacked(baseURI, "{id}.json"));
-}
-```
-
-## Royalty Standard (ERC-2981)
-
-### Interface
-
-```solidity
-interface IERC2981 {
-    function royaltyInfo(
-        uint256 tokenId,
-        uint256 salePrice
-    ) external view returns (
-        address receiver,
-        uint256 royaltyAmount
-    );
-}
-```
-
-### Implementation
-
-```solidity
-function royaltyInfo(uint256 tokenId, uint256 salePrice)
-    public view returns (address, uint256)
-{
-    uint256 royaltyAmount = (salePrice * royaltyBasisPoints) / 10000;
-    return (royaltyReceiver, royaltyAmount);
-}
-```
-
-### Royalty Rates
-
-- **Standard Range**: 5-10% (500-1000 basis points)
-- **Premium Art**: 10-15% (1000-1500 basis points)
-- **Gaming Assets**: 2.5-5% (250-500 basis points)
-- **Music NFTs**: 10-15% (1000-1500 basis points)
-
-## Collection Metadata
-
-### Contract-Level Metadata
-
-```json
-{
-  "name": "Collection Name",
-  "description": "Collection description",
-  "image": "ipfs://QmCollectionImage...",
-  "external_link": "https://project.com",
-  "seller_fee_basis_points": 750,
-  "fee_recipient": "0x...",
-  "properties": {
-    "category": "art",
-    "total_supply": 10000,
-    "mint_date": "2025-01-15"
-  }
-}
-```
-
-## Data Validation
-
-### Metadata Validation Rules
-
-1. **Required Fields**: Presence of name, image, description
-2. **URI Format**: Valid IPFS, HTTPS, or data URI
-3. **Attribute Types**: Consistent trait_type and value types
-4. **Image Specifications**: Recommended dimensions and file size
-5. **JSON Validity**: Well-formed JSON structure
-
-### Quality Checklist
-
-- [ ] All required metadata fields present
-- [ ] Images optimized for web (< 2MB)
-- [ ] IPFS content pinned on reliable service
-- [ ] Attributes follow consistent naming convention
-- [ ] External URLs functional and secure (HTTPS)
-- [ ] Metadata tested across major marketplaces
-- [ ] High-resolution assets available for future use
-
-## File Format Specifications
-
-### Images
-
-- **Formats**: PNG (preferred for art), JPG (photos), SVG (vector)
-- **Dimensions**: Minimum 1000x1000px, recommended 2000x2000px
-- **File Size**: Target < 2MB for standard display, < 10MB for high-res
-- **Color Space**: sRGB for consistent display
-- **Transparency**: PNG-24 for alpha channel support
-
-### Animation
-
-- **Video**: MP4 (H.264), WebM, maximum 50MB
-- **Audio**: MP3, WAV, FLAC
-- **3D Models**: GLTF, GLB for metaverse compatibility
-- **Interactive**: HTML with embedded JavaScript
-
-## Security Considerations
-
-### Metadata Immutability
-
-- **Frozen Metadata**: Set tokenURI during minting, prevent changes
-- **Decentralized Storage**: Use IPFS/Arweave, avoid centralized servers
-- **Backup Strategy**: Multiple pinning services for redundancy
-- **Verification**: Provide tools for users to verify metadata integrity
-
-### Content Security
-
-- **IPFS Hashing**: Verify content matches CID
-- **CORS Headers**: Configure for cross-origin access
-- **Rate Limiting**: Implement for custom API endpoints
-- **Access Control**: Restrict metadata update permissions
-
-## Compliance and Standards
-
-### OpenSea Compatibility
-
-- Metadata must conform to OpenSea standard
-- Collection metadata at contract level
-- Rarity traits properly formatted
-- External URL points to project website
-
-### Multi-Marketplace Support
-
-- Test metadata display across platforms
-- Ensure attribute filtering works correctly
-- Verify image rendering at various sizes
-- Check animation playback compatibility
-
-## Version Control
-
-### Metadata Versioning
-
-```json
-{
-  "version": "1.0.0",
-  "schema": "https://schema.org/NFTMetadata/v1",
-  "updated": "2025-01-15T10:30:00Z"
-}
-```
-
-### Changelog Tracking
-
-Maintain transparent record of metadata schema changes:
-- Version numbers (semantic versioning)
-- Change descriptions
-- Migration guides for existing tokens
-- Backward compatibility guarantees
-
-## Future Extensions
-
-### Planned Enhancements
-
-- **Multi-resolution Images**: Serve optimal size based on context
-- **Localization**: Multi-language metadata support
-- **Dynamic Metadata**: Oracle-driven real-time updates
-- **Cross-chain Standards**: Interoperability across blockchains
-- **Enhanced Royalties**: Programmable royalty curves
+# WIA-nft PHASE 1 — DATA-FORMAT Specification
+
+**Standard:** WIA-nft
+**Phase:** 1 — DATA-FORMAT
+**Version:** 1.0
+**Status:** Stable
+
+This document defines the canonical DATA-FORMAT layer for WIA-nft (Nft).
+
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-**Status**: Draft
-**Version**: 1.0.0
-**Last Updated**: 2025-01-15
-**Authors**: WIA Technical Committee
+## §1 Scope
 
-© 2025 SmileStory Inc. / WIA
-弘益人間 (홍익인간) · Benefit All Humanity
+This PHASE document is one of four that together define the WIA-nft
+standard. It addresses the data-format layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "nft"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/nft`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `nft` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

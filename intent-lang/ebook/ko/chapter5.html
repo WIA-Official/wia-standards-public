@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 통합 가이드 - WIA-INTENT v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="wia-badge">WIA 표준</div>
+                <div class="version">버전 1.0</div>
+            </div>
+            <h1>5장: 통합 가이드</h1>
+            <p class="subtitle">LLM 통합 및 전통 언어 상호 운용성</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>5.1 LLM 통합 (WIA-LLM-INTEROP)</h2>
+                <p>
+                    WIA-INTENT는 WIA-LLM-INTEROP 표준을 통해 대형 언어 모델과 원활하게 통합되어
+                    자연어 프로그래밍 기능을 활성화합니다.
+                </p>
+
+                <h3>기본 LLM 통합</h3>
+                <pre><code>use wia.llm
+
+intent GenerateSummary {
+  given: long_document
+  want: concise_summary
+
+  using ai {
+    model: wia.llm.gpt_compatible
+    prompt_template: """
+      다음 문서를 3-5개의 요점으로 요약하세요.
+      핵심 인사이트와 실행 가능한 항목에 집중하세요.
+
+      문서: {document}
+    """
+  }
+
+  constraints {
+    length: 100..300 words
+    style: professional
+    accuracy: &gt;= 0.9
+  }
+
+  verify {
+    fact_check: true
+    hallucination_detection: enabled
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>5.2 전통 언어 상호 운용성</h2>
+                <p>
+                    WIA-INTENT는 Python, JavaScript, Rust와 같은 기존 언어와 상호 운용할 수 있어
+                    점진적인 마이그레이션과 기존 코드베이스 활용이 가능합니다.
+                </p>
+
+                <h3>기존 코드 임베딩</h3>
+                <pre><code>// 기존 Python 코드 사용
+intent ProcessImage {
+  given: image
+  want: processed_image
+
+  implementation {
+    python {
+      import cv2
+      import numpy as np
+
+      # Gaussian blur 적용
+      result = cv2.GaussianBlur(image, (5,5), 0)
+
+      # 엣지 검출 적용
+      edges = cv2.Canny(result, 100, 200)
+
+      return edges
+    }
+  }
+
+  constraints {
+    time: &lt;= 100.milliseconds
+    quality: &gt;= 0.85
+  }
+}</code></pre>
+
+                <h3>Python에서 WIA-INTENT 호출</h3>
+                <pre><code># Python 코드
+from wia_intent import IntentRunner
+
+# 의도 정의
+my_intent = """
+intent AnalyzeData {
+  given: dataset
+  want: insights
+  certainty: &gt;= 0.8
+}
+"""
+
+# 의도 실행
+runner = IntentRunner()
+result = runner.execute(
+    my_intent,
+    inputs={"dataset": my_data},
+    timeout=30.0
+)
+
+if result.certainty &gt;= 0.8:
+    print(f"인사이트: {result.value}")
+else:
+    print(f"낮은 신뢰도: {result.certainty}")</code></pre>
+            </section>
+
+            <section>
+                <h2>5.3 다른 WIA 표준과의 통합</h2>
+
+                <h3>WIA-QUANTUM 통합</h3>
+                <pre><code>use wia.quantum
+
+intent QuantumOptimization {
+  given: optimization_problem
+  want: optimal_solution
+
+  using quantum {
+    algorithm: variational_quantum_eigensolver
+    qubits: 20
+    shots: 1000
+  }
+
+  fallback {
+    if quantum_unavailable:
+      use classical_optimization
+  }
+}</code></pre>
+
+                <h3>WIA-PQ-CRYPTO 통합</h3>
+                <pre><code>use wia.pq_crypto
+
+intent SecureTransmission {
+  given: sensitive_data, recipient
+  want: data at recipient with privacy
+
+  sequence {
+    1. Encrypt {
+         using: wia.pq_crypto.kyber
+         want: encrypted_data
+       }
+    2. Sign {
+         using: wia.pq_crypto.dilithium
+         want: signed_package
+       }
+    3. Send {
+         given: signed_package, recipient
+         want: delivery_confirmation
+       }
+  }
+
+  constraints {
+    quantum_safe: true
+    forward_secrecy: ensure
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>5.4 데이터베이스 통합</h2>
+
+                <h3>선언적 데이터베이스 작업</h3>
+                <pre><code>intent StoreUserPreferences {
+  given: user_id, preferences
+  want: preferences stored
+
+  constraints {
+    consistency: strong
+    durability: guaranteed
+    privacy: encrypt_at_rest
+  }
+
+  implementation {
+    // WIA-INTENT가 최적의 SQL/NoSQL 생성
+    // 데이터베이스 백엔드 기반
+    auto_generate: true
+  }
+}
+
+intent QueryUsers {
+  given: search_criteria
+  want: matching_users
+
+  constraints {
+    time: &lt;= 100.milliseconds
+    privacy: only_necessary_fields
+  }
+
+  optimize {
+    prefer: indexed_fields
+    consider: query_caching
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>5.5 웹 API 통합</h2>
+
+                <h3>REST API 의도</h3>
+                <pre><code>intent FetchWeatherData {
+  given: location, date
+  want: weather_forecast
+
+  using api {
+    endpoint: "https://api.weather.com/v1/forecast"
+    method: GET
+    auth: api_key
+  }
+
+  constraints {
+    timeout: 5.seconds
+    retry: 3.times with exponential_backoff
+  }
+
+  fallback {
+    if api_unavailable:
+      use cached_data with staleness_warning
+  }
+
+  transform {
+    // API 응답을 내부 형식으로 변환
+    from: api_response
+    to: internal_weather_format
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>5.6 이벤트 기반 통합</h2>
+
+                <h3>메시지 큐 통합</h3>
+                <pre><code>intent ProcessMessageQueue {
+  want: all_messages processed
+
+  using queue {
+    type: "rabbitmq"
+    queue: "task_queue"
+    prefetch: 10
+  }
+
+  for_each message {
+    intent ProcessMessage {
+      given: message
+      want: processed_result
+
+      constraints {
+        time: &lt;= 30.seconds
+        acknowledge_after: success
+      }
+
+      fallback {
+        if processing_fails:
+          requeue with max_retries: 3
+      }
+    }
+  }
+
+  constraints {
+    throughput: &gt;= 100 messages_per_second
+    order: preserve within partition
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>5.7 코드 생성을 위한 템플릿 시스템</h2>
+
+                <pre><code>template CRUD&lt;Entity&gt; {
+  intent Create${Entity} {
+    given: ${entity}_data
+    want: created_${entity}
+    constraints { validate: true }
+  }
+
+  intent Read${Entity} {
+    given: ${entity}_id
+    want: ${entity}_data
+    fallback: not_found_error
+  }
+
+  intent Update${Entity} {
+    given: ${entity}_id, new_data
+    want: updated_${entity}
+  }
+
+  intent Delete${Entity} {
+    given: ${entity}_id
+    want: confirmation
+    constraints { soft_delete: prefer }
+  }
+}
+
+// 사용
+use CRUD&lt;User&gt;
+use CRUD&lt;Product&gt;
+use CRUD&lt;Order&gt;
+
+// 이제 CreateUser, ReadUser, UpdateUser, DeleteUser
+// CreateProduct, ReadProduct 등이 있습니다.</code></pre>
+            </section>
+
+            </main>
+
+        </div>
+</body>
+</html>

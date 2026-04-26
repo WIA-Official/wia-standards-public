@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA-INTENT v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="wia-badge">WIA Standard</div>
+                <div class="version">Version 1.0</div>
+            </div>
+            <h1>Chapter 6: Security & Privacy</h1>
+            <p class="subtitle">Intent Validation and Safe Execution Boundaries</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>6.1 Security by Design</h2>
+                <p>
+                    WIA-INTENT incorporates security and privacy as fundamental design principles,
+                    not afterthoughts. Every intent operates within safe boundaries by default.
+                </p>
+
+                <pre><code>security {
+  // 보안이 기본값 (Security is default)
+
+  data {
+    encrypt: by_default
+    anonymize: when_possible
+    minimize: collect_only_necessary
+  }
+
+  access {
+    authenticate: required
+    authorize: principle_of_least_privilege
+    audit: all_actions
+  }
+
+  quantum_safe {
+    use: wia.pq_crypto
+    prepare_for: quantum_threats
+  }
+}</code></pre>
+
+                <div class="info-box warning">
+                    <h4>Security First Principle</h4>
+                    <p>
+                        In WIA-INTENT, security is opt-out, not opt-in. Intents are secure by default,
+                        and you must explicitly reduce security (with appropriate warnings) if needed
+                        for specific use cases.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2>6.2 Intent Validation</h2>
+                <p>
+                    All intents are validated before execution to ensure they meet security,
+                    privacy, and ethical requirements.
+                </p>
+
+                <h3>Static Validation</h3>
+                <pre><code>validate_intent {
+  // Compile-time checks
+
+  security_checks {
+    no_arbitrary_code_execution: enforce
+    no_sql_injection: enforce
+    no_path_traversal: enforce
+    input_sanitization: required
+  }
+
+  privacy_checks {
+    data_minimization: verify
+    consent_required_for: personal_data
+    no_unauthorized_tracking: enforce
+  }
+
+  ethical_checks {
+    no_discrimination: enforce
+    no_manipulation: enforce
+    transparency: required
+  }
+}</code></pre>
+
+                <h3>Runtime Validation</h3>
+                <pre><code>intent ProcessUserData {
+  given: user_data
+  want: analysis_result
+
+  validate_at_runtime {
+    // Check data hasn't been tampered with
+    integrity: verify_checksum
+
+    // Ensure user consent is current
+    consent: check_not_expired
+
+    // Verify data classification
+    classification: confirm_handling_appropriate
+  }
+
+  constraints {
+    privacy: maximum
+    audit_trail: complete
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.3 Safe Execution Boundaries</h2>
+                <p>
+                    Intents execute within sandboxed environments with strictly controlled
+                    access to system resources.
+                </p>
+
+                <h3>Resource Limits</h3>
+                <pre><code>intent UserSubmittedCode {
+  given: code, inputs
+  want: execution_result
+
+  sandbox {
+    // Strict resource limits
+    memory: &lt;= 256.megabytes
+    cpu_time: &lt;= 10.seconds
+    disk_read: &lt;= 100.megabytes
+    disk_write: &lt;= 10.megabytes
+    network: disabled
+
+    // Forbidden operations
+    forbid {
+      file_system_access: outside_temp_dir
+      process_creation: true
+      system_calls: dangerous_ones
+    }
+  }
+
+  timeout: 30.seconds
+  kill_on_timeout: true
+}</code></pre>
+
+                <h3>Capability-Based Security</h3>
+                <pre><code>intent AccessDatabase {
+  given: query
+  want: results
+
+  capabilities_required {
+    database.read: "users_table"
+    // No write capability granted
+  }
+
+  verify {
+    query_is_safe: true
+    no_privilege_escalation: true
+  }
+}
+
+intent ModifyUserProfile {
+  given: user_id, changes
+  want: updated_profile
+
+  capabilities_required {
+    database.read: "users_table"
+    database.write: "users_table"
+    // Only for specific user
+    scope: user_id
+  }
+
+  verify {
+    user_owns_profile: true
+    changes_are_valid: true
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.4 Privacy Protection</h2>
+
+                <h3>Data Minimization</h3>
+                <pre><code>intent RecommendProducts {
+  given: user_profile
+  want: recommendations
+
+  privacy {
+    // Only access necessary fields
+    access_fields: [
+      "preferences",
+      "purchase_history"
+    ]
+
+    // Don't access
+    forbid_fields: [
+      "email",
+      "phone",
+      "address",
+      "payment_methods"
+    ]
+
+    // Anonymize where possible
+    anonymize: {
+      user_id: hash_before_use
+    }
+  }
+
+  constraints {
+    no_tracking: ensure
+    no_profiling: beyond_necessary
+  }
+}</code></pre>
+
+                <h3>Differential Privacy</h3>
+                <pre><code>intent AnalyzeUserBehavior {
+  given: user_data_collection
+  want: aggregate_insights
+
+  privacy {
+    method: differential_privacy
+    epsilon: 0.1  // Privacy budget
+    delta: 1e-5
+
+    noise_mechanism: laplace
+    ensure: individual_privacy
+  }
+
+  verify {
+    no_individual_identification: true
+    statistical_validity: maintained
+  }
+}</code></pre>
+
+                <h3>Consent Management</h3>
+                <pre><code>intent UsePersonalData {
+  given: user_id, data_purpose
+  want: data_access_granted
+
+  require_consent {
+    purpose: data_purpose
+    explicit: true
+    revocable: true
+    granular: true
+  }
+
+  verify {
+    consent_is_current: true
+    consent_scope_matches: data_purpose
+  }
+
+  fallback {
+    if no_consent:
+      deny_access with explanation
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.5 Built-in Ethics Framework</h2>
+                <p>
+                    All intents are subject to global ethical principles that cannot be bypassed.
+                </p>
+
+                <pre><code>global_ethics {
+  // 모든 인텐트에 적용되는 윤리 규칙
+
+  principles {
+    beneficence: "인류에게 이로워야 함"
+    non_maleficence: "해를 끼치지 않음"
+    autonomy: "인간의 자율성 존중"
+    justice: "공정하게 대우"
+    transparency: "설명 가능해야 함"
+  }
+
+  forbidden {
+    harm_humans: always
+    deceive_maliciously: always
+    violate_privacy: without_consent
+    discriminate: unfairly
+  }
+
+  required {
+    explain_decisions: when_asked
+    respect_boundaries: always
+    learn_ethically: from_consented_data
+  }
+}</code></pre>
+
+                <h3>Ethical Decision Making</h3>
+                <pre><code>intent MakeLoanDecision {
+  given: applicant_data
+  want: loan_decision
+
+  ethics {
+    fairness {
+      // No discrimination
+      protected_attributes: [
+        "race", "gender", "religion",
+        "sexual_orientation", "age"
+      ]
+      ensure: not_used_in_decision
+
+      // Require fairness metrics
+      demographic_parity: &gt;= 0.9
+      equal_opportunity: &gt;= 0.9
+    }
+
+    transparency {
+      explainable: true
+      show_factors: decision_influencing
+      allow_appeal: true
+    }
+
+    autonomy {
+      human_in_loop: for high_impact_decisions
+      user_can_opt_out: true
+    }
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.6 Audit and Compliance</h2>
+
+                <h3>Audit Logging</h3>
+                <pre><code>intent ProcessSensitiveData {
+  given: sensitive_data
+  want: processed_result
+
+  audit {
+    log_level: detailed
+
+    log_events {
+      data_accessed: {
+        what: data_identifier
+        when: timestamp
+        who: user_id
+        why: purpose
+      }
+
+      decisions_made: {
+        decision: outcome
+        factors: influencing_factors
+        confidence: certainty_level
+      }
+
+      privacy_events: {
+        consent_checked: result
+        anonymization: applied
+        retention: policy_followed
+      }
+    }
+
+    retention {
+      duration: 7.years
+      secure_storage: encrypted
+      access_controlled: true
+    }
+  }
+}</code></pre>
+
+                <h3>Compliance Verification</h3>
+                <pre><code>intent EnsureGDPRCompliance {
+  want: system_is_gdpr_compliant
+
+  verify {
+    // Right to access
+    user_can_access_own_data: true
+
+    // Right to deletion
+    user_can_delete_data: true
+    deletion_is_complete: true
+
+    // Right to portability
+    data_export: machine_readable_format
+
+    // Right to be forgotten
+    cascading_deletion: implemented
+
+    // Consent management
+    consent_is_explicit: true
+    consent_is_revocable: true
+
+    // Data protection
+    encryption_at_rest: true
+    encryption_in_transit: true
+    anonymization: where_appropriate
+  }
+
+  compliance_frameworks {
+    GDPR: required
+    CCPA: required
+    HIPAA: if_applicable
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.7 Secure Multi-Party Computation</h2>
+                <p>
+                    Enable computation on encrypted data without revealing the data itself.
+                </p>
+
+                <pre><code>intent CollaborativeAnalysis {
+  given: [encrypted_dataset_A, encrypted_dataset_B]
+  want: combined_insights
+
+  using {
+    method: secure_multi_party_computation
+    parties: [organization_A, organization_B]
+  }
+
+  ensure {
+    // Neither party sees other's raw data
+    data_privacy: complete
+
+    // But both get the aggregate result
+    result_sharing: agreed_upon
+
+    // Verifiable computation
+    correctness: cryptographically_proven
+  }
+
+  constraints {
+    no_data_leakage: enforce
+    output_only: aggregate_statistics
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.8 Quantum-Safe Security</h2>
+                <p>
+                    Integration with WIA-PQ-CRYPTO for post-quantum cryptography.
+                </p>
+
+                <pre><code>use wia.pq_crypto
+
+intent SecureCommunication {
+  given: message, recipient
+  want: secure_delivery
+
+  encryption {
+    algorithm: wia.pq_crypto.kyber
+    key_exchange: quantum_safe
+    forward_secrecy: ensure
+  }
+
+  signature {
+    algorithm: wia.pq_crypto.dilithium
+    verify_integrity: true
+    non_repudiation: ensure
+  }
+
+  constraints {
+    quantum_resistant: true
+    classical_security: &gt;= 256.bits
+  }
+}</code></pre>
+
+                <div class="info-box success">
+                    <h4>Future-Proof Security</h4>
+                    <p>
+                        WIA-INTENT is designed to be secure even against quantum computers.
+                        By integrating with WIA-PQ-CRYPTO, your intents remain secure in the
+                        post-quantum era.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2>6.9 Threat Modeling</h2>
+
+                <pre><code>threat_model {
+  intent: ProcessPayment
+
+  threats {
+    replay_attack: {
+      likelihood: medium
+      impact: high
+      mitigation: unique_transaction_ids with timestamp
+    }
+
+    sql_injection: {
+      likelihood: high
+      impact: critical
+      mitigation: parameterized_queries only
+    }
+
+    man_in_middle: {
+      likelihood: medium
+      impact: high
+      mitigation: tls_1_3 with certificate_pinning
+    }
+
+    privilege_escalation: {
+      likelihood: low
+      impact: critical
+      mitigation: capability_based_security
+    }
+  }
+
+  security_testing {
+    penetration_testing: quarterly
+    vulnerability_scanning: continuous
+    code_review: all_changes
+  }
+}</code></pre>
+            </section>
+
+            </main>
+
+        </div>
+</body>
+</html>

@@ -1,357 +1,241 @@
-# WIA-MED-022 Nutrition Tracking Standard
-## Phase 4: Integration Specification
+# WIA-nutrition-tracking PHASE 4 — INTEGRATION Specification
 
-### Version: 1.0.0
-### Status: Complete
-### Last Updated: 2025-01-15
+**Standard:** WIA-nutrition-tracking
+**Phase:** 4 — INTEGRATION
+**Version:** 1.0
+**Status:** Stable
 
----
+This document defines the canonical INTEGRATION layer for WIA-nutrition-tracking (Nutrition Tracking).
 
-## 1. System Integration Overview
-
-This phase defines how WIA-MED-022 integrates with external systems including healthcare platforms, wearable devices, and third-party services.
-
----
-
-## 2. Healthcare System Integration
-
-### 2.1 Electronic Medical Records (EMR)
-```
-HL7 v2 Message Format:
-
-MSH|^~\&|NutritionApp|Hospital|EMR|Hospital|20250115100000||ORM^O01|MSG001|P|2.5
-PID|1||123456||Doe^John||19900101|M
-ORC|NW|ORD001|||||||20250115100000
-OBR|1|ORD001||DIET^Diabetic Diet
-
-Integration Points:
-- Patient demographics sync
-- Nutrition orders from dietitian
-- Lab results for nutritional assessment
-- Medication interactions check
-```
-
-### 2.2 FHIR R4 Compliance
-```
-Resource Mapping:
-- Patient → user_profile
-- Observation → nutrition_metrics
-- NutritionOrder → meal_plan
-- AllergyIntolerance → user_allergies
-- Condition → medical_conditions
-```
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 3. Wearable Device Integration
+## §1 Scope
 
-### 3.1 Apple Watch
-```
-Features:
-- Quick meal logging via voice
-- Water intake tracking
-- Calorie burn sync (ActivityKit)
-- Goal progress complications
+This PHASE document is one of four that together define the WIA-nutrition-tracking
+standard. It addresses the integration layer of the standard.
 
-WatchKit Implementation:
-- Meal log interface
-- Nutrition summary view
-- Water tracking buttons
-- Daily goal rings
-```
+## §2 Manifest
 
-### 3.2 Fitbit
-```
-API Integration:
-- Endpoint: https://api.fitbit.com/1/user/-/foods/log.json
-- Permissions: nutrition, weight
+Implementations publish a signed manifest containing standardSlug
+(constant value: "nutrition-tracking"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-Data Exchange:
-Fitbit → App:
-  - Calories burned
-  - Weight measurements
-  - Sleep data
-  - Activity levels
+## §3 Conformance Tiers
 
-App → Fitbit:
-  - Calories consumed
-  - Water intake
-  - Macro nutrients
-```
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-### 3.3 Garmin
-```
-Garmin Health API:
-- Activity data
-- Heart rate
-- Stress levels
-- Sleep metrics
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-Integration:
-- Adjust TDEE based on Garmin activity
-- Update meal recommendations
-- Correlate stress with eating patterns
-```
+## §4 Discovery
 
----
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/nutrition-tracking`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-## 4. Food Database Integration
+## §5 Time and Identity
 
-### 4.1 USDA FoodData Central
-```
-API Configuration:
-- Base URL: https://api.nal.usda.gov/fdc/v1/
-- Auth: API Key in header
-- Rate Limit: 1000 requests/hour
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Endpoints Used:
-- /foods/search - Food lookup
-- /food/{fdcId} - Detailed nutrition
-- /foods/list - Bulk retrieval
+## §6 Versioning and Deprecation
 
-Data Sync:
-- Initial: Full database import
-- Incremental: Weekly updates
-- Cache: 7-day TTL
-```
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-### 4.2 Open Food Facts
-```
-API Configuration:
-- Base URL: https://world.openfoodfacts.org/api/v2/
-- No auth required (open source)
-- Rate Limit: Unlimited (be reasonable)
+## §7 Privacy and Security
 
-Barcode Lookup:
-GET /product/{barcode}.json
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Data Mapping:
-- product_name → food.name
-- nutriments → food.nutrition
-- allergens → food.allergens
-- image_url → food.photo_url
-```
+## §8 Open Governance
 
-### 4.3 Korean Food Database
-```
-Source: 식품의약품안전처
-- Food composition database
-- ~6,000 Korean food items
-- Korean traditional dishes
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `nutrition-tracking` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-Integration Method:
-- CSV import
-- Monthly updates
-- Manual verification for quality
-```
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
----
 
-## 5. AI Service Integration
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
 
-### 5.1 Image Recognition API
-```
-Service: TensorFlow Serving / Custom API
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
 
-Request:
-POST /v1/models/food-recognition:predict
-Content-Type: application/json
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-{
-  "instances": [
-    {
-      "image_bytes": "base64_encoded_image"
-    }
-  ]
-}
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-Response:
-{
-  "predictions": [
-    {
-      "class": "grilled_chicken",
-      "confidence": 0.92,
-      "bounding_box": [x, y, w, h],
-      "portion_grams": 180
-    }
-  ]
-}
-```
+## Annex F — Adoption Roadmap
 
-### 5.2 Barcode Scanning
-```
-Service: Google ML Kit / ZXing
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-Implementation:
-- Real-time camera feed processing
-- Barcode detection (EAN-13, UPC-A, QR)
-- Product lookup in databases
-- Fallback to manual entry
-```
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
----
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-## 6. Third-Party Service Integration
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-### 6.1 Payment Processing
-```
-Stripe Integration:
-- Subscription management
-- Premium feature access
-- One-time purchases (meal plans)
+## Annex G — Test Vectors and Conformance Evidence
 
-Endpoints:
-- /api/billing/subscribe
-- /api/billing/manage
-- /api/billing/cancel
-```
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-### 6.2 Cloud Storage
-```
-AWS S3 Configuration:
-- Meal photos
-- User profile pictures
-- Export files (PDF reports)
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-Settings:
-- Encryption: AES-256
-- Lifecycle: 90 days for unused photos
-- CDN: CloudFront for global access
-```
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
 
-### 6.3 Analytics
-```
-Google Analytics 4:
-- User engagement metrics
-- Feature usage tracking
-- Goal achievement rates
-- Retention analysis
+## Annex H — Versioning and Deprecation Policy
 
-Custom Events:
-- meal_logged
-- goal_set
-- photo_scanned
-- barcode_scanned
-```
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
----
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## 7. Export & Interoperability
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-### 7.1 Data Export Formats
-```
-CSV Export:
-date,meal_type,food_name,quantity,calories,protein,carbs,fat
-2025-01-15,breakfast,Oatmeal,50g,180,6,30,3
+## Annex I — Interoperability Profiles
 
-JSON Export:
-{
-  "export_date": "2025-01-15",
-  "date_range": {
-    "start": "2025-01-01",
-    "end": "2025-01-15"
-  },
-  "meals": [ ... ],
-  "summary": { ... }
-}
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-PDF Report:
-- Formatted nutrition summary
-- Charts and graphs
-- Recommendations
-- Goal progress
-```
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-### 7.2 Import Support
-```
-Supported Formats:
-- MyFitnessPal CSV
-- Lose It! JSON
-- Cronometer CSV
-- Apple Health XML
-
-Import Process:
-1. Upload file
-2. Validate format
-3. Map fields
-4. Preview import
-5. Confirm & import
-6. Conflict resolution
-```
-
----
-
-## 8. Webhook Integration
-
-### 8.1 Webhook Configuration
-```
-POST /api/webhooks
-Authorization: Bearer {token}
-
-{
-  "url": "https://your-server.com/webhook",
-  "events": ["meal.created", "goal.updated"],
-  "secret": "webhook_secret_key"
-}
-```
-
-### 8.2 Webhook Payload
-```
-POST {webhook_url}
-X-WIA-Signature: sha256=hash
-Content-Type: application/json
-
-{
-  "event": "meal.created",
-  "timestamp": "2025-01-15T12:30:00Z",
-  "data": {
-    "meal_id": "uuid",
-    "user_id": "uuid",
-    "nutrition_summary": { ... }
-  }
-}
-```
-
----
-
-## 9. Migration Tools
-
-### 9.1 Database Migration
-```
-Supported Sources:
-- MyFitnessPal
-- Lose It!
-- Cronometer
-- Noom
-
-Migration Steps:
-1. Export from source app
-2. Upload to migration tool
-3. Automatic field mapping
-4. Data validation
-5. Preview & confirm
-6. Import into WIA-MED-022
-```
-
----
-
-## 10. Compliance & Standards
-
-### 10.1 Supported Standards
-- FHIR R4 (Healthcare)
-- HL7 v2 (Legacy EMR)
-- OAuth 2.0 (Authentication)
-- OpenID Connect (Identity)
-- GDPR (Data Privacy)
-- HIPAA (Health Data, US)
-- PIPA (Personal Info, Korea)
-
-### 10.2 Certification
-- WIA-MED-022 Certified
-- SOC 2 Type II
-- ISO 27001
-- HITRUST
-
----
-
-© 2025 WIA Standards - Benefit All Humanity (弘益人間)
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

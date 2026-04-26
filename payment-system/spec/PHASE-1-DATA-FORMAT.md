@@ -1,840 +1,241 @@
-# WIA-FIN-012 Phase 1: Data Format Specification
+# WIA-payment-system PHASE 1 — DATA-FORMAT Specification
 
-**Version:** 1.0.0  
-**Status:** Final  
-**Date:** 2025-01-15  
-**Category:** Finance - Payment Systems
+**Standard:** WIA-payment-system
+**Phase:** 1 — DATA-FORMAT
+**Version:** 1.0
+**Status:** Stable
 
----
+This document defines the canonical DATA-FORMAT layer for WIA-payment-system (Payment System).
 
-## 1. Introduction
-
-This specification defines the data formats, structures, and validation rules for payment card data in the WIA-FIN-012 Payment System Standard. It covers card data representation, encryption standards, tokenization formats, and PCI-DSS compliance requirements.
-
-### 1.1 Scope
-
-This phase covers:
-- Primary Account Number (PAN) format and validation
-- Card metadata (expiry, CVV, cardholder name)
-- Magnetic stripe data structures
-- EMV chip data formats
-- ISO 8583 message structure
-- Data encryption and tokenization
-- PCI-DSS data classification
-
-### 1.2 Normative References
-
-- ISO/IEC 7812: Identification cards - Identification of issuers
-- ISO/IEC 7813: Identification cards - Financial transaction cards
-- ISO 8583: Financial transaction card originated messages
-- EMV 4.3: Integrated Circuit Card Specifications for Payment Systems
-- PCI-DSS 4.0: Payment Card Industry Data Security Standard
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 2. Primary Account Number (PAN)
-
-### 2.1 Structure
-
-```
-PAN Structure (16 digits typical):
-┌─────────┬──────────────────┬────────┐
-│  1-6    │      7-15        │   16   │
-│  BIN    │  Account Number  │ Check  │
-│  (IIN)  │                  │ Digit  │
-└─────────┴──────────────────┴────────┘
-
-Detailed Breakdown:
-Position 1:      Major Industry Identifier (MII)
-Positions 1-6:   Bank Identification Number (BIN) / Issuer Identification Number (IIN)
-Positions 7-15:  Individual Account Identifier
-Position 16:     Check Digit (Luhn algorithm)
-```
-
-### 2.2 Length Specifications
-
-| Card Network | PAN Length | Format |
-|-------------|-----------|---------|
-| Visa | 13, 16, 19 | 4xxx xxxx xxxx xxx(x)(x) |
-| Mastercard | 16 | 5xxx xxxx xxxx xxxx |
-| American Express | 15 | 3xxx xxxxxx xxxxx |
-| Discover | 16 | 6xxx xxxx xxxx xxxx |
-| Diners Club | 14 | 3xxx xxxx xxxx xx |
-| JCB | 16 | 35xx xxxx xxxx xxxx |
-| UnionPay | 16-19 | 62xx xxxx xxxx xxxx (xxx) |
-
-### 2.3 Luhn Algorithm
-
-**Purpose:** Detect accidental errors in PAN entry
-
-**Algorithm:**
-```python
-def luhn_check(pan: str) -> bool:
-    """
-    Validates PAN using Luhn algorithm (modulus 10)
-    
-    Steps:
-    1. Remove all non-digit characters
-    2. Reverse the digit string
-    3. Double every second digit (starting from index 1)
-    4. If doubled digit > 9, subtract 9
-    5. Sum all digits
-    6. If sum % 10 == 0, valid
-    """
-    digits = [int(d) for d in pan if d.isdigit()][::-1]
-    checksum = sum(
-        d if i % 2 == 0 else (d * 2 - 9 if d * 2 > 9 else d * 2)
-        for i, d in enumerate(digits)
-    )
-    return checksum % 10 == 0
-
-# Example:
-# PAN: 4532 1234 5678 9010
-# Reversed: 0109 8765 4321 2354
-# Process: 0+1+0+18+8+14+6+10+4+6+2+2+2+6+5+8 = 92
-# 92 % 10 = 2 (if this were 0, it would be valid)
-```
-
-**Test Card Numbers (Always Valid):**
-```
-Visa:              4532 1234 5678 9010
-Visa:              4916 3385 0643 3430
-Mastercard:        5425 2334 3010 9903
-American Express:  3782 822463 10005
-Discover:          6011 1111 1111 1117
-```
-
----
-
-## 3. Card Metadata
-
-### 3.1 Expiration Date
-
-**Format:** `YYMM` or `MM/YY`
-
-```
-Storage Format:   YYMM (4 digits)
-Display Format:   MM/YY
-Example:          2512 (December 2025)
-Display:          12/25
-
-Validation Rules:
-- MM must be 01-12
-- YY must be current year or future
-- Card invalid if current date > last day of expiry month
-```
-
-### 3.2 Card Verification Value (CVV/CVC/CID)
-
-| Card Network | Name | Location | Length |
-|-------------|------|----------|---------|
-| Visa | CVV2 | Back | 3 digits |
-| Mastercard | CVC2 | Back | 3 digits |
-| American Express | CID | Front | 4 digits |
-| Discover | CID | Back | 3 digits |
-
-**Security Rules:**
-```
-✅ ALLOWED:
-- Collect for authorization
-- Transmit encrypted for processing
-
-❌ NEVER:
-- Store after authorization (even encrypted)
-- Log in plain text
-- Display to unauthorized parties
-- Include in receipts or statements
-
-PENALTY: Up to $500,000 per incident + decertification
-```
-
-### 3.3 Cardholder Name
-
-**Format:**
-```
-Pattern: [A-Z ]{2,26}
-Max Length: 26 characters (embossing limitation)
-Case: UPPERCASE (traditional embossing)
-Separator: Space or slash (/)
-
-Examples:
-JOHN DOE
-MARY JANE SMITH
-O'BRIEN/PATRICK
-
-Validation:
-- Minimum 2 characters
-- Maximum 26 characters
-- Letters and spaces only (some systems allow apostrophe, hyphen)
-- No numbers or special characters
-```
-
----
-
-## 4. Magnetic Stripe Data
-
-### 4.1 Track 1 Specification
-
-**Format Code:** ALPHA (alphanumeric)  
-**Density:** 210 bits per inch (bpi)  
-**Capacity:** 79 characters maximum
-
-```
-Structure:
-%B{PAN}^{Name}^{Expiry}{ServiceCode}{DiscretionaryData}?{LRC}
-
-Example:
-%B4532123456789010^DOE/JOHN^25121011234567890123456789?
-
-Field Breakdown:
-%               Start Sentinel
-B               Format Code (B = ALPHA)
-4532...9010     Primary Account Number
-^               Field Separator
-DOE/JOHN        Cardholder Name (surname/firstname)
-^               Field Separator
-2512            Expiration Date (YYMM)
-101             Service Code (3 digits)
-1234...789      Discretionary Data (optional, max 28 chars)
-?               End Sentinel
-LRC             Longitudinal Redundancy Check
-```
-
-### 4.2 Track 2 Specification
-
-**Format Code:** NUMERIC  
-**Density:** 75 bits per inch (bpi)  
-**Capacity:** 40 characters maximum
-
-```
-Structure:
-;{PAN}={Expiry}{ServiceCode}{DiscretionaryData}?{LRC}
-
-Example:
-;4532123456789010=25121011234?
-
-Field Breakdown:
-;               Start Sentinel
-4532...9010     Primary Account Number
-=               Field Separator
-2512            Expiration Date (YYMM)
-101             Service Code
-1234            Discretionary Data (max 13 chars)
-?               End Sentinel
-LRC             Longitudinal Redundancy Check
-
-Note: Track 2 is most commonly used for payment transactions
-```
-
-### 4.3 Service Code
-
-**3-Digit Code Structure:**
-
-**First Digit (Interchange & Technology):**
-```
-1 = International, ICC (chip)
-2 = International, magnetic stripe
-5 = National, ICC
-6 = National, magnetic stripe
-7 = Private use
-```
-
-**Second Digit (Authorization Processing):**
-```
-0 = Normal authorization, no restrictions
-2 = Online authorization required
-3 = Offline PIN required (if supported)
-5 = Offline PIN required
-6 = Prompt for PIN
-```
-
-**Third Digit (Allowed Services):**
-```
-0 = No restrictions, PIN required if indicated
-1 = Goods and services only (no cash)
-2 = ATM only
-3 = Goods and services, authorized ATM
-4 = Cash only
-5 = Goods and services (no cash), PIN required
-6 = No restrictions, PIN required
-7 = Goods and services, PIN required
-```
-
-**Common Service Codes:**
-```
-101 = International, no restrictions, no PIN (most credit cards)
-121 = International, no restrictions, online PIN (debit cards)
-201 = International, mag stripe, no restrictions
-221 = International, mag stripe, PIN required
-```
-
----
-
-## 5. EMV Chip Data
-
-### 5.1 TLV (Tag-Length-Value) Structure
-
-```
-TLV Encoding:
-┌──────┬────────┬───────────────┐
-│ Tag  │ Length │     Value     │
-│ 1-2  │  1-3   │   Variable    │
-│ bytes│ bytes  │     bytes     │
-└──────┴────────┴───────────────┘
-
-Example:
-5A 08 4532123456789010
-│  │  └─ Value (8 bytes): PAN
-│  └─── Length (1 byte): 8
-└────── Tag (1 byte): Application PAN (0x5A)
-```
-
-### 5.2 Critical EMV Tags
-
-```
-Card Data Tags:
-├─ 5A         Application PAN
-├─ 5F20       Cardholder Name
-├─ 5F24       Application Expiration Date (YYMMDD)
-├─ 5F25       Application Effective Date
-├─ 5F28       Issuer Country Code (ISO 3166-1 numeric)
-├─ 5F34       PAN Sequence Number
-└─ 57         Track 2 Equivalent Data
-
-Application Tags:
-├─ 4F         Application Identifier (AID)
-├─ 50         Application Label
-├─ 82         Application Interchange Profile (AIP)
-├─ 84         Dedicated File (DF) Name
-├─ 87         Application Priority Indicator
-├─ 8C         Card Risk Management Data Object List 1 (CDOL1)
-├─ 8D         Card Risk Management Data Object List 2 (CDOL2)
-└─ 8E         Cardholder Verification Method (CVM) List
-
-Transaction Tags:
-├─ 9A         Transaction Date (YYMMDD)
-├─ 9C         Transaction Type
-├─ 9F02       Amount, Authorized (Numeric)
-├─ 9F03       Amount, Other (Numeric)
-├─ 9F1A       Terminal Country Code
-└─ 9F21       Transaction Time (HHMMSS)
-
-Cryptographic Tags:
-├─ 9F26       Application Cryptogram (ARQC/TC/AAC)
-├─ 9F27       Cryptogram Information Data
-├─ 9F34       CVM Results
-├─ 9F36       Application Transaction Counter (ATC)
-└─ 9F37       Unpredictable Number (Terminal Random)
-```
-
-### 5.3 Application Identifiers (AID)
-
-```
-Registered Application Identifiers (RID):
-
-Visa:
-A0000000031010    Visa Credit/Debit
-A0000000032010    Visa Electron  
-A0000000033010    Visa Interlink (V PAY)
-A0000000038010    Visa Plus
-
-Mastercard:
-A0000000041010    Mastercard Credit/Debit
-A0000000042010    Maestro
-A0000000043010    Cirrus
-
-American Express:
-A00000002501      American Express
-
-Discover:
-A0000001523010    Discover
-
-JCB:
-A0000000651010    JCB
-
-UnionPay:
-A000000333010101  UnionPay Credit
-A000000333010102  UnionPay Debit
-A000000333010103  UnionPay Electronic Cash
-```
-
----
-
-## 6. ISO 8583 Data Elements
-
-### 6.1 Message Type Indicator (MTI)
-
-```
-4-Digit MTI Structure:
-┌────────┬────────┬────────┬────────┐
-│Version │ Class  │Function│ Origin │
-│  0-9   │  0-9   │  0-9   │  0-9   │
-└────────┴────────┴────────┴────────┘
-
-Version:
-0 = ISO 8583-1:1987
-1 = ISO 8583-1:1993
-2 = ISO 8583-1:2003
-9 = Private use
-
-Class:
-0 = Reserved
-1 = Authorization
-2 = Financial
-3 = File actions
-4 = Reversal/Chargeback
-5 = Reconciliation
-6 = Administrative
-7 = Fee collection
-8 = Network management
-9 = Reserved
-
-Function:
-0 = Request
-1 = Request response
-2 = Advice
-3 = Advice response
-4 = Notification
-5-9 = Reserved
-
-Origin:
-0 = Acquirer
-1 = Acquirer repeat
-2 = Issuer
-3 = Issuer repeat
-4 = Other
-5 = Other repeat
-6-9 = Reserved
-
-Common MTIs:
-0100 = Authorization Request (Acquirer → Issuer)
-0110 = Authorization Response (Issuer → Acquirer)
-0200 = Financial Transaction Request
-0210 = Financial Transaction Response
-0220 = Financial Advice
-0400 = Reversal Request
-0420 = Reversal Advice
-0800 = Network Management Request
-0810 = Network Management Response
-```
-
-### 6.2 Common Data Elements
-
-```
-Field | Name | Type | Length | Description
-------|------|------|--------|-------------
-1     | Bitmap | b | 8/16 | Secondary bitmap indicator
-2     | PAN | n | ≤19 | Primary Account Number
-3     | Processing Code | n | 6 | Transaction type
-4     | Amount, Transaction | n | 12 | Transaction amount
-7     | Transmission Date/Time | n | 10 | MMDDhhmmss
-11    | STAN | n | 6 | Systems Trace Audit Number
-12    | Time, Local Transaction | n | 6 | hhmmss
-13    | Date, Local Transaction | n | 4 | MMDD
-14    | Expiration Date | n | 4 | YYMM
-18    | Merchant Type | n | 4 | MCC Code
-22    | POS Entry Mode | n | 3 | Card data entry method
-23    | Card Sequence Number | n | 3 | For chip cards
-25    | POS Condition Code | n | 2 | Transaction environment
-32    | Acquiring Institution ID | n | ≤11 | Acquirer BIN
-35    | Track 2 Data | z | ≤37 | Track 2 equivalent
-37    | Retrieval Reference | an | 12 | Unique reference
-38    | Authorization Code | an | 6 | Approval code
-39    | Response Code | an | 2 | Transaction result
-41    | Terminal ID | ans | 8 | Terminal identifier
-42    | Merchant ID | ans | 15 | Card acceptor ID
-43    | Merchant Name/Location | ans | 40 | Merchant details
-49    | Currency Code | n | 3 | ISO 4217 numeric
-52    | PIN Data | b | 8 | Encrypted PIN block
-54    | Additional Amounts | an | ≤120 | Cashback, etc.
-55    | ICC Data | b | ≤255 | EMV chip data
-90    | Original Data Elements | n | 42 | For reversals
-95    | Replacement Amounts | an | 42 | Amended amounts
-
-Type Codes:
-n   = Numeric only
-an  = Alphanumeric
-ans = Alphanumeric + special
-b   = Binary
-z   = Track 2/3 (numeric + = ?)
-```
-
----
-
-## 7. Data Encryption
-
-### 7.1 Encryption Standards
-
-**At Rest:**
-```
-Required:
-- AES-256-GCM (recommended)
-- AES-128-GCM (minimum)
-- RSA-2048 (for key encryption)
-
-Prohibited:
-- DES
-- 3DES/TDEA (deprecated 2023)
-- RSA-1024 or lower
-- RC4
-- MD5
-- SHA-1
-```
-
-**In Transit:**
-```
-TLS Requirements:
-✓ TLS 1.3 (recommended)
-✓ TLS 1.2 (minimum)
-✗ TLS 1.1 (prohibited)
-✗ TLS 1.0 (prohibited)
-✗ SSL 3.0 (prohibited)
-✗ SSL 2.0 (prohibited)
-
-Cipher Suites (Strong):
-- TLS_AES_256_GCM_SHA384
-- TLS_CHACHA20_POLY1305_SHA256
-- TLS_AES_128_GCM_SHA256
-- ECDHE-RSA-AES256-GCM-SHA384
-- ECDHE-RSA-AES128-GCM-SHA256
-```
-
-### 7.2 PAN Encryption
-
-```javascript
-// Example: AES-256-GCM Encryption
-const crypto = require('crypto');
-
-function encryptPAN(pan, key) {
-  const algorithm = 'aes-256-gcm';
-  const iv = crypto.randomBytes(12); // 96-bit IV for GCM
-  const cipher = crypto.createCipheriv(algorithm, key, iv);
-  
-  let encrypted = cipher.update(pan, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  const authTag = cipher.getAuthTag();
-  
-  return {
-    encrypted: encrypted,
-    iv: iv.toString('hex'),
-    authTag: authTag.toString('hex')
-  };
-}
-
-function decryptPAN(encryptedData, key) {
-  const algorithm = 'aes-256-gcm';
-  const decipher = crypto.createDecipheriv(
-    algorithm,
-    key,
-    Buffer.from(encryptedData.iv, 'hex')
-  );
-  
-  decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
-  
-  let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
-}
-```
-
----
-
-## 8. Tokenization
-
-### 8.1 Token Format
-
-**Format-Preserving Tokenization:**
-```
-Real PAN:  4532 1234 5678 9010
-Token:     4532 9876 5432 1098
-           ↑↑↑↑               ↑
-           │││└─ Preserved for BIN routing
-           │││
-           └──────────────── Maintains Luhn validity
-
-Characteristics:
-✓ Same length as PAN
-✓ Passes Luhn check
-✓ First 6 (BIN) preserved for routing
-✓ Last 4 may be preserved for display
-✓ Cannot be reverse-engineered
-```
-
-**Non-Format-Preserving:**
-```
-Real PAN:  4532 1234 5678 9010
-Token:     tok_7h3k2m9p4x1q8n5w
-
-Characteristics:
-✓ Different format from PAN
-✓ Clear distinction from PAN
-✓ Flexible structure
-✓ Cannot be mistaken for real PAN
-```
-
-### 8.2 Token Lifecycle
-
-```
-1. Token Generation:
-   PAN → Token Vault → Token
-   - Store PAN securely encrypted
-   - Generate cryptographically random token
-   - Create bidirectional mapping
-   
-2. Token Usage:
-   Merchant → Token → Payment Gateway
-   - Merchant stores/transmits token only
-   - Token vault detokenizes for processing
-   - Real PAN sent to card network
-   
-3. Token Expiration:
-   - Default: Tied to card expiry
-   - Custom: 30/60/90 days
-   - Revocation: Immediate on request
-   
-4. Token Security:
-   - Tokens are single-domain (cannot use elsewhere)
-   - Rate limiting on detokenization
-   - Audit logging of all token operations
-   - Automatic token rotation
-```
-
----
-
-## 9. PCI-DSS Data Classification
-
-### 9.1 Cardholder Data (CHD)
-
-**Primary Account Number (PAN):**
-```
-Status: SENSITIVE - Highest Protection Level
-
-Storage Rules:
-✓ Encrypted with AES-256 if stored
-✓ Tokenized preferred over storage
-✓ Masked when displayed (show last 4 only)
-✗ Never in plain text logs
-✗ Never in emails/SMS
-✗ Minimize retention period
-
-Masking Format:
-Full PAN:     4532 1234 5678 9010
-Displayed:    •••• •••• •••• 9010
-Logs:         PAN ending 9010
-Receipts:     ************9010
-```
-
-**Cardholder Name:**
-```
-Status: Moderately Sensitive
-
-Rules:
-✓ May store if business need
-✓ Encrypt if stored with PAN
-✓ Access controls required
-✓ Include in data retention policy
-```
-
-**Expiration Date:**
-```
-Status: Moderately Sensitive
-
-Rules:
-✓ Required for recurring billing
-✓ Encrypt if stored with PAN
-✓ Include in security policies
-```
-
-**Service Code:**
-```
-Status: Moderately Sensitive
-
-Rules:
-✓ May store for fraud checks
-✓ Encrypt if stored with PAN
-✓ Not required post-authorization
-```
-
-### 9.2 Sensitive Authentication Data (SAD)
-
-**NEVER STORE AFTER AUTHORIZATION:**
-
-**Full Magnetic Stripe:**
-```
-Status: FORBIDDEN TO STORE
-❌ NEVER store (not even encrypted)
-❌ Purge immediately after authorization
-✓ Use for authorization only
-Penalty: Up to $500,000 + decertification
-```
-
-**CVV/CVC/CVV2/CID:**
-```
-Status: FORBIDDEN TO STORE
-❌ NEVER store (not even encrypted)
-❌ No logging allowed
-✓ Collect for authorization only
-✓ Transmitted encrypted
-Penalty: Immediate PCI non-compliance
-```
-
-**PIN/PIN Block:**
-```
-Status: FORBIDDEN TO STORE
-❌ NEVER store in any form
-✓ Process only in HSM
-✓ Triple-DES encryption minimum
-✓ No clear-text PIN ever
-Penalty: Criminal liability possible
-```
-
----
-
-## 10. Validation Rules
-
-### 10.1 PAN Validation
-
-```typescript
-interface PANValidation {
-  isLuhnValid: boolean;
-  cardNetwork: string;
-  isLengthValid: boolean;
-  isFormatValid: boolean;
-}
-
-function validatePAN(pan: string): PANValidation {
-  // Remove spaces and non-digits
-  const cleanPAN = pan.replace(/\D/g, '');
-  
-  // Luhn check
-  const luhnValid = luhnCheck(cleanPAN);
-  
-  // Detect network
-  const network = detectCardNetwork(cleanPAN);
-  
-  // Length validation
-  const expectedLengths = {
-    'visa': [13, 16, 19],
-    'mastercard': [16],
-    'amex': [15],
-    'discover': [16],
-    'diners': [14],
-    'jcb': [16]
-  };
-  
-  const lengthValid = network && 
-    expectedLengths[network]?.includes(cleanPAN.length);
-  
-  // Format validation
-  const formatValid = /^\d+$/.test(cleanPAN);
-  
-  return {
-    isLuhnValid: luhnValid,
-    cardNetwork: network,
-    isLengthValid: lengthValid,
-    isFormatValid: formatValid
-  };
-}
-```
-
-### 10.2 Expiry Validation
-
-```typescript
-function validateExpiry(expiry: string): boolean {
-  // Format: YYMM or MM/YY
-  const match = expiry.match(/^(\d{2})[\/\-]?(\d{2})$/);
-  if (!match) return false;
-  
-  const [_, mmOrYY, yyOrMM] = match;
-  
-  // Determine format
-  let month, year;
-  if (parseInt(mmOrYY) > 12) {
-    year = parseInt(mmOrYY);
-    month = parseInt(yyOrMM);
-  } else {
-    month = parseInt(mmOrYY);
-    year = parseInt(yyOrMM);
-  }
-  
-  // Validate month
-  if (month < 1 || month > 12) return false;
-  
-  // Convert 2-digit year to 4-digit
-  const fullYear = year < 100 ? 2000 + year : year;
-  
-  // Check not expired
-  const now = new Date();
-  const expiryDate = new Date(fullYear, month, 0); // Last day of month
-  
-  return expiryDate >= now;
-}
-```
-
----
-
-## 11. Implementation Requirements
-
-### 11.1 Mandatory
-
-- Luhn algorithm validation for all PAN inputs
-- PAN masking in all displays and logs
-- TLS 1.2+ for all data transmission
-- AES-256 for PAN encryption if stored
-- CVV/CVC never stored after authorization
-- Magnetic stripe purged after authorization
-- PIN processing only in HSM
-
-### 11.2 Recommended
-
-- Tokenization for recurring payments
-- Format-preserving encryption
-- Network tokenization integration
-- Real-time PAN validation
-- Automated key rotation
-- Comprehensive audit logging
-
-### 11.3 Optional
-
-- Homomorphic encryption for analytics
-- Blockchain-based token registry
-- AI-powered fraud detection
-- Biometric cardholder verification
-
----
-
-## 12. Compliance Checklist
-
-- [ ] PAN encryption at rest (AES-256)
-- [ ] PAN transmission over TLS 1.2+
-- [ ] PAN masking in all interfaces
-- [ ] Luhn validation implemented
-- [ ] CVV never stored
-- [ ] Magnetic stripe never stored
-- [ ] PIN processing in HSM only
-- [ ] Tokenization system operational
-- [ ] Key management procedures
-- [ ] Data retention policies
-- [ ] Audit logging enabled
-- [ ] Regular security testing
-- [ ] PCI-DSS SAQ completed
-- [ ] Incident response plan
-- [ ] Staff security training
-
----
-
-**弘益人間 (Hongik Ingan) - Benefit All Humanity**
-
-*Secure data formats are the foundation of trustworthy payment systems. By properly handling sensitive payment data, we protect consumers and enable global commerce.*
-
----
-
-**Document Control:**
-- Version: 1.0.0
-- Last Updated: 2025-01-15
-- Next Review: 2026-01-15
-- Maintained by: WIA Payment Standards Committee
-- Contact: standards@wia.org
-
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-payment-system
+standard. It addresses the data-format layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "payment-system"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/payment-system`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `payment-system` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

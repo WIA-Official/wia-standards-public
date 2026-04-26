@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 4: Protocol Specification - WIA-FIN-012</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">CHAPTER 4</div>
+    <h1>Protocol Specification</h1>
+    <p class="subtitle">Card Networks & ISO 8583 Protocol</p>
+  </header>
+  <section>
+    <h2>4.1 ISO 8583 Message Standard</h2>
+    <p>ISO 8583 is the international standard for financial transaction card originated messages. It defines the message format for authorization, clearing, and settlement between acquirers and issuers.</p>
+    <h3>Message Structure</h3>
+    <pre><code>ISO 8583 Message Components:
+
+[MTI][Bitmap][Data Elements]
+
+Example Authorization Request (ASCII):
+0100 7220000000C00000 4532123456789010=25121015432101234567
+
+Breakdown:
+0100                  - Message Type Indicator
+7220000000C00000      - Bitmap (indicates which fields are present)
+4532123456789010...   - Data elements (PAN, expiry, amount, etc.)
+</code></pre>
+
+    <h3>Message Type Indicator (MTI)</h3>
+    <table>
+      <tr><th>MTI</th><th>Description</th><th>Direction</th></tr>
+      <tr><td>0100</td><td>Authorization Request</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0110</td><td>Authorization Response</td><td>Issuer → Acquirer</td></tr>
+      <tr><td>0120</td><td>Authorization Advice</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0121</td><td>Authorization Advice Repeat</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0200</td><td>Financial Request (Purchase)</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0210</td><td>Financial Response</td><td>Issuer → Acquirer</td></tr>
+      <tr><td>0220</td><td>Financial Advice (Completion)</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0400</td><td>Reversal Request</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0410</td><td>Reversal Response</td><td>Issuer → Acquirer</td></tr>
+      <tr><td>0420</td><td>Reversal Advice</td><td>Acquirer → Issuer</td></tr>
+      <tr><td>0800</td><td>Network Management Request</td><td>Either direction</td></tr>
+      <tr><td>0810</td><td>Network Management Response</td><td>Either direction</td></tr>
+    </table>
+
+    <h3>Key Data Elements</h3>
+    <table>
+      <tr><th>Field</th><th>Name</th><th>Description</th></tr>
+      <tr><td>2</td><td>Primary Account Number (PAN)</td><td>Card number</td></tr>
+      <tr><td>3</td><td>Processing Code</td><td>Transaction type and account types</td></tr>
+      <tr><td>4</td><td>Amount, Transaction</td><td>Transaction amount in minor units</td></tr>
+      <tr><td>7</td><td>Transmission Date/Time</td><td>MMDDhhmmss format</td></tr>
+      <tr><td>11</td><td>Systems Trace Audit Number (STAN)</td><td>Unique transaction ID</td></tr>
+      <tr><td>12</td><td>Time, Local Transaction</td><td>hhmmss format</td></tr>
+      <tr><td>13</td><td>Date, Local Transaction</td><td>MMDD format</td></tr>
+      <tr><td>14</td><td>Date, Expiration</td><td>Card expiry YYMM</td></tr>
+      <tr><td>22</td><td>POS Entry Mode</td><td>How PAN was entered (chip, swipe, manual)</td></tr>
+      <tr><td>25</td><td>POS Condition Code</td><td>Card present/not present</td></tr>
+      <tr><td>32</td><td>Acquiring Institution ID</td><td>Acquirer bank identifier</td></tr>
+      <tr><td>37</td><td>Retrieval Reference Number</td><td>Unique reference for transaction</td></tr>
+      <tr><td>38</td><td>Authorization ID Response</td><td>Auth code from issuer</td></tr>
+      <tr><td>39</td><td>Response Code</td><td>Approval/decline reason</td></tr>
+      <tr><td>41</td><td>Card Acceptor Terminal ID</td><td>Terminal identifier</td></tr>
+      <tr><td>42</td><td>Card Acceptor ID Code</td><td>Merchant identifier</td></tr>
+      <tr><td>43</td><td>Card Acceptor Name/Location</td><td>Merchant details</td></tr>
+      <tr><td>49</td><td>Currency Code, Transaction</td><td>ISO 4217 code (840=USD)</td></tr>
+      <tr><td>52</td><td>PIN Data</td><td>Encrypted PIN block</td></tr>
+      <tr><td>55</td><td>ICC Data - EMV Tags</td><td>Chip card data</td></tr>
+    </table>
+
+    <h2>4.2 Card Network Routing</h2>
+    <p>Transaction routing through card networks follows specific protocols and message flows.</p>
+
+    <h3>Visa Network Protocol</h3>
+    <pre><code>Visa Transaction Flow:
+
+1. Terminal → Acquirer
+   - ISO 8583 0100 Authorization Request
+   - Contains: PAN, amount, merchant ID, terminal data
+
+2. Acquirer → VisaNet
+   - Formatted to Visa specifications
+   - BIN routing determines destination issuer
+
+3. VisaNet → Issuer
+   - Routes based on BIN table
+   - Applies Visa risk rules
+   - Logs for settlement
+
+4. Issuer Processing
+   - Account validation
+   - Fraud checks
+   - Authorization decision
+
+5. Issuer → VisaNet → Acquirer → Terminal
+   - ISO 8583 0110 Response
+   - Response code (00=approved, etc.)
+   - Auth code if approved
+
+Timing: Typically 1-3 seconds end-to-end
+</code></pre>
+
+    <h3>Mastercard Network Protocol</h3>
+    <pre><code>Mastercard Transaction Flow:
+
+Similar to Visa with differences:
+- Banknet network infrastructure
+- Different message format specifications
+- Unique response codes
+- CVC2 vs CVV2 naming
+- Authorization Characteristics (Field 61)
+
+Key Differences from Visa:
+- Field 61: Point of Service Data
+- Field 123: Verification Data
+- Different BIN ranges
+- Network assessment fee structure
+</code></pre>
+
+    <h2>4.3 EMV Transaction Flow</h2>
+
+    <h3>Chip Card Transaction Steps</h3>
+    <pre><code>1. Card Insertion/Contact
+   - Terminal powers chip
+   - Application selection (SELECT command)
+   - Card returns Application Interchange Profile (AIP)
+
+2. Initialize Transaction
+   - GET PROCESSING OPTIONS command
+   - Terminal sends amount, currency, transaction type
+   - Card returns Application File Locator (AFL)
+
+3. Read Application Data
+   - READ RECORD commands
+   - Retrieve card data (PAN, expiry, etc.)
+   - Retrieve issuer parameters
+
+4. Cardholder Verification
+   - CVM List processing
+   - PIN entry if required
+   - Signature capture if needed
+   - No CVM for contactless low value
+
+5. Terminal Risk Management
+   - Floor limit checking
+   - Random transaction selection
+   - Velocity checking
+
+6. Card Risk Management
+   - Card checks issuer risk parameters
+   - Decides online/offline auth
+   - Generates ARQC (online) or TC (offline)
+
+7. Online Authorization (if required)
+   - GENERATE AC command with ARQC
+   - ISO 8583 message to issuer
+   - Issuer validates ARQC
+   - Returns ARPC in response
+
+8. Second GENERATE AC
+   - Terminal sends ARPC to card
+   - Card validates issuer response
+   - Generates TC (transaction certificate)
+
+9. Transaction Completion
+   - Receipt printing
+   - Transaction logging
+   - Card removal
+</code></pre>
+
+    <h2>4.4 Response Codes</h2>
+
+    <h3>ISO 8583 Response Codes</h3>
+    <table>
+      <tr><th>Code</th><th>Description</th><th>Action</th></tr>
+      <tr><td>00</td><td>Approved</td><td>Transaction successful</td></tr>
+      <tr><td>01</td><td>Refer to issuer</td><td>Call issuer phone number</td></tr>
+      <tr><td>02</td><td>Refer to issuer (special)</td><td>Call issuer</td></tr>
+      <tr><td>03</td><td>Invalid merchant</td><td>Merchant configuration issue</td></tr>
+      <tr><td>04</td><td>Pick up card</td><td>Card should be retained</td></tr>
+      <tr><td>05</td><td>Do not honor</td><td>Generic decline</td></tr>
+      <tr><td>06</td><td>Error</td><td>System error, retry possible</td></tr>
+      <tr><td>07</td><td>Pick up card (special)</td><td>Fraud suspected</td></tr>
+      <tr><td>12</td><td>Invalid transaction</td><td>Transaction type not supported</td></tr>
+      <tr><td>13</td><td>Invalid amount</td><td>Amount format error</td></tr>
+      <tr><td>14</td><td>Invalid card number</td><td>PAN invalid or not found</td></tr>
+      <tr><td>15</td><td>Invalid issuer</td><td>Issuer not recognized</td></tr>
+      <tr><td>19</td><td>Re-enter transaction</td><td>Retry the transaction</td></tr>
+      <tr><td>25</td><td>Unable to locate record</td><td>Transaction not found</td></tr>
+      <tr><td>28</td><td>File temporarily unavailable</td><td>System busy, retry</td></tr>
+      <tr><td>41</td><td>Lost card</td><td>Card reported lost</td></tr>
+      <tr><td>43</td><td>Stolen card</td><td>Card reported stolen</td></tr>
+      <tr><td>51</td><td>Insufficient funds</td><td>Not enough balance/credit</td></tr>
+      <tr><td>54</td><td>Expired card</td><td>Card past expiration</td></tr>
+      <tr><td>55</td><td>Incorrect PIN</td><td>PIN verification failed</td></tr>
+      <tr><td>57</td><td>Transaction not permitted</td><td>Card restrictions</td></tr>
+      <tr><td>58</td><td>Transaction not permitted to terminal</td><td>Terminal restrictions</td></tr>
+      <tr><td>61</td><td>Exceeds withdrawal limit</td><td>Amount exceeds limits</td></tr>
+      <tr><td>62</td><td>Restricted card</td><td>Card blocked for transaction type</td></tr>
+      <tr><td>63</td><td>Security violation</td><td>Fraud suspected</td></tr>
+      <tr><td>65</td><td>Exceeds withdrawal frequency</td><td>Too many transactions</td></tr>
+      <tr><td>75</td><td>PIN tries exceeded</td><td>Too many incorrect PINs</td></tr>
+      <tr><td>91</td><td>Issuer unavailable</td><td>Issuer system down</td></tr>
+      <tr><td>96</td><td>System malfunction</td><td>Technical error</td></tr>
+    </table>
+
+    <div class="info-box">
+      <h4>Protocol Best Practices</h4>
+      <ul>
+        <li>Implement proper timeout handling (5-30 seconds)</li>
+        <li>Support reversal messages for failed transactions</li>
+        <li>Log all messages for reconciliation and dispute resolution</li>
+        <li>Use proper field validation before transmission</li>
+        <li>Implement retry logic with exponential backoff</li>
+        <li>Secure PIN handling with HSM encryption</li>
+        <li>Validate message authenticity with MAC (Message Authentication Code)</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="navigation">
+    <a href="chapter3.html" class="nav-button">← Previous: API Endpoints</a>
+    <a href="chapter5.html" class="nav-button next">Next: Integration Guide →</a>
+  </div>
+</body>
+</html>

@@ -1,1202 +1,241 @@
-# Phase 3: Pet Health Passport Communication Protocol Specification
+# WIA-pet-health-passport PHASE 3 — PROTOCOL Specification
 
-## WIA-PET-HEALTH-PASSPORT Protocol Standard
+**Standard:** WIA-pet-health-passport
+**Phase:** 3 — PROTOCOL
+**Version:** 1.0
+**Status:** Stable
 
-**Version**: 1.0.0
-**Date**: 2025-12-16
-**Status**: Draft
-**Standard ID**: WIA-PET-HEALTH-PASSPORT-PHASE3-001
+This document defines the canonical PROTOCOL layer for WIA-pet-health-passport (Pet Health Passport).
 
----
-
-## 1. 개요
-
-WIA-PET-HEALTH-PASSPORT 프로토콜은 수의사, 검역소, 보호소, 반려동물 보호자 간의
-안전하고 표준화된 건강 기록 교환을 정의합니다.
-
-### 1.1 통신 구조
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                 WIA-PET-HEALTH-PASSPORT 통신 구조                  │
-├────────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  [보호자 앱] ←→ [WIA Gateway] ←→ [수의사 시스템]                   │
-│       ↓              ↓               ↓                            │
-│  [마이크로칩     [분산 저장소]    [검역 시스템]                     │
-│   리더기]            ↓               ↓                            │
-│       ↓         [블록체인]      [정부 DB]                         │
-│  [QR 스캐너]         ↓               ↓                            │
-│                 [a11y.wiabooks.store]                             │
-│                    ↓                                              │
-│              [211개 언어 지원]                                     │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
-```
-
-### 1.2 프로토콜 레이어
-
-| 레이어 | 프로토콜 | 역할 |
-|--------|----------|------|
-| Application | WIA-PET Protocol | 데이터 교환 |
-| Security | WIA-PQ-CRYPTO | 양자 내성 암호화 |
-| Session | OAuth 2.0 / DID | 인증/인가 |
-| Transport | HTTPS / WebSocket | 전송 |
-| Physical | Internet / NFC / BLE | 하드웨어 |
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 2. REST API Specification
-
-### 2.1 Base URL
-
-```
-Production: https://api.pet.wia.world/v1
-Staging:    https://api.pet.staging.wia.world/v1
-```
-
-### 2.2 인증
-
-```http
-Authorization: Bearer <WIA_ACCESS_TOKEN>
-X-WIA-DID: did:wia:pet:guardian:1234567890
-```
-
-### 2.3 Passport Endpoints
-
-#### 2.3.1 Create Passport
-
-```http
-POST /passports
-Content-Type: application/json
-
-Request:
-{
-  "identity": {
-    "species": "dog",
-    "breed": "Golden Retriever",
-    "name": "Max",
-    "dateOfBirth": "2022-03-15",
-    "sex": "neutered_male",
-    "color": "Golden",
-    "markings": ["White chest patch"]
-  },
-  "microchip": {
-    "chipNumber": "985141234567890",
-    "implantedAt": "2022-05-01",
-    "implantLocation": "left_neck"
-  },
-  "guardian": {
-    "name": "홍길동",
-    "contactPhone": "+82-10-1234-5678",
-    "contactEmail": "hong@example.com",
-    "address": {
-      "country": "KR",
-      "postalCode": "06164",
-      "city": "Seoul",
-      "addressLine1": "123 Gangnam-daero"
-    }
-  }
-}
-
-Response: 201 Created
-{
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "identity": { ... },
-  "microchip": { ... },
-  "guardian": { ... },
-  "qrCode": "data:image/png;base64,...",
-  "createdAt": "2025-12-16T10:00:00Z"
-}
-```
-
-#### 2.3.2 Get Passport
-
-```http
-GET /passports/{passportId}
-
-Response: 200 OK
-{
-  "header": {
-    "magic": "WIAPET",
-    "version": [1, 0, 0],
-    "standard": "WIA-PET-HEALTH-PASSPORT",
-    "createdAt": "2025-12-16T10:00:00Z",
-    "lastUpdated": "2025-12-16T15:30:00Z"
-  },
-  "identity": { ... },
-  "microchip": { ... },
-  "guardian": { ... },
-  "medicalRecords": {
-    "vaccinations": [...],
-    "surgeries": [...],
-    "diagnostics": [...],
-    "allergies": [...],
-    "conditions": [...],
-    "medications": [...]
-  },
-  "genetics": { ... },
-  "travel": { ... },
-  "verification": {
-    "issuingAuthority": "wia:authority:kr:mafra",
-    "digitalSignature": "...",
-    "certificateChain": [...]
-  }
-}
-```
-
-#### 2.3.3 Get Passport by Microchip
-
-```http
-GET /passports/microchip/{chipNumber}
-
-Response: 200 OK
-{
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "identity": { ... },
-  ...
-}
-```
-
-#### 2.3.4 Get Passport by QR Code
-
-```http
-POST /passports/qr
-Content-Type: application/json
-
-Request:
-{
-  "qrData": "WIAPET01H5XNQK..."
-}
-
-Response: 200 OK
-{
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "mini": {
-    "petName": "Max",
-    "species": "dog",
-    "rabiesValid": true,
-    "rabiesExpiry": "2026-03-15",
-    "emergencyPhone": "+82-10-1234-5678"
-  },
-  "fullDataUrl": "https://api.pet.wia.world/v1/passports/01H5XNQK..."
-}
-```
-
-### 2.4 Medical Records Endpoints
-
-#### 2.4.1 Add Vaccination
-
-```http
-POST /passports/{passportId}/vaccinations
-Content-Type: application/json
-X-WIA-Veterinarian-License: KR-VET-12345
-
-Request:
-{
-  "vaccine": {
-    "name": "Nobivac Rabies",
-    "manufacturer": "MSD Animal Health",
-    "lotNumber": "A123456",
-    "serialNumber": "SN789012"
-  },
-  "targetDiseases": ["RABIES"],
-  "administeredAt": "2025-12-16T10:00:00Z",
-  "validFrom": "2025-12-16T10:00:00Z",
-  "validUntil": "2026-12-16T10:00:00Z",
-  "doseNumber": 1,
-  "totalDoses": 1,
-  "clinic": {
-    "name": "Happy Pet Clinic",
-    "licenseNumber": "KR-CLINIC-001",
-    "address": "Seoul, Korea"
-  }
-}
-
-Response: 201 Created
-{
-  "recordId": "vax_01H5XP123456",
-  "vaccine": { ... },
-  "administeredAt": "2025-12-16T10:00:00Z",
-  "verified": true,
-  "digitalSignature": "..."
-}
-```
-
-#### 2.4.2 Get Vaccination History
-
-```http
-GET /passports/{passportId}/vaccinations
-
-Query Parameters:
-  - disease: Filter by disease (e.g., RABIES)
-  - from: Start date
-  - to: End date
-  - valid_only: Only return valid vaccinations (true/false)
-
-Response: 200 OK
-{
-  "vaccinations": [
-    {
-      "recordId": "vax_01H5XP123456",
-      "vaccine": { ... },
-      "targetDiseases": ["RABIES"],
-      "administeredAt": "2025-12-16T10:00:00Z",
-      "validUntil": "2026-12-16T10:00:00Z",
-      "verified": true
-    }
-  ],
-  "summary": {
-    "total": 5,
-    "valid": 4,
-    "expired": 1
-  }
-}
-```
-
-#### 2.4.3 Add Allergy
-
-```http
-POST /passports/{passportId}/allergies
-Content-Type: application/json
-
-Request:
-{
-  "allergen": "Chicken",
-  "allergenType": "FOOD",
-  "reactionSeverity": "moderate",
-  "symptoms": ["Itching", "Ear inflammation", "Digestive upset"],
-  "diagnosedAt": "2024-06-15T00:00:00Z",
-  "diagnosisMethod": "elimination_diet",
-  "avoidanceInstructions": "Avoid all chicken-based foods and treats",
-  "status": "active"
-}
-
-Response: 201 Created
-{
-  "recordId": "allergy_01H5XQ789012",
-  ...
-}
-```
-
-### 2.5 Quarantine Endpoints
-
-#### 2.5.1 Check Travel Eligibility
-
-```http
-POST /quarantine/check
-Content-Type: application/json
-
-Request:
-{
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "departureCountry": "KR",
-  "arrivalCountry": "DE",
-  "travelDate": "2025-06-01"
-}
-
-Response: 200 OK
-{
-  "eligible": true,
-  "overallScore": 95,
-  "requirements": [
-    {
-      "requirement": "Microchip",
-      "status": "passed",
-      "details": "ISO 11784/11785 compliant (985141234567890)"
-    },
-    {
-      "requirement": "Rabies Vaccination",
-      "status": "passed",
-      "details": "Valid until 2026-12-16"
-    },
-    {
-      "requirement": "Rabies Titer Test",
-      "status": "passed",
-      "details": "0.7 IU/ml (minimum: 0.5 IU/ml)"
-    },
-    {
-      "requirement": "Tapeworm Treatment",
-      "status": "pending",
-      "details": "Required 24-120 hours before arrival",
-      "actionRequired": "Get treatment from veterinarian",
-      "deadline": "2025-05-31T00:00:00Z"
-    }
-  ],
-  "missingItems": [],
-  "recommendations": [
-    "Schedule tapeworm treatment 1-5 days before departure"
-  ],
-  "estimatedProcessingDays": 0
-}
-```
-
-#### 2.5.2 Get Country Requirements
-
-```http
-GET /quarantine/requirements/{countryCode}
-
-Query Parameters:
-  - species: dog, cat, etc.
-  - fromCountry: Origin country
-
-Response: 200 OK
-{
-  "country": "DE",
-  "lastUpdated": "2025-12-01T00:00:00Z",
-  "requirements": {
-    "microchipRequired": true,
-    "microchipStandard": "ISO11784",
-    "rabiesVaccination": {
-      "required": true,
-      "minimumAge": 3,
-      "waitPeriod": 21,
-      "validityPeriod": 12,
-      "titerTestRequired": true,
-      "minimumTiter": 0.5
-    },
-    "otherVaccinations": [],
-    "parasiteTreatment": {
-      "type": "tapeworm",
-      "required": true,
-      "timingBeforeEntry": 120
-    },
-    "quarantine": null,
-    "bannedBreeds": [],
-    "importPermitRequired": false,
-    "healthCertificateRequired": true,
-    "healthCertificateValidDays": 10
-  },
-  "exemptCountries": ["FR", "NL", "BE", "AT"]
-}
-```
-
-#### 2.5.3 Generate Health Certificate
-
-```http
-POST /quarantine/certificate
-Content-Type: application/json
-
-Request:
-{
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "departureCountry": "KR",
-  "arrivalCountry": "DE",
-  "travelDate": "2025-06-01",
-  "veterinarianLicense": "KR-VET-12345",
-  "format": "PDF"
-}
-
-Response: 200 OK
-{
-  "certificateId": "cert_01H5XR345678",
-  "issuedAt": "2025-12-16T12:00:00Z",
-  "validUntil": "2025-12-26T12:00:00Z",
-  "format": "PDF",
-  "downloadUrl": "https://api.pet.wia.world/v1/certificates/cert_01H5XR345678/download",
-  "digitalSignature": "...",
-  "qrCode": "data:image/png;base64,..."
-}
-```
-
-### 2.6 Emergency Endpoints
-
-#### 2.6.1 Get Emergency Info
-
-```http
-GET /passports/{passportId}/emergency
-
-Response: 200 OK
-{
-  "criticalAlerts": [
-    {
-      "type": "allergy",
-      "severity": "high",
-      "message": "ALLERGY: Penicillin - Severe reaction",
-      "action": "Use alternative antibiotics"
-    }
-  ],
-  "pet": {
-    "name": "Max",
-    "species": "dog",
-    "breed": "Golden Retriever",
-    "age": "3 years 9 months",
-    "weight": 30.5,
-    "sex": "Neutered Male"
-  },
-  "medical": {
-    "severeAllergies": ["Penicillin"],
-    "currentMedications": [
-      {
-        "name": "Apoquel",
-        "dosage": "16mg BID",
-        "route": "oral",
-        "indication": "Allergic dermatitis"
-      }
-    ],
-    "activeConditions": ["Allergic dermatitis"],
-    "recentSurgeries": []
-  },
-  "contacts": [
-    {
-      "name": "홍길동",
-      "relationship": "Owner",
-      "phone": "+82-10-1234-5678"
-    }
-  ],
-  "veterinaryNotes": [
-    "Rabies: Current (until 2026-12-16)",
-    "No known anesthesia complications"
-  ]
-}
-```
-
-#### 2.6.2 Emergency Access (No Auth)
-
-```http
-POST /emergency/access
-Content-Type: application/json
-
-Request:
-{
-  "microchipId": "985141234567890",
-  "veterinarianLicense": "KR-VET-12345",
-  "reason": "Emergency surgery",
-  "location": {
-    "lat": 37.5665,
-    "lng": 126.9780
-  }
-}
-
-Response: 200 OK
-{
-  "accessGranted": true,
-  "accessToken": "emergency_01H5XS...",
-  "expiresIn": 3600,
-  "petInfo": {
-    "name": "Max",
-    "species": "dog",
-    "criticalInfo": { ... }
-  },
-  "guardianNotified": true
-}
-```
-
-### 2.7 Verification Endpoints
-
-#### 2.7.1 Verify Passport
-
-```http
-POST /verify/passport
-Content-Type: application/json
-
-Request:
-{
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW"
-}
-
-Response: 200 OK
-{
-  "valid": true,
-  "signatureValid": true,
-  "chainValid": true,
-  "issuerTrusted": true,
-  "issuer": {
-    "id": "wia:authority:kr:mafra",
-    "name": "Ministry of Agriculture, Food and Rural Affairs",
-    "country": "KR"
-  },
-  "recordsVerified": 12,
-  "recordsFailed": 0,
-  "details": [
-    {
-      "component": "Passport Signature",
-      "status": "valid",
-      "message": "Digital signature verified"
-    },
-    {
-      "component": "Certificate Chain",
-      "status": "valid",
-      "message": "Certificate chain valid"
-    }
-  ],
-  "warnings": []
-}
-```
-
-#### 2.7.2 Verify Vaccination Record
-
-```http
-POST /verify/vaccination
-Content-Type: application/json
-
-Request:
-{
-  "recordId": "vax_01H5XP123456",
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW"
-}
-
-Response: 200 OK
-{
-  "valid": true,
-  "clinicVerified": true,
-  "veterinarianVerified": true,
-  "vaccineVerified": true,
-  "blockchainAnchor": {
-    "network": "wia-chain",
-    "txHash": "0x1234...",
-    "blockNumber": 12345678,
-    "timestamp": "2025-12-16T10:01:00Z"
-  }
-}
-```
-
----
-
-## 3. WebSocket API
-
-### 3.1 Connection
-
-```javascript
-const ws = new WebSocket('wss://api.pet.wia.world/v1/ws');
-
-// 인증
-ws.send(JSON.stringify({
-  type: 'auth',
-  token: 'YOUR_ACCESS_TOKEN'
-}));
-```
-
-### 3.2 Message Types
-
-#### 3.2.1 Subscribe to Passport Updates
-
-```json
-// Client → Server
-{
-  "type": "subscribe",
-  "channel": "passport",
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW"
-}
-
-// Server → Client (on update)
-{
-  "type": "passport_updated",
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "updateType": "vaccination_added",
-  "data": {
-    "recordId": "vax_01H5XT456789",
-    "vaccine": "Rabies",
-    "administeredAt": "2025-12-16T14:00:00Z"
-  },
-  "timestamp": "2025-12-16T14:00:05Z"
-}
-```
-
-#### 3.2.2 Real-time Location Tracking (Travel Mode)
-
-```json
-// Client → Server
-{
-  "type": "travel_mode",
-  "action": "start",
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "journey": {
-    "departure": "KR",
-    "arrival": "DE",
-    "estimatedArrival": "2025-06-01T10:00:00Z"
-  }
-}
-
-// Server → Client (status updates)
-{
-  "type": "travel_status",
-  "status": "in_transit",
-  "currentLocation": {
-    "country": "transit",
-    "description": "In flight"
-  },
-  "nextCheckpoint": "DE border control",
-  "estimatedArrival": "2025-06-01T10:00:00Z"
-}
-```
-
-#### 3.2.3 Emergency Alert
-
-```json
-// Server → Client (emergency access notification)
-{
-  "type": "emergency_access",
-  "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-  "accessedBy": {
-    "type": "veterinarian",
-    "license": "KR-VET-12345",
-    "clinic": "Emergency Animal Hospital"
-  },
-  "reason": "Emergency surgery",
-  "location": {
-    "lat": 37.5665,
-    "lng": 126.9780,
-    "address": "Seoul, Korea"
-  },
-  "timestamp": "2025-12-16T15:00:00Z"
-}
-```
-
----
-
-## 4. NFC/RFID Protocol
-
-### 4.1 Microchip Reading
-
-```typescript
-interface MicrochipReadProtocol {
-  // ISO 11784/11785 표준
-  frequency: 134.2;              // kHz (FDX-B)
-  modulation: 'FSK';
-
-  // 데이터 구조
-  data: {
-    chipNumber: string;          // 15자리
-    countryCode: string;         // 3자리
-    manufacturer: string;
-  };
-
-  // 읽기 프로토콜
-  readSequence: [
-    'activate_field',            // RF 필드 활성화
-    'detect_transponder',        // 트랜스폰더 감지
-    'read_id',                   // ID 읽기
-    'verify_checksum',           // 체크섬 검증
-    'deactivate_field'           // RF 필드 비활성화
-  ];
-}
-```
-
-### 4.2 NFC Pet Tag (확장)
-
-```typescript
-interface NFCPetTag {
-  // NDEF 메시지
-  ndefMessage: {
-    // Record 1: 여권 URL
-    record1: {
-      type: 'U';                 // URI
-      payload: 'https://pet.wia.world/p/01H5XNQK...'
-    };
-
-    // Record 2: 응급 정보 (오프라인)
-    record2: {
-      type: 'T';                 // Text
-      payload: {
-        name: 'Max',
-        species: 'dog',
-        allergies: ['Penicillin'],
-        emergencyPhone: '+82-10-1234-5678'
-      }
-    };
-
-    // Record 3: 서명
-    record3: {
-      type: 'application/wia-signature';
-      payload: '...'
-    };
-  };
-}
-```
-
----
-
-## 5. Error Handling
-
-### 5.1 Error Codes
-
-```typescript
-enum PetPassportErrorCode {
-  // 인증 에러 (1xxx)
-  UNAUTHORIZED = 1001,
-  TOKEN_EXPIRED = 1002,
-  INSUFFICIENT_PERMISSIONS = 1003,
-
-  // 여권 에러 (2xxx)
-  PASSPORT_NOT_FOUND = 2001,
-  PASSPORT_ALREADY_EXISTS = 2002,
-  PASSPORT_INVALID = 2003,
-  MICROCHIP_NOT_FOUND = 2004,
-  MICROCHIP_ALREADY_REGISTERED = 2005,
-
-  // 의료 기록 에러 (3xxx)
-  RECORD_NOT_FOUND = 3001,
-  INVALID_VACCINATION = 3002,
-  DUPLICATE_RECORD = 3003,
-  VETERINARIAN_NOT_VERIFIED = 3004,
-
-  // 검역 에러 (4xxx)
-  COUNTRY_NOT_SUPPORTED = 4001,
-  REQUIREMENTS_NOT_MET = 4002,
-  BREED_BANNED = 4003,
-  CERTIFICATE_EXPIRED = 4004,
-
-  // 검증 에러 (5xxx)
-  SIGNATURE_INVALID = 5001,
-  CERTIFICATE_CHAIN_INVALID = 5002,
-  ISSUER_NOT_TRUSTED = 5003,
-
-  // 서버 에러 (9xxx)
-  INTERNAL_ERROR = 9001,
-  SERVICE_UNAVAILABLE = 9002,
-  RATE_LIMIT_EXCEEDED = 9003
-}
-```
-
-### 5.2 Error Response Format
-
-```json
-{
-  "error": {
-    "code": 2001,
-    "message": "Passport not found",
-    "details": "No passport exists with ID: 01H5XNQK...",
-    "suggestions": [
-      "Verify the passport ID is correct",
-      "The passport may have been deleted",
-      "Try searching by microchip number instead"
-    ],
-    "documentationUrl": "https://docs.pet.wia.world/errors/2001"
-  },
-  "requestId": "req_01H5XU123456",
-  "timestamp": "2025-12-16T12:00:00Z"
-}
-```
-
-### 5.3 Retry Strategy
-
-```typescript
-interface RetryConfig {
-  maxRetries: 3;
-  backoffMs: [1000, 2000, 4000];  // 지수 백오프
-  retryableErrors: [
-    9001,  // Internal Error
-    9002,  // Service Unavailable
-    9003   // Rate Limit Exceeded
-  ];
-}
-```
-
----
-
-## 6. Rate Limiting
-
-### 6.1 Rate Limits
-
-| Endpoint Type | Limit | Window |
-|--------------|-------|--------|
-| Read (GET) | 1000 req | 1 minute |
-| Write (POST/PUT) | 100 req | 1 minute |
-| Emergency | Unlimited | - |
-| Verification | 500 req | 1 minute |
-| Certificate Gen | 10 req | 1 hour |
-
-### 6.2 Rate Limit Headers
-
-```http
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 950
-X-RateLimit-Reset: 1702728000
-X-RateLimit-RetryAfter: 60
-```
-
----
-
-## 7. Security
-
-### 7.1 Authentication
-
-```typescript
-interface AuthenticationMethods {
-  // OAuth 2.0 + PKCE
-  oauth2: {
-    authorizationEndpoint: 'https://auth.wia.world/oauth/authorize';
-    tokenEndpoint: 'https://auth.wia.world/oauth/token';
-    scopes: [
-      'passport:read',
-      'passport:write',
-      'medical:read',
-      'medical:write',
-      'emergency:access',
-      'quarantine:check'
-    ];
-  };
-
-  // DID 인증 (분산 신원)
-  did: {
-    method: 'did:wia';
-    resolver: 'https://resolver.wia.world';
-  };
-
-  // 수의사 라이선스 인증
-  veterinarian: {
-    licenseVerification: 'https://verify.wia.world/veterinarian';
-    requiredForOperations: ['add_vaccination', 'add_surgery', 'issue_certificate'];
-  };
-}
-```
-
-### 7.2 Encryption
-
-```typescript
-interface EncryptionConfig {
-  // 전송 중 암호화
-  transport: {
-    protocol: 'TLS 1.3';
-    cipherSuites: [
-      'TLS_AES_256_GCM_SHA384',
-      'TLS_CHACHA20_POLY1305_SHA256'
-    ];
-  };
-
-  // 저장 시 암호화
-  atRest: {
-    algorithm: 'AES-256-GCM';
-    keyManagement: 'WIA-KMS';
-  };
-
-  // 양자 내성 암호화 (WIA-PQ-CRYPTO)
-  postQuantum: {
-    keyEncapsulation: 'CRYSTALS-Kyber';
-    signature: 'CRYSTALS-Dilithium';
-  };
-}
-```
-
-### 7.3 Access Control
-
-```typescript
-interface AccessControlPolicy {
-  // 역할 기반 접근 제어
-  roles: {
-    guardian: {
-      permissions: ['read:own', 'write:own', 'share'];
-      restrictions: ['cannot_delete_verified_records'];
-    };
-
-    veterinarian: {
-      permissions: ['read:all', 'write:medical', 'verify'];
-      requires: ['valid_license', 'clinic_registration'];
-    };
-
-    quarantine_officer: {
-      permissions: ['read:travel', 'verify', 'approve_entry'];
-      requires: ['government_credential'];
-    };
-
-    shelter: {
-      permissions: ['read:basic', 'transfer:ownership'];
-      requires: ['shelter_registration'];
-    };
-
-    emergency_responder: {
-      permissions: ['read:emergency'];
-      requires: ['emergency_credentials', 'location_verification'];
-    };
-  };
-
-  // 속성 기반 접근 제어
-  abac: {
-    rules: [
-      {
-        resource: 'genetic_data',
-        action: 'read',
-        conditions: [
-          'subject.role == guardian AND resource.owner == subject.id',
-          'subject.role == veterinarian AND subject.treating == true'
-        ]
-      }
-    ];
-  };
-}
-```
-
-### 7.4 Privacy Protection
-
-```typescript
-interface PrivacyConfig {
-  // 데이터 최소화
-  dataMinimization: {
-    emergencyAccess: ['name', 'species', 'allergies', 'medications', 'emergency_contact'];
-    publicProfile: ['species', 'breed', 'microchip_prefix'];
-    quarantineCheck: ['vaccination_status', 'travel_documents'];
-  };
-
-  // 익명화
-  anonymization: {
-    guardianInfo: 'hash_after_transfer';
-    locationData: 'coarse_location_only';
-    medicalHistory: 'aggregate_after_5_years';
-  };
-
-  // 동의 관리
-  consent: {
-    required: ['data_sharing', 'location_tracking', 'analytics'];
-    optional: ['research_participation', 'breed_database'];
-    withdrawable: true;
-  };
-
-  // 데이터 보존
-  retention: {
-    activeRecords: 'indefinite';
-    deletedPassports: '30_days';
-    accessLogs: '1_year';
-    analytics: '5_years_anonymized';
-  };
-}
-```
-
----
-
-## 8. Webhook Events
-
-### 8.1 Event Types
-
-```typescript
-enum WebhookEventType {
-  // 여권 이벤트
-  PASSPORT_CREATED = 'passport.created',
-  PASSPORT_UPDATED = 'passport.updated',
-  PASSPORT_TRANSFERRED = 'passport.transferred',
-
-  // 의료 이벤트
-  VACCINATION_ADDED = 'vaccination.added',
-  VACCINATION_EXPIRING = 'vaccination.expiring',
-  ALLERGY_ADDED = 'allergy.added',
-  CONDITION_UPDATED = 'condition.updated',
-
-  // 검역 이벤트
-  TRAVEL_APPROVED = 'travel.approved',
-  TRAVEL_DENIED = 'travel.denied',
-  CERTIFICATE_ISSUED = 'certificate.issued',
-
-  // 응급 이벤트
-  EMERGENCY_ACCESS = 'emergency.access',
-
-  // 검증 이벤트
-  VERIFICATION_FAILED = 'verification.failed'
-}
-```
-
-### 8.2 Webhook Payload
-
-```json
-{
-  "id": "evt_01H5XV789012",
-  "type": "vaccination.added",
-  "apiVersion": "2025-12-16",
-  "created": "2025-12-16T14:00:00Z",
-  "data": {
-    "passportId": "01H5XNQK4PJXV8RQFY7D6KTHNW",
-    "recordId": "vax_01H5XT456789",
-    "vaccine": "Rabies",
-    "administeredAt": "2025-12-16T14:00:00Z",
-    "validUntil": "2026-12-16T14:00:00Z"
-  }
-}
-```
-
-### 8.3 Webhook Signature
-
-```typescript
-// HMAC-SHA256 서명 검증
-function verifyWebhookSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(`sha256=${expectedSignature}`)
-  );
-}
-```
-
----
-
-## 9. Internationalization
-
-### 9.1 Language Support
-
-```http
-Accept-Language: ko-KR, ko;q=0.9, en;q=0.8
-```
-
-### 9.2 a11y.wiabooks.store Integration
-
-```typescript
-interface AccessibilityIntegration {
-  // 211개 언어 지원
-  languages: 211;
-
-  // 수어 비디오
-  signLanguage: {
-    supported: ['KSL', 'ASL', 'BSL', 'JSL', /* ... */];
-    contentTypes: ['emergency_info', 'instructions', 'alerts'];
-  };
-
-  // 접근성 형식
-  formats: {
-    screenReader: true;
-    braille: true;
-    largeText: true;
-    highContrast: true;
-  };
-}
-```
-
-### 9.3 Localized Response Example
-
-```json
-{
-  "message": "백신 기록이 추가되었습니다",
-  "message_en": "Vaccination record added",
-  "details": {
-    "vaccine": {
-      "name": "광견병 백신",
-      "name_en": "Rabies Vaccine"
-    }
-  }
-}
-```
-
----
-
-## 10. SDK Examples
-
-### 10.1 JavaScript/TypeScript
-
-```typescript
-import { WIAPetPassport } from '@wia/pet-passport';
-
-const client = new WIAPetPassport({
-  apiKey: 'your_api_key',
-  environment: 'production'
-});
-
-// 여권 조회
-const passport = await client.passports.get('01H5XNQK...');
-
-// 검역 체크
-const eligibility = await client.quarantine.check({
-  passportId: passport.id,
-  departureCountry: 'KR',
-  arrivalCountry: 'DE',
-  travelDate: '2025-06-01'
-});
-
-if (eligibility.eligible) {
-  console.log('Travel approved!');
-} else {
-  console.log('Missing:', eligibility.missingItems);
-}
-```
-
-### 10.2 Python
-
-```python
-from wia_pet_passport import WIAPetPassport
-
-client = WIAPetPassport(api_key="your_api_key")
-
-# 여권 생성
-passport = client.passports.create(
-    species="dog",
-    breed="Golden Retriever",
-    name="Max",
-    date_of_birth="2022-03-15"
-)
-
-# 백신 기록 추가
-vaccination = client.vaccinations.add(
-    passport_id=passport.id,
-    vaccine_name="Nobivac Rabies",
-    target_diseases=["RABIES"],
-    administered_at="2025-12-16T10:00:00Z",
-    valid_until="2026-12-16T10:00:00Z"
-)
-```
-
-### 10.3 Rust
-
-```rust
-use wia_pet_passport::{Client, Passport, QuarantineCheck};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let client = Client::new("your_api_key")?;
-
-    // 여권 조회
-    let passport = client
-        .passports()
-        .get("01H5XNQK...")
-        .await?;
-
-    // 응급 정보 조회
-    let emergency = client
-        .emergency()
-        .get(&passport.id)
-        .await?;
-
-    for alert in emergency.critical_alerts {
-        println!("ALERT: {}", alert.message);
-    }
-
-    Ok(())
-}
-```
-
----
-
-## 11. Compliance
-
-### 11.1 국제 규정 준수
-
-| 규정 | 요구사항 | WIA 구현 |
-|------|----------|---------|
-| EU Regulation 576/2013 | EU 펫 여권 | 완전 호환 |
-| USDA APHIS | 미국 수입 규정 | 인증서 생성 |
-| OIE Standards | 국제 동물 건강 | 질병 코드 매핑 |
-| GDPR | 개인정보 보호 | 데이터 최소화 |
-| KPIPA | 한국 개인정보보호법 | 동의 관리 |
-
-### 11.2 Audit Logging
-
-```typescript
-interface AuditLog {
-  logId: string;
-  timestamp: ISO8601;
-  actor: {
-    type: 'user' | 'veterinarian' | 'system' | 'emergency';
-    id: string;
-    ip?: string;
-  };
-  action: string;
-  resource: {
-    type: string;
-    id: string;
-  };
-  outcome: 'success' | 'failure';
-  details?: object;
-}
-```
-
----
-
-**Document ID**: WIA-PET-HEALTH-PASSPORT-PHASE3-001
-**Version**: 1.0.0
-**Last Updated**: 2025-12-16
-**Copyright**: © 2025 WIA - MIT License
-
-**홍익인간 (弘益人間)** - 인류와 동물 모두를 이롭게 하라
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pet-health-passport
+standard. It addresses the protocol layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-health-passport"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-health-passport`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-health-passport` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

@@ -1,417 +1,241 @@
-# WIA-PET-007 PHASE 4: INTEGRATION AND CERTIFICATION
+# WIA-pet-wearable PHASE 4 — INTEGRATION Specification
 
-**Version:** 1.0.0  
-**Date:** 2025-12-25  
-**Status:** Active Standard
+**Standard:** WIA-pet-wearable
+**Phase:** 4 — INTEGRATION
+**Version:** 1.0
+**Status:** Stable
 
----
+This document defines the canonical INTEGRATION layer for WIA-pet-wearable (Pet Wearable).
 
-## 1. Integration Overview
-
-PHASE 4 defines integration protocols with external systems, certification procedures, and ecosystem partnerships for WIA-PET-007 compliant devices.
-
----
-
-## 2. Mobile Application Integration
-
-### 2.1 Platform Requirements
-
-+------------------+----------------------+--------------------------------+
-| Platform         | Minimum Version      | Required Features              |
-+------------------+----------------------+--------------------------------+
-| iOS              | iOS 14.0+            | HealthKit, Widgets, Shortcuts  |
-| Android          | Android 8.0 (API 26)+| Google Fit, Widgets, Bkgd Loc  |
-| Web              | Modern browsers      | PWA, offline support           |
-+------------------+----------------------+--------------------------------+
-
-### 2.2 App Core Features
-
-**Required:**
-- Device pairing (BLE) in < 60 seconds
-- Real-time dashboard
-- Historical data visualization
-- Push notifications
-- Pet profile management
-- Data export functionality
-
-**Recommended:**
-- Voice assistant integration (Siri, Google Assistant)
-- Widget support
-- Dark mode
-- Multi-language support
-- Accessibility (VoiceOver, TalkBack)
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 3. Smart Home Integration
-
-### 3.1 Supported Platforms
-
-+-------------------+-------------------------+
-| Platform          | Integration Method      |
-+-------------------+-------------------------+
-| Apple HomeKit     | HomeKit Accessory (HAP) |
-| Google Home       | Google Assistant SDK    |
-| Amazon Alexa      | Alexa Skills Kit        |
-| Samsung SmartThing| SmartThings SDK         |
-| IFTTT             | Webhooks API            |
-+-------------------+-------------------------+
-
-### 3.2 Automation Examples
-
-```javascript
-// IFTTT Recipe: Unlock door when pet arrives home
-{
-  "trigger": {
-    "type": "geofence_entry",
-    "deviceId": "PW-DOG-12345",
-    "fenceId": "FENCE-HOME-001"
-  },
-  "action": {
-    "type": "unlock_door",
-    "device": "smart_lock_123"
-  }
-}
-```
-
----
-
-## 4. Veterinary System Integration
-
-### 4.1 VPMS (Veterinary Practice Management System) Support
-
-**Supported Systems:**
-- ezyVet
-- Avimark
-- Cornerstone
-- Impromed
-- RxWorks
-- Generic FHIR endpoint
-
-### 4.2 Data Exchange
-
-**Inbound (VPMS → Pet Wearable):**
-- Vaccination records
-- Diagnoses and conditions
-- Medications and prescriptions
-- Appointment schedule
-
-**Outbound (Pet Wearable → VPMS):**
-- Activity trends
-- Vital sign alerts
-- Health events
-- Behavioral changes
-
-### 4.3 Authorization Flow
-
-```
-1. Owner initiates data sharing in pet wearable app
-2. Redirect to VPMS authorization page
-3. Owner logs in and grants access
-4. VPMS returns authorization code
-5. Pet wearable app exchanges code for access token
-6. Token valid for 90 days (renewable with owner consent)
-```
-
-### 4.4 Telemedicine Integration
-
-**Features:**
-- Live data streaming during video consultations
-- Historical data access for diagnosis
-- Annotation and notes on timeline
-- Prescription integration
-
----
-
-## 5. Pet Insurance Integration
-
-### 5.1 Wellness Discount Programs
-
-```json
-{
-  "insuranceProvider": "PetInsuranceCo",
-  "policyNumber": "POL-12345",
-  "activityGoalsMet": {
-    "january": 92,
-    "february": 88,
-    "march": 95
-  },
-  "discountEligibility": {
-    "eligible": true,
-    "discountPercent": 10,
-    "reason": "Met activity goals 3 months in a row"
-  }
-}
-```
-
-### 5.2 Claims Data Sharing
-
-With owner consent, share health events for insurance claims:
-- Injury detection (sudden behavior change)
-- Illness indicators (prolonged inactivity, fever)
-- Treatment adherence (medication reminders followed)
-
----
-
-## 6. WIA-PET-007 Certification
-
-### 6.1 Certification Levels
-
-+------------------+---------------------------+------------------+
-| Level            | Requirements              | Annual Fee       |
-+------------------+---------------------------+------------------+
-| Basic Compliance | Data format, API          | $2,000 / $500    |
-| Full Compliance  | All specs + testing       | $10,000 / $2,500 |
-| Premium          | Enhanced features + AI    | $25,000 / $5,000 |
-+------------------+---------------------------+------------------+
-
-### 6.2 Certification Process
-
-**Step 1: Application (1 week)**
-- Submit specifications
-- Pay certification fee
-- Provide 5 sample devices
-
-**Step 2: Documentation Review (2 weeks)**
-- Hardware schematics and BOM
-- Firmware documentation
-- Test reports (battery, safety, EMC)
-- User manuals
-
-**Step 3: Testing (4-6 weeks)**
-- Data format validation (automated)
-- BLE protocol compliance
-- Battery life verification
-- Safety inspection
-- EMC testing
-- UX evaluation
-
-**Step 4: Review (1 week)**
-- Pass: Certificate and badge issued
-- Conditional: Minor fixes, re-test
-- Fail: Major issues, full re-submission
-
-**Step 5: Ongoing**
-- Annual re-certification
-- Firmware update reviews
-
-### 6.3 Certification Marks
-
-**Usage:**
-- Display "WIA-PET-007 Certified" badge on packaging
-- Use certification logo in marketing materials
-- List on WIA website's certified devices page
-
-**Prohibited:**
-- Modification of certification logos
-- Misleading claims about certification level
-- Use after certification expiration
-
----
-
-## 7. Developer Resources
-
-### 7.1 Official SDKs
-
-**Available:**
-- iOS SDK (Swift)
-- Android SDK (Kotlin/Java)
-- JavaScript SDK (Web/React Native)
-- Python SDK (Backend/ML)
-- Firmware Libraries (C/C++)
-
-**Features:**
-- BLE communication helpers
-- Data parsing and validation
-- UI components and widgets
-- Authentication wrappers
-- Error handling utilities
-
-### 7.2 Reference Implementations
-
-**Sample App:**
-- Repository: https://github.com/WIA-Official/pet-wearable-reference-app
-- License: MIT
-- Platforms: iOS, Android, Web
-- Features: Complete implementation of all WIA-PET-007 features
-
-**Firmware Template:**
-- Repository: https://github.com/WIA-Official/pet-wearable-firmware
-- License: Apache 2.0
-- Hardware: Nordic nRF52840
-- Features: BLE, sensors, GPS, power management
-
-### 7.3 Testing Tools
-
-- **Data Format Validator:** Online JSON schema validator
-- **BLE Protocol Tester:** Desktop app for characteristic verification
-- **Battery Life Simulator:** Power consumption modeling
-- **API Compliance Checker:** Automated endpoint testing
-
----
-
-## 8. Community and Ecosystem
-
-### 8.1 Developer Portal
-
-**Resources:**
-- Documentation: https://docs.wia.org/pet-007
-- API Reference: https://api-docs.wia.org/pet-007
-- Tutorials and guides
-- Sample code snippets
-- FAQ and troubleshooting
-
-### 8.2 Support Channels
-
-- **Discussion Forums:** community.wia.org
-- **Stack Overflow:** Tag `[wia-pet-007]`
-- **GitHub Issues:** Bug reports and feature requests
-- **Developer Newsletter:** Monthly updates
-
-### 8.3 Partner Ecosystem
-
-+----------------------+---------------------------+
-| Partner Type         | Examples                  |
-+----------------------+---------------------------+
-| Device Manufacturers | Whistle, FitBark, Tractive|
-| Veterinary Software  | ezyVet, Avimark, RxWorks  |
-| Pet Insurance        | Nationwide, Trupanion     |
-| Smart Home           | Apple, Google, Amazon     |
-| Research Institutes  | Universities, vet schools |
-+----------------------+---------------------------+
-
----
-
-## 9. Standards Governance
-
-### 9.1 Standards Committee
-
-**Composition:**
-- 40% Device manufacturers
-- 20% Veterinarians
-- 15% Researchers
-- 15% Pet owner advocates
-- 10% Technical experts
-
-**Meetings:**
-- Quarterly: Review proposals, discuss issues
-- Annual: Major revisions, strategic direction
-- Ad-hoc: Emergency meetings for critical issues
-
-### 9.2 Revision Process
-
-**Version Types:**
-- **Patch (1.0.X):** Clarifications, typos (2-4 times/year)
-- **Minor (1.X.0):** New optional features (1-2 times/year)
-- **Major (X.0.0):** Breaking changes (every 3-5 years)
-
-**Process:**
-- Proposal submission (30-day comment period)
-- Committee review and voting (75% majority)
-- Public draft release (60-day feedback)
-- Final approval and publication
-
-### 9.3 Backward Compatibility
-
-- **Deprecation Notice:** Minimum 18 months
-- **Migration Period:** Devices certified to previous version valid for 3 years
-- **Legacy Support:** Apps must support previous major version
-
----
-
-## 10. Future Roadmap
-
-### 10.1 Version 2.0 (Target: 2028)
-
-**Planned Features:**
-- Advanced biosensors (blood glucose, SpO2, ECG)
-- AI/ML model interchange format
-- 5G and edge computing standards
-- AR visualization standards
-- Blockchain health records
-- Interspecies expansion (horses, livestock, exotics)
-
-### 10.2 Emerging Technologies
-
-**Under Consideration:**
-- Ultra-wideband positioning (UWB)
-- E-paper displays on collars
-- Energy harvesting (solar + kinetic)
-- Implantable sensors (research phase)
-
----
-
-## 11. Compliance Checklist
-
-### 11.1 Data Format Compliance
-
-- [ ] JSON schema validation passes
-- [ ] All required fields present
-- [ ] Timestamp in ISO 8601 UTC
-- [ ] Numeric precision correct
-- [ ] Error handling implemented
-
-### 11.2 Hardware Compliance
-
-- [ ] Sensor accuracy meets specs
-- [ ] Battery life verified (standardized test)
-- [ ] IP rating tested and certified
-- [ ] Materials biocompatibility tested
-- [ ] Weight within category limits
-
-### 11.3 API Compliance
-
-- [ ] All required endpoints implemented
-- [ ] OAuth 2.0 authentication
-- [ ] Rate limiting enforced
-- [ ] Error responses formatted correctly
-- [ ] BLE characteristics match UUIDs
-
-### 11.4 Safety Compliance
-
-- [ ] FCC/CE/regional certifications obtained
-- [ ] Battery safety mechanisms tested
-- [ ] Choking hazard prevention verified
-- [ ] User manual includes safety warnings
-- [ ] Post-market surveillance plan in place
-
----
-
-## Appendix A: Certification Application
-
-**Application Form:**
-```
-1. Company Information
-   - Company name:
-   - Contact person:
-   - Email:
-   - Phone:
-
-2. Device Information
-   - Model name:
-   - Model number:
-   - Target pet size category:
-   - Key features:
-
-3. Compliance Level
-   [ ] Basic Compliance
-   [ ] Full Compliance
-   [ ] Premium
-
-4. Attach Documentation
-   - Hardware specifications
-   - BOM (Bill of Materials)
-   - Test reports
-   - User manual
-
-5. Certification Fee Payment
-   - Payment method:
-   - Transaction ID:
-```
-
----
-
-**弘益人間 (홍익인간) · Benefit All Humanity**
-
-© 2025 SmileStory Inc. / WIA  
-WIA-PET-007 PHASE 4 Specification
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pet-wearable
+standard. It addresses the integration layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-wearable"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-wearable`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-wearable` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

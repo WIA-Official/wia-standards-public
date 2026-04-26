@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제4장: 프로토콜 사양 - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제4장: 프로토콜 사양</h1>
+            <p class="subtitle">프로토콜 수용자 & 의도 해석기</p>
+        </header>
+
+        <div class="content">
+            <h2>4.1 프로토콜 수용자</h2>
+
+            <p>
+                프로토콜 수용자는 WIA-OMNI-API의 "어머니" 철학의 핵심입니다.
+                현재와 미래의 모든 API 프로토콜을 받아들이고 이해하며, 각 클라이언트의
+                선호하는 통신 스타일에 적응합니다.
+            </p>
+
+            <h3>지원 프로토콜</h3>
+
+            <h4>REST 프로토콜 지원</h4>
+            <pre><code>rest_protocol:
+  methods: [GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS]
+  versions: [HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/3]
+
+  features:
+    - resource_oriented: true
+    - idempotent_operations: 강제됨
+    - stateless: 선호됨
+    - cacheable: 자동
+    - hypermedia: HATEOAS 링크</code></pre>
+
+            <h4>GraphQL 프로토콜 지원</h4>
+            <pre><code>graphql_protocol:
+  operations: [query, mutation, subscription]
+  versions: [June2018, October2021, Draft]
+
+  features:
+    - introspection: 전체 스키마 검색
+    - batching: 자동 쿼리 배치
+    - deduplication: 동일 쿼리 병합
+    - persisted_queries: APQ 지원</code></pre>
+
+            <h4>gRPC 프로토콜 지원</h4>
+            <pre><code>grpc_protocol:
+  modes: [unary, server_stream, client_stream, bidi_stream]
+  encoding: protobuf (Protocol Buffers)
+  transport: HTTP/2
+
+  features:
+    - type_safety: 컴파일 시간 검사
+    - streaming: 양방향
+    - deadline: 타임아웃 지원
+    - metadata: 사용자 정의 헤더</code></pre>
+
+            <h2>4.2 의도 해석기</h2>
+
+            <p>
+                의도 해석기는 클라이언트가 문자 그대로 요청하는 것이 아니라 달성하고자 하는 것을
+                이해합니다. 여러 수준의 의도 표현을 지원합니다.
+            </p>
+
+            <h3>의도 수준</h3>
+
+            <h4>수준 1: 프로토콜별 (전통적)</h4>
+            <pre><code>// REST
+GET /api/users/123
+
+// GraphQL
+query { user(id: 123) { name email } }
+
+// gRPC
+UserService.GetUser({ user_id: 123 })</code></pre>
+
+            <h4>수준 2: 자연어</h4>
+            <pre><code>{
+  "intent": "사용자 123의 프로필 정보 가져와"
+}
+
+// 어머니가 해석하고 최적 쿼리 실행</code></pre>
+
+            <h4>수준 3: WIA-INTENT (구조화된 의도)</h4>
+            <pre><code>{
+  "intent": {
+    "type": "wia-intent",
+    "code": `
+      intent GetUserProfile {
+        given: user_id = 123
+        want: user_profile
+        constraints {
+          include: [name, email, avatar]
+          exclude: [password, internal_id]
+          freshness: &lt;= 5.minutes
+        }
+        certainty: &gt;= 0.95
+      }
+    `
+  }
+}</code></pre>
+
+            <h2>4.3 프로토콜 자동 선택</h2>
+
+            <p>
+                클라이언트가 프로토콜 선호도를 지정하지 않으면, 어머니가 여러 요인을 기반으로
+                최적의 프로토콜을 선택합니다.
+            </p>
+
+            <h3>선택 기준</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>시나리오</th>
+                        <th>최적 프로토콜</th>
+                        <th>이유</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>브라우저, 간단한 쿼리</td>
+                        <td>REST</td>
+                        <td>광범위한 지원, 캐시 가능</td>
+                    </tr>
+                    <tr>
+                        <td>복잡한 중첩 데이터</td>
+                        <td>GraphQL</td>
+                        <td>정확한 필드 선택</td>
+                    </tr>
+                    <tr>
+                        <td>고성능 서비스</td>
+                        <td>gRPC</td>
+                        <td>바이너리 인코딩, 타입 안전</td>
+                    </tr>
+                    <tr>
+                        <td>실시간 업데이트</td>
+                        <td>WebSocket</td>
+                        <td>양방향, 낮은 지연시간</td>
+                    </tr>
+                    <tr>
+                        <td>IoT 장치, 제한된 대역폭</td>
+                        <td>MQTT</td>
+                        <td>경량, QoS 지원</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>4.4 프로토콜 상호 운용성</h2>
+
+            <p>
+                서로 다른 프로토콜이 어머니의 변환 계층을 통해 원활하게 상호 운용할 수 있습니다.
+            </p>
+
+            <h2>4.5 프로토콜 간 에러 처리</h2>
+
+            <p>
+                어머니는 모든 프로토콜에서 에러 응답을 정규화하여, 동정적이고 실행 가능한
+                에러 메시지를 제공합니다.
+            </p>
+
+            <h3>통합 에러 형식</h3>
+            <pre><code>{
+  "success": false,
+  "error": {
+    "code": "USER_NOT_FOUND",
+    "message": "ID 999 사용자가 존재하지 않습니다",
+    "comfort": "걱정 마세요, 이런 일은 자주 일어나요.",
+    "cause": "요청하신 사용자 ID가 시스템에 없습니다",
+    "solution": "사용자 ID를 확인하거나 이름으로 검색해보세요",
+    "recovery_options": [
+      {
+        "action": "search_similar",
+        "description": "비슷한 이름의 사용자 검색",
+        "endpoint": "/users/search",
+        "auto_applicable": false,
+        "confidence": 0.7
+      }
+    ]
+  }
+}</code></pre>
+
+            <div class="success-box">
+                <strong>미래 보장:</strong> 새로운 프로토콜이 등장해도 API 통합이 구식이 되지 않습니다.
+                어머니가 적응하므로 여러분은 그럴 필요가 없습니다.
+            </div>
+
+            <div class="navigation">
+                <a href="chapter3.html">← 이전: API 엔드포인트</a>
+                <a href="chapter5.html">다음: 통합 가이드 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

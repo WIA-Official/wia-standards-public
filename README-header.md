@@ -5,10 +5,10 @@
 
 | Tier | Count | Description |
 |------|:-----:|-------------|
-| 🏆 Deep Published v3 (21/21) | **1** | Publication-grade. All 17 size/structure + 4 veracity gates passed. Safe to cite externally. |
-| 📚 Draft (Surface)            | 0 | Imported from prior bulk merge. Pending content depth and/or citation cleanup. Not for external citation yet. |
+| 🏆 Deep Published v3 (21/21) | **575** | Publication-grade. All 17 size/structure + 4 veracity gates passed. Safe to cite externally. |
+| 📚 Draft (Surface)            | 410 | Imported from prior bulk merge. Pending content depth and/or citation cleanup. Not for external citation yet. |
 
-**Mission progress**: 1 / 749 standards Deep Published — **0.1%**
+**Mission progress**: 575 / 749 standards Deep Published — **76.8%**
 
 Standards graduate from Draft → Deep automatically when they pass `validate-published-v3.sh`. See [`docs/CITATION-POLICY.md`](docs/CITATION-POLICY.md) for the policy that gates the transition.
 

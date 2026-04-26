@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제8장: 구현 가이드 및 모범 사례 - WIA 의수 제어 표준</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; border-left: 6px solid #3b82f6; }
+        h1 { color: #3b82f6; font-size: 2rem; }
+        blockquote { background: #1e293b; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b; }
+        h2 { color: #3b82f6; font-size: 1.6rem; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 2px solid #334155; padding-bottom: 0.5rem; }
+        h3 { color: #60a5fa; font-size: 1.3rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; color: #cbd5e1; }
+        pre { background: #0f172a; padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; border: 1px solid #334155; }
+        code { color: #fbbf24; font-family: 'Courier New', monospace; }
+        .summary-box { background: #14532d; border: 2px solid #16a34a; padding: 2rem; border-radius: 12px; margin: 2rem 0; }
+        .summary-box h2 { color: #86efac; border-bottom: 2px solid #16a34a; }
+        footer { text-align: center; padding: 2rem; color: #64748b; border-top: 1px solid #334155; margin-top: 3rem; }
+        .philosophy { color: #f59e0b; font-size: 1.1rem; margin-top: 1rem; }
+        .nav-links { display: flex; justify-content: space-between; margin-top: 2rem; }
+        .nav-link { padding: 1rem 2rem; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제8장: 구현 가이드 및 모범 사례</h1>
+        </header>
+
+        <blockquote>
+            <p><strong>弘益人間 (홍익인간)</strong></p>
+            <p><em>실용적인 구현 지침이 연구실의 혁신을 사용자의 일상생활로 가져옵니다.</em></p>
+        </blockquote>
+
+        <h2>8.1 개발 환경 설정</h2>
+
+        <h3>8.1.1 필수 도구</h3>
+
+        <pre><code># WIA 의수 SDK 설치
+npm install @wia/prosthetic-sdk
+
+# 또는 Python 버전
+pip install wia-prosthetic-sdk
+
+# 개발 도구
+npm install -g @wia/prosthetic-cli
+wia-cli init my-prosthetic-project</code></pre>
+
+        <h3>8.1.2 하드웨어 요구사항</h3>
+
+        <ul>
+            <li><strong>EMG 획득 보드:</strong> 최소 8채널, 16비트 ADC, 1kHz 샘플링</li>
+            <li><strong>처리 유닛:</strong> ARM Cortex-M4 이상, 또는 Linux SBC</li>
+            <li><strong>모터 드라이버:</strong> PWM 지원, 전류 감지 기능</li>
+            <li><strong>통신 모듈:</strong> BLE 5.0 또는 CAN 트랜시버</li>
+        </ul>
+
+        <h2>8.2 EMG 신호 처리 구현</h2>
+
+        <h3>8.2.1 신호 획득</h3>
+
+        <pre><code>import { EMGAcquisition, SignalProcessor } from '@wia/prosthetic-sdk';
+
+// EMG 획득 설정
+const emg = new EMGAcquisition({
+    channels: 8,
+    sampleRate: 1000,
+    resolution: 16,
+    gain: 1000,
+    bandpass: { low: 20, high: 450 }
+});
+
+// 신호 처리 파이프라인
+const processor = new SignalProcessor({
+    windowSize: 200,  // ms
+    windowIncrement: 50,  // ms
+    features: ['MAV', 'RMS', 'WL', 'ZC', 'SSC']
+});
+
+// 실시간 처리 루프
+emg.onData((samples) => {
+    const features = processor.extractFeatures(samples);
+    const classification = classifier.predict(features);
+    sendCommand(classification);
+});</code></pre>
+
+        <h3>8.2.2 분류기 훈련</h3>
+
+        <pre><code>import { LDAClassifier, TrainingSession } from '@wia/prosthetic-sdk';
+
+// 훈련 세션 생성
+const training = new TrainingSession({
+    gestures: [
+        'hand_open', 'hand_close', 'wrist_pronation',
+        'wrist_supination', 'pinch', 'point', 'rest'
+    ],
+    repetitions: 5,
+    holdTime: 3000,  // ms
+    restTime: 2000   // ms
+});
+
+// 데이터 수집
+await training.start();
+
+// 분류기 훈련
+const classifier = new LDAClassifier();
+await classifier.train(training.getData());
+
+// 성능 평가
+const accuracy = classifier.crossValidate(5);
+console.log(`분류 정확도: ${accuracy.mean}% (±${accuracy.std}%)`);</code></pre>
+
+        <h2>8.3 모터 제어 구현</h2>
+
+        <h3>8.3.1 관절 제어</h3>
+
+        <pre><code>import { MotorController, JointConfig } from '@wia/prosthetic-sdk';
+
+// 손 관절 구성
+const handConfig: JointConfig[] = [
+    { id: 'thumb_mcp', motorId: 1, gearRatio: 100, maxTorque: 0.5 },
+    { id: 'thumb_ip', motorId: 2, gearRatio: 50, maxTorque: 0.3 },
+    { id: 'index_mcp', motorId: 3, gearRatio: 80, maxTorque: 0.4 },
+    // ... 추가 관절
+];
+
+const motors = new MotorController(handConfig);
+
+// 파지 패턴 실행
+async function executeGrip(pattern: GripPattern) {
+    const trajectory = pattern.getTrajectory();
+    
+    for (const waypoint of trajectory) {
+        await motors.moveTo(waypoint.positions, {
+            velocities: waypoint.velocities,
+            forceLimits: waypoint.forces,
+            timeout: 1000
+        });
+    }
+}</code></pre>
+
+        <h3>8.3.2 힘 제어</h3>
+
+        <pre><code>// 임피던스 제어 구현
+class ImpedanceController {
+    constructor(
+        private stiffness: number,  // N/m
+        private damping: number,    // N·s/m
+        private inertia: number     // kg
+    ) {}
+    
+    compute(
+        targetPos: number,
+        currentPos: number,
+        currentVel: number,
+        externalForce: number
+    ): number {
+        const posError = targetPos - currentPos;
+        const desiredAccel = (
+            this.stiffness * posError - 
+            this.damping * currentVel + 
+            externalForce
+        ) / this.inertia;
+        
+        return desiredAccel;
+    }
+}</code></pre>
+
+        <h2>8.4 감각 피드백 구현</h2>
+
+        <pre><code>import { FeedbackController, VibrationMotor } from '@wia/prosthetic-sdk';
+
+// 피드백 시스템 설정
+const feedback = new FeedbackController({
+    devices: [
+        new VibrationMotor({ id: 1, location: 'forearm_anterior' }),
+        new VibrationMotor({ id: 2, location: 'forearm_posterior' })
+    ]
+});
+
+// 센서-피드백 매핑
+function mapGripToFeedback(gripForce: number): FeedbackParams {
+    const normalized = Math.min(gripForce / MAX_GRIP_FORCE, 1.0);
+    
+    return {
+        deviceId: 1,
+        frequency: 50 + normalized * 200,  // 50-250 Hz
+        amplitude: 0.2 + normalized * 0.8,  // 20-100%
+        duration: 'continuous'
+    };
+}
+
+// 실시간 피드백 루프
+sensors.onGripForce((force) => {
+    const params = mapGripToFeedback(force);
+    feedback.apply(params);
+});</code></pre>
+
+        <h2>8.5 시스템 통합</h2>
+
+        <h3>8.5.1 전체 시스템 초기화</h3>
+
+        <pre><code>import { 
+    ProstheticSystem,
+    EMGAcquisition,
+    SignalProcessor,
+    LDAClassifier,
+    MotorController,
+    FeedbackController,
+    SafetyMonitor
+} from '@wia/prosthetic-sdk';
+
+async function initializeSystem() {
+    // 구성요소 초기화
+    const emg = new EMGAcquisition(emgConfig);
+    const processor = new SignalProcessor(processorConfig);
+    const classifier = await LDAClassifier.load('trained_model.json');
+    const motors = new MotorController(handConfig);
+    const feedback = new FeedbackController(feedbackConfig);
+    const safety = new SafetyMonitor(safetyConfig);
+    
+    // 시스템 조립
+    const system = new ProstheticSystem({
+        acquisition: emg,
+        processing: processor,
+        classification: classifier,
+        actuation: motors,
+        feedback: feedback,
+        safety: safety
+    });
+    
+    // 안전 콜백 등록
+    safety.onEmergency(() => {
+        motors.emergencyStop();
+        feedback.disable();
+    });
+    
+    return system;
+}</code></pre>
+
+        <h3>8.5.2 메인 제어 루프</h3>
+
+        <pre><code>async function mainControlLoop(system: ProstheticSystem) {
+    const LOOP_PERIOD = 20;  // ms (50 Hz)
+    
+    while (system.isRunning()) {
+        const startTime = Date.now();
+        
+        // 1. EMG 데이터 획득
+        const emgData = await system.acquisition.read();
+        
+        // 2. 특징 추출
+        const features = system.processing.extractFeatures(emgData);
+        
+        // 3. 분류
+        const { gesture, confidence } = system.classification.predict(features);
+        
+        // 4. 명령 생성
+        if (confidence > CONFIDENCE_THRESHOLD) {
+            const command = generateCommand(gesture, emgData);
+            
+            // 5. 모터 제어
+            await system.actuation.execute(command);
+            
+            // 6. 감각 피드백
+            const sensorData = await system.actuation.readSensors();
+            system.feedback.update(sensorData);
+        }
+        
+        // 7. 안전 점검
+        system.safety.check();
+        
+        // 루프 타이밍 유지
+        const elapsed = Date.now() - startTime;
+        if (elapsed < LOOP_PERIOD) {
+            await sleep(LOOP_PERIOD - elapsed);
+        }
+    }
+}</code></pre>
+
+        <h2>8.6 테스트 및 검증</h2>
+
+        <h3>8.6.1 단위 테스트</h3>
+
+        <pre><code>import { test, expect } from '@wia/prosthetic-sdk/testing';
+
+test('LDA 분류기 정확도', async () => {
+    const classifier = await LDAClassifier.load('test_model.json');
+    const testData = await loadTestData('test_features.json');
+    
+    const accuracy = classifier.evaluate(testData);
+    expect(accuracy).toBeGreaterThan(0.90);
+});
+
+test('모터 응답 시간', async () => {
+    const motors = new MotorController(testConfig);
+    
+    const startTime = Date.now();
+    await motors.moveTo({ thumb_mcp: 45 });
+    const responseTime = Date.now() - startTime;
+    
+    expect(responseTime).toBeLessThan(100);  // ms
+});</code></pre>
+
+        <h3>8.6.2 통합 테스트</h3>
+
+        <ul>
+            <li>전체 지연 시간 측정 (목표: < 300ms)</li>
+            <li>분류 정확도 실시간 검증</li>
+            <li>피드백 응답 확인</li>
+            <li>비상 정지 기능 테스트</li>
+            <li>장시간 안정성 테스트</li>
+        </ul>
+
+        <h2>8.7 배포 및 유지보수</h2>
+
+        <ul>
+            <li><strong>펌웨어 업데이트:</strong> OTA(Over-The-Air) 업데이트 지원</li>
+            <li><strong>사용자 데이터:</strong> 사용 패턴, 분류기 성능 모니터링</li>
+            <li><strong>원격 진단:</strong> 문제 해결을 위한 로그 수집</li>
+            <li><strong>정기 교정:</strong> 주기적 분류기 재훈련 권장</li>
+        </ul>
+
+        <div class="summary-box">
+            <h2>장 요약</h2>
+            <ol>
+                <li><strong>개발 환경:</strong> WIA SDK와 적절한 하드웨어로 개발 환경을 구성합니다.</li>
+                <li><strong>신호 처리:</strong> EMG 획득, 특징 추출, 분류를 파이프라인으로 구현합니다.</li>
+                <li><strong>모터 제어:</strong> 위치, 속도, 힘 제어를 관절별로 구현합니다.</li>
+                <li><strong>감각 피드백:</strong> 센서-피드백 매핑으로 사용자에게 촉각 정보를 전달합니다.</li>
+                <li><strong>테스트:</strong> 단위, 통합, 사용자 테스트로 시스템 신뢰성을 검증합니다.</li>
+            </ol>
+        </div>
+
+        <div class="nav-links">
+            <a href="chapter-07.html" class="nav-link">← 제7장</a>
+            <a href="index.html" class="nav-link">목차로 →</a>
+        </div>
+
+        </div>
+</body>
+</html>

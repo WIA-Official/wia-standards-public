@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WIA-SEMI-014 Interface and Protocol Specification</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 1000px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+        h1 { color: #8B5CF6; border-bottom: 3px solid #8B5CF6; padding-bottom: 10px; }
+        h2 { color: #0891B2; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; }
+        th { background: #8B5CF6; color: white; padding: 12px; }
+        td { padding: 10px; border: 1px solid #ddd; }
+        .spec-section { background: white; padding: 25px; margin: 20px 0; border-left: 4px solid #8B5CF6; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        pre { background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>WIA-SEMI-014: LiDAR Interface and Protocol Specification</h1>
+    
+    <div class="spec-section">
+        <h2>1. Physical Interfaces</h2>
+        <h3>1.1 Connector Specifications</h3>
+        <p>Automotive LiDAR sensors SHALL use waterproof, automotive-grade connectors:</p>
+        <table>
+            <tr>
+                <th>Interface</th>
+                <th>Connector Type</th>
+                <th>Pinout</th>
+            </tr>
+            <tr>
+                <td>Power</td>
+                <td>Deutsch DT series or equivalent (IP67)</td>
+                <td>Pin 1: +12V/+24V<br>Pin 2: GND<br>Pin 3: GND (shield)</td>
+            </tr>
+            <tr>
+                <td>Ethernet</td>
+                <td>M12 X-coded or Fakra (for Automotive Ethernet)</td>
+                <td>Pin 1: TX+<br>Pin 2: RX+<br>Pin 3: TX-<br>Pin 4: RX-</td>
+            </tr>
+            <tr>
+                <td>CAN Bus</td>
+                <td>M12 A-coded 5-pin</td>
+                <td>Pin 1: CAN Shield<br>Pin 2: CAN_H<br>Pin 3: GND<br>Pin 4: CAN_L<br>Pin 5: NC</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="spec-section">
+        <h2>2. Ethernet Data Protocol</h2>
+        <h3>2.1 UDP Point Cloud Streaming</h3>
+        <p>Point cloud data SHALL be transmitted via UDP for minimum latency:</p>
+        <pre>
+UDP Packet Structure:
+Header (42 bytes):
+    - Ethernet Header (14 bytes)
+    - IP Header (20 bytes)
+    - UDP Header (8 bytes)
+
+LiDAR Data Packet (variable length):
+    - Packet Header (12 bytes):
+        - Magic Number: 0xA5FF (2 bytes)
+        - Packet Type: 0x01 (point cloud) (1 byte)
+        - Sequence Number: (4 bytes, wraps at 2^32)
+        - Timestamp: GPS time in microseconds (8 bytes)
+        - Number of Points: N (2 bytes)
+    
+    - Point Data (N × point_size bytes):
+        For each point:
+            - X coordinate: float32 (4 bytes)
+            - Y coordinate: float32 (4 bytes)
+            - Z coordinate: float32 (4 bytes)
+            - Intensity: uint8 or float32 (1 or 4 bytes)
+            - Timestamp offset: uint32 nanoseconds (4 bytes)
+            - Ring ID: uint8 (1 byte)
+        
+        Total: 17 or 21 bytes per point
+        </pre>
+
+        <h3>2.2 ROS/ROS2 Integration</h3>
+        <p>LiDAR drivers SHALL publish data using standard ROS message types:</p>
+        <pre>
+sensor_msgs/PointCloud2:
+    header:
+        stamp: Time
+        frame_id: "lidar_link"
+    height: 1 (unordered cloud) or N_rings (organized)
+    width: N_points
+    fields:
+        - name: "x", offset: 0, datatype: FLOAT32, count: 1
+        - name: "y", offset: 4, datatype: FLOAT32, count: 1
+        - name: "z", offset: 8, datatype: FLOAT32, count: 1
+        - name: "intensity", offset: 12, datatype: FLOAT32, count: 1
+        - name: "ring", offset: 16, datatype: UINT16, count: 1 (optional)
+        - name: "time", offset: 18, datatype: FLOAT32, count: 1 (optional)
+    is_bigendian: false
+    point_step: 18 or 22 bytes
+    row_step: width × point_step
+    data: [binary point cloud data]
+    is_dense: false (allows NaN/Inf for invalid points)
+        </pre>
+    </div>
+
+    <div class="spec-section">
+        <h2>3. CAN Bus Protocol</h2>
+        <h3>3.1 CAN Message IDs</h3>
+        <table>
+            <tr>
+                <th>Message ID (Hex)</th>
+                <th>Purpose</th>
+                <th>Period</th>
+                <th>DLC (bytes)</th>
+            </tr>
+            <tr>
+                <td>0x100</td>
+                <td>LiDAR Status</td>
+                <td>100ms</td>
+                <td>8</td>
+            </tr>
+            <tr>
+                <td>0x101</td>
+                <td>Diagnostics</td>
+                <td>1000ms</td>
+                <td>8</td>
+            </tr>
+            <tr>
+                <td>0x102</td>
+                <td>Configuration Command</td>
+                <td>On-demand</td>
+                <td>8</td>
+            </tr>
+            <tr>
+                <td>0x103</td>
+                <td>Configuration Response</td>
+                <td>On-demand</td>
+                <td>8</td>
+            </tr>
+        </table>
+
+        <h3>3.2 Status Message Format (ID 0x100)</h3>
+        <pre>
+Byte 0: Operational Mode
+    0x00 = Initializing
+    0x01 = Normal Operation
+    0x02 = Degraded Mode (reduced performance)
+    0x03 = Error Mode
+    0x04 = Safe State
+
+Byte 1: Health Status Flags (bitfield)
+    Bit 0: Laser operational
+    Bit 1: Detector operational
+    Bit 2: Thermal warning
+    Bit 3: Communication error
+    Bit 4-7: Reserved
+
+Byte 2-3: Frame Rate (uint16, 0.1 Hz units, e.g., 100 = 10.0 Hz)
+
+Byte 4: Temperature (int8, °C, offset +50, e.g., 0x32 = 0°C)
+
+Byte 5: Power Consumption (uint8, 0.5W units, e.g., 30 = 15W)
+
+Byte 6-7: Uptime (uint16, hours)
+        </pre>
+    </div>
+
+    <div class="spec-section">
+        <h2>4. Point Cloud File Formats</h2>
+        
+        <h3>4.1 PCD (Point Cloud Data) Format</h3>
+        <pre>
+# .PCD v0.7 - Point Cloud Data file format
+VERSION 0.7
+FIELDS x y z intensity ring timestamp
+SIZE 4 4 4 4 2 4
+TYPE F F F F U F
+COUNT 1 1 1 1 1 1
+WIDTH 1000000
+HEIGHT 1
+VIEWPOINT 0 0 0 1 0 0 0
+POINTS 1000000
+DATA binary
+[binary data follows...]
+        </pre>
+
+        <h3>4.2 LAS 1.4 Format (for mapping applications)</h3>
+        <p>LiDAR data MAY be exported in LAS 1.4 format for GIS and mapping applications. Refer to ASPRS LAS 1.4 specification for complete format details.</p>
+    </div>
+
+    <div class="spec-section">
+        <h2>5. Time Synchronization</h2>
+        
+        <h3>5.1 PPS (Pulse Per Second) Input</h3>
+        <p>LiDAR sensors SHALL support GPS PPS input for multi-sensor time synchronization:</p>
+        <ul>
+            <li><strong>Input Signal:</strong> 3.3V or 5V logic, rising edge trigger</li>
+            <li><strong>Pulse Width:</strong> 100ms ± 50ms</li>
+            <li><strong>Accuracy:</strong> Timestamp alignment to GPS time within ±1ms</li>
+            <li><strong>Connector:</strong> Dedicated pin on main connector or separate coax (SMA/MCX)</li>
+        </ul>
+
+        <h3>5.2 PTP (Precision Time Protocol) - IEEE 1588</h3>
+        <p>LiDAR sensors MAY support PTP over Ethernet for sub-microsecond synchronization:</p>
+        <pre>
+PTP Configuration:
+    - Domain: 0 (default)
+    - Transport: IEEE 802.3 (Layer 2) or UDP/IPv4
+    - Sync Interval: 1 second
+    - Delay Request Interval: 1 second
+    - Expected Accuracy: <1 μs timestamp alignment
+        </pre>
+    </div>
+
+    <div class="spec-section">
+        <h2>6. Configuration and Diagnostics API</h2>
+        
+        <h3>6.1 HTTP REST API (Optional)</h3>
+        <p>LiDAR sensors MAY provide HTTP REST API for configuration via Ethernet:</p>
+        <pre>
+GET /api/v1/status
+    Returns: JSON object with current sensor status
+
+POST /api/v1/config
+    Body: JSON configuration parameters
+    {
+        "frame_rate": 10,
+        "range_mode": "standard",  // or "long_range", "short_range"
+        "intensity_calibration": true,
+        "return_mode": "strongest"  // or "last", "dual"
+    }
+
+GET /api/v1/diagnostics
+    Returns: Detailed diagnostic data, error codes, logs
+
+POST /api/v1/firmware_update
+    Body: Firmware binary file
+    Initiates firmware update process
+        </pre>
+    </div>
+
+    <div class="spec-section">
+        <h2>7. Coordinate Systems and Transformations</h2>
+        
+        <h3>7.1 Sensor Coordinate Frame</h3>
+        <p>Point cloud data SHALL be expressed in right-hand Cartesian coordinate system:</p>
+        <ul>
+            <li><strong>X-axis:</strong> Forward (vehicle heading direction)</li>
+            <li><strong>Y-axis:</strong> Left (lateral, perpendicular to heading)</li>
+            <li><strong>Z-axis:</strong> Up (vertical, perpendicular to ground plane)</li>
+            <li><strong>Origin:</strong> Sensor optical center</li>
+        </ul>
+
+        <h3>7.2 Calibration Parameters</h3>
+        <p>Extrinsic calibration SHALL define transformation from LiDAR frame to vehicle frame:</p>
+        <pre>
+Transformation Matrix (4×4 homogeneous):
+    [R11  R12  R13  Tx]
+    [R21  R22  R23  Ty]
+    [R31  R32  R33  Tz]
+    [0    0    0    1 ]
+
+Where:
+    R = 3×3 rotation matrix (roll, pitch, yaw)
+    T = [Tx, Ty, Tz] translation vector (meters)
+
+Typical Installation:
+    - Tx: 0.5m to 2.0m forward from vehicle center
+    - Ty: -0.3m to +0.3m lateral offset
+    - Tz: 1.2m to 2.5m height above ground
+    - Roll: ±2°, Pitch: ±5°, Yaw: ±10°
+        </pre>
+    </div>
+
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ddd; color: #666; text-align: center;">
+        <p>&copy; 2025 WIA | WIA-SEMI-014 Interface and Protocol Specification</p>
+    </footer>
+</body>
+</html>

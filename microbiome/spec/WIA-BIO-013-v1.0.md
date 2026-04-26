@@ -712,30 +712,36 @@ Recommendations:
 
 ## 10. References
 
-### 10.1 Sequencing Protocols
+### 10.1 Normative References (Standards & Guidance)
 
-1. 선행 연구. "Ultra-high-throughput microbial community analysis on the Illumina HiSeq and MiSeq platforms." ISME J.
-2. 선행 연구. "Reproducible, interactive, scalable and extensible microbiome data science using QIIME 2." Nat Biotechnol.
-3. 선행 연구. "MetaPhlAn2 for enhanced metagenomic taxonomic profiling." Nat Methods.
+1. ISO 20387:2018 — Biotechnology — Biobanking — General requirements for biobanking.
+2. ISO 23418:2022 — Microbiology of the food chain — Whole genome sequencing for typing and genomic characterization of bacteria — General requirements and guidance.
+3. ISO/IEC 11179 — Information technology — Metadata registries.
+4. CLSI MM09 — Nucleic Acid Sequencing Methods in Diagnostic Laboratory Medicine.
+5. Genomic Standards Consortium (GSC) — Minimum Information about any (x) Sequence (MIxS) checklists.
+6. Genomic Standards Consortium (GSC) — Minimum Information about a Marker Gene Sequence (MIMARKS).
+7. Genomic Standards Consortium (GSC) — Minimum Information about a Metagenomic Sequence (MIMS).
 
-### 10.2 Diversity Metrics
+### 10.2 Diversity Metrics (Foundational Definitions)
 
-1. Shannon, C.E. (1948). "A Mathematical Theory of Communication." Bell System Technical Journal.
-2. Simpson, E.H. (1949). "Measurement of Diversity." Nature.
-3. Lozupone, C. & Knight, R. (2005). "UniFrac: a new phylogenetic method for comparing microbial communities." Appl Environ Microbiol.
+The diversity indices used in §6 are defined in widely adopted public sources:
+- Shannon entropy — defined in classical information theory (Bell System Technical Journal, 1948).
+- Simpson's index — defined in standard ecological-diversity literature (1949).
+- UniFrac phylogenetic distance — defined in the open scientific literature (2005) and implemented in the public QIIME 2 toolchain.
 
-### 10.3 Clinical Applications
+### 10.3 Public Data Resources
 
-1. 선행 연구. "A metagenome-wide association study of gut microbiota in type 2 diabetes." Nature.
-2. 선행 연구. "Reduced diversity of faecal microbiota in Crohn's disease revealed by a metagenomic approach." Gut.
-3. van 선행 연구. "Duodenal infusion of donor feces for recurrent Clostridium difficile." NEJM.
+- SILVA rRNA database — https://www.arb-silva.de
+- Greengenes2 — https://greengenes2.ucsd.edu
+- KEGG — https://www.genome.jp/kegg
+- MIxS / GSC — https://genomicsstandardsconsortium.github.io/mixs
+- NCBI Sequence Read Archive (SRA) — https://www.ncbi.nlm.nih.gov/sra
+- EMBL-EBI MGnify — https://www.ebi.ac.uk/metagenomics
+- Human Microbiome Project Data Coordination Center — https://hmpdacc.org
 
-### 10.4 Databases
+### 10.4 Informative References (Field Background)
 
-- Silva: https://www.arb-silva.de/
-- Greengenes: http://greengenes.secondgenome.com/
-- KEGG: https://www.genome.jp/kegg/
-- MIxS: https://genomicsstandardsconsortium.github.io/mixs/
+The clinical microbiome literature — including metagenome-wide association studies of gut microbiota in type-2 diabetes, reduced faecal-microbiota diversity in Crohn's disease, faecal microbiota transplantation for recurrent *Clostridioides difficile* infection, and the methodological foundations of the QIIME 2 and MetaPhlAn pipelines — is documented in the open peer-reviewed literature accessible through the data resources in §10.3. Implementers requiring historical or experimental context are referred to those archives rather than to specific bibliographic entries reproduced here.
 
 ### 10.5 WIA Standards
 

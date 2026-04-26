@@ -1,1134 +1,241 @@
-# WIA Ocean Plastic Track API Interface Standard
-## Phase 2 Specification
+# WIA-ocean-plastic-track PHASE 2 — API-INTERFACE Specification
+
+**Standard:** WIA-ocean-plastic-track
+**Phase:** 2 — API-INTERFACE
+**Version:** 1.0
+**Status:** Stable
+
+This document defines the canonical API-INTERFACE layer for WIA-ocean-plastic-track (Ocean Plastic Track).
+
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Authors**: WIA Standards Committee
-**License**: MIT
-**Primary Color**: #84CC16 (Lime)
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Authentication](#authentication)
-3. [API Endpoints](#api-endpoints)
-4. [Request/Response Format](#requestresponse-format)
-5. [Error Handling](#error-handling)
-6. [Rate Limiting](#rate-limiting)
-7. [SDK Examples](#sdk-examples)
-8. [Webhooks](#webhooks)
-9. [Version History](#version-history)
-
----
-
-## Overview
-
-### 1.1 Purpose
-
-The WIA Ocean Plastic Track API Interface Standard defines RESTful API endpoints, authentication methods, and integration patterns for ocean plastic tracking systems, enabling seamless data exchange between collection devices, recycling facilities, and monitoring platforms.
-
-**Core Objectives**:
-- Provide standardized API for plastic tracking data
-- Enable real-time IoT device integration
-- Support third-party application development
-- Facilitate data sharing across organizations
-
-### 1.2 API Design Principles
-
-1. **RESTful**: Standard HTTP methods (GET, POST, PUT, DELETE)
-2. **JSON-first**: All data exchange in JSON format
-3. **Secure**: OAuth 2.0 and API Key authentication
-4. **Versioned**: API version in URL path
-5. **Paginated**: Large result sets paginated by default
-
-### 1.3 Base URL
-
-```
-Production:  https://api.wia.live/ocean-plastic-track/v1
-Staging:     https://api-staging.wia.live/ocean-plastic-track/v1
-Development: https://api-dev.wia.live/ocean-plastic-track/v1
-```
-
----
-
-## Authentication
-
-### 2.1 Supported Methods
-
-| Method | Use Case | Security Level |
-|--------|----------|----------------|
-| OAuth 2.0 | User applications | High |
-| API Key | Server-to-server | Medium |
-| JWT | Mobile/Web apps | High |
-| Device Token | IoT devices | Medium |
-
-### 2.2 OAuth 2.0 Authentication
-
-#### Authorization Code Flow
-
-```http
-# Step 1: Authorization Request
-GET /oauth/authorize?
-  client_id=YOUR_CLIENT_ID&
-  response_type=code&
-  redirect_uri=https://yourapp.com/callback&
-  scope=read:batches write:batches&
-  state=random_state_string
-
-# Step 2: Token Exchange
-POST /oauth/token
-Content-Type: application/json
-
-{
-  "grant_type": "authorization_code",
-  "code": "AUTH_CODE",
-  "client_id": "YOUR_CLIENT_ID",
-  "client_secret": "YOUR_CLIENT_SECRET",
-  "redirect_uri": "https://yourapp.com/callback"
-}
-
-# Response
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "refresh_token": "refresh_token_here",
-  "scope": "read:batches write:batches"
-}
-```
-
-#### Client Credentials Flow (Server-to-Server)
-
-```http
-POST /oauth/token
-Content-Type: application/json
-
-{
-  "grant_type": "client_credentials",
-  "client_id": "YOUR_CLIENT_ID",
-  "client_secret": "YOUR_CLIENT_SECRET",
-  "scope": "read:batches"
-}
-```
-
-### 2.3 API Key Authentication
-
-```http
-GET /v1/batches
-Authorization: ApiKey YOUR_API_KEY
-```
-
-**Generating API Keys:**
-
-```http
-POST /v1/auth/api-keys
-Authorization: Bearer YOUR_OAUTH_TOKEN
-Content-Type: application/json
-
-{
-  "name": "Production API Key",
-  "scopes": ["read:batches", "write:batches"],
-  "expiresIn": "365d"
-}
-
-# Response
-{
-  "apiKey": "wia_live_abc123...",
-  "keyId": "key-001",
-  "created": "2025-01-15T10:00:00Z",
-  "expiresAt": "2026-01-15T10:00:00Z"
-}
-```
-
-### 2.4 Device Token Authentication
-
-For IoT devices with limited resources:
-
-```http
-POST /v1/auth/device-token
-Content-Type: application/json
-
-{
-  "deviceId": "IOT-DEV-001",
-  "deviceSecret": "device_secret_here"
-}
-
-# Response
-{
-  "deviceToken": "dt_abc123...",
-  "expiresIn": 86400
-}
-
-# Using device token
-POST /v1/batches
-Authorization: DeviceToken dt_abc123...
-```
-
----
-
-## API Endpoints
-
-### 3.1 Batch Management
-
-#### 3.1.1 Create Plastic Batch
-
-```http
-POST /v1/batches
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "collection": {
-    "location": {
-      "gps": {
-        "latitude": 37.5665,
-        "longitude": 126.9780,
-        "accuracy": 5.0
-      },
-      "description": "Haeundae Beach, Busan"
-    },
-    "timestamp": "2025-01-15T10:30:00Z",
-    "collector": {
-      "deviceId": "IOT-DEV-001",
-      "organizationId": "ORG-CLEANUP-001"
-    },
-    "method": "beach_cleanup"
-  },
-  "material": {
-    "totalWeight": {
-      "value": 25.8,
-      "unit": "kg"
-    },
-    "composition": [
-      {
-        "resinCode": "PET",
-        "percentage": 50,
-        "weight": {"value": 12.9, "unit": "kg"},
-        "condition": "good"
-      },
-      {
-        "resinCode": "PP",
-        "percentage": 50,
-        "weight": {"value": 12.9, "unit": "kg"},
-        "condition": "good"
-      }
-    ]
-  }
-}
-
-# Response: 201 Created
-{
-  "batchId": "BATCH-2025-000001",
-  "status": "collected",
-  "created": "2025-01-15T10:30:00Z",
-  "qrCode": "https://api.wia.live/qr/BATCH-2025-000001",
-  "trackingUrl": "https://track.wia.live/batch/BATCH-2025-000001"
-}
-```
-
-#### 3.1.2 Get Batch Details
-
-```http
-GET /v1/batches/{batchId}
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 200 OK
-{
-  "batchId": "BATCH-2025-000001",
-  "status": "collected",
-  "created": "2025-01-15T10:30:00Z",
-  "collection": { ... },
-  "material": { ... },
-  "recycling": { ... },
-  "environmental": { ... }
-}
-```
-
-#### 3.1.3 Update Batch Status
-
-```http
-PUT /v1/batches/{batchId}/status
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "status": "transported",
-  "notes": "Transported to sorting facility",
-  "location": {
-    "latitude": 37.5665,
-    "longitude": 126.9780
-  },
-  "timestamp": "2025-01-16T08:00:00Z"
-}
-
-# Response: 200 OK
-{
-  "batchId": "BATCH-2025-000001",
-  "status": "transported",
-  "updatedAt": "2025-01-16T08:00:00Z"
-}
-```
-
-#### 3.1.4 List Batches
-
-```http
-GET /v1/batches?
-  status=collected&
-  startDate=2025-01-01&
-  endDate=2025-01-31&
-  organizationId=ORG-CLEANUP-001&
-  limit=50&
-  offset=0
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 200 OK
-{
-  "data": [
-    {
-      "batchId": "BATCH-2025-000001",
-      "status": "collected",
-      "created": "2025-01-15T10:30:00Z",
-      "totalWeight": {"value": 25.8, "unit": "kg"}
-    }
-  ],
-  "pagination": {
-    "total": 150,
-    "limit": 50,
-    "offset": 0,
-    "hasMore": true
-  }
-}
-```
-
-#### 3.1.5 Delete Batch
-
-```http
-DELETE /v1/batches/{batchId}
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 204 No Content
-```
-
-### 3.2 IoT Device Management
-
-#### 3.2.1 Register Device
-
-```http
-POST /v1/devices
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "deviceId": "IOT-DEV-001",
-  "deviceType": "vessel_tracker",
-  "organizationId": "ORG-CLEANUP-001",
-  "sensors": ["gps", "weight", "environmental"],
-  "metadata": {
-    "vesselName": "Ocean Guardian",
-    "maxCapacity": 500
-  }
-}
-
-# Response: 201 Created
-{
-  "deviceId": "IOT-DEV-001",
-  "deviceSecret": "generated_secret_here",
-  "registered": "2025-01-15T10:00:00Z"
-}
-```
-
-#### 3.2.2 Send Sensor Data
-
-```http
-POST /v1/devices/{deviceId}/sensors
-Authorization: DeviceToken dt_abc123...
-Content-Type: application/json
-
-{
-  "timestamp": "2025-01-15T10:30:00Z",
-  "sensors": [
-    {
-      "type": "gps",
-      "data": {
-        "latitude": 37.5665,
-        "longitude": 126.9780,
-        "speed": 15,
-        "heading": 180
-      }
-    },
-    {
-      "type": "weight",
-      "data": {
-        "currentWeight": 45.5,
-        "percentFull": 9.1
-      }
-    }
-  ]
-}
-
-# Response: 202 Accepted
-{
-  "received": "2025-01-15T10:30:01Z",
-  "processed": true
-}
-```
-
-#### 3.2.3 Get Device Status
-
-```http
-GET /v1/devices/{deviceId}/status
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 200 OK
-{
-  "deviceId": "IOT-DEV-001",
-  "status": "active",
-  "lastPing": "2025-01-15T10:30:00Z",
-  "battery": {
-    "level": 85,
-    "estimatedHours": 48
-  },
-  "location": {
-    "latitude": 37.5665,
-    "longitude": 126.9780
-  },
-  "firmware": "v2.1.0"
-}
-```
-
-### 3.3 Recycling Facility Management
-
-#### 3.3.1 Register Facility
-
-```http
-POST /v1/facilities
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "name": "Seoul Plastic Sorting Center",
-  "type": "sorting",
-  "location": {
-    "latitude": 37.5665,
-    "longitude": 126.9780,
-    "address": "123 Recycling St, Seoul, Korea"
-  },
-  "certifications": ["ISO-14001", "GREEN-CERT-KR"],
-  "capacity": {
-    "daily": {"value": 1000, "unit": "kg"}
-  }
-}
-
-# Response: 201 Created
-{
-  "facilityId": "FAC-SORT-001",
-  "created": "2025-01-15T10:00:00Z"
-}
-```
-
-#### 3.3.2 Receive Batch at Facility
-
-```http
-POST /v1/facilities/{facilityId}/receive
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "batchId": "BATCH-2025-000001",
-  "arrivalTime": "2025-01-16T08:00:00Z",
-  "inspectionNotes": "Material quality: good"
-}
-
-# Response: 200 OK
-{
-  "received": true,
-  "nextStage": "sorting",
-  "estimatedProcessingTime": "2025-01-17T08:00:00Z"
-}
-```
-
-### 3.4 Analytics & Reporting
-
-#### 3.4.1 Get Collection Statistics
-
-```http
-GET /v1/analytics/collection?
-  startDate=2025-01-01&
-  endDate=2025-01-31&
-  groupBy=day&
-  organizationId=ORG-CLEANUP-001
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 200 OK
-{
-  "period": {
-    "start": "2025-01-01T00:00:00Z",
-    "end": "2025-01-31T23:59:59Z"
-  },
-  "statistics": {
-    "totalBatches": 150,
-    "totalWeight": {"value": 3875.5, "unit": "kg"},
-    "byResinType": {
-      "PET": {"batches": 90, "weight": {"value": 1550.2, "unit": "kg"}},
-      "HDPE": {"batches": 45, "weight": {"value": 1162.6, "unit": "kg"}},
-      "PP": {"batches": 60, "weight": {"value": 775.3, "unit": "kg"}}
-    },
-    "byMethod": {
-      "beach_cleanup": 100,
-      "vessel_net": 40,
-      "underwater_collection": 10
-    }
-  },
-  "daily": [
-    {
-      "date": "2025-01-01",
-      "batches": 5,
-      "weight": {"value": 129.2, "unit": "kg"}
-    }
-  ]
-}
-```
-
-#### 3.4.2 Get Environmental Impact
-
-```http
-GET /v1/analytics/environmental?
-  startDate=2025-01-01&
-  endDate=2025-01-31
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 200 OK
-{
-  "period": {
-    "start": "2025-01-01T00:00:00Z",
-    "end": "2025-01-31T23:59:59Z"
-  },
-  "impact": {
-    "totalPlasticCollected": {"value": 3875.5, "unit": "kg"},
-    "marineLifeSaved": {
-      "estimatedAnimals": 1250,
-      "speciesTypes": ["fish", "turtle", "seabird", "whale"]
-    },
-    "carbonFootprint": {
-      "collection": {"value": 450.0, "unit": "kg_co2"},
-      "transportation": {"value": 320.0, "unit": "kg_co2"},
-      "processing": {"value": 180.0, "unit": "kg_co2"},
-      "total": {"value": 950.0, "unit": "kg_co2"},
-      "netImpact": {"value": -3100.0, "unit": "kg_co2"}
-    },
-    "oceanCleanupArea": {"value": 125000, "unit": "m2"},
-    "virginPlasticAvoided": {"value": 3100.2, "unit": "kg"}
-  }
-}
-```
-
-#### 3.4.3 Generate Report
-
-```http
-POST /v1/reports/generate
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "type": "monthly_impact",
-  "period": {
-    "start": "2025-01-01",
-    "end": "2025-01-31"
-  },
-  "organizationId": "ORG-CLEANUP-001",
-  "format": "pdf",
-  "includeCharts": true
-}
-
-# Response: 202 Accepted
-{
-  "reportId": "RPT-2025-001",
-  "status": "processing",
-  "estimatedCompletion": "2025-01-15T10:35:00Z"
-}
-
-# Get Report Status
-GET /v1/reports/{reportId}
-
-# Response: 200 OK
-{
-  "reportId": "RPT-2025-001",
-  "status": "completed",
-  "downloadUrl": "https://api.wia.live/reports/RPT-2025-001/download",
-  "expiresAt": "2025-01-22T10:30:00Z"
-}
-```
-
-### 3.5 Search & Query
-
-#### 3.5.1 Search Batches by Location
-
-```http
-POST /v1/search/batches/geo
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "center": {
-    "latitude": 37.5665,
-    "longitude": 126.9780
-  },
-  "radius": 50,
-  "unit": "km",
-  "filters": {
-    "status": ["collected", "transported"],
-    "dateRange": {
-      "start": "2025-01-01",
-      "end": "2025-01-31"
-    }
-  }
-}
-
-# Response: 200 OK
-{
-  "results": [
-    {
-      "batchId": "BATCH-2025-000001",
-      "distance": {"value": 5.2, "unit": "km"},
-      "location": {
-        "latitude": 37.5665,
-        "longitude": 126.9780
-      }
-    }
-  ],
-  "total": 25
-}
-```
-
-#### 3.5.2 Track Batch Journey
-
-```http
-GET /v1/batches/{batchId}/journey
-Authorization: Bearer YOUR_TOKEN
-
-# Response: 200 OK
-{
-  "batchId": "BATCH-2025-000001",
-  "journey": [
-    {
-      "stage": "collected",
-      "timestamp": "2025-01-15T10:30:00Z",
-      "location": {
-        "latitude": 37.5665,
-        "longitude": 126.9780,
-        "description": "Haeundae Beach"
-      },
-      "verifiedBy": "ORG-CLEANUP-001"
-    },
-    {
-      "stage": "transported",
-      "timestamp": "2025-01-16T08:00:00Z",
-      "location": {
-        "latitude": 37.5665,
-        "longitude": 126.9780,
-        "description": "Seoul Sorting Center"
-      },
-      "distance": {"value": 50, "unit": "km"}
-    },
-    {
-      "stage": "sorting",
-      "timestamp": "2025-01-16T10:00:00Z",
-      "facility": "FAC-SORT-001"
-    }
-  ],
-  "currentStage": "sorting"
-}
-```
-
-### 3.6 Notifications
-
-#### 3.6.1 Subscribe to Notifications
-
-```http
-POST /v1/notifications/subscribe
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-{
-  "events": [
-    "batch.created",
-    "batch.status_changed",
-    "device.offline"
-  ],
-  "endpoint": "https://yourapp.com/webhooks",
-  "secret": "your_webhook_secret"
-}
-
-# Response: 201 Created
-{
-  "subscriptionId": "SUB-001",
-  "created": "2025-01-15T10:00:00Z"
-}
-```
-
----
-
-## Request/Response Format
-
-### 4.1 Standard Request Headers
-
-```http
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-Accept: application/json
-X-Request-ID: unique-request-id
-X-API-Version: 1.0.0
-```
-
-### 4.2 Standard Response Format
-
-#### Success Response
-
-```json
-{
-  "success": true,
-  "data": { ... },
-  "meta": {
-    "requestId": "req-abc123",
-    "timestamp": "2025-01-15T10:30:00Z",
-    "version": "1.0.0"
-  }
-}
-```
-
-#### Error Response
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERR_INVALID_BATCH",
-    "message": "Invalid batch format",
-    "details": {
-      "field": "collection.location.gps",
-      "reason": "GPS coordinates required"
-    }
-  },
-  "meta": {
-    "requestId": "req-abc123",
-    "timestamp": "2025-01-15T10:30:00Z"
-  }
-}
-```
-
-### 4.3 Pagination
-
-```json
-{
-  "data": [ ... ],
-  "pagination": {
-    "total": 150,
-    "limit": 50,
-    "offset": 0,
-    "hasMore": true,
-    "nextOffset": 50,
-    "prevOffset": null
-  }
-}
-```
-
----
-
-## Error Handling
-
-### 5.1 HTTP Status Codes
-
-| Code | Name | Description |
-|------|------|-------------|
-| 200 | OK | Request succeeded |
-| 201 | Created | Resource created |
-| 202 | Accepted | Async processing started |
-| 204 | No Content | Successful deletion |
-| 400 | Bad Request | Invalid request data |
-| 401 | Unauthorized | Authentication required |
-| 403 | Forbidden | Insufficient permissions |
-| 404 | Not Found | Resource not found |
-| 409 | Conflict | Resource conflict |
-| 422 | Unprocessable Entity | Validation failed |
-| 429 | Too Many Requests | Rate limit exceeded |
-| 500 | Internal Server Error | Server error |
-| 503 | Service Unavailable | Service temporarily down |
-
-### 5.2 Error Codes
-
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `ERR_INVALID_TOKEN` | 401 | Invalid or expired token |
-| `ERR_INSUFFICIENT_SCOPE` | 403 | Missing required scope |
-| `ERR_BATCH_NOT_FOUND` | 404 | Batch ID not found |
-| `ERR_INVALID_GPS` | 422 | Invalid GPS coordinates |
-| `ERR_WEIGHT_MISMATCH` | 422 | Weight calculation error |
-| `ERR_DEVICE_OFFLINE` | 503 | IoT device offline |
-| `ERR_RATE_LIMIT` | 429 | Rate limit exceeded |
-
----
-
-## Rate Limiting
-
-### 6.1 Rate Limit Tiers
-
-| Tier | Requests/Hour | Burst |
-|------|---------------|-------|
-| Free | 1,000 | 100 |
-| Standard | 10,000 | 500 |
-| Premium | 100,000 | 2,000 |
-| Enterprise | Unlimited | Custom |
-
-### 6.2 Rate Limit Headers
-
-```http
-X-RateLimit-Limit: 10000
-X-RateLimit-Remaining: 9950
-X-RateLimit-Reset: 1642253400
-X-RateLimit-Tier: standard
-```
-
-### 6.3 Rate Limit Exceeded Response
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERR_RATE_LIMIT",
-    "message": "Rate limit exceeded",
-    "details": {
-      "limit": 10000,
-      "resetAt": "2025-01-15T11:00:00Z"
-    }
-  }
-}
-```
-
----
-
-## SDK Examples
-
-### 7.1 Python SDK
-
-```python
-from wia_ocean_plastic import OceanPlasticClient
-
-# Initialize client
-client = OceanPlasticClient(
-    api_key='your_api_key_here',
-    environment='production'
-)
-
-# Create a batch
-batch = client.batches.create(
-    collection={
-        'location': {
-            'gps': {
-                'latitude': 37.5665,
-                'longitude': 126.9780,
-                'accuracy': 5.0
-            },
-            'description': 'Haeundae Beach, Busan'
-        },
-        'timestamp': '2025-01-15T10:30:00Z',
-        'collector': {
-            'device_id': 'IOT-DEV-001',
-            'organization_id': 'ORG-CLEANUP-001'
-        },
-        'method': 'beach_cleanup'
-    },
-    material={
-        'total_weight': {'value': 25.8, 'unit': 'kg'},
-        'composition': [
-            {
-                'resin_code': 'PET',
-                'percentage': 50,
-                'weight': {'value': 12.9, 'unit': 'kg'},
-                'condition': 'good'
-            }
-        ]
-    }
-)
-
-print(f"Created batch: {batch.batch_id}")
-
-# Get batch details
-batch = client.batches.get('BATCH-2025-000001')
-print(f"Status: {batch.status}")
-
-# Update batch status
-batch.update_status('transported', notes='Moved to facility')
-
-# List batches with filters
-batches = client.batches.list(
-    status='collected',
-    start_date='2025-01-01',
-    limit=50
-)
-
-for batch in batches:
-    print(f"{batch.batch_id}: {batch.total_weight}")
-
-# Send IoT sensor data
-client.devices.send_sensor_data(
-    device_id='IOT-DEV-001',
-    sensors=[
-        {
-            'type': 'gps',
-            'data': {
-                'latitude': 37.5665,
-                'longitude': 126.9780
-            }
-        }
-    ]
-)
-
-# Get analytics
-stats = client.analytics.collection_statistics(
-    start_date='2025-01-01',
-    end_date='2025-01-31',
-    organization_id='ORG-CLEANUP-001'
-)
-
-print(f"Total collected: {stats.total_weight}")
-```
-
-### 7.2 TypeScript SDK
-
-```typescript
-import { OceanPlasticClient } from '@wia/ocean-plastic-track';
-
-// Initialize client
-const client = new OceanPlasticClient({
-  apiKey: 'your_api_key_here',
-  environment: 'production'
-});
-
-// Create a batch
-const batch = await client.batches.create({
-  collection: {
-    location: {
-      gps: {
-        latitude: 37.5665,
-        longitude: 126.9780,
-        accuracy: 5.0
-      },
-      description: 'Haeundae Beach, Busan'
-    },
-    timestamp: '2025-01-15T10:30:00Z',
-    collector: {
-      deviceId: 'IOT-DEV-001',
-      organizationId: 'ORG-CLEANUP-001'
-    },
-    method: 'beach_cleanup'
-  },
-  material: {
-    totalWeight: { value: 25.8, unit: 'kg' },
-    composition: [
-      {
-        resinCode: 'PET',
-        percentage: 50,
-        weight: { value: 12.9, unit: 'kg' },
-        condition: 'good'
-      }
-    ]
-  }
-});
-
-console.log(`Created batch: ${batch.batchId}`);
-
-// Get batch details
-const batchDetails = await client.batches.get('BATCH-2025-000001');
-console.log(`Status: ${batchDetails.status}`);
-
-// Update batch status
-await batchDetails.updateStatus('transported', {
-  notes: 'Moved to facility'
-});
-
-// List batches with filters
-const batches = await client.batches.list({
-  status: 'collected',
-  startDate: '2025-01-01',
-  limit: 50
-});
-
-batches.data.forEach(batch => {
-  console.log(`${batch.batchId}: ${batch.totalWeight.value}kg`);
-});
-
-// Subscribe to real-time updates
-client.batches.subscribe('BATCH-2025-000001', (update) => {
-  console.log(`Status changed to: ${update.status}`);
-});
-
-// Get analytics
-const stats = await client.analytics.collectionStatistics({
-  startDate: '2025-01-01',
-  endDate: '2025-01-31',
-  organizationId: 'ORG-CLEANUP-001'
-});
-
-console.log(`Total collected: ${stats.totalWeight.value}kg`);
-```
-
-### 7.3 JavaScript (Node.js) SDK
-
-```javascript
-const { OceanPlasticClient } = require('@wia/ocean-plastic-track');
-
-// Initialize client
-const client = new OceanPlasticClient({
-  apiKey: process.env.WIA_API_KEY
-});
-
-// Create batch
-async function createBatch() {
-  try {
-    const batch = await client.batches.create({
-      collection: {
-        location: {
-          gps: { latitude: 37.5665, longitude: 126.9780 }
-        },
-        timestamp: new Date().toISOString(),
-        collector: {
-          deviceId: 'IOT-DEV-001'
-        },
-        method: 'beach_cleanup'
-      },
-      material: {
-        totalWeight: { value: 25.8, unit: 'kg' },
-        composition: [
-          { resinCode: 'PET', percentage: 100, weight: { value: 25.8, unit: 'kg' } }
-        ]
-      }
-    });
-
-    console.log('Batch created:', batch.batchId);
-    return batch;
-  } catch (error) {
-    console.error('Error creating batch:', error.message);
-  }
-}
-
-createBatch();
-```
-
-### 7.4 cURL Examples
-
-```bash
-# Create a batch
-curl -X POST https://api.wia.live/ocean-plastic-track/v1/batches \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "collection": {
-      "location": {
-        "gps": {"latitude": 37.5665, "longitude": 126.9780}
-      },
-      "timestamp": "2025-01-15T10:30:00Z",
-      "collector": {"deviceId": "IOT-DEV-001"},
-      "method": "beach_cleanup"
-    },
-    "material": {
-      "totalWeight": {"value": 25.8, "unit": "kg"},
-      "composition": [
-        {"resinCode": "PET", "percentage": 100, "weight": {"value": 25.8, "unit": "kg"}}
-      ]
-    }
-  }'
-
-# Get batch details
-curl -X GET https://api.wia.live/ocean-plastic-track/v1/batches/BATCH-2025-000001 \
-  -H "Authorization: Bearer YOUR_TOKEN"
-
-# Update batch status
-curl -X PUT https://api.wia.live/ocean-plastic-track/v1/batches/BATCH-2025-000001/status \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "transported",
-    "timestamp": "2025-01-16T08:00:00Z"
-  }'
-```
-
----
-
-## Webhooks
-
-### 8.1 Webhook Events
-
-| Event | Description | Payload |
-|-------|-------------|---------|
-| `batch.created` | New batch created | Full batch object |
-| `batch.status_changed` | Batch status updated | Batch with new status |
-| `batch.completed` | Batch recycling completed | Final batch state |
-| `device.online` | IoT device came online | Device status |
-| `device.offline` | IoT device went offline | Device status |
-| `facility.received` | Facility received batch | Batch + facility info |
-
-### 8.2 Webhook Payload
-
-```json
-{
-  "event": "batch.status_changed",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "data": {
-    "batchId": "BATCH-2025-000001",
-    "previousStatus": "collected",
-    "currentStatus": "transported",
-    "updatedAt": "2025-01-15T10:30:00Z"
-  },
-  "signature": "sha256=abc123..."
-}
-```
-
-### 8.3 Webhook Verification
-
-```python
-import hmac
-import hashlib
-
-def verify_webhook(payload, signature, secret):
-    expected = 'sha256=' + hmac.new(
-        secret.encode(),
-        payload.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-    return hmac.compare_digest(expected, signature)
-
-# Usage
-if verify_webhook(request.body, request.headers['X-Signature'], webhook_secret):
-    # Process webhook
-    pass
-```
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial release |
-
----
-
-<div align="center">
-
-**WIA Ocean Plastic Track Standard v1.0.0**
-
-**弘益人間 (홍익인간)** - Benefit All Humanity
-
----
-
-**© 2025 WIA**
-
-**MIT License**
-
-</div>
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-ocean-plastic-track
+standard. It addresses the api-interface layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "ocean-plastic-track"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/ocean-plastic-track`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `ocean-plastic-track` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Integration Guide - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 5: Integration Guide</h1>
+            <p class="subtitle">Legacy System Migration & Multi-Protocol Support</p>
+        </header>
+
+        <div class="content">
+            <h2>5.1 Migration Strategy</h2>
+
+            <p>
+                Migrating to WIA-OMNI-API is designed to be gradual, risk-free, and
+                immediately beneficial. Mother doesn't force change - she adapts to
+                your current situation while offering a path forward.
+            </p>
+
+            <h3>Four-Phase Migration</h3>
+
+            <div class="diagram">
+Phase 1: Wrapper          Phase 2: Enhancement
+┌─────────────┐          ┌─────────────┐
+│  Existing   │          │  Existing   │
+│    APIs     │          │    APIs     │
+└──────┬──────┘          └──────┬──────┘
+       │                        │
+       ▼                        ▼
+┌─────────────┐          ┌─────────────┐
+│ OMNI Proxy  │          │ OMNI Proxy  │
+│  (Minimal)  │          │  + Cache    │
+└─────────────┘          │  + Batch    │
+                         └─────────────┘
+
+Phase 3: Evolution       Phase 4: Full Intent
+┌─────────────┐          ┌─────────────┐
+│  Services   │          │  Services   │
+└──────┬──────┘          └──────┬──────┘
+       │                        │
+       ▼                        ▼
+┌─────────────┐          ┌─────────────┐
+│   OMNI      │          │   OMNI      │
+│  Gateway    │          │  Gateway    │
+│  + Learn    │          │ Intent-Only │
+└─────────────┘          └─────────────┘
+            </div>
+
+            <h3>Phase 1: Wrap Existing APIs (Day 1)</h3>
+
+            <p>Minimal effort, immediate benefits. Simply proxy your existing APIs through
+               the OMNI gateway without any code changes.</p>
+
+            <pre><code>// Before: Direct API calls
+const user = await fetch('https://api.example.com/users/123');
+
+// After: Through OMNI Gateway (no client changes needed!)
+// Point clients to: https://api.example.com/omni/users/123
+
+// OMNI Gateway configuration:
+{
+  "backends": {
+    "users": {
+      "url": "https://internal.api.example.com/users",
+      "protocol": "rest",
+      "version": "1.0"
+    }
+  }
+}
+
+// Immediate benefits:
+// ✓ Unified monitoring
+// ✓ Automatic error recovery
+// ✓ Usage analytics
+// ✓ Security layer</code></pre>
+
+            <h3>Phase 2: Add Enhancements (Week 1-2)</h3>
+
+            <p>Enable OMNI features progressively through configuration.</p>
+
+            <pre><code>// Enable caching
+{
+  "backends": {
+    "users": {
+      "url": "https://internal.api.example.com/users",
+      "cache": {
+        "enabled": true,
+        "ttl": 300,  // 5 minutes
+        "strategy": "auto"  // Mother learns optimal strategy
+      }
+    }
+  }
+}
+
+// Enable batching
+{
+  "optimization": {
+    "batching": {
+      "enabled": true,
+      "window_ms": 10,  // Collect requests for 10ms
+      "max_batch_size": 100
+    }
+  }
+}
+
+// Enable protocol translation
+{
+  "protocols": {
+    "accept": ["rest", "graphql"],
+    "backend": "rest",
+    "auto_translate": true
+  }
+}</code></pre>
+
+            <h3>Phase 3: Enable Evolution (Month 1-3)</h3>
+
+            <p>Let Mother learn from usage patterns and optimize automatically.</p>
+
+            <pre><code>// Enable self-evolution
+{
+  "evolution": {
+    "enabled": true,
+    "auto_optimize": {
+      "caching": true,
+      "batching": true,
+      "bundling": true,
+      "query_rewriting": true
+    },
+    "require_approval": {
+      "new_endpoints": true,
+      "breaking_changes": true
+    }
+  }
+}
+
+// Mother starts learning:
+// - Which queries are frequently made together → bundle them
+// - Which data rarely changes → cache aggressively
+// - Which patterns cause errors → suggest fixes
+// - Which endpoints are slow → optimize routes</code></pre>
+
+            <h3>Phase 4: Full Intent-Based (Optional)</h3>
+
+            <p>Migrate to pure intent-based APIs for maximum flexibility.</p>
+
+            <pre><code>// Before: Protocol-specific
+GET /api/users/123/orders?status=pending&limit=10
+
+// After: Intent-based
+{
+  "intent": "show pending orders for user 123, max 10"
+}
+
+// Or with WIA-INTENT:
+{
+  "intent": {
+    "type": "wia-intent",
+    "code": `
+      intent GetPendingOrders {
+        given: user_id = 123
+        want: orders
+        constraints {
+          status: = "pending"
+          limit: <= 10
+          sort: by date desc
+        }
+      }
+    `
+  }
+}</code></pre>
+
+            <h2>5.2 Legacy System Integration</h2>
+
+            <p>
+                Mother excels at bridging modern and legacy systems without forcing
+                legacy system changes.
+            </p>
+
+            <h3>Common Legacy Scenarios</h3>
+
+            <h4>Scenario 1: SOAP to REST</h4>
+            <pre><code>// Legacy SOAP service
+&lt;soap:Envelope&gt;
+  &lt;soap:Body&gt;
+    &lt;GetUser&gt;
+      &lt;UserId&gt;123&lt;/UserId&gt;
+    &lt;/GetUser&gt;
+  &lt;/soap:Body&gt;
+&lt;/soap:Envelope&gt;
+
+// OMNI Gateway exposes as REST
+GET /api/users/123
+
+// Configuration:
+{
+  "backends": {
+    "users": {
+      "protocol": "soap",
+      "wsdl": "https://legacy.example.com/users?wsdl",
+      "expose_as": "rest",
+      "transformations": {
+        "GetUser": {
+          "rest_path": "/users/{userId}",
+          "method": "GET"
+        }
+      }
+    }
+  }
+}</code></pre>
+
+            <h4>Scenario 2: Multiple Legacy APIs to Unified</h4>
+            <pre><code>// You have 3 legacy services:
+// - User service (SOAP)
+// - Order service (REST v1)
+// - Inventory service (Custom XML-RPC)
+
+// OMNI unifies them:
+{
+  "backends": {
+    "users": {
+      "protocol": "soap",
+      "url": "https://users.legacy.com/service"
+    },
+    "orders": {
+      "protocol": "rest",
+      "version": "1.0",
+      "url": "https://orders.legacy.com/api"
+    },
+    "inventory": {
+      "protocol": "xmlrpc",
+      "url": "https://inventory.legacy.com/rpc"
+    }
+  },
+  "composition": {
+    "user_dashboard": {
+      "intent": "get user dashboard",
+      "combines": [
+        "users.getUser",
+        "orders.getUserOrders",
+        "inventory.getUserInventory"
+      ],
+      "execution": "parallel"
+    }
+  }
+}
+
+// Client gets unified response:
+GET /api/user-dashboard/123
+{
+  "user": {...},      // from SOAP service
+  "orders": [...],    // from REST v1 service
+  "inventory": {...}  // from XML-RPC service
+}</code></pre>
+
+            <h4>Scenario 3: Database to API</h4>
+            <pre><code>// Legacy: Direct database access
+// Mother can expose database as API
+
+{
+  "backends": {
+    "legacy_db": {
+      "type": "database",
+      "driver": "postgresql",
+      "connection": "postgresql://...",
+      "expose_as": "rest",
+      "auto_generate_endpoints": true,
+      "security": {
+        "read_only": true,
+        "expose_tables": ["users", "orders"],
+        "hide_columns": ["password", "ssn"]
+      }
+    }
+  }
+}
+
+// Automatically generates:
+// GET /api/users
+// GET /api/users/{id}
+// GET /api/orders
+// etc.</code></pre>
+
+            <h2>5.3 Multi-Protocol Client Support</h2>
+
+            <p>
+                Support different client types simultaneously, each using their
+                preferred protocol.
+            </p>
+
+            <h3>Client Type Matrix</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Client Type</th>
+                        <th>Recommended Protocol</th>
+                        <th>Format</th>
+                        <th>Features</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Web Browser</td>
+                        <td>REST or GraphQL</td>
+                        <td>JSON</td>
+                        <td>Caching, CORS</td>
+                    </tr>
+                    <tr>
+                        <td>Mobile App</td>
+                        <td>GraphQL or gRPC</td>
+                        <td>JSON/Protobuf</td>
+                        <td>Offline, Compression</td>
+                    </tr>
+                    <tr>
+                        <td>Backend Service</td>
+                        <td>gRPC</td>
+                        <td>Protobuf</td>
+                        <td>Type-safety, Performance</td>
+                    </tr>
+                    <tr>
+                        <td>IoT Device</td>
+                        <td>MQTT</td>
+                        <td>Binary</td>
+                        <td>Lightweight, QoS</td>
+                    </tr>
+                    <tr>
+                        <td>AI Agent</td>
+                        <td>Intent-based</td>
+                        <td>JSON</td>
+                        <td>Natural language, Context</td>
+                    </tr>
+                    <tr>
+                        <td>Legacy System</td>
+                        <td>SOAP/XML-RPC</td>
+                        <td>XML</td>
+                        <td>Compatibility</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Serving All Clients Simultaneously</h3>
+            <pre><code>// Browser client (REST)
+GET /api/users/123
+Accept: application/json
+
+// Mobile app (GraphQL)
+POST /api/graphql
+{ "query": "{ user(id: 123) { name avatar } }" }
+
+// Backend service (gRPC)
+UserService.GetUser({ user_id: 123 })
+
+// IoT device (MQTT)
+PUBLISH users/123/get
+
+// AI Agent (Intent)
+POST /api/intent
+{ "intent": "get user 123's profile" }
+
+// All receive the SAME underlying data
+// All responses are type-safe and validated
+// All benefit from caching and optimization</code></pre>
+
+            <h2>5.4 Gradual Feature Adoption</h2>
+
+            <p>
+                Adopt OMNI features at your own pace. Each feature provides value
+                independently.
+            </p>
+
+            <h3>Feature Checklist</h3>
+
+            <div class="info-box">
+                <strong>Level 1: Basic (Day 1)</strong>
+                <ul>
+                    <li>□ Proxy existing APIs through OMNI gateway</li>
+                    <li>□ Enable monitoring and logging</li>
+                    <li>□ Configure basic error handling</li>
+                </ul>
+
+                <strong>Level 2: Optimization (Week 1)</strong>
+                <ul>
+                    <li>□ Enable response caching</li>
+                    <li>□ Configure request batching</li>
+                    <li>□ Add compression</li>
+                    <li>□ Enable CORS for browsers</li>
+                </ul>
+
+                <strong>Level 3: Multi-Protocol (Week 2-4)</strong>
+                <ul>
+                    <li>□ Add GraphQL endpoint</li>
+                    <li>□ Configure gRPC for services</li>
+                    <li>□ Enable WebSocket for real-time</li>
+                    <li>□ Set up protocol translation</li>
+                </ul>
+
+                <strong>Level 4: Intelligence (Month 2-3)</strong>
+                <ul>
+                    <li>□ Enable self-evolution engine</li>
+                    <li>□ Configure predictive bundling</li>
+                    <li>□ Set up auto-optimization</li>
+                    <li>□ Review and approve AI suggestions</li>
+                </ul>
+
+                <strong>Level 5: Intent-Based (Month 3+)</strong>
+                <ul>
+                    <li>□ Integrate WIA-INTENT parser</li>
+                    <li>□ Enable natural language queries</li>
+                    <li>□ Configure contextual understanding</li>
+                    <li>□ Implement custom intent handlers</li>
+                </ul>
+            </div>
+
+            <h2>5.5 Testing and Validation</h2>
+
+            <p>
+                OMNI provides comprehensive testing tools to ensure migration safety.
+            </p>
+
+            <h3>Shadow Mode</h3>
+            <pre><code>// Run OMNI in shadow mode: parallel but not serving
+{
+  "mode": "shadow",
+  "shadow_config": {
+    "compare_responses": true,
+    "log_differences": true,
+    "alert_on_discrepancy": true,
+    "primary": "https://current.api.example.com",
+    "shadow": "omni-gateway"
+  }
+}
+
+// OMNI processes all requests in parallel with existing API
+// Logs differences for review
+// No impact on production traffic</code></pre>
+
+            <h3>Canary Deployment</h3>
+            <pre><code>// Route small percentage through OMNI
+{
+  "routing": {
+    "strategy": "canary",
+    "percentage": 5,  // 5% of traffic
+    "criteria": {
+      "internal_users": true,  // Start with internal users
+      "new_users": true         // Or new users
+    }
+  }
+}
+
+// Gradually increase:
+// Week 1: 5%
+// Week 2: 10%
+// Week 3: 25%
+// Week 4: 50%
+// Week 5: 100%</code></pre>
+
+            <h3>Automated Testing</h3>
+            <pre><code>// OMNI generates test suites automatically
+omni test generate --from-traffic
+
+// Generates tests based on real traffic patterns:
+describe('User API', () =&gt; {
+  it('should get user by id', async () =&gt; {
+    const response = await omni.request({
+      intent: 'get user 123'
+    });
+    expect(response.success).toBe(true);
+    expect(response.data.id).toBe(123);
+  });
+
+  // More tests generated from observed patterns...
+});
+
+// Run compatibility tests:
+omni test compatibility --protocols all</code></pre>
+
+            <h2>5.6 Best Practices</h2>
+
+            <div class="success-box">
+                <strong>Do's:</strong>
+                <ul>
+                    <li>✓ Start small - wrap one API first</li>
+                    <li>✓ Use shadow mode before switching</li>
+                    <li>✓ Monitor metrics continuously</li>
+                    <li>✓ Let Mother learn - enable evolution early</li>
+                    <li>✓ Review AI suggestions before approving</li>
+                    <li>✓ Document intent mappings</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <strong>Don'ts:</strong>
+                <ul>
+                    <li>✗ Don't migrate everything at once</li>
+                    <li>✗ Don't skip testing phase</li>
+                    <li>✗ Don't ignore Mother's suggestions</li>
+                    <li>✗ Don't disable evolution without reason</li>
+                    <li>✗ Don't force clients to change</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter4.html">← Previous: Protocol Specification</a>
+                <a href="chapter6.html">Next: Security & Privacy →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

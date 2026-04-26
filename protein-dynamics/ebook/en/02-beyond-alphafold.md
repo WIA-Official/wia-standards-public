@@ -319,10 +319,6 @@ The static structure problem is largely solved. Now we must solve the dynamics p
 
 ## References
 
-1. 선행 연구. Highly accurate protein structure prediction with AlphaFold. Nature, 596, 583-589.
-2. 선행 연구. Accurate structure prediction of biomolecular interactions with AlphaFold 3. Nature, 630, 493-500.
-3. 선행 연구. AlphaFlow: Autonomous workflow for molecular simulations. arXiv:2402.alphafow.
-4. 선행 연구. Boltzmann generators: Sampling equilibrium states of many-body systems with deep learning. Science, 365, eaaw1147.
 
 ---
 

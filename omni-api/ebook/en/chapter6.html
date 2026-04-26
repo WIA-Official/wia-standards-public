@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 6: Security & Privacy</h1>
+            <p class="subtitle">Cross-Protocol Security & Authentication Bridge</p>
+        </header>
+
+        <div class="content">
+            <h2>6.1 Security Philosophy: Protective Mother</h2>
+
+            <div class="philosophy-box">
+                <strong>"A mother protects her children from harm,<br>
+                guides them away from mistakes,<br>
+                and shields them from excessive costs."</strong>
+                <br><br>
+                어머니는 자식을 위험으로부터 보호하고,<br>
+                실수에서 지켜주고,<br>
+                과도한 비용으로부터 막아준다.
+            </div>
+
+            <p>
+                WIA-OMNI-API security follows three protection principles: defend against
+                external threats, prevent mistakes, and protect from unnecessary costs.
+            </p>
+
+            <h2>6.2 Authentication Bridge</h2>
+
+            <p>
+                Mother handles authentication across all protocols, translating different
+                auth mechanisms seamlessly.
+            </p>
+
+            <h3>Supported Authentication Methods</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Protocols</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>API Keys</td>
+                        <td>All</td>
+                        <td>Simple services, scripts</td>
+                    </tr>
+                    <tr>
+                        <td>OAuth 2.0</td>
+                        <td>REST, GraphQL</td>
+                        <td>Web/mobile apps</td>
+                    </tr>
+                    <tr>
+                        <td>JWT</td>
+                        <td>All</td>
+                        <td>Stateless authentication</td>
+                    </tr>
+                    <tr>
+                        <td>mTLS</td>
+                        <td>gRPC, MQTT</td>
+                        <td>Service-to-service</td>
+                    </tr>
+                    <tr>
+                        <td>SAML</td>
+                        <td>REST</td>
+                        <td>Enterprise SSO</td>
+                    </tr>
+                    <tr>
+                        <td>WIA-PQ-CRYPTO</td>
+                        <td>All</td>
+                        <td>Quantum-resistant</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Authentication Translation</h3>
+            <pre><code>// Client uses OAuth 2.0
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+
+// Backend requires API Key
+// Mother translates automatically:
+1. Validates OAuth token
+2. Retrieves user identity
+3. Generates/retrieves backend API key
+4. Forwards request with API key
+
+// Backend receives:
+X-API-Key: backend-api-key-abc123
+
+// Reverse translation on response
+// Client never knows about backend API key</code></pre>
+
+            <h3>Token Refresh (Automatic)</h3>
+            <pre><code>// Client's token expires during request
+// Traditional API: 401 Unauthorized, client must refresh
+
+// Mother's approach:
+1. Detect token expiration
+2. Attempt automatic refresh (if refresh token available)
+3. Retry request with new token
+4. Return success to client
+
+// Client experience: Seamless
+// No error, no interruption
+
+// Response includes gentle notice:
+{
+  "success": true,
+  "data": {...},
+  "meta": {
+    "auth_refreshed": true,
+    "new_token": "eyJhbGciOiJSUzI1NiIs...",
+    "expires_in": 3600
+  }
+}</code></pre>
+
+            <h2>6.3 Authorization & Access Control</h2>
+
+            <p>
+                Fine-grained access control that works consistently across all protocols.
+            </p>
+
+            <h3>Role-Based Access Control (RBAC)</h3>
+            <pre><code>// Define roles and permissions
+{
+  "roles": {
+    "admin": {
+      "permissions": ["users:*", "orders:*", "system:*"]
+    },
+    "user": {
+      "permissions": ["users:read:self", "orders:read:own"]
+    },
+    "guest": {
+      "permissions": ["users:read:public"]
+    }
+  }
+}
+
+// Mother enforces across all protocols:
+// REST
+GET /api/users/123  // ✓ Allowed if user is admin or self
+
+// GraphQL
+query { user(id: 123) {...} }  // ✓ Same rules apply
+
+// gRPC
+UserService.GetUser({id: 123})  // ✓ Consistent enforcement
+
+// Intent-based
+{ "intent": "get user 123" }  // ✓ Permission checked</code></pre>
+
+            <h3>Attribute-Based Access Control (ABAC)</h3>
+            <pre><code>// More flexible, context-aware
+{
+  "policies": [
+    {
+      "name": "own_data_access",
+      "rule": "subject.id == resource.owner_id",
+      "allow": ["read", "update"]
+    },
+    {
+      "name": "business_hours",
+      "rule": "time.hour >= 9 && time.hour <= 17",
+      "allow": ["sensitive_operations"]
+    },
+    {
+      "name": "ip_whitelist",
+      "rule": "request.ip in allowed_ips",
+      "allow": ["admin_operations"]
+    }
+  ]
+}
+
+// Dynamic evaluation on each request
+// Works with all protocols
+// Can use WIA-INTENT constraints for fine control</code></pre>
+
+            <h2>6.4 Data Protection</h2>
+
+            <h3>Encryption in Transit</h3>
+            <pre><code>// All protocols encrypted by default
+{
+  "encryption": {
+    "tls": {
+      "minimum_version": "1.3",
+      "cipher_suites": ["TLS_AES_256_GCM_SHA384"],
+      "prefer_server_cipher": true
+    },
+    "quantum_resistant": {
+      "enabled": true,
+      "algorithm": "WIA-PQ-CRYPTO",
+      "key_exchange": "CRYSTALS-Kyber",
+      "signatures": "CRYSTALS-Dilithium"
+    }
+  }
+}
+
+// Future-proof: Quantum-resistant crypto enabled
+// Clients don't need to change
+// Mother handles crypto negotiation</code></pre>
+
+            <h3>Encryption at Rest (Field-Level)</h3>
+            <pre><code>// Sensitive fields encrypted automatically
+{
+  "field_encryption": {
+    "enabled": true,
+    "fields": [
+      "password",
+      "ssn",
+      "credit_card",
+      "api_key"
+    ],
+    "algorithm": "AES-256-GCM",
+    "key_rotation": "30d"
+  }
+}
+
+// Mother encrypts before storage
+// Decrypts only for authorized access
+// Audit log of all decryption events</code></pre>
+
+            <h3>Data Masking</h3>
+            <pre><code>// Automatic PII masking based on permissions
+// User with low permissions requests:
+GET /api/users/123
+
+// Response (masked):
+{
+  "id": 123,
+  "name": "Kim ***",
+  "email": "k***@example.com",
+  "phone": "***-****-5678",
+  "ssn": "***-**-6789"
+}
+
+// Admin with full permissions:
+{
+  "id": 123,
+  "name": "Kim Min-jun",
+  "email": "kim@example.com",
+  "phone": "+82-10-1234-5678",
+  "ssn": "123-45-6789"
+}</code></pre>
+
+            <h2>6.5 Threat Protection</h2>
+
+            <h3>DDoS Protection</h3>
+            <pre><code>// Multi-layer DDoS protection
+{
+  "ddos_protection": {
+    // Layer 3/4: Network level
+    "network": {
+      "syn_flood": "auto_mitigate",
+      "udp_flood": "auto_mitigate"
+    },
+    // Layer 7: Application level
+    "application": {
+      "rate_limiting": "adaptive",
+      "bot_detection": "ml_based",
+      "challenge_response": "captcha"
+    }
+  }
+}</code></pre>
+
+            <h3>Injection Prevention</h3>
+            <pre><code>// Automatic sanitization across all protocols
+// SQL Injection
+{ "intent": "get user where name = 'Kim'; DROP TABLE users--" }
+// Mother detects and blocks
+
+// NoSQL Injection
+{ "payload": { "age": { "$gt": "" } } }
+// Mother validates and sanitizes
+
+// GraphQL Injection
+query { user(id: "1 UNION SELECT...") }
+// Mother rejects malformed queries
+
+// Logging:
+{
+  "security_event": {
+    "type": "injection_attempt",
+    "blocked": true,
+    "client_ip": "203.0.113.45",
+    "action": "log_and_block"
+  }
+}</code></pre>
+
+            <h3>Rate Limiting (Gentle)</h3>
+
+            <div class="info-box">
+                <strong>Mother's Approach:</strong> Instead of hard blocks, progressive slowdown
+                with helpful messages.
+            </div>
+
+            <pre><code>// Traditional: Hard limit, sudden 429
+GET /api/users
+→ 429 Too Many Requests (cold and unhelpful)
+
+// Mother's gentle approach:
+// Level 1: Normal (0-100 req/min)
+→ 200 OK, fast response
+
+// Level 2: Warning (100-120 req/min)
+→ 200 OK, slightly slower
+   X-WIA-Gentle-Warning: "You're making many requests. Everything OK?"
+
+// Level 3: Throttling (120-150 req/min)
+→ 200 OK, progressively slower
+   X-WIA-Rate-Limit: "Please slow down. I'll respond slower now."
+
+// Level 4: Queueing (150-200 req/min)
+→ 202 Accepted, queued
+   X-WIA-Queue-Position: 5
+   "Your request is queued. Processing soon."
+
+// Level 5: Temporary pause (>200 req/min)
+→ 429 (only as last resort)
+   Retry-After: 60
+   "Please rest. I'll be ready in 60 seconds."
+
+// Comfort message with recovery options:
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "comfort": "You're enthusiastic! But let's pace ourselves.",
+    "recovery_options": [
+      {
+        "action": "wait",
+        "description": "Wait 60 seconds",
+        "auto_applicable": true
+      },
+      {
+        "action": "batch",
+        "description": "Use batch endpoint instead",
+        "endpoint": "/api/batch"
+      }
+    ]
+  }
+}</code></pre>
+
+            <h2>6.6 Privacy Compliance</h2>
+
+            <h3>GDPR Compliance</h3>
+            <pre><code>// Built-in GDPR features
+{
+  "gdpr": {
+    "right_to_access": {
+      "endpoint": "/api/gdpr/export",
+      "format": ["json", "csv", "pdf"]
+    },
+    "right_to_deletion": {
+      "endpoint": "/api/gdpr/delete",
+      "confirmation": "required",
+      "retention_policy": "immediate"
+    },
+    "right_to_portability": {
+      "export_format": "machine_readable"
+    },
+    "consent_management": {
+      "granular": true,
+      "tracking": "all_changes"
+    }
+  }
+}
+
+// User can request their data:
+POST /api/gdpr/export
+{
+  "intent": "export my data",
+  "format": "json"
+}
+
+// User can request deletion:
+POST /api/gdpr/delete
+{
+  "intent": "delete my account",
+  "confirm": true
+}</code></pre>
+
+            <h3>Audit Logging</h3>
+            <pre><code>// Comprehensive audit trail
+{
+  "audit": {
+    "enabled": true,
+    "events": [
+      "authentication",
+      "authorization",
+      "data_access",
+      "data_modification",
+      "security_events",
+      "api_evolution"
+    ],
+    "retention": "7_years",
+    "tamper_proof": true,
+    "searchable": true,
+    "exportable": true
+  }
+}
+
+// Every request logged:
+{
+  "timestamp": "2024-01-01T10:00:00Z",
+  "request_id": "req-abc123",
+  "client_ip": "203.0.113.45",
+  "user_id": 123,
+  "intent": "get user 456",
+  "protocol": "rest",
+  "endpoint": "/api/users/456",
+  "authorization": "success",
+  "data_accessed": ["user.name", "user.email"],
+  "response_time_ms": 45,
+  "cache_hit": false
+}</code></pre>
+
+            <h2>6.7 Security Best Practices</h2>
+
+            <div class="success-box">
+                <strong>Recommended Configuration:</strong>
+                <ul>
+                    <li>✓ Enable TLS 1.3 minimum</li>
+                    <li>✓ Use WIA-PQ-CRYPTO for quantum resistance</li>
+                    <li>✓ Implement mTLS for service-to-service</li>
+                    <li>✓ Enable comprehensive audit logging</li>
+                    <li>✓ Use field-level encryption for sensitive data</li>
+                    <li>✓ Configure gentle rate limiting</li>
+                    <li>✓ Enable automatic threat detection</li>
+                    <li>✓ Implement GDPR compliance features</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <strong>Common Mistakes to Avoid:</strong>
+                <ul>
+                    <li>✗ Don't disable TLS even in development</li>
+                    <li>✗ Don't store sensitive data unencrypted</li>
+                    <li>✗ Don't use hard rate limits without warnings</li>
+                    <li>✗ Don't ignore security audit logs</li>
+                    <li>✗ Don't grant excessive permissions by default</li>
+                    <li>✗ Don't skip authentication for "internal" services</li>
+                </ul>
+            </div>
+
+            <h2>6.8 Incident Response</h2>
+
+            <p>
+                Mother helps detect, respond to, and recover from security incidents.
+            </p>
+
+            <h3>Automatic Threat Response</h3>
+            <pre><code>// Suspicious pattern detected
+{
+  "threat_detection": {
+    "pattern": "credential_stuffing",
+    "confidence": 0.95,
+    "source_ip": "203.0.113.45",
+    "actions_taken": [
+      "temporary_block_ip",
+      "require_2fa_for_affected_accounts",
+      "notify_security_team",
+      "increase_logging_level"
+    ]
+  }
+}
+
+// Mother automatically:
+// 1. Blocks the threat
+// 2. Notifies relevant parties
+// 3. Gathers evidence
+// 4. Suggests remediation
+// 5. Learns to prevent similar attacks</code></pre>
+
+            <div class="navigation">
+                <a href="chapter5.html">← Previous: Integration Guide</a>
+                <a href="chapter7.html">Next: Implementation Examples →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 3: API Endpoints</h1>
+            <p class="subtitle">Unified Gateway, Protocol Translation & Version Harmonization</p>
+        </header>
+
+        <div class="content">
+            <h2>3.1 Unified Gateway Architecture</h2>
+
+            <p>
+                WIA-OMNI-API provides a single entry point for all API requests, regardless
+                of the underlying protocol. This unified gateway acts as the "mother" that
+                welcomes all clients and routes their requests appropriately.
+            </p>
+
+            <div class="diagram">
+┌──────────────────────────────────────────────────┐
+│         Single Entry Point (Gateway)             │
+│              https://api.example.com             │
+└─────────────────────┬────────────────────────────┘
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+    REST Path    GraphQL Path   gRPC Path
+    /api/v1      /graphql       :50051
+        │             │             │
+        └─────────────┼─────────────┘
+                      ▼
+            ┌─────────────────┐
+            │ Protocol Router │
+            └─────────────────┘
+            </div>
+
+            <h3>Single Endpoint Design</h3>
+            <pre><code>// All requests go to the same base URL
+const gateway = "https://api.example.com/omni"
+
+// REST-style
+GET https://api.example.com/omni/users/123
+
+// GraphQL-style
+POST https://api.example.com/omni
+{ "query": "{ user(id: 123) { name } }" }
+
+// Intent-style (recommended)
+POST https://api.example.com/omni
+{ "intent": "get user 123" }
+
+// Mother routes to optimal backend automatically</code></pre>
+
+            <h2>3.2 Protocol Translation Endpoints</h2>
+
+            <p>
+                The gateway automatically translates between protocols, allowing clients
+                to use their preferred protocol while backends use theirs.
+            </p>
+
+            <h3>REST to GraphQL Bridge</h3>
+            <pre><code>// Client sends REST request
+GET /api/users/123?fields=name,email,orders
+
+// Mother translates to GraphQL internally
+query {
+  user(id: 123) {
+    name
+    email
+    orders {
+      id
+      total
+    }
+  }
+}
+
+// Benefits:
+// - No N+1 query problem
+// - Precise field selection
+// - Single network request
+// - Client doesn't need to know GraphQL</code></pre>
+
+            <h3>GraphQL to REST Bridge</h3>
+            <pre><code>// Client sends GraphQL query
+query {
+  user(id: 123) {
+    name
+    orders {
+      id
+      total
+    }
+  }
+}
+
+// Mother decomposes to REST calls (if backend is REST)
+1. GET /users/123 → { name }
+2. GET /users/123/orders → [{ id, total }, ...]
+
+// Mother executes in parallel and combines results
+// Client receives unified GraphQL response</code></pre>
+
+            <h3>Any-to-Any Translation Matrix</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>From \ To</th>
+                        <th>REST</th>
+                        <th>GraphQL</th>
+                        <th>gRPC</th>
+                        <th>WebSocket</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>REST</strong></td>
+                        <td>Native</td>
+                        <td>Query generation</td>
+                        <td>Proto mapping</td>
+                        <td>Event streaming</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GraphQL</strong></td>
+                        <td>Decomposition</td>
+                        <td>Native</td>
+                        <td>Type mapping</td>
+                        <td>Subscription</td>
+                    </tr>
+                    <tr>
+                        <td><strong>gRPC</strong></td>
+                        <td>HTTP mapping</td>
+                        <td>Schema conversion</td>
+                        <td>Native</td>
+                        <td>Stream proxy</td>
+                    </tr>
+                    <tr>
+                        <td><strong>WebSocket</strong></td>
+                        <td>Polling emulation</td>
+                        <td>Real-time query</td>
+                        <td>Bidirectional</td>
+                        <td>Native</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>3.3 Version Harmonization</h2>
+
+            <p>
+                The Version Harmonizer ensures that API evolution never breaks existing
+                clients. This is WIA-OMNI-API's sacred promise.
+            </p>
+
+            <h3>Never-Break Policy</h3>
+            <div class="info-box">
+                <strong>Guarantee:</strong> Once an API contract is established, it is supported
+                forever. Clients using version 1.0 will continue to work even when the API
+                reaches version 10.0.
+            </div>
+
+            <h3>Version Detection</h3>
+            <pre><code>// Method 1: Explicit version header
+GET /api/users/123
+X-WIA-API-Version: 1.0
+
+// Method 2: URL path versioning
+GET /api/v1/users/123
+
+// Method 3: Accept header
+GET /api/users/123
+Accept: application/vnd.api.v1+json
+
+// Method 4: Auto-detection from request pattern
+GET /api/users/123
+// Mother infers version from request structure
+
+// Method 5: No version specified → use latest compatible
+GET /api/users/123
+// Mother serves newest version compatible with client</code></pre>
+
+            <h3>Handling Schema Changes</h3>
+
+            <h4>Field Addition (Non-Breaking)</h4>
+            <pre><code>// Version 1.0 schema
+{
+  "id": 123,
+  "name": "Kim"
+}
+
+// Version 2.0 schema (added fields)
+{
+  "id": 123,
+  "name": "Kim",
+  "email": "kim@example.com",  // New
+  "phone": "+82-10-1234-5678"  // New
+}
+
+// Version 1.0 client receives v1 schema
+// Version 2.0 client receives v2 schema
+// Automatic and transparent</code></pre>
+
+            <h4>Field Removal (Handled Gracefully)</h4>
+            <pre><code>// Version 1.0 had "legacy_id" field
+// Version 2.0 removed it
+
+// Strategy: Keep serving to old clients
+{
+  "id": 123,
+  "legacy_id": 123,  // Computed or mapped
+  "_deprecated": {
+    "fields": ["legacy_id"],
+    "message": "Use 'id' instead",
+    "sunset_date": null  // null = never forced
+  }
+}</code></pre>
+
+            <h4>Field Rename (Dual Support)</h4>
+            <pre><code>// Version 1.0: "user_name"
+// Version 2.0: "name"
+
+// Mother serves both
+{
+  "user_name": "Kim",  // Old field (alias)
+  "name": "Kim",       // New field
+  "_evolution": {
+    "aliases": {
+      "user_name": "name"
+    },
+    "preferred": "name"
+  }
+}</code></pre>
+
+            <h4>Type Change (Auto Conversion)</h4>
+            <pre><code>// Version 1.0: amount as string
+{ "amount": "100.50" }
+
+// Version 2.0: amount as number
+{ "amount": 100.50 }
+
+// Mother handles both:
+// - Old clients get string
+// - New clients get number
+// - Conversion is lossless and documented</code></pre>
+
+            <h2>3.4 Intelligent Routing</h2>
+
+            <p>
+                The gateway routes requests to optimal backends based on multiple factors,
+                learning and improving over time.
+            </p>
+
+            <h3>Routing Criteria</h3>
+            <ul>
+                <li><strong>Client Capability</strong>: Browser vs. high-performance service</li>
+                <li><strong>Network Condition</strong>: Bandwidth, latency, reliability</li>
+                <li><strong>Request Type</strong>: Query vs. mutation vs. subscription</li>
+                <li><strong>Performance Requirement</strong>: Speed vs. accuracy vs. cost</li>
+                <li><strong>Data Freshness</strong>: Real-time vs. cacheable</li>
+                <li><strong>Load Balancing</strong>: Backend availability and load</li>
+            </ul>
+
+            <h3>Smart Caching</h3>
+            <pre><code>// Mother learns caching patterns
+// Frequently requested, rarely changed → cache aggressively
+GET /api/users/123
+
+Response Headers:
+X-WIA-Cache-Strategy: aggressive
+X-WIA-Cache-Hit: true
+X-WIA-Cache-Age: 45s
+X-WIA-Cache-TTL: 300s
+
+// Frequently changing data → cache cautiously
+GET /api/stock-prices
+
+Response Headers:
+X-WIA-Cache-Strategy: fresh
+X-WIA-Cache-Hit: false
+X-WIA-Cache-TTL: 5s</code></pre>
+
+            <h2>3.5 Endpoint Discovery</h2>
+
+            <p>
+                Clients can discover available endpoints and their capabilities
+                automatically, following HATEOAS principles enhanced with AI.
+            </p>
+
+            <h3>Capability Declaration</h3>
+            <pre><code>GET /api/omni
+
+Response:
+{
+  "capabilities": {
+    "protocols": ["rest", "graphql", "grpc", "websocket"],
+    "formats": ["json", "xml", "protobuf", "msgpack"],
+    "versions": ["1.0", "1.1", "2.0"],
+    "features": {
+      "intent_based": true,
+      "wia_intent": true,
+      "auto_caching": true,
+      "auto_batching": true,
+      "realtime": true
+    }
+  },
+  "endpoints": {
+    "users": {
+      "operations": ["list", "get", "create", "update", "delete"],
+      "relationships": ["orders", "preferences", "activity"],
+      "searchable": true,
+      "filterable": true
+    }
+  }
+}</code></pre>
+
+            <h3>HATEOAS Links</h3>
+            <pre><code>GET /api/users/123
+
+Response:
+{
+  "id": 123,
+  "name": "Kim",
+  "_links": {
+    "self": "/api/users/123",
+    "orders": "/api/users/123/orders",
+    "preferences": "/api/users/123/preferences",
+    "avatar": "/api/users/123/avatar"
+  },
+  "_actions": {
+    "update": {
+      "method": "PUT",
+      "href": "/api/users/123",
+      "fields": ["name", "email", "phone"]
+    },
+    "delete": {
+      "method": "DELETE",
+      "href": "/api/users/123",
+      "confirm": true
+    }
+  }
+}</code></pre>
+
+            <h2>3.6 Batch and Bundling</h2>
+
+            <p>
+                Mother automatically detects opportunities for batching and bundling
+                to optimize performance.
+            </p>
+
+            <h3>Automatic Batching</h3>
+            <pre><code>// Client sends multiple requests
+GET /api/users/1
+GET /api/users/2
+GET /api/users/3
+
+// Mother batches internally
+GET /api/users?ids=1,2,3
+
+// Returns individual responses to client
+// Client doesn't know batching happened</code></pre>
+
+            <h3>Predictive Bundling</h3>
+            <pre><code>// Mother learns: 95% of requests for user data
+// also request user's orders
+
+// Client requests:
+GET /api/users/123
+
+// Mother proactively includes likely needed data:
+{
+  "user": { "id": 123, "name": "Kim" },
+  "_prefetched": {
+    "orders": [...],  // Included automatically
+    "why": "Frequently requested together"
+  }
+}
+
+// Next request is instant (already cached):
+GET /api/users/123/orders  // Instant response!</code></pre>
+
+            <div class="success-box">
+                <strong>Performance Boost:</strong> Automatic batching and predictive bundling
+                can reduce network requests by 50-80% without any client changes.
+            </div>
+
+            <div class="navigation">
+                <a href="chapter2.html">← Previous: Data Schema</a>
+                <a href="chapter4.html">Next: Protocol Specification →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

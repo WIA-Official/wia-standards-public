@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 구현 예제 - WIA-INTENT v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="wia-badge">WIA 표준</div>
+                <div class="version">버전 1.0</div>
+            </div>
+            <h1>7장: 구현 예제</h1>
+            <p class="subtitle">의도 언어를 위한 Python, TypeScript, Bash</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>7.1 Python 구현</h2>
+                <p>
+                    Python에서 WIA-INTENT 인터프리터를 구축하는 방법을 보여주는 참조 구현입니다.
+                </p>
+
+                <h3>기본 의도 파서</h3>
+                <pre><code>from dataclasses import dataclass
+from typing import Any, Dict, Optional, List
+import openai
+
+@dataclass
+class Intent:
+    name: str
+    given: Optional[Dict[str, Any]] = None
+    want: Optional[str] = None
+    constraints: Optional[Dict[str, Any]] = None
+    certainty: float = 0.0
+    fallback: Optional[Dict[str, Any]] = None
+    evolve: Optional[Dict[str, Any]] = None
+
+class IntentRunner:
+    def __init__(self, ai_model: str = "gpt-4"):
+        self.ai_model = ai_model
+        self.execution_history = []
+
+    def parse_intent(self, intent_code: str) → Intent:
+        """WIA-INTENT 코드를 Intent 객체로 파싱"""
+        # 단순화된 파서 - 프로덕션에서는 적절한 렉서/파서 사용
+        # 이 예제는 개념을 보여줌
+        pass
+
+    def resolve_intent(self, intent: Intent, inputs: Dict[str, Any]) → Any:
+        """AI를 사용하여 의도 해결"""
+        prompt = f"""
+        다음 의도가 주어졌을 때:
+        이름: {intent.name}
+        목표: {intent.want}
+        제약: {intent.constraints}
+        입력: {inputs}
+
+        모든 제약을 준수하면서 이 의도를 충족하는
+        Python 코드를 생성하세요.
+        """
+
+        # AI를 사용하여 솔루션 생성
+        response = openai.chat.completions.create(
+            model=self.ai_model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        generated_code = response.choices[0].message.content
+
+        # 제약 검증
+        if self.verify_constraints(generated_code, intent.constraints):
+            return self.execute_safe(generated_code, inputs)
+        else:
+            return self.handle_fallback(intent, inputs)
+
+    def verify_constraints(
+        self,
+        code: str,
+        constraints: Dict[str, Any]
+    ) → bool:
+        """생성된 코드가 제약을 충족하는지 검증"""
+        # 정적 분석, 리소스 추정 등
+        pass
+
+    def execute_safe(self, code: str, inputs: Dict[str, Any]) → Any:
+        """샌드박스 환경에서 코드 실행"""
+        # 제한된 실행 환경 사용
+        import RestrictedPython
+
+        # 제한과 함께 컴파일
+        compiled = RestrictedPython.compile_restricted(
+            code,
+            filename='&lt;intent&gt;',
+            mode='exec'
+        )
+
+        # 제한된 globals로 실행
+        safe_globals = {
+            '__builtins__': RestrictedPython.safe_builtins,
+            'inputs': inputs
+        }
+
+        exec(compiled, safe_globals)
+        return safe_globals.get('result')
+
+    def handle_fallback(
+        self,
+        intent: Intent,
+        inputs: Dict[str, Any]
+    ) → Any:
+        """의도를 충족할 수 없을 때 폴백 처리"""
+        if intent.fallback:
+            # 폴백 로직 실행
+            pass
+        else:
+            raise IntentResolutionError(
+                f"의도 {intent.name}을(를) 충족할 수 없습니다"
+            )
+</code></pre>
+
+                <h3>사용 예제</h3>
+                <pre><code>runner = IntentRunner()
+
+intent_code = """
+intent ProcessItems {
+  given: items
+  want: each item processed
+  constraints {
+    order: any
+    completeness: all
+  }
+  certainty: &gt;= 0.9
+}
+"""
+
+result = runner.execute(
+    intent_code,
+    inputs={'items': [1, 2, 3, 4, 5]}
+)
+
+print(f"결과: {result.value}")
+print(f"확실성: {result.certainty}")
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.2 TypeScript 구현</h2>
+                <p>
+                    웹 및 Node.js 환경을 위한 TypeScript/JavaScript 구현입니다.
+                </p>
+
+                <h3>핵심 타입</h3>
+                <pre><code>// types.ts
+export interface Intent {
+  name: string;
+  given?: Record&lt;string, any&gt;;
+  want?: string;
+  constraints?: Record&lt;string, any&gt;;
+  certainty?: number;
+  fallback?: Record&lt;string, any&gt;;
+  evolve?: Record&lt;string, any&gt;;
+}
+
+export interface ExecutionResult&lt;T&gt; {
+  value: T;
+  certainty: number;
+  executionTime: number;
+  metrics: ExecutionMetrics;
+}
+
+export interface ExecutionMetrics {
+  cpuTime: number;
+  memoryUsed: number;
+  optimizationsApplied: string[];
+}
+</code></pre>
+
+                <h3>의도 실행기</h3>
+                <pre><code>// intent-runner.ts
+import { Intent, ExecutionResult } from './types';
+import OpenAI from 'openai';
+
+export class IntentRunner {
+  private openai: OpenAI;
+  private executionHistory: ExecutionResult&lt;any&gt;[] = [];
+
+  constructor(apiKey: string) {
+    this.openai = new OpenAI({ apiKey });
+  }
+
+  async execute&lt;T&gt;(
+    intentCode: string,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;ExecutionResult&lt;T&gt;&gt; {
+    const startTime = Date.now();
+
+    // 의도 파싱
+    const intent = this.parseIntent(intentCode);
+
+    // AI를 사용하여 해결
+    const solution = await this.resolveIntent(intent, inputs);
+
+    // 제약 검증
+    if (!this.verifyConstraints(solution, intent.constraints)) {
+      return this.handleFallback(intent, inputs);
+    }
+
+    // 실행
+    const result = await this.executeSafe&lt;T&gt;(solution, inputs);
+
+    const executionTime = Date.now() - startTime;
+
+    return {
+      value: result,
+      certainty: this.calculateCertainty(intent, result),
+      executionTime,
+      metrics: this.collectMetrics()
+    };
+  }
+
+  private parseIntent(code: string): Intent {
+    // 단순화된 파서
+    // 프로덕션: 적절한 파서 생성기 사용
+    const lines = code.split('\n');
+    const intent: Intent = { name: '' };
+
+    // 의도 구조 파싱
+    // ... 파싱 로직 ...
+
+    return intent;
+  }
+
+  private async resolveIntent(
+    intent: Intent,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;string&gt; {
+    const prompt = `
+      다음 의도가 주어졌을 때:
+      이름: ${intent.name}
+      목표: ${intent.want}
+      제약: ${JSON.stringify(intent.constraints)}
+      입력: ${JSON.stringify(inputs)}
+
+      이 의도를 충족하는 TypeScript 코드를 생성하세요.
+    `;
+
+    const response = await this.openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    return response.choices[0].message.content || '';
+  }
+
+  private verifyConstraints(
+    code: string,
+    constraints?: Record&lt;string, any&gt;
+  ): boolean {
+    if (!constraints) return true;
+
+    // 시간 제약 검증
+    if (constraints.time) {
+      // 실행 시간 추정
+    }
+
+    // 리소스 제약 검증
+    if (constraints.memory) {
+      // 메모리 사용량 추정
+    }
+
+    return true;
+  }
+
+  private async executeSafe&lt;T&gt;(
+    code: string,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;T&gt; {
+    // 샌드박스 실행을 위해 VM 사용
+    const vm = require('vm');
+
+    const sandbox = {
+      inputs,
+      console,
+      result: null
+    };
+
+    const script = new vm.Script(code);
+    const context = vm.createContext(sandbox);
+
+    script.runInContext(context, {
+      timeout: 30000, // 30초 타임아웃
+      breakOnSigint: true
+    });
+
+    return sandbox.result;
+  }
+
+  private calculateCertainty(
+    intent: Intent,
+    result: any
+  ): number {
+    // 다양한 요소를 기반으로 확실성 계산
+    // 단순화된 버전
+    return 0.95;
+  }
+
+  private collectMetrics(): ExecutionMetrics {
+    return {
+      cpuTime: 0,
+      memoryUsed: 0,
+      optimizationsApplied: []
+    };
+  }
+
+  private handleFallback&lt;T&gt;(
+    intent: Intent,
+    inputs: Record&lt;string, any&gt;
+  ): Promise&lt;ExecutionResult&lt;T&gt;&gt; {
+    throw new Error(`의도를 충족할 수 없습니다: ${intent.name}`);
+  }
+}
+</code></pre>
+
+                <h3>사용 예제</h3>
+                <pre><code>// main.ts
+import { IntentRunner } from './intent-runner';
+
+const runner = new IntentRunner(process.env.OPENAI_API_KEY!);
+
+const intentCode = `
+  intent FetchUserData {
+    given: user_id
+    want: user_profile
+    constraints {
+      time: &lt;= 500.milliseconds
+      privacy: respect
+    }
+  }
+`;
+
+const result = await runner.execute(intentCode, {
+  user_id: '12345'
+});
+
+console.log('결과:', result.value);
+console.log('확실성:', result.certainty);
+console.log('실행 시간:', result.executionTime, 'ms');
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.3 Bash 통합</h2>
+                <p>
+                    시스템 자동화를 위해 셸 스크립트에서 WIA-INTENT를 사용합니다.
+                </p>
+
+                <h3>CLI 도구</h3>
+                <pre><code>#!/bin/bash
+# wia-intent - WIA-INTENT를 위한 명령줄 도구
+
+set -euo pipefail
+
+INTENT_FILE=""
+INPUTS_FILE=""
+OUTPUT_FILE=""
+VERBOSE=false
+
+# 명령줄 인수 파싱
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -i|--intent)
+      INTENT_FILE="$2"
+      shift 2
+      ;;
+    -d|--data)
+      INPUTS_FILE="$2"
+      shift 2
+      ;;
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    -v|--verbose)
+      VERBOSE=true
+      shift
+      ;;
+    *)
+      echo "알 수 없는 옵션: $1"
+      exit 1
+      ;;
+  esac
+done
+
+# 입력 검증
+if [[ -z "$INTENT_FILE" ]]; then
+  echo "오류: 의도 파일 필요 (-i)"
+  exit 1
+fi
+
+# 의도 읽기
+INTENT_CODE=$(&lt; "$INTENT_FILE")
+
+# 입력이 제공되었으면 읽기
+INPUTS="{}"
+if [[ -n "$INPUTS_FILE" ]]; then
+  INPUTS=$(&lt; "$INPUTS_FILE")
+fi
+
+# API를 통해 의도 실행
+RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/execute \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"intent\": $(jq -Rs . &lt;&lt;&lt; "$INTENT_CODE"),
+    \"inputs\": $INPUTS
+  }")
+
+# 결과 추출
+RESULT=$(echo "$RESPONSE" | jq -r '.result.value')
+CERTAINTY=$(echo "$RESPONSE" | jq -r '.metrics.certainty')
+
+if [[ "$VERBOSE" == true ]]; then
+  echo "확실성: $CERTAINTY"
+  echo "실행 시간: $(echo "$RESPONSE" | jq -r '.metrics.execution_time_ms')ms"
+fi
+
+# 결과 출력
+if [[ -n "$OUTPUT_FILE" ]]; then
+  echo "$RESULT" &gt; "$OUTPUT_FILE"
+else
+  echo "$RESULT"
+fi
+</code></pre>
+
+                <h3>사용 예제</h3>
+                <pre><code>#!/bin/bash
+# backup-system.sh - WIA-INTENT를 사용한 시스템 백업
+
+# 의도 정의
+cat &gt; backup-intent.wia &lt;&lt;'EOF'
+intent BackupSystem {
+  given: source_dirs, backup_destination
+  want: backup completed
+
+  constraints {
+    compression: gzip
+    encryption: aes256
+    verification: checksum
+    time: &lt;= 1.hour
+  }
+
+  fallback {
+    if disk_full:
+      cleanup_old_backups
+      retry
+    if network_error:
+      use_local_backup
+  }
+}
+EOF
+
+# 입력 정의
+cat &gt; backup-data.json &lt;&lt;EOF
+{
+  "source_dirs": ["/etc", "/home", "/var/www"],
+  "backup_destination": "/backup/$(date +%Y%m%d)"
+}
+EOF
+
+# 의도 실행
+wia-intent \
+  --intent backup-intent.wia \
+  --data backup-data.json \
+  --output backup-result.json \
+  --verbose
+
+# 결과 확인
+if jq -e '.status == "success"' backup-result.json &gt; /dev/null; then
+  echo "백업이 성공적으로 완료되었습니다"
+  # 알림 전송
+  notify-send "백업 완료" "시스템 백업이 완료되었습니다"
+else
+  echo "백업 실패"
+  exit 1
+fi
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.4 실제 예제: 전자상거래 추천 시스템</h2>
+
+                <pre><code>intent RecommendProducts {
+  given {
+    user: current_user
+    context: browsing_history, time, device
+    catalog: available_products
+  }
+
+  want {
+    recommendations: list&lt;Product&gt;
+    count: 5..10
+    relevance: high
+  }
+
+  constraints {
+    diversity: ensure         // 다양한 카테고리
+    freshness: prefer_new     // 새 상품 선호
+    stock: in_stock_only      // 재고 있는 것만
+    personalization: respect_preferences
+    time: &lt;= 200.milliseconds
+  }
+
+  certainty: &gt;= 0.7
+
+  ethics {
+    no_manipulation: true
+    explain_why: when_asked
+    respect_budget: user.stated_budget
+    no_dark_patterns: true
+  }
+
+  evolve {
+    learn_from: click_through_rate, purchases, returns
+    improve: recommendation_quality
+    never: exploit_vulnerabilities
+
+    metrics {
+      track: conversion_rate, user_satisfaction
+      optimize_for: long_term_value
+    }
+  }
+
+  fallback {
+    if insufficient_data:
+      show_popular_items
+    if error:
+      show_curated_collection
+    if low_certainty:
+      show_diverse_options with explanation
+  }
+
+  implementation {
+    // 선택사항: 구현 힌트 제공
+    consider {
+      collaborative_filtering
+      content_based_filtering
+      hybrid_approach
+    }
+
+    optimize_for {
+      speed: high_priority
+      personalization: high_priority
+      diversity: medium_priority
+    }
+  }
+}
+</code></pre>
+            </section>
+
+            <section>
+                <h2>7.5 구현 테스트</h2>
+
+                <h3>단위 테스트 (Python)</h3>
+                <pre><code>import unittest
+from intent_runner import IntentRunner, Intent
+
+class TestIntentRunner(unittest.TestCase):
+    def setUp(self):
+        self.runner = IntentRunner()
+
+    def test_simple_intent(self):
+        intent_code = """
+        intent DoubleNumbers {
+          given: numbers
+          want: each number doubled
+        }
+        """
+
+        result = self.runner.execute(
+            intent_code,
+            inputs={'numbers': [1, 2, 3]}
+        )
+
+        self.assertEqual(result.value, [2, 4, 6])
+        self.assertGreaterEqual(result.certainty, 0.9)
+
+    def test_constraint_violation(self):
+        intent_code = """
+        intent SlowOperation {
+          want: result
+          constraints {
+            time: &lt;= 1.milliseconds
+          }
+        }
+        """
+
+        with self.assertRaises(ConstraintViolationError):
+            self.runner.execute(intent_code, inputs={})
+
+    def test_fallback(self):
+        intent_code = """
+        intent RiskyOperation {
+          want: result
+          certainty: &gt;= 0.99
+          fallback {
+            if certainty &lt; 0.99:
+              return "fallback_result"
+          }
+        }
+        """
+
+        result = self.runner.execute(intent_code, inputs={})
+        self.assertEqual(result.value, "fallback_result")
+
+if __name__ == '__main__':
+    unittest.main()
+</code></pre>
+            </section>
+
+            </main>
+
+        </div>
+</body>
+</html>

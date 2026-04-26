@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Geofencing & Alert Systems | WIA-PET-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f172a; color: #e2e8f0; line-height: 1.8;
+        }
+        .header {
+            background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+            padding: 1.5rem 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px);
+        }
+        .header-content {
+            max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;
+        }
+        .logo { font-size: 1.25rem; font-weight: 800; color: #F59E0B; text-decoration: none; }
+        .nav-links { display: flex; gap: 1rem; }
+        .nav-links a {
+            color: #94a3b8; text-decoration: none; padding: 0.5rem 1rem;
+            border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; transition: all 0.3s ease;
+        }
+        .nav-links a:hover { border-color: #F59E0B; color: #F59E0B; }
+        .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        h1 {
+            font-size: 3rem; font-weight: 800; margin-bottom: 1rem;
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        h2 {
+            font-size: 2rem; font-weight: 700; color: #F59E0B; margin: 3rem 0 1.5rem;
+            padding-bottom: 0.5rem; border-bottom: 2px solid rgba(245, 158, 11, 0.2);
+        }
+        h3 { font-size: 1.5rem; font-weight: 600; color: #F59E0B; margin: 2rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1.5rem; font-size: 1.125rem; }
+        .highlight {
+            background: rgba(245, 158, 11, 0.1); border-left: 4px solid #F59E0B;
+            padding: 1.5rem; border-radius: 8px; margin: 2rem 0;
+        }
+        ul, ol { margin: 1rem 0 1.5rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.75rem; }
+        .info-box {
+            background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 12px; padding: 1.5rem; margin: 2rem 0; backdrop-filter: blur(10px);
+        }
+        .code-block {
+            background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto;
+        }
+        .code-block pre { margin: 0; color: #e2e8f0; font-family: 'Courier New', monospace; }
+        .chapter-nav {
+            display: flex; justify-content: space-between; margin-top: 4rem;
+            padding-top: 2rem; border-top: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .chapter-nav a {
+            color: #F59E0B; text-decoration: none; padding: 0.75rem 1.5rem;
+            border: 1px solid #F59E0B; border-radius: 8px; transition: all 0.3s ease;
+        }
+        .chapter-nav a:hover { background: rgba(245, 158, 11, 0.1); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="index.html" class="logo">📍 WIA-PET-008</a>
+            <div class="nav-links">
+                <a href="index.html">← Contents</a>
+                <a href="../../index.html">Home</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>Chapter 3: Geofencing & Alert Systems</h1>
+
+        <div class="highlight">
+            <p><strong>In this chapter:</strong> Learn geofence algorithms, detect zone entry/exit, implement smart alerts, prevent notification fatigue, and build community-based lost pet recovery systems.</p>
+        </div>
+
+        <h2>3.1 Geofencing Fundamentals</h2>
+        <p>
+            Geofencing creates virtual boundaries around geographic areas. When a pet enters or exits these zones, the system triggers alerts. This is the most critical safety feature for pet tracking, preventing escapes and enabling rapid response when pets wander beyond safe areas.
+        </p>
+
+        <h3>Geofence Types</h3>
+        <ul>
+            <li><strong>Circular Geofences:</strong> Defined by center point and radius. Simplest to implement and most computationally efficient. Example: 100-meter radius around home.</li>
+            <li><strong>Polygon Geofences:</strong> Defined by series of lat/lng points forming irregular shapes. Useful for property boundaries, parks, or neighborhoods.</li>
+            <li><strong>Corridor Geofences:</strong> Path-based zones with width tolerance. Useful for walking routes or allowing pets along specific streets.</li>
+            <li><strong>Dynamic Geofences:</strong> Follow moving entities like owner's phone. Maintains proximity alerts when traveling with pets.</li>
+        </ul>
+
+        <h3>Circular Geofence Detection Algorithm</h3>
+        <div class="code-block">
+            <pre>function isInsideCircularGeofence(petLocation, geofence) {
+  const R = 6371000; // Earth radius in meters
+  
+  const φ1 = petLocation.lat * Math.PI / 180;
+  const φ2 = geofence.center.lat * Math.PI / 180;
+  const Δφ = (geofence.center.lat - petLocation.lat) * Math.PI / 180;
+  const Δλ = (geofence.center.lng - petLocation.lng) * Math.PI / 180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+
+  return distance <= geofence.radius;
+}
+
+// Example usage
+const petLocation = { lat: 37.7749, lng: -122.4194 };
+const homeGeofence = {
+  center: { lat: 37.7750, lng: -122.4195 },
+  radius: 100  // meters
+};
+
+const isHome = isInsideCircularGeofence(petLocation, homeGeofence);
+console.log("Pet is home:", isHome);
+</pre>
+        </div>
+
+        <h3>Polygon Geofence Detection (Point-in-Polygon)</h3>
+        <div class="code-block">
+            <pre>function isInsidePolygonGeofence(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lng, yi = polygon[i].lat;
+    const xj = polygon[j].lng, yj = polygon[j].lat;
+    
+    const intersect = ((yi > point.lat) !== (yj > point.lat))
+        && (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+    
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// Example: Park boundary
+const parkBoundary = [
+  { lat: 37.7750, lng: -122.4200 },
+  { lat: 37.7755, lng: -122.4195 },
+  { lat: 37.7753, lng: -122.4188 },
+  { lat: 37.7748, lng: -122.4193 }
+];
+
+const isInPark = isInsidePolygonGeofence(petLocation, parkBoundary);
+</pre>
+        </div>
+
+        <h2>3.2 Smart Alert Management</h2>
+        <p>
+            Raw geofence alerts can be noisy and cause alert fatigue. Smart alert systems use hysteresis, dwell time, and confidence scoring to ensure notifications are meaningful.
+        </p>
+
+        <h3>Hysteresis Buffering</h3>
+        <p>
+            Prevents rapid toggling near boundaries. If geofence radius is 100m, create an inner zone (90m) and outer zone (110m). Only trigger exit when pet moves beyond 110m, re-entry when returning inside 90m. This 20m buffer prevents alerts from GPS jitter near boundaries.
+        </p>
+
+        <h3>Dwell Time Requirements</h3>
+        <p>
+            Require pet to be outside geofence for minimum duration before alerting. Example: Only alert if pet has been outside safe zone for 60 seconds continuously. Prevents false alarms from brief GPS errors or pets momentarily crossing boundaries.
+        </p>
+
+        <div class="code-block">
+            <pre>class SmartGeofenceMonitor {
+  constructor(geofence, options = {}) {
+    this.geofence = geofence;
+    this.dwellTimeMs = options.dwellTime || 60000; // 60 seconds
+    this.hysteresisMeters = options.hysteresis || 10;
+    this.state = 'inside';
+    this.transitionStart = null;
+  }
+
+  checkLocation(location, timestamp) {
+    const distance = calculateDistance(location, this.geofence.center);
+    const innerRadius = this.geofence.radius - this.hysteresisMeters;
+    const outerRadius = this.geofence.radius + this.hysteresisMeters;
+
+    let newState;
+    if (distance < innerRadius) {
+      newState = 'inside';
+    } else if (distance > outerRadius) {
+      newState = 'outside';
+    } else {
+      newState = 'boundary'; // In hysteresis zone
+    }
+
+    // Check for state transition
+    if (newState !== this.state && newState !== 'boundary') {
+      if (this.transitionStart === null) {
+        this.transitionStart = timestamp;
+      } else if (timestamp - this.transitionStart > this.dwellTimeMs) {
+        // Dwell time exceeded - confirm transition
+        const alert = {
+          type: newState === 'inside' ? 'geofence_enter' : 'geofence_exit',
+          geofenceId: this.geofence.id,
+          location: location,
+          timestamp: timestamp
+        };
+        this.state = newState;
+        this.transitionStart = null;
+        return alert;
+      }
+    } else if (newState === this.state) {
+      // Back to stable state - reset transition
+      this.transitionStart = null;
+    }
+
+    return null; // No alert
+  }
+}
+</pre>
+        </div>
+
+        <h2>3.3 Multi-Channel Alert Delivery</h2>
+        <p>
+            Critical alerts should use multiple notification channels to ensure owners are reached quickly, especially during escape scenarios.
+        </p>
+
+        <h3>Alert Priority Levels</h3>
+        <ul>
+            <li><strong>Critical:</strong> Geofence exit, device offline, battery critical. Use push + SMS + email + phone call.</li>
+            <li><strong>High:</strong> Low battery warning, unusual activity patterns. Use push + SMS.</li>
+            <li><strong>Medium:</strong> Geofence entry, daily activity summary. Use push notification.</li>
+            <li><strong>Low:</strong> Device status updates, achievements. Use in-app notification only.</li>
+        </ul>
+
+        <h3>Intelligent Notification Timing</h3>
+        <p>
+            Respect quiet hours and user preferences while ensuring critical alerts always get through. Example: Non-critical alerts during 10pm-7am are queued until morning, but geofence exits always alert immediately regardless of time.
+        </p>
+
+        <div class="code-block">
+            <pre>{
+  "alertConfig": {
+    "geofenceExit": {
+      "priority": "critical",
+      "channels": ["push", "sms", "email"],
+      "respectQuietHours": false,
+      "escalation": {
+        "enabled": true,
+        "noResponseTimeoutSeconds": 300,
+        "escalateTo": ["emergency_contact"]
+      }
+    },
+    "lowBattery": {
+      "priority": "high",
+      "channels": ["push", "email"],
+      "respectQuietHours": true
+    },
+    "activitySummary": {
+      "priority": "low",
+      "channels": ["push"],
+      "respectQuietHours": true,
+      "schedule": "daily_8am"
+    }
+  },
+  "quietHours": {
+    "enabled": true,
+    "start": "22:00",
+    "end": "07:00",
+    "timezone": "America/Los_Angeles"
+  }
+}
+</pre>
+        </div>
+
+        <h2>3.4 Lost Pet Recovery Features</h2>
+        <p>
+            When a pet goes missing, every minute counts. Advanced alert systems include community-based features to maximize recovery chances.
+        </p>
+
+        <h3>Lost Mode Activation</h3>
+        <p>
+            One-tap activation that:
+        </p>
+        <ul>
+            <li>Increases GPS update frequency to every 10 seconds</li>
+            <li>Enables maximum transmission power</li>
+            <li>Activates audio beacon on collar (if equipped)</li>
+            <li>Broadcasts lost pet alert to nearby WIA-PET-008 users</li>
+            <li>Shares location with local shelters and veterinary clinics</li>
+            <li>Creates social media posts with last known location and description</li>
+        </ul>
+
+        <h3>Community Alert Network</h3>
+        <p>
+            Pet owners within radius of lost pet receive notifications. If they spot the pet, they can report sightings that are displayed on owner's map. Privacy-preserving: only approximate location shared with community, precise location only visible to owner and authorized helpers.
+        </p>
+
+        <div class="code-block">
+            <pre>// Lost Pet Alert Format
+{
+  "alertType": "lost_pet",
+  "alertId": "alert_xyz789",
+  "pet": {
+    "name": "Max",
+    "species": "dog",
+    "breed": "Golden Retriever",
+    "color": "Golden",
+    "age": 3,
+    "photo": "https://cdn.pettrack.wia.org/photos/max_123.jpg",
+    "identifiers": {
+      "microchip": "985112345678901",
+      "collar": "Blue with bone tag"
+    }
+  },
+  "lastKnownLocation": {
+    "latitude": 37.7749,
+    "longitude": -122.4194,
+    "timestamp": "2025-12-25T14:30:00Z",
+    "accuracy": 8.5
+  },
+  "searchRadius": 5000,  // meters
+  "contactInfo": {
+    "masked": true,
+    "verifiedNumber": "+1-555-***-1234"
+  },
+  "reward": 100,  // USD
+  "instructions": "Friendly, responds to name. Please do not chase."
+}
+</pre>
+        </div>
+
+        <h2>3.5 Activity-Based Alerts</h2>
+        <p>
+            Beyond geofencing, monitor activity patterns and alert on anomalies that may indicate health issues or unusual behavior.
+        </p>
+
+        <h3>Anomaly Detection Scenarios</h3>
+        <ul>
+            <li><strong>Sudden Activity Change:</strong> Pet normally walks 5km/day but hasn't moved in 24 hours → Potential health issue</li>
+            <li><strong>Excessive Activity:</strong> Restless pacing or running could indicate anxiety, pain, or distress</li>
+            <li><strong>Unusual Hours:</strong> Active movement at 3am when normally sleeping → Possible disturbance or illness</li>
+            <li><strong>Rapid Movement:</strong> Sudden high-speed movement could indicate pet in vehicle (stolen, ran into road)</li>
+            <li><strong>Stationary Away from Home:</strong> Pet hasn't moved for 2 hours at unknown location → May be trapped or injured</li>
+        </ul>
+
+        <div class="info-box">
+            <h4>💡 Key Takeaway</h4>
+            <p>
+                Effective geofencing requires careful algorithm design with hysteresis and dwell time to prevent false alarms. Smart alert systems use multiple channels, priority levels, and intelligent timing. Lost pet recovery features leverage community networks and rapid response protocols. Activity-based alerts can detect health issues early, potentially saving lives beyond just preventing escapes.
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

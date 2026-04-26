@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Oled Led - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .model-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .model-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .model-card:hover { border-color: var(--primary); }
+        .model-card.selected { border-color: var(--primary); background: rgba(16, 185, 129, 0.1); }
+        .model-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .model-name { font-weight: 600; }
+        .model-level { font-size: 0.85rem; color: var(--primary); margin-top: 5px; }
+
+        .federation-viz { background: var(--bg); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .node { display: inline-block; width: 60px; height: 60px; background: var(--primary); border-radius: 50%; margin: 10px; line-height: 60px; font-weight: bold; }
+        .node.orchestrator { background: var(--secondary); }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .circuit-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .circuit-table th, .circuit-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        .circuit-table th { color: var(--primary); }
+        .status-closed { color: var(--success); }
+        .status-open { color: var(--danger); }
+        .status-half { color: var(--secondary); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .form-grid { grid-template-columns: 1fr; }
+            .model-grid { grid-template-columns: 1fr; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Oled Led</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🤖 WIA Oled Led</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Oled Lederability Standard" data-ko="LLM 상호운용 표준">Oled Lederability Standard</h1>
+            <p data-en="AI-to-AI messaging, federation, and consensus" data-ko="AI 간 메시징, 페더레이션, 합의">AI-to-AI messaging & federation</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🎯 Capability" data-ko="🎯 능력">🎯 Capability</div>
+            <div class="tab" onclick="showPanel(1)" data-en="💬 Message" data-ko="💬 메시지">💬 Message</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔗 Federation" data-ko="🔗 페더레이션">🔗 Federation</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🗳️ Consensus" data-ko="🗳️ 합의">🗳️ Consensus</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🔌 API" data-ko="🔌 API">🔌 API</div>
+        </div>
+
+        <!-- Panel 0: Capability -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🎯 AI Capability Declaration" data-ko="🎯 AI 능력 선언">🎯 Capability Declaration</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select an AI model to view capabilities" data-ko="AI 모델 선택하여 능력 조회">Select AI model</p>
+
+            <div class="model-grid">
+                <div class="model-card selected" onclick="selectModel('gpt4')">
+                    <div class="model-icon">🧠</div>
+                    <div class="model-name">GPT-4</div>
+                    <div class="model-level">Level 4 - Advanced</div>
+                </div>
+                <div class="model-card" onclick="selectModel('claude')">
+                    <div class="model-icon">🤖</div>
+                    <div class="model-name">Claude 3</div>
+                    <div class="model-level">Level 4 - Advanced</div>
+                </div>
+                <div class="model-card" onclick="selectModel('gemini')">
+                    <div class="model-icon">💎</div>
+                    <div class="model-name">Gemini Pro</div>
+                    <div class="model-level">Level 3 - Specialist</div>
+                </div>
+                <div class="model-card" onclick="selectModel('llama')">
+                    <div class="model-icon">🦙</div>
+                    <div class="model-name">Llama 2</div>
+                    <div class="model-level">Level 2 - Reasoning</div>
+                </div>
+                <div class="model-card" onclick="selectModel('codellama')">
+                    <div class="model-icon">💻</div>
+                    <div class="model-name">Code Llama</div>
+                    <div class="model-level">Level 3 - Specialist</div>
+                </div>
+                <div class="model-card" onclick="selectModel('mistral')">
+                    <div class="model-icon">🌬️</div>
+                    <div class="model-name">Mistral</div>
+                    <div class="model-level">Level 3 - Specialist</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="declareCapability()" data-en="🎯 Declare Capability" data-ko="🎯 능력 선언">🎯 Declare Capability</button>
+            </div>
+            <div class="output" id="capabilityOutput"></div>
+        </div>
+
+        <!-- Panel 1: Message -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="💬 AI-to-AI Messaging" data-ko="💬 AI 간 메시징">💬 AI Messaging</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Send structured messages between AI models" data-ko="AI 모델 간 구조화된 메시지 전송">Send messages between AI</p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="From AI" data-ko="발신 AI">From AI</label>
+                    <select id="fromAI">
+                        <option value="claude">Claude 3 Opus</option>
+                        <option value="gpt4">GPT-4</option>
+                        <option value="gemini">Gemini Pro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="To AI" data-ko="수신 AI">To AI</label>
+                    <select id="toAI">
+                        <option value="gpt4">GPT-4</option>
+                        <option value="claude">Claude 3 Opus</option>
+                        <option value="codellama">Code Llama</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Message Type" data-ko="메시지 유형">Message Type</label>
+                    <select id="msgType">
+                        <option value="query">Query - Ask</option>
+                        <option value="delegate">Delegate - Assign</option>
+                        <option value="collaborate">Collaborate</option>
+                        <option value="verify">Verify</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Priority" data-ko="우선순위">Priority</label>
+                    <select id="priority">
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label data-en="Message Content" data-ko="메시지 내용">Message Content</label>
+                <textarea id="msgContent" rows="3" style="width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 8px;">Analyze this code for security vulnerabilities.</textarea>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="sendMessage()" data-en="💬 Send Message" data-ko="💬 메시지 전송">💬 Send Message</button>
+            </div>
+            <div class="output" id="messageOutput"></div>
+        </div>
+
+        <!-- Panel 2: Federation -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="🔗 AI Federation" data-ko="🔗 AI 페더레이션">🔗 AI Federation</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Create multi-AI collaborative networks" data-ko="다중 AI 협업 네트워크 생성">Multi-AI collaboration</p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-en="Federation Name" data-ko="페더레이션 이름">Federation Name</label>
+                    <input type="text" id="fedName" value="Security Analysis Team">
+                </div>
+                <div class="form-group">
+                    <label data-en="Topology" data-ko="토폴로지">Topology</label>
+                    <select id="topology">
+                        <option value="STAR">STAR - Central orchestrator</option>
+                        <option value="MESH">MESH - Peer-to-peer</option>
+                        <option value="HIERARCHICAL">HIERARCHICAL - Tree</option>
+                        <option value="RING">RING - Sequential</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="federation-viz">
+                <div data-en="Federation Topology" data-ko="페더레이션 토폴로지">Federation Topology</div>
+                <div style="margin-top: 20px;">
+                    <div class="node orchestrator">O</div>
+                    <div style="margin: 10px 0;">│</div>
+                    <div>
+                        <span class="node">A1</span>
+                        <span class="node">A2</span>
+                        <span class="node">A3</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="createFederation()" data-en="🔗 Create Federation" data-ko="🔗 페더레이션 생성">🔗 Create Federation</button>
+            </div>
+            <div class="output" id="federationOutput"></div>
+        </div>
+
+        <!-- Panel 3: Consensus -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🗳️ Consensus Voting" data-ko="🗳️ 합의 투표">🗳️ Consensus Voting</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Multi-AI decision making with weighted votes" data-ko="가중 투표를 통한 다중 AI 의사결정">Multi-AI decision making</p>
+
+            <div class="form-group">
+                <label data-en="Question for Consensus" data-ko="합의 질문">Question for Consensus</label>
+                <input type="text" id="consensusQ" value="Is the SQL injection vulnerability critical severity?">
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">YES</div>
+                    <div class="metric-label">GPT-4 (0.92)</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">YES</div>
+                    <div class="metric-label">Claude 3 (0.88)</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">YES</div>
+                    <div class="metric-label">Code Llama (0.95)</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" style="color: var(--success);">94%</div>
+                    <div class="metric-label" data-en="Weighted Consensus" data-ko="가중 합의">Consensus</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="calculateConsensus()" data-en="🗳️ Calculate Consensus" data-ko="🗳️ 합의 계산">🗳️ Calculate Consensus</button>
+            </div>
+            <div class="output" id="consensusOutput"></div>
+        </div>
+
+        <!-- Panel 4: API -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔌 API & Circuit Breaker" data-ko="🔌 API & 서킷 브레이커">🔌 API & Circuit Breaker</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Health monitoring and API reference" data-ko="상태 모니터링 및 API 레퍼런스">Health monitoring</p>
+
+            <table class="circuit-table">
+                <thead>
+                    <tr>
+                        <th data-en="AI Model" data-ko="AI 모델">AI Model</th>
+                        <th data-en="Status" data-ko="상태">Status</th>
+                        <th data-en="Failures" data-ko="실패">Failures</th>
+                        <th data-en="Action" data-ko="액션">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>GPT-4</td>
+                        <td class="status-closed">[OK] CLOSED</td>
+                        <td id="gpt4Fail">0</td>
+                        <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="simulateFail('gpt4')">Fail</button></td>
+                    </tr>
+                    <tr>
+                        <td>Claude 3</td>
+                        <td class="status-closed">[OK] CLOSED</td>
+                        <td id="claudeFail">0</td>
+                        <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="simulateFail('claude')">Fail</button></td>
+                    </tr>
+                    <tr>
+                        <td>Gemini Pro</td>
+                        <td class="status-closed">[OK] CLOSED</td>
+                        <td id="geminiFail">0</td>
+                        <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="simulateFail('gemini')">Fail</button></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="testApi()" data-en="🔌 Test API" data-ko="🔌 API 테스트">🔌 Test API</button>
+                <button class="btn btn-secondary" onclick="resetCircuits()" data-en="Reset Circuits" data-ko="서킷 리셋">Reset Circuits</button>
+            </div>
+            <div class="output" id="apiOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="Enabling AI collaboration for humanity" data-ko="인류를 위한 AI 협업 실현">AI collaboration for humanity</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let selectedModel = 'gpt4';
+        const failures = { gpt4: 0, claude: 0, gemini: 0 };
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = text;
+                else el.textContent = text;
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        function selectModel(model) {
+            selectedModel = model;
+            document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.model-card').classList.add('selected');
+        }
+
+        function declareCapability() {
+            const capabilities = {
+                gpt4: { id: 'did:wia:llm:openai:gpt-4', level: 4, domains: ['CODE', 'MATH', 'ANALYSIS', 'CREATIVE'], contextWindow: 128000 },
+                claude: { id: 'did:wia:llm:anthropic:claude-3-opus', level: 4, domains: ['CODE', 'ANALYSIS', 'CREATIVE', 'LEGAL'], contextWindow: 200000 },
+                gemini: { id: 'did:wia:llm:google:gemini-pro', level: 3, domains: ['CODE', 'MATH', 'ANALYSIS'], contextWindow: 32000 },
+                llama: { id: 'did:wia:llm:local:llama-2-70b', level: 2, domains: ['CODE', 'ANALYSIS'], contextWindow: 4096 },
+                codellama: { id: 'did:wia:llm:local:codellama-34b', level: 3, domains: ['CODE'], contextWindow: 16000 },
+                mistral: { id: 'did:wia:llm:local:mistral-7b', level: 3, domains: ['CODE', 'ANALYSIS'], contextWindow: 8000 }
+            };
+            document.getElementById('capabilityOutput').textContent = JSON.stringify({
+                '@context': 'https://wia.org/contexts/llm-capability/v1',
+                ...capabilities[selectedModel],
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function sendMessage() {
+            const from = document.getElementById('fromAI').value;
+            const to = document.getElementById('toAI').value;
+            const type = document.getElementById('msgType').value;
+            const content = document.getElementById('msgContent').value;
+            document.getElementById('messageOutput').textContent = JSON.stringify({
+                '@context': 'https://wia.org/contexts/llm-message/v1',
+                id: 'msg:' + Date.now(),
+                header: { from: 'did:wia:llm:' + from, to: 'did:wia:llm:' + to, type: type.toUpperCase(), priority: document.getElementById('priority').value },
+                payload: { content: content },
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function createFederation() {
+            const name = document.getElementById('fedName').value;
+            const topology = document.getElementById('topology').value;
+            document.getElementById('federationOutput').textContent = JSON.stringify({
+                '@context': 'https://wia.org/contexts/llm-federation/v1',
+                id: 'fed:' + Math.random().toString(36).substr(2, 8),
+                name: name, topology: topology,
+                members: [
+                    { did: 'did:wia:llm:openai:gpt-4', role: topology === 'STAR' ? 'ORCHESTRATOR' : 'PARTICIPANT' },
+                    { did: 'did:wia:llm:anthropic:claude-3-opus', role: 'PARTICIPANT' },
+                    { did: 'did:wia:llm:local:codellama-34b', role: 'PARTICIPANT' }
+                ],
+                status: 'ACTIVE', createdAt: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function calculateConsensus() {
+            const question = document.getElementById('consensusQ').value;
+            document.getElementById('consensusOutput').textContent = JSON.stringify({
+                question: question,
+                votes: [
+                    { model: 'GPT-4', vote: 'YES', confidence: 0.92, weight: 0.95 },
+                    { model: 'Claude 3', vote: 'YES', confidence: 0.88, weight: 0.93 },
+                    { model: 'Code Llama', vote: 'YES', confidence: 0.95, weight: 0.90 }
+                ],
+                result: { decision: 'YES', consensusPercent: '94.2%', algorithm: 'WEIGHTED' },
+                message: currentLang === 'ko' ? '합의 도달: YES' : 'Consensus reached: YES'
+            }, null, 2);
+        }
+
+        function simulateFail(model) {
+            failures[model]++;
+            document.getElementById(model + 'Fail').textContent = failures[model];
+        }
+
+        function resetCircuits() {
+            Object.keys(failures).forEach(k => { failures[k] = 0; document.getElementById(k + 'Fail').textContent = '0'; });
+        }
+
+        function testApi() {
+            document.getElementById('apiOutput').textContent = JSON.stringify({
+                endpoints: {
+                    capability: 'POST /api/v1/capability',
+                    message: 'POST /api/v1/message',
+                    federation: 'POST /api/v1/federation',
+                    consensus: 'POST /api/v1/consensus'
+                },
+                healthCheck: { status: 'ok', uptime: '99.9%', latency: '45ms' }
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('wiaLang') || 'en';
+            setLang(savedLang);
+            declareCapability();
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

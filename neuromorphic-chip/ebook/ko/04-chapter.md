@@ -401,14 +401,14 @@ SOPS/W = (총 시냅스 연산) / (소비 에너지)
 2. Izhikevich (2003) - 스파이킹 뉴런의 간단한 모델
 3. Bi & Poo (1998) - 뇌의 시냅스 가소성
 
-**뉴로모픽 하드웨어:**
-4. 선행 연구 - Loihi: 뉴로모픽 매니코어 프로세서
-5. 선행 연구 - TrueNorth: 설계 및 도구 흐름
-6. 선행 연구 - SpiNNaker 프로젝트
+**뉴로모픽 하드웨어 플랫폼 (제조사 공식 문서):**
+4. Intel Loihi 2 — Intel Neuromorphic Research Community 공식 문서: https://intel.com/content/www/us/en/research/neuromorphic-computing.html
+5. IBM TrueNorth — IBM Research 공식 페이지 (TrueNorth 아키텍처 명세).
+6. SpiNNaker / SpiNNaker2 — University of Manchester APT Group 공식 프로젝트 페이지: https://apt.cs.manchester.ac.uk/projects/SpiNNaker/
 
-**응용 프로그램:**
-7. 선행 연구 - 스파이킹 뉴런을 사용한 딥 러닝
-8. 선행 연구 - 스파이킹 신경망의 직접 학습
+**응용 분야 (오픈 데이터·표준):**
+7. Neuromorphic Vision 데이터셋 — N-MNIST, DVS128 Gesture, CIFAR10-DVS (공개 벤치마크).
+8. SNN 학습 도구체인 — Norse (PyTorch 기반 오픈소스), Nengo (Applied Brain Research).
 
 ---
 

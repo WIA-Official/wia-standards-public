@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 구현 예제 - WIA OMNI-API 표준</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>7장: 구현 예제</h1>
+
+        <section>
+            <h2>7.1 Python 구현</h2>
+            <p>Python으로 OMNI-API 클라이언트와 게이트웨이를 구현하는 방법입니다.</p>
+
+            <h3>Python 클라이언트 SDK</h3>
+            <div class="code-header">omni_client.py</div>
+            <pre><code>from typing import Any, Dict, Optional
+import requests
+import json
+
+class OmniAPIClient:
+    """OMNI-API 통합 클라이언트"""
+    
+    def __init__(self, base_url: str, auth_token: Optional[str] = None):
+        self.base_url = base_url
+        self.auth_token = auth_token
+        self.session = requests.Session()
+        
+        if auth_token:
+            self.session.headers.update({
+                'Authorization': f'Bearer {auth_token}'
+            })
+    
+    def request(self, intent: str, **params) -> Dict[str, Any]:
+        """
+        자연어 의도 기반 요청
+        
+        예제:
+            client.request("get user 123")
+            client.request("create order", items=[...])
+        """
+        payload = {
+            "omniapiVersion": "1.0",
+            "intent": {
+                "naturalLanguage": intent,
+                "parameters": params
+            }
+        }
+        
+        response = self.session.post(
+            f"{self.base_url}/omni",
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def rest(self, method: str, path: str, **kwargs) -> Dict[str, Any]:
+        """전통적인 REST 방식 호출"""
+        response = self.session.request(method, f"{self.base_url}{path}", **kwargs)
+        response.raise_for_status()
+        return response.json()
+    
+    def graphql(self, query: str, variables: Optional[Dict] = None) -> Dict[str, Any]:
+        """GraphQL 쿼리 실행"""
+        payload = {"query": query}
+        if variables:
+            payload["variables"] = variables
+        
+        response = self.session.post(
+            f"{self.base_url}/graphql",
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
+# 사용 예제
+if __name__ == "__main__":
+    client = OmniAPIClient("https://api.example.com", "your-token")
+    
+    # 의도 기반 요청
+    user = client.request("get user 123")
+    print(user)
+    
+    # REST 요청
+    users = client.rest("GET", "/users", params={"limit": 10})
+    print(users)
+    
+    # GraphQL 요청
+    result = client.graphql("""
+        query GetUser($id: ID!) {
+            user(id: $id) {
+                name
+                email
+            }
+        }
+    """, variables={"id": "123"})
+    print(result)</code></pre>
+
+            <h3>Python 게이트웨이 서버</h3>
+            <div class="code-header">omni_gateway.py</div>
+            <pre><code>from fastapi import FastAPI, Request, HTTPException
+from typing import Dict, Any
+import json
+
+app = FastAPI(title="OMNI-API Gateway")
+
+class ProtocolEmbr acer:
+    """프로토콜 수용자 - 모든 프로토콜 자동 감지 및 변환"""
+    
+    @staticmethod
+    async def detect_protocol(request: Request) -> str:
+        content_type = request.headers.get("content-type", "")
+        
+        if "application/json" in content_type:
+            body = await request.json()
+            if "query" in body:
+                return "GraphQL"
+            elif "omniapiVersion" in body:
+                return "OMNI"
+            else:
+                return "REST"
+        elif "application/grpc" in content_type:
+            return "gRPC"
+        else:
+            return "REST"
+    
+    @staticmethod
+    def normalize_request(protocol: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """모든 프로토콜을 통합 형식으로 변환"""
+        if protocol == "REST":
+            return {
+                "action": data.get("method", "read").lower(),
+                "resource": data.get("resource"),
+                "parameters": data.get("params", {})
+            }
+        elif protocol == "GraphQL":
+            # GraphQL 쿼리 파싱 및 변환
+            return parse_graphql_query(data["query"])
+        elif protocol == "OMNI":
+            return data.get("intent", {})
+        
+        return data
+
+@app.post("/omni")
+async def omni_endpoint(request: Request):
+    """통합 OMNI 엔드포인트 - 모든 프로토콜 수용"""
+    protocol = await ProtocolEmbracer.detect_protocol(request)
+    data = await request.json()
+    
+    # 프로토콜 정규화
+    normalized = ProtocolEmbracer.normalize_request(protocol, data)
+    
+    # 비즈니스 로직 처리
+    result = await process_request(normalized)
+    
+    # 응답 반환
+    return {
+        "omniapiVersion": "1.0",
+        "status": {"code": 200, "message": "Success"},
+        "data": result,
+        "metadata": {
+            "sourceProtocol": protocol,
+            "processingTime": "45ms"
+        }
+    }
+
+async def process_request(intent: Dict[str, Any]) -> Dict[str, Any]:
+    """실제 비즈니스 로직 처리"""
+    action = intent.get("action")
+    resource = intent.get("resource")
+    
+    # 여기에 실제 비즈니스 로직 구현
+    if action == "read" and resource == "user":
+        return {"id": "123", "name": "John Doe"}
+    
+    return {"message": "처리 완료"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)</code></pre>
+        </section>
+
+        <section>
+            <h2>7.2 TypeScript 구현</h2>
+            <p>TypeScript/Node.js로 OMNI-API를 구현하는 방법입니다.</p>
+
+            <div class="code-header">omni-client.ts</div>
+            <pre><code>interface OmniRequest {
+  omniapiVersion: string;
+  intent: {
+    naturalLanguage?: string;
+    action?: string;
+    resource?: string;
+    parameters?: Record&lt;string, any&gt;;
+  };
+  preferences?: {
+    responseFormat?: string;
+    locale?: string;
+  };
+}
+
+interface OmniResponse {
+  omniapiVersion: string;
+  requestId: string;
+  status: {
+    code: number;
+    message: string;
+  };
+  data: any;
+  metadata?: Record&lt;string, any&gt;;
+}
+
+class OmniAPIClient {
+  private baseUrl: string;
+  private authToken?: string;
+
+  constructor(baseUrl: string, authToken?: string) {
+    this.baseUrl = baseUrl;
+    this.authToken = authToken;
+  }
+
+  /**
+   * 의도 기반 요청
+   */
+  async request(intent: string, params?: Record&lt;string, any&gt;): Promise&lt;any&gt; {
+    const payload: OmniRequest = {
+      omniapiVersion: "1.0",
+      intent: {
+        naturalLanguage: intent,
+        parameters: params
+      }
+    };
+
+    return this.send(payload);
+  }
+
+  /**
+   * REST 스타일 요청
+   */
+  async rest(method: string, path: string, data?: any): Promise&lt;any&gt; {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: this.getHeaders(),
+      body: data ? JSON.stringify(data) : undefined
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * GraphQL 쿼리
+   */
+  async graphql(query: string, variables?: Record&lt;string, any&gt;): Promise&lt;any&gt; {
+    const response = await fetch(`${this.baseUrl}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ query, variables })
+    });
+
+    const result = await response.json();
+    
+    if (result.errors) {
+      throw new Error(`GraphQL Error: ${JSON.stringify(result.errors)}`);
+    }
+
+    return result.data;
+  }
+
+  private async send(payload: OmniRequest): Promise&lt;any&gt; {
+    const response = await fetch(`${this.baseUrl}/omni`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`OMNI-API Error: ${response.statusText}`);
+    }
+
+    const result: OmniResponse = await response.json();
+    return result.data;
+  }
+
+  private getHeaders(): Record&lt;string, string&gt; {
+    const headers: Record&lt;string, string&gt; = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
+    return headers;
+  }
+}
+
+// 사용 예제
+const client = new OmniAPIClient('https://api.example.com', 'your-token');
+
+// 의도 기반
+client.request('get user 123').then(console.log);
+
+// REST
+client.rest('GET', '/users/123').then(console.log);
+
+// GraphQL
+client.graphql(`
+  query {
+    user(id: "123") {
+      name
+      email
+    }
+  }
+`).then(console.log);</code></pre>
+        </section>
+
+        <section>
+            <h2>7.3 Bash/cURL 구현</h2>
+            <p>Bash 스크립트와 cURL을 사용한 OMNI-API 호출 예제입니다.</p>
+
+            <div class="code-header">omni-cli.sh</div>
+            <pre><code>#!/bin/bash
+
+# OMNI-API Bash 클라이언트
+OMNI_API_URL="${OMNI_API_URL:-https://api.example.com}"
+OMNI_API_TOKEN="${OMNI_API_TOKEN:-}"
+
+# 의도 기반 요청 함수
+omni_request() {
+    local intent="$1"
+    shift
+    local params="$@"
+    
+    local payload=$(cat &lt;&lt;EOF
+{
+  "omniapiVersion": "1.0",
+  "intent": {
+    "naturalLanguage": "$intent",
+    "parameters": {$params}
+  }
+}
+EOF
+    )
+    
+    curl -s -X POST "$OMNI_API_URL/omni" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $OMNI_API_TOKEN" \
+        -d "$payload" | jq '.'
+}
+
+# REST 요청 함수
+omni_rest() {
+    local method="$1"
+    local path="$2"
+    local data="$3"
+    
+    if [ -n "$data" ]; then
+        curl -s -X "$method" "$OMNI_API_URL$path" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OMNI_API_TOKEN" \
+            -d "$data" | jq '.'
+    else
+        curl -s -X "$method" "$OMNI_API_URL$path" \
+            -H "Authorization: Bearer $OMNI_API_TOKEN" | jq '.'
+    fi
+}
+
+# GraphQL 요청 함수
+omni_graphql() {
+    local query="$1"
+    
+    local payload=$(cat &lt;&lt;EOF
+{
+  "query": "$query"
+}
+EOF
+    )
+    
+    curl -s -X POST "$OMNI_API_URL/graphql" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $OMNI_API_TOKEN" \
+        -d "$payload" | jq '.data'
+}
+
+# 사용 예제
+case "$1" in
+    intent)
+        omni_request "$2"
+        ;;
+    rest)
+        omni_rest "$2" "$3" "$4"
+        ;;
+    graphql)
+        omni_graphql "$2"
+        ;;
+    *)
+        echo "사용법: $0 {intent|rest|graphql} [args]"
+        echo ""
+        echo "예제:"
+        echo "  $0 intent 'get user 123'"
+        echo "  $0 rest GET /users/123"
+        echo "  $0 graphql 'query { user(id: \"123\") { name } }'"
+        exit 1
+        ;;
+esac</code></pre>
+
+            <h3>Bash 스크립트 사용 예제</h3>
+            <div class="code-header">사용 예제</div>
+            <pre><code># 환경 변수 설정
+export OMNI_API_URL="https://api.example.com"
+export OMNI_API_TOKEN="your-token-here"
+
+# 의도 기반 요청
+./omni-cli.sh intent "get user 123"
+
+# REST 요청
+./omni-cli.sh rest GET /users/123
+
+# 데이터와 함께 POST 요청
+./omni-cli.sh rest POST /users '{"name":"John","email":"john@example.com"}'
+
+# GraphQL 쿼리
+./omni-cli.sh graphql 'query { users(limit: 10) { id name } }'</code></pre>
+        </section>
+
+        <section>
+            <h2>7.4 프로덕션 배포 예제</h2>
+            <p>실제 프로덕션 환경에서 OMNI-API 게이트웨이를 배포하는 방법입니다.</p>
+
+            <div class="code-header">docker-compose.yml</div>
+            <pre><code>version: '3.8'
+
+services:
+  omni-gateway:
+    image: omni-api/gateway:latest
+    ports:
+      - "443:443"
+      - "8080:8080"
+    environment:
+      - OMNI_ENV=production
+      - OMNI_LOG_LEVEL=info
+      - OMNI_CACHE_ENABLED=true
+      - OMNI_METRICS_ENABLED=true
+    volumes:
+      - ./config:/etc/omni
+      - ./certs:/etc/certs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - omni-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    networks:
+      - omni-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=omniapi
+      - POSTGRES_USER=omni
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - omni-network
+
+volumes:
+  redis-data:
+  postgres-data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+networks:
+  omni-network:
+    driver: bridge</code></pre>
+
+            <div class="code-header">Kubernetes 배포 (omni-deployment.yaml)</div>
+            <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omni-gateway
+  labels:
+    app: omni-gateway
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: omni-gateway
+  template:
+    metadata:
+      labels:
+        app: omni-gateway
+    spec:
+      containers:
+      - name: gateway
+        image: omni-api/gateway:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: OMNI_ENV
+          value: "production"
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: omni-secrets
+              key: redis-url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omni-gateway
+spec:
+  selector:
+    app: omni-gateway
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: LoadBalancer</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

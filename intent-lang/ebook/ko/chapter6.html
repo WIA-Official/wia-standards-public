@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 보안 및 프라이버시 - WIA-INTENT v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="wia-badge">WIA 표준</div>
+                <div class="version">버전 1.0</div>
+            </div>
+            <h1>6장: 보안 및 프라이버시</h1>
+            <p class="subtitle">의도 검증 및 안전한 실행 경계</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>6.1 설계에 의한 보안</h2>
+                <p>
+                    WIA-INTENT는 보안과 프라이버시를 사후 고려 사항이 아닌 근본적인 설계 원칙으로
+                    통합합니다. 모든 의도는 기본적으로 안전한 경계 내에서 작동합니다.
+                </p>
+
+                <pre><code>security {
+  // 보안이 기본값 (Security is default)
+
+  data {
+    encrypt: by_default
+    anonymize: when_possible
+    minimize: collect_only_necessary
+  }
+
+  access {
+    authenticate: required
+    authorize: principle_of_least_privilege
+    audit: all_actions
+  }
+
+  quantum_safe {
+    use: wia.pq_crypto
+    prepare_for: quantum_threats
+  }
+}</code></pre>
+
+                <div class="info-box warning">
+                    <h4>보안 우선 원칙</h4>
+                    <p>
+                        WIA-INTENT에서 보안은 선택 사항이 아니라 기본값입니다. 의도는 기본적으로 안전하며,
+                        특정 사용 사례에 필요한 경우 적절한 경고와 함께 보안을 명시적으로 줄여야 합니다.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2>6.2 의도 검증</h2>
+                <p>
+                    모든 의도는 실행 전에 보안, 프라이버시 및 윤리적 요구 사항을 충족하는지 검증됩니다.
+                </p>
+
+                <h3>정적 검증</h3>
+                <pre><code>validate_intent {
+  // 컴파일 타임 검사
+
+  security_checks {
+    no_arbitrary_code_execution: enforce
+    no_sql_injection: enforce
+    no_path_traversal: enforce
+    input_sanitization: required
+  }
+
+  privacy_checks {
+    data_minimization: verify
+    consent_required_for: personal_data
+    no_unauthorized_tracking: enforce
+  }
+
+  ethical_checks {
+    no_discrimination: enforce
+    no_manipulation: enforce
+    transparency: required
+  }
+}</code></pre>
+
+                <h3>런타임 검증</h3>
+                <pre><code>intent ProcessUserData {
+  given: user_data
+  want: analysis_result
+
+  validate_at_runtime {
+    // 데이터가 변조되지 않았는지 확인
+    integrity: verify_checksum
+
+    // 사용자 동의가 유효한지 확인
+    consent: check_not_expired
+
+    // 데이터 분류 확인
+    classification: confirm_handling_appropriate
+  }
+
+  constraints {
+    privacy: maximum
+    audit_trail: complete
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.3 안전한 실행 경계</h2>
+                <p>
+                    의도는 시스템 리소스에 대한 엄격하게 통제된 액세스를 가진 샌드박스
+                    환경 내에서 실행됩니다.
+                </p>
+
+                <h3>리소스 제한</h3>
+                <pre><code>intent UserSubmittedCode {
+  given: code, inputs
+  want: execution_result
+
+  sandbox {
+    // 엄격한 리소스 제한
+    memory: &lt;= 256.megabytes
+    cpu_time: &lt;= 10.seconds
+    disk_read: &lt;= 100.megabytes
+    disk_write: &lt;= 10.megabytes
+    network: disabled
+
+    // 금지된 작업
+    forbid {
+      file_system_access: outside_temp_dir
+      process_creation: true
+      system_calls: dangerous_ones
+    }
+  }
+
+  timeout: 30.seconds
+  kill_on_timeout: true
+}</code></pre>
+
+                <h3>능력 기반 보안</h3>
+                <pre><code>intent AccessDatabase {
+  given: query
+  want: results
+
+  capabilities_required {
+    database.read: "users_table"
+    // 쓰기 권한 부여되지 않음
+  }
+
+  verify {
+    query_is_safe: true
+    no_privilege_escalation: true
+  }
+}
+
+intent ModifyUserProfile {
+  given: user_id, changes
+  want: updated_profile
+
+  capabilities_required {
+    database.read: "users_table"
+    database.write: "users_table"
+    // 특정 사용자에게만
+    scope: user_id
+  }
+
+  verify {
+    user_owns_profile: true
+    changes_are_valid: true
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.4 프라이버시 보호</h2>
+
+                <h3>데이터 최소화</h3>
+                <pre><code>intent RecommendProducts {
+  given: user_profile
+  want: recommendations
+
+  privacy {
+    // 필요한 필드만 액세스
+    access_fields: [
+      "preferences",
+      "purchase_history"
+    ]
+
+    // 액세스 금지
+    forbid_fields: [
+      "email",
+      "phone",
+      "address",
+      "payment_methods"
+    ]
+
+    // 가능한 경우 익명화
+    anonymize: {
+      user_id: hash_before_use
+    }
+  }
+
+  constraints {
+    no_tracking: ensure
+    no_profiling: beyond_necessary
+  }
+}</code></pre>
+
+                <h3>차등 프라이버시</h3>
+                <pre><code>intent AnalyzeUserBehavior {
+  given: user_data_collection
+  want: aggregate_insights
+
+  privacy {
+    method: differential_privacy
+    epsilon: 0.1  // 프라이버시 예산
+    delta: 1e-5
+
+    noise_mechanism: laplace
+    ensure: individual_privacy
+  }
+
+  verify {
+    no_individual_identification: true
+    statistical_validity: maintained
+  }
+}</code></pre>
+
+                <h3>동의 관리</h3>
+                <pre><code>intent UsePersonalData {
+  given: user_id, data_purpose
+  want: data_access_granted
+
+  require_consent {
+    purpose: data_purpose
+    explicit: true
+    revocable: true
+    granular: true
+  }
+
+  verify {
+    consent_is_current: true
+    consent_scope_matches: data_purpose
+  }
+
+  fallback {
+    if no_consent:
+      deny_access with explanation
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.5 내장 윤리 프레임워크</h2>
+                <p>
+                    모든 의도는 우회할 수 없는 글로벌 윤리 원칙의 적용을 받습니다.
+                </p>
+
+                <pre><code>global_ethics {
+  // 모든 인텐트에 적용되는 윤리 규칙
+
+  principles {
+    beneficence: "인류에게 이로워야 함"
+    non_maleficence: "해를 끼치지 않음"
+    autonomy: "인간의 자율성 존중"
+    justice: "공정하게 대우"
+    transparency: "설명 가능해야 함"
+  }
+
+  forbidden {
+    harm_humans: always
+    deceive_maliciously: always
+    violate_privacy: without_consent
+    discriminate: unfairly
+  }
+
+  required {
+    explain_decisions: when_asked
+    respect_boundaries: always
+    learn_ethically: from_consented_data
+  }
+}</code></pre>
+
+                <h3>윤리적 의사 결정</h3>
+                <pre><code>intent MakeLoanDecision {
+  given: applicant_data
+  want: loan_decision
+
+  ethics {
+    fairness {
+      // 차별 금지
+      protected_attributes: [
+        "race", "gender", "religion",
+        "sexual_orientation", "age"
+      ]
+      ensure: not_used_in_decision
+
+      // 공정성 지표 요구
+      demographic_parity: &gt;= 0.9
+      equal_opportunity: &gt;= 0.9
+    }
+
+    transparency {
+      explainable: true
+      show_factors: decision_influencing
+      allow_appeal: true
+    }
+
+    autonomy {
+      human_in_loop: for high_impact_decisions
+      user_can_opt_out: true
+    }
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.6 감사 및 규정 준수</h2>
+
+                <h3>감사 로깅</h3>
+                <pre><code>intent ProcessSensitiveData {
+  given: sensitive_data
+  want: processed_result
+
+  audit {
+    log_level: detailed
+
+    log_events {
+      data_accessed: {
+        what: data_identifier
+        when: timestamp
+        who: user_id
+        why: purpose
+      }
+
+      decisions_made: {
+        decision: outcome
+        factors: influencing_factors
+        confidence: certainty_level
+      }
+
+      privacy_events: {
+        consent_checked: result
+        anonymization: applied
+        retention: policy_followed
+      }
+    }
+
+    retention {
+      duration: 7.years
+      secure_storage: encrypted
+      access_controlled: true
+    }
+  }
+}</code></pre>
+
+                <h3>규정 준수 검증</h3>
+                <pre><code>intent EnsureGDPRCompliance {
+  want: system_is_gdpr_compliant
+
+  verify {
+    // 접근 권리
+    user_can_access_own_data: true
+
+    // 삭제 권리
+    user_can_delete_data: true
+    deletion_is_complete: true
+
+    // 이동 권리
+    data_export: machine_readable_format
+
+    // 잊혀질 권리
+    cascading_deletion: implemented
+
+    // 동의 관리
+    consent_is_explicit: true
+    consent_is_revocable: true
+
+    // 데이터 보호
+    encryption_at_rest: true
+    encryption_in_transit: true
+    anonymization: where_appropriate
+  }
+
+  compliance_frameworks {
+    GDPR: required
+    CCPA: required
+    HIPAA: if_applicable
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.7 안전한 다자간 계산</h2>
+                <p>
+                    데이터 자체를 공개하지 않고 암호화된 데이터에 대한 계산을 가능하게 합니다.
+                </p>
+
+                <pre><code>intent CollaborativeAnalysis {
+  given: [encrypted_dataset_A, encrypted_dataset_B]
+  want: combined_insights
+
+  using {
+    method: secure_multi_party_computation
+    parties: [organization_A, organization_B]
+  }
+
+  ensure {
+    // 어느 쪽도 상대방의 원시 데이터를 볼 수 없음
+    data_privacy: complete
+
+    // 하지만 둘 다 집계 결과를 얻음
+    result_sharing: agreed_upon
+
+    // 검증 가능한 계산
+    correctness: cryptographically_proven
+  }
+
+  constraints {
+    no_data_leakage: enforce
+    output_only: aggregate_statistics
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>6.8 양자 안전 보안</h2>
+                <p>
+                    포스트 양자 암호화를 위한 WIA-PQ-CRYPTO와의 통합.
+                </p>
+
+                <pre><code>use wia.pq_crypto
+
+intent SecureCommunication {
+  given: message, recipient
+  want: secure_delivery
+
+  encryption {
+    algorithm: wia.pq_crypto.kyber
+    key_exchange: quantum_safe
+    forward_secrecy: ensure
+  }
+
+  signature {
+    algorithm: wia.pq_crypto.dilithium
+    verify_integrity: true
+    non_repudiation: ensure
+  }
+
+  constraints {
+    quantum_resistant: true
+    classical_security: &gt;= 256.bits
+  }
+}</code></pre>
+
+                <div class="info-box success">
+                    <h4>미래 보장 보안</h4>
+                    <p>
+                        WIA-INTENT는 양자 컴퓨터에 대해서도 안전하도록 설계되었습니다.
+                        WIA-PQ-CRYPTO와 통합하여 포스트 양자 시대에도 의도가 안전하게 유지됩니다.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2>6.9 위협 모델링</h2>
+
+                <pre><code>threat_model {
+  intent: ProcessPayment
+
+  threats {
+    replay_attack: {
+      likelihood: medium
+      impact: high
+      mitigation: unique_transaction_ids with timestamp
+    }
+
+    sql_injection: {
+      likelihood: high
+      impact: critical
+      mitigation: parameterized_queries only
+    }
+
+    man_in_middle: {
+      likelihood: medium
+      impact: high
+      mitigation: tls_1_3 with certificate_pinning
+    }
+
+    privilege_escalation: {
+      likelihood: low
+      impact: critical
+      mitigation: capability_based_security
+    }
+  }
+
+  security_testing {
+    penetration_testing: quarterly
+    vulnerability_scanning: continuous
+    code_review: all_changes
+  }
+}</code></pre>
+            </section>
+
+            </main>
+
+        </div>
+</body>
+</html>

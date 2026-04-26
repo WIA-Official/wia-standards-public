@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 데이터 스키마 및 타입 시스템 - WIA-INTENT v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="wia-badge">WIA 표준</div>
+                <div class="version">버전 1.0</div>
+            </div>
+            <h1>2장: 데이터 스키마 및 타입 시스템</h1>
+            <p class="subtitle">의도 선언, 제약 정의, 확실성 값</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>2.1 기본 구문</h2>
+                <p>
+                    모든 WIA-INTENT 프로그램은 의도 선언으로 구성됩니다. 기본 구조는 다음과 같습니다:
+                </p>
+
+                <pre><code>// 의도 선언
+intent &lt;IntentName&gt; {
+  // 주어진 것 (입력)
+  given: &lt;inputs&gt;
+
+  // 원하는 것 (출력/목표)
+  want: &lt;desired_outcome&gt;
+
+  // 솔루션에 대한 제약
+  constraints {
+    &lt;constraint_name&gt;: &lt;constraint_value&gt;
+  }
+
+  // 신뢰도/확실성 요구 사항
+  certainty: &lt;0.0 - 1.0&gt;
+
+  // 의도를 충족할 수 없는 경우 수행할 작업
+  fallback: &lt;fallback_action&gt;
+
+  // 솔루션이 진화할 수 있는 방법
+  evolve: &lt;evolution_rules&gt;
+}</code></pre>
+
+                <div class="info-box">
+                    <h4>주요 구성 요소</h4>
+                    <ul>
+                        <li><strong>given:</strong> 입력 데이터 및 컨텍스트</li>
+                        <li><strong>want:</strong> 원하는 결과 또는 목표</li>
+                        <li><strong>constraints:</strong> 요구 사항 및 경계</li>
+                        <li><strong>certainty:</strong> 필요한 신뢰 수준 (0.0-1.0)</li>
+                        <li><strong>fallback:</strong> 의도를 충족할 수 없을 때의 동작</li>
+                        <li><strong>evolve:</strong> 학습 및 개선 규칙</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h2>2.2 데이터 타입</h2>
+
+                <h3>2.2.1 기본 타입</h3>
+                <p>WIA-INTENT는 표준 기본형과 고유한 확률적 타입을 지원합니다:</p>
+
+                <pre><code>// 스칼라 타입
+number: 42, 3.14, -17
+text: "hello world"
+truth: true, false, maybe(0.7)  // 확률적 진리값!
+nothing: void
+
+// 시간 타입
+moment: @2025-12-16T10:30:00Z
+duration: 5.minutes, 2.hours, 1.day</code></pre>
+
+                <h3>2.2.2 확률적 타입</h3>
+                <p>
+                    WIA-INTENT의 고유한 기능: 타입 시스템에 내장된 불확실성 및 확률
+                    분포에 대한 기본 지원.
+                </p>
+
+                <pre><code>// 불확실성을 언어 자체에서 표현
+probability: 0.85
+distribution: normal(mean: 100, std: 15)
+range: 10..20 with_confidence 0.9
+
+// Maybe 타입 (확률적)
+maybe&lt;number&gt;: 42 with_probability 0.95</code></pre>
+
+                <div class="info-box success">
+                    <h4>확률적 타입이 중요한 이유</h4>
+                    <p>
+                        실제 데이터는 불확실합니다. 날씨 예측, 사용자 행동, 시장 트렌드—
+                        모두 확률을 포함합니다. WIA-INTENT는 불확실성을 일급 개념으로 만들어
+                        프로그램이 신뢰 수준에 대해 명시적으로 추론할 수 있도록 합니다.
+                    </p>
+                </div>
+
+                <h3>2.2.3 복합 타입</h3>
+                <pre><code>// 컬렉션
+list&lt;T&gt;: [1, 2, 3]
+set&lt;T&gt;: {1, 2, 3}
+map&lt;K, V&gt;: {"a": 1, "b": 2}
+
+// 구조
+entity Person {
+  name: text
+  age: number
+  mood: distribution  // 감정도 분포로!
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>2.3 의도 선언</h2>
+
+                <h3>간단한 의도</h3>
+                <pre><code>intent MakeCoffee {
+  want: hot_coffee
+  constraints {
+    temperature: 85..95 celsius
+    time: &lt;= 5.minutes
+  }
+}</code></pre>
+
+                <h3>입력 및 출력이 있는 의도</h3>
+                <pre><code>intent ProcessData {
+  given: raw_data, transformation_rules
+  want: processed_data
+
+  constraints {
+    accuracy: &gt;= 0.95
+    time: &lt;= 1.second
+  }
+
+  certainty: &gt;= 0.9
+
+  fallback {
+    if certainty &lt; 0.9:
+      return partial_results with warning
+  }
+}</code></pre>
+            </section>
+
+            <section>
+                <h2>2.4 제약 정의</h2>
+                <p>
+                    제약은 솔루션이 작동해야 하는 경계를 정의합니다.
+                    전통적인 어설션보다 더 유연합니다.
+                </p>
+
+                <pre><code>constraints {
+  // 시간 제약
+  time: &lt;= 5.minutes
+  deadline: @2025-12-16T18:00:00Z
+
+  // 자원 제약
+  memory: &lt;= 1.gigabyte
+  cost: &lt;= 100.dollars
+  energy: minimize
+
+  // 품질 제약
+  accuracy: &gt;= 0.95
+  latency: &lt;= 100.milliseconds
+
+  // 윤리 제약
+  privacy: respect
+  fairness: ensure
+  transparency: required
+
+  // 사용자 정의 제약
+  custom("no_profanity"): true
+}</code></pre>
+
+                <table>
+                    <tr>
+                        <th>제약 유형</th>
+                        <th>목적</th>
+                        <th>예제</th>
+                    </tr>
+                    <tr>
+                        <td>시간</td>
+                        <td>시간 및 마감일 제한</td>
+                        <td><code>time: &lt;= 5.minutes</code></td>
+                    </tr>
+                    <tr>
+                        <td>자원</td>
+                        <td>메모리, 비용, 에너지 경계</td>
+                        <td><code>memory: &lt;= 1.gigabyte</code></td>
+                    </tr>
+                    <tr>
+                        <td>품질</td>
+                        <td>정확도 및 성능</td>
+                        <td><code>accuracy: &gt;= 0.95</code></td>
+                    </tr>
+                    <tr>
+                        <td>윤리</td>
+                        <td>프라이버시, 공정성, 투명성</td>
+                        <td><code>privacy: respect</code></td>
+                    </tr>
+                    <tr>
+                        <td>사용자 정의</td>
+                        <td>도메인별 규칙</td>
+                        <td><code>custom("rule_name"): true</code></td>
+                    </tr>
+                </table>
+            </section>
+
+            <section>
+                <h2>2.5 확실성 값</h2>
+                <p>
+                    확실성은 의도의 결과에 필요한 신뢰 수준을 나타냅니다.
+                    0.0 (완전한 불확실성)과 1.0 (절대적 확실성) 사이의 값입니다.
+                </p>
+
+                <pre><code>intent PredictWeather {
+  given: location, date
+  want: weather_forecast
+
+  certainty: &gt;= 0.8
+
+  fallback {
+    if certainty &lt; 0.8:
+      return uncertain_forecast with warning
+
+    if impossible:
+      ask_human("날씨 예측 실패. 어떻게 할까요?")
+  }
+}</code></pre>
+
+                <h3>확실성 수준 (가이드)</h3>
+                <table>
+                    <tr>
+                        <th>확실성</th>
+                        <th>해석</th>
+                        <th>사용 사례</th>
+                    </tr>
+                    <tr>
+                        <td>0.99+</td>
+                        <td>거의 절대적 확실성</td>
+                        <td>안전 중요 시스템</td>
+                    </tr>
+                    <tr>
+                        <td>0.95-0.99</td>
+                        <td>매우 높은 신뢰도</td>
+                        <td>금융 거래</td>
+                    </tr>
+                    <tr>
+                        <td>0.80-0.95</td>
+                        <td>높은 신뢰도</td>
+                        <td>의료 진단 지원</td>
+                    </tr>
+                    <tr>
+                        <td>0.60-0.80</td>
+                        <td>중간 신뢰도</td>
+                        <td>추천, 예측</td>
+                    </tr>
+                    <tr>
+                        <td>&lt;0.60</td>
+                        <td>낮은 신뢰도</td>
+                        <td>탐색적 분석</td>
+                    </tr>
+                </table>
+
+                <div class="info-box warning">
+                    <h4>중요: 불확실성에 대한 정직함</h4>
+                    <p>
+                        WIA-INTENT는 시스템이 모르는 것에 대해 정직하도록 권장합니다.
+                        낮은 확실성은 실패가 아닙니다—의사 결정을 위한 귀중한 정보입니다.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2>2.6 의도 구성</h2>
+
+                <h3>순차적 의도</h3>
+                <pre><code>intent MakeCoffee {
+  sequence {
+    1. GrindBeans { want: ground_coffee }
+    2. HeatWater { want: hot_water, temp: 92..96 celsius }
+    3. Brew { given: ground_coffee, hot_water; want: coffee }
+  }
+}</code></pre>
+
+                <h3>병렬 의도</h3>
+                <pre><code>intent PrepareBreakfast {
+  parallel {
+    MakeCoffee { want: coffee }
+    ToastBread { want: toast }
+    FryEggs { want: eggs, style: sunny_side_up }
+  }
+  then: Serve { given: coffee, toast, eggs }
+}</code></pre>
+
+                <h3>조건부 의도</h3>
+                <pre><code>intent GetToWork {
+  given: current_location, work_location, weather, time
+
+  choose {
+    when weather.is_rainy and time.is_rush_hour:
+      UseSubway { want: arrive_at work_location }
+
+    when weather.is_nice and time.is_flexible:
+      WalkOrBike { want: arrive_at work_location, prefer: scenic }
+
+    default:
+      UseCar { want: arrive_at work_location }
+  }
+}</code></pre>
+            </section>
+
+            </main>
+
+        </div>
+</body>
+</html>

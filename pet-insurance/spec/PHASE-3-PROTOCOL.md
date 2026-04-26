@@ -1,869 +1,241 @@
-# WIA-PET-010 Pet Insurance - Phase 3: Protocol
+# WIA-pet-insurance PHASE 3 — PROTOCOL Specification
 
-**Version:** 1.0.0
-**Status:** ✅ Complete
-**Last Updated:** 2025-12-25
+**Standard:** WIA-pet-insurance
+**Phase:** 3 — PROTOCOL
+**Version:** 1.0
+**Status:** Stable
 
----
+This document defines the canonical PROTOCOL layer for WIA-pet-insurance (Pet Insurance).
 
-## 1. Overview
-
-Phase 3 defines the communication protocols and real-time processing systems for the WIA Pet Insurance Standard. This specification ensures reliable, secure, and efficient data exchange between all stakeholders in the pet insurance ecosystem.
-
-### 1.1 Protocol Goals
-
-- **Real-time Processing**: Instant claim verification and approval
-- **Event-Driven Architecture**: Asynchronous event handling
-- **Security**: End-to-end encryption and authentication
-- **Reliability**: Guaranteed message delivery
-- **Scalability**: Support for millions of concurrent users
-- **Interoperability**: Cross-provider communication
-
-### 1.2 Protocol Stack
-
-```
-Application Layer: WIA Pet Insurance Protocol (WIA-PET-010)
-Transport Layer: WebSocket, HTTPS, MQTT
-Security Layer: TLS 1.3, JWT, OAuth 2.0
-Data Layer: JSON, Protocol Buffers
-Blockchain Layer: Ethereum, Polygon, Smart Contracts
-```
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 2. Real-Time Communication
-
-### 2.1 WebSocket Protocol
-
-**Connection Endpoint:**
-```
-wss://realtime.wiastandards.com/pet-insurance/v1/ws
-```
-
-**Connection Flow:**
-```
-Client → Server: WebSocket Handshake
-Server → Client: Connection Established
-Client → Server: Authenticate (JWT token)
-Server → Client: Authentication Success
-[Bidirectional messaging begins]
-```
-
-**Authentication:**
-```json
-{
-  "type": "auth",
-  "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "clientId": "CLIENT-2025-001"
-}
-```
-
-**Server Response:**
-```json
-{
-  "type": "auth_success",
-  "sessionId": "SESSION-2025-123456",
-  "expiresIn": 3600,
-  "timestamp": "2025-12-25T10:30:00Z"
-}
-```
-
-### 2.2 Message Format
-
-All WebSocket messages follow this structure:
-
-```json
-{
-  "messageId": "MSG-2025-123456",
-  "type": "message_type",
-  "timestamp": "2025-12-25T10:30:00Z",
-  "payload": { ... },
-  "signature": "sha256:abcdef123456..."
-}
-```
-
-### 2.3 Message Types
-
-| Type | Direction | Description |
-|------|-----------|-------------|
-| `claim.status_update` | Server → Client | Claim status changed |
-| `policy.update` | Server → Client | Policy modified |
-| `coverage.verification` | Client → Server | Verify coverage |
-| `coverage.response` | Server → Client | Coverage verification result |
-| `fraud.alert` | Server → Client | Fraud detected |
-| `premium.adjustment` | Server → Client | Premium changed |
-| `payment.processed` | Server → Client | Payment completed |
-| `heartbeat` | Bidirectional | Keep-alive ping/pong |
-
----
-
-## 3. Claims Processing Protocol
-
-### 3.1 Instant Claim Submission
-
-**Flow:**
-```
-1. Pet Owner submits claim via mobile app
-2. App sends claim to API endpoint
-3. API validates claim data
-4. Fraud detection system checks claim (< 2 seconds)
-5. If low risk: Auto-approve
-6. If medium/high risk: Send to review queue
-7. Notification sent to owner
-8. Blockchain record created
-```
-
-**Claim Submission Message:**
-```json
-{
-  "messageId": "MSG-2025-123456",
-  "type": "claim.submit",
-  "timestamp": "2025-12-21T10:30:00Z",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "policyId": "PET-INS-2025-001234",
-    "type": "Illness",
-    "amount": 850.00,
-    "clinic": {
-      "id": "VET-2025-456",
-      "name": "City Pet Hospital"
-    },
-    "documents": [
-      {
-        "type": "Invoice",
-        "hash": "sha256:9f86d081..."
-      }
-    ]
-  }
-}
-```
-
-**Instant Response:**
-```json
-{
-  "messageId": "MSG-2025-123457",
-  "type": "claim.received",
-  "timestamp": "2025-12-21T10:30:01Z",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "status": "Processing",
-    "estimatedProcessingTime": 120,
-    "trackingUrl": "https://portal.wia.com/claims/CLM-2025-001234"
-  }
-}
-```
-
-**Auto-Approval Message (if approved):**
-```json
-{
-  "messageId": "MSG-2025-123458",
-  "type": "claim.approved",
-  "timestamp": "2025-12-21T10:30:03Z",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "status": "Approved",
-    "amounts": {
-      "total": 850.00,
-      "insurancePays": 480.00,
-      "ownerPays": 370.00
-    },
-    "paymentETA": "2025-12-22T00:00:00Z",
-    "fraudScore": 15,
-    "autoApproved": true
-  }
-}
-```
-
-### 3.2 Real-Time Status Updates
-
-Clients subscribe to claim status updates:
-
-**Subscribe:**
-```json
-{
-  "type": "subscribe",
-  "channel": "claim.CLM-2025-001234"
-}
-```
-
-**Status Update:**
-```json
-{
-  "type": "claim.status_update",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "previousStatus": "Processing",
-    "currentStatus": "Approved",
-    "changedAt": "2025-12-22T09:00:00Z",
-    "changedBy": "AUTO-APPROVAL-SYSTEM"
-  }
-}
-```
-
----
-
-## 4. Policy Management Protocol
-
-### 4.1 Policy Creation Flow
-
-```
-1. Owner fills application
-2. System calculates premium
-3. Health passport data synced (if available)
-4. Risk assessment performed
-5. Premium finalized
-6. Payment processed
-7. Policy activated
-8. Blockchain record created
-9. QR code & VC generated
-10. Welcome email sent
-```
-
-**Policy Creation Event:**
-```json
-{
-  "type": "policy.created",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "pet": { "name": "Buddy", "species": "Dog" },
-    "plan": { "tier": "Premium" },
-    "monthlyPremium": 89.99,
-    "status": "Active",
-    "startDate": "2025-01-01",
-    "blockchain": {
-      "transactionId": "0xfedcba0987654321...",
-      "timestamp": "2025-01-01T00:00:00Z"
-    }
-  }
-}
-```
-
-### 4.2 Policy Update Protocol
-
-**Update Request:**
-```json
-{
-  "type": "policy.update",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "changes": {
-      "plan.tier": "Premium",
-      "owner.email": "newemail@example.com"
-    }
-  }
-}
-```
-
-**Update Confirmation:**
-```json
-{
-  "type": "policy.updated",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "version": 2,
-    "updatedFields": ["plan.tier", "owner.email"],
-    "premiumChange": {
-      "previous": 59.99,
-      "new": 89.99,
-      "effectiveDate": "2025-01-01"
-    },
-    "blockchain": {
-      "transactionId": "0xabcd1234...",
-      "timestamp": "2025-12-25T10:30:00Z"
-    }
-  }
-}
-```
-
----
-
-## 5. Fraud Detection Protocol
-
-### 5.1 Multi-Layer Fraud Detection
-
-```
-Layer 1: Pattern Recognition (ML)
-   ↓
-Layer 2: Cross-Provider Verification
-   ↓
-Layer 3: Blockchain Audit Trail
-   ↓
-Layer 4: Veterinary Clinic Validation
-   ↓
-Layer 5: Historical Analysis
-```
-
-### 5.2 Fraud Check Protocol
-
-**Fraud Check Request:**
-```json
-{
-  "type": "fraud.check",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "policyId": "PET-INS-2025-001234",
-    "amount": 850.00,
-    "clinic": { "id": "VET-2025-456" },
-    "treatmentDate": "2025-12-20",
-    "diagnosis": { "code": "K29.70" }
-  }
-}
-```
-
-**Fraud Check Response:**
-```json
-{
-  "type": "fraud.result",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "fraudScore": 15,
-    "riskLevel": "Low",
-    "flags": [],
-    "checks": {
-      "duplicateClaim": false,
-      "clinicVerified": true,
-      "amountReasonable": true,
-      "frequencyNormal": true,
-      "patternMatch": false,
-      "blockchainVerified": true
-    },
-    "recommendation": "Auto-approve",
-    "confidence": 98
-  }
-}
-```
-
-### 5.3 Fraud Alert Protocol
-
-**High-Risk Alert:**
-```json
-{
-  "type": "fraud.alert",
-  "severity": "High",
-  "payload": {
-    "claimId": "CLM-2025-001235",
-    "fraudScore": 85,
-    "flags": [
-      "Duplicate claim detected",
-      "Clinic not verified",
-      "Amount exceeds typical range"
-    ],
-    "evidence": {
-      "duplicateOf": "CLM-2025-000123",
-      "clinicVerificationStatus": "Unverified",
-      "amountStdDev": 3.2
-    },
-    "action": "Hold for manual review"
-  }
-}
-```
-
----
-
-## 6. Health Integration Protocol
-
-### 6.1 Health Passport Sync
-
-**Sync Request:**
-```json
-{
-  "type": "health.sync",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "healthPassportId": "WIA-PET-HEALTH-001234",
-    "syncMode": "full"
-  }
-}
-```
-
-**Sync Response:**
-```json
-{
-  "type": "health.synced",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "healthPassportId": "WIA-PET-HEALTH-001234",
-    "syncedAt": "2025-12-25T10:30:00Z",
-    "records": {
-      "vaccinations": 8,
-      "medicalHistory": 12,
-      "preventiveCare": 4
-    },
-    "healthScore": 85,
-    "premiumAdjustment": {
-      "previous": 89.99,
-      "new": 84.99,
-      "discount": 5.00,
-      "reason": "Health score >= 80"
-    }
-  }
-}
-```
-
-### 6.2 Auto-Claim from Health Records
-
-When vet visit recorded in health passport, auto-submit claim:
-
-**Health Event Notification:**
-```json
-{
-  "type": "health.event",
-  "payload": {
-    "healthPassportId": "WIA-PET-HEALTH-001234",
-    "eventType": "VetVisit",
-    "eventDate": "2025-12-20",
-    "clinic": { "id": "VET-2025-456" },
-    "cost": 850.00,
-    "diagnosis": "Gastritis"
-  }
-}
-```
-
-**Auto-Claim Creation:**
-```json
-{
-  "type": "claim.auto_created",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "policyId": "PET-INS-2025-001234",
-    "source": "health_passport",
-    "healthEventId": "HEALTH-EVT-2025-567",
-    "status": "Processing",
-    "prePopulated": true
-  }
-}
-```
-
----
-
-## 7. Cross-Border Protocol
-
-### 7.1 International Coverage
-
-**Coverage Check for International Treatment:**
-```json
-{
-  "type": "coverage.international_check",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "treatmentCountry": "CA",
-    "estimatedCost": 1200.00,
-    "currency": "CAD",
-    "clinic": {
-      "name": "Toronto Animal Hospital",
-      "licenseNumber": "VET-ON-2024-789"
-    }
-  }
-}
-```
-
-**Coverage Response:**
-```json
-{
-  "type": "coverage.international_response",
-  "payload": {
-    "covered": true,
-    "conversionRate": 0.74,
-    "estimatedCostUSD": 888.00,
-    "coverageDetails": {
-      "insurancePaysUSD": 510.40,
-      "ownerPaysUSD": 377.60,
-      "insurancePaysCAD": 690.00,
-      "ownerPaysCAD": 510.00
-    },
-    "preApprovalRequired": false,
-    "additionalDocuments": ["Translation of medical records"]
-  }
-}
-```
-
-### 7.2 Multi-Currency Support
-
-**Supported Currencies:**
-- USD (United States Dollar)
-- EUR (Euro)
-- GBP (British Pound)
-- CAD (Canadian Dollar)
-- AUD (Australian Dollar)
-- JPY (Japanese Yen)
-
-**Currency Conversion Protocol:**
-```json
-{
-  "type": "currency.convert",
-  "payload": {
-    "amount": 1200.00,
-    "fromCurrency": "CAD",
-    "toCurrency": "USD",
-    "date": "2025-12-20"
-  }
-}
-```
-
-**Conversion Response:**
-```json
-{
-  "type": "currency.converted",
-  "payload": {
-    "amount": 1200.00,
-    "fromCurrency": "CAD",
-    "toCurrency": "USD",
-    "convertedAmount": 888.00,
-    "exchangeRate": 0.74,
-    "rateDate": "2025-12-20",
-    "source": "XE.com API"
-  }
-}
-```
-
----
-
-## 8. Payment Protocol
-
-### 8.1 Payment Processing Flow
-
-```
-1. Claim approved
-2. Payment amount calculated
-3. Payment method validated
-4. Payment initiated
-5. Bank/payment gateway processes
-6. Confirmation received
-7. Blockchain record updated
-8. Owner notified
-```
-
-**Payment Initiation:**
-```json
-{
-  "type": "payment.initiate",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "policyId": "PET-INS-2025-001234",
-    "amount": 480.00,
-    "currency": "USD",
-    "method": "BankTransfer",
-    "recipient": {
-      "accountHolder": "John Smith",
-      "accountNumber": "encrypted:...",
-      "routingNumber": "encrypted:...",
-      "bankName": "Wells Fargo"
-    }
-  }
-}
-```
-
-**Payment Confirmation:**
-```json
-{
-  "type": "payment.processed",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "paymentId": "PAY-2025-567890",
-    "amount": 480.00,
-    "currency": "USD",
-    "processedAt": "2025-12-22T14:00:00Z",
-    "estimatedArrival": "2025-12-24T00:00:00Z",
-    "transactionId": "TXN-BANK-987654",
-    "status": "Completed"
-  }
-}
-```
-
-### 8.2 Crypto Payment Support
-
-**Crypto Payment Request:**
-```json
-{
-  "type": "payment.crypto",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "amount": 480.00,
-    "currency": "USD",
-    "cryptoCurrency": "USDC",
-    "network": "Ethereum",
-    "recipientAddress": "0x1234567890abcdef..."
-  }
-}
-```
-
-**Crypto Payment Confirmation:**
-```json
-{
-  "type": "payment.crypto_confirmed",
-  "payload": {
-    "claimId": "CLM-2025-001234",
-    "paymentId": "PAY-CRYPTO-2025-123",
-    "amount": 480.00,
-    "cryptoAmount": 480.00,
-    "cryptoCurrency": "USDC",
-    "network": "Ethereum",
-    "transactionHash": "0xabcdef1234567890...",
-    "confirmations": 12,
-    "status": "Confirmed"
-  }
-}
-```
-
----
-
-## 9. Notification Protocol
-
-### 9.1 Multi-Channel Notifications
-
-**Channels:**
-- Email
-- SMS
-- Push Notification (Mobile App)
-- WebSocket (Real-time)
-- Webhook
-
-**Notification Message:**
-```json
-{
-  "type": "notification.send",
-  "payload": {
-    "recipientId": "OWNER-2025-456789",
-    "channels": ["email", "push"],
-    "template": "claim_approved",
-    "data": {
-      "claimId": "CLM-2025-001234",
-      "amount": 480.00,
-      "approvedAt": "2025-12-22T09:00:00Z"
-    },
-    "priority": "High"
-  }
-}
-```
-
-**Notification Status:**
-```json
-{
-  "type": "notification.delivered",
-  "payload": {
-    "notificationId": "NOTIF-2025-123456",
-    "channels": {
-      "email": {
-        "status": "Delivered",
-        "deliveredAt": "2025-12-22T09:01:00Z"
-      },
-      "push": {
-        "status": "Delivered",
-        "deliveredAt": "2025-12-22T09:00:30Z"
-      }
-    }
-  }
-}
-```
-
----
-
-## 10. QR Code & VC Protocol
-
-### 10.1 QR Code Generation
-
-**QR Code Request:**
-```json
-{
-  "type": "qr.generate",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "format": "png",
-    "size": 400,
-    "includeVC": true
-  }
-}
-```
-
-**QR Code Response:**
-```json
-{
-  "type": "qr.generated",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "qrCode": "data:image/png;base64,iVBORw0KGg...",
-    "url": "https://verify.wia.com/qr/PET-INS-2025-001234",
-    "expiresAt": "2026-01-01T00:00:00Z",
-    "vcIncluded": true
-  }
-}
-```
-
-### 10.2 QR Code Verification
-
-**Scan and Verify:**
-```json
-{
-  "type": "qr.verify",
-  "payload": {
-    "qrData": "encrypted_qr_payload",
-    "scannedAt": "2025-12-25T10:30:00Z",
-    "location": {
-      "clinicId": "VET-2025-456",
-      "latitude": 37.7749,
-      "longitude": -122.4194
-    }
-  }
-}
-```
-
-**Verification Response:**
-```json
-{
-  "type": "qr.verified",
-  "payload": {
-    "valid": true,
-    "policyId": "PET-INS-2025-001234",
-    "pet": { "name": "Buddy", "species": "Dog" },
-    "owner": { "name": "John Smith" },
-    "plan": { "tier": "Premium" },
-    "status": "Active",
-    "coverageRemaining": 12500.00,
-    "verifiedAt": "2025-12-25T10:30:01Z"
-  }
-}
-```
-
-### 10.3 Verifiable Credential Protocol
-
-**VC Issuance:**
-```json
-{
-  "type": "vc.issue",
-  "payload": {
-    "policyId": "PET-INS-2025-001234",
-    "credentialType": "PetInsurancePolicy",
-    "validUntil": "2026-01-01T00:00:00Z"
-  }
-}
-```
-
-**VC Response:**
-```json
-{
-  "type": "vc.issued",
-  "payload": {
-    "@context": ["https://www.w3.org/2018/credentials/v1"],
-    "type": ["VerifiableCredential", "PetInsurancePolicy"],
-    "issuer": "did:wia:insurance:premium-pet",
-    "issuanceDate": "2025-01-01T00:00:00Z",
-    "credentialSubject": {
-      "id": "did:wia:pet:001234",
-      "policyId": "PET-INS-2025-001234"
-    },
-    "proof": {
-      "type": "Ed25519Signature2020",
-      "proofValue": "z3FXQzM2NjE4NTA..."
-    }
-  }
-}
-```
-
----
-
-## 11. Error Handling & Retry
-
-### 11.1 Retry Strategy
-
-**Exponential Backoff:**
-```
-Attempt 1: Immediate
-Attempt 2: 1 second
-Attempt 3: 2 seconds
-Attempt 4: 4 seconds
-Attempt 5: 8 seconds
-Max attempts: 5
-```
-
-**Retry Message:**
-```json
-{
-  "type": "retry_attempt",
-  "payload": {
-    "originalMessageId": "MSG-2025-123456",
-    "attempt": 2,
-    "maxAttempts": 5,
-    "nextRetryIn": 2000,
-    "reason": "Timeout waiting for response"
-  }
-}
-```
-
-### 11.2 Dead Letter Queue
-
-Failed messages after max retries go to DLQ:
-
-```json
-{
-  "type": "dlq.message",
-  "payload": {
-    "originalMessage": { ... },
-    "failureReason": "Max retries exceeded",
-    "attempts": 5,
-    "firstAttemptAt": "2025-12-25T10:30:00Z",
-    "lastAttemptAt": "2025-12-25T10:30:15Z"
-  }
-}
-```
-
----
-
-## 12. Monitoring & Heartbeat
-
-### 12.1 Heartbeat Protocol
-
-**Ping:**
-```json
-{
-  "type": "ping",
-  "timestamp": "2025-12-25T10:30:00Z"
-}
-```
-
-**Pong:**
-```json
-{
-  "type": "pong",
-  "timestamp": "2025-12-25T10:30:00Z",
-  "serverTime": "2025-12-25T10:30:00.123Z"
-}
-```
-
-### 12.2 Health Check
-
-**Health Check Request:**
-```json
-{
-  "type": "health.check"
-}
-```
-
-**Health Check Response:**
-```json
-{
-  "type": "health.status",
-  "payload": {
-    "status": "Healthy",
-    "services": {
-      "api": "Up",
-      "database": "Up",
-      "blockchain": "Up",
-      "fraudDetection": "Up",
-      "paymentGateway": "Up"
-    },
-    "latency": {
-      "api": 15,
-      "database": 5,
-      "blockchain": 200
-    },
-    "timestamp": "2025-12-25T10:30:00Z"
-  }
-}
-```
-
----
-
-**弘益人間 · Benefit All Humanity**
-
-*WIA - World Certification Industry Association*
-*© 2025 MIT License*
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pet-insurance
+standard. It addresses the protocol layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-insurance"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-insurance`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-insurance` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

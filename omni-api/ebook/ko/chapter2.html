@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: 데이터 스키마 - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>제2장: 데이터 스키마</h1>
+            <p class="subtitle">요청/응답 정규화 & 프로토콜 매핑</p>
+        </header>
+
+        <div class="content">
+            <h2>2.1 범용 요청 형식</h2>
+
+            <p>
+                WIA-OMNI-API는 기본 사용 사례에서는 간단하게 유지하면서 모든 의도를 표현할 수 있는
+                유연한 요청 형식을 정의합니다. 스키마는 "점진적 복잡성" 원칙을 따릅니다 -
+                간단한 요청은 간단하게 유지되고, 복잡한 요구는 필요할 때 지원됩니다.
+            </p>
+
+            <h3>TypeScript 인터페이스</h3>
+            <pre><code>interface OmniRequest {
+  // 의도 (가장 중요) - 클라이언트가 원하는 것
+  intent: string | WiaIntent;
+
+  // 선택적 힌트 - 제공하지 않으면 어머니가 알아서
+  hints?: {
+    protocol?: 'rest' | 'graphql' | 'grpc' | 'auto';
+    format?: 'json' | 'xml' | 'auto';
+    version?: string | 'latest' | 'compatible';
+    priority?: 'speed' | 'accuracy' | 'cost';
+    timeout?: number | 'patient';  // 어머니는 참을성 있게 기다림
+  };
+
+  // 페이로드 - 어떤 형태든 OK
+  payload?: any;
+
+  // 컨텍스트 - 대화 기록
+  context?: {
+    session_id?: string;
+    previous_requests?: string[];
+    user_preferences?: Record&lt;string, any&gt;;
+  };
+}</code></pre>
+
+            <h3>요청 예제</h3>
+
+            <div class="info-box">
+                <strong>가장 간단한 요청:</strong>
+                <pre><code>{
+  intent: "사용자 정보 가져와",
+  payload: { user_id: 123 }
+}</code></pre>
+                <p>어머니가 자동으로 프로토콜, 포맷, 최적 실행 경로를 결정합니다.</p>
+            </div>
+
+            <h3>자연어 요청</h3>
+            <pre><code>{
+  intent: "사용자 123의 최근 주문 3개만 빨리 가져와",
+  hints: {
+    priority: "speed"
+  }
+}
+
+// 어머니가 해석하고 실행:
+// → 충분히 신선하면 캐시된 데이터 사용
+// → 가장 빠른 프로토콜 선택 (REST 또는 gRPC)
+// → 요청한 것을 정확히 반환</code></pre>
+
+            <h2>2.2 범용 응답 형식</h2>
+
+            <p>
+                모든 응답은 기본 프로토콜이나 백엔드 서비스에 관계없이 일관된 구조를 따릅니다.
+                이러한 예측 가능성으로 클라이언트 코드가 더 간단하고 강건해집니다.
+            </p>
+
+            <h3>TypeScript 인터페이스</h3>
+            <pre><code>interface OmniResponse {
+  // 성공 지표
+  success: boolean;
+
+  // 결과 데이터
+  data?: any;
+
+  // 메타데이터
+  meta: {
+    protocol_used: string;      // 실제 사용된 프로토콜
+    version_used: string;        // 실제 사용된 버전
+    format_used: string;         // 실제 사용된 포맷
+    latency_ms: number;          // 응답 시간
+    from_cache: boolean;         // 캐시 히트?
+    suggestions?: string[];      // 어머니의 조언
+  };
+
+  // 에러 (있다면)
+  error?: {
+    code: string;
+    message: string;
+    comfort: string;             // 어머니의 위로
+    recovery_options: RecoveryOption[];
+  };
+
+  // 관련 리소스 (HATEOAS 스타일, 자동)
+  related?: {
+    next?: string;
+    prev?: string;
+    parent?: string;
+    children?: string[];
+  };
+
+  // 진화 힌트
+  evolution?: {
+    better_approach?: string;    // 개선 제안
+    deprecation_notice?: string; // 사전 경고
+    new_features?: string[];     // 새로운 기능
+  };
+}</code></pre>
+
+            <h2>2.3 프로토콜 매핑</h2>
+
+            <p>
+                프로토콜 수용자 컴포넌트는 의도 기반 요청을 특정 프로토콜 구현에 매핑합니다.
+                이 매핑은 시간이 지남에 따라 학습되고 최적화됩니다.
+            </p>
+
+            <h3>REST 매핑</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>의도</th>
+                        <th>REST 변환</th>
+                        <th>HTTP 메서드</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>사용자 123 가져와</td>
+                        <td>/users/123</td>
+                        <td>GET</td>
+                    </tr>
+                    <tr>
+                        <td>사용자 생성</td>
+                        <td>/users</td>
+                        <td>POST</td>
+                    </tr>
+                    <tr>
+                        <td>사용자 123 업데이트</td>
+                        <td>/users/123</td>
+                        <td>PUT/PATCH</td>
+                    </tr>
+                    <tr>
+                        <td>사용자 123 삭제</td>
+                        <td>/users/123</td>
+                        <td>DELETE</td>
+                    </tr>
+                    <tr>
+                        <td>사용자 목록</td>
+                        <td>/users</td>
+                        <td>GET</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2.4 데이터 정규화</h2>
+
+            <p>
+                백엔드 서비스의 데이터 포맷에 관계없이, WIA-OMNI-API는 응답을 일관된 구조로
+                정규화합니다. 이를 통해 백엔드가 독립적으로 진화하는 동안 클라이언트가
+                데이터를 예측 가능하게 작업할 수 있습니다.
+            </p>
+
+            <h3>타입 강제 변환</h3>
+            <pre><code>// 백엔드 반환: { "amount": "100.50" }  (문자열)
+// 클라이언트 기대: { "amount": 100.50 }     (숫자)
+
+// 어머니가 자동으로 변환하고 변환을 기록:
+{
+  "data": {
+    "amount": 100.50
+  },
+  "meta": {
+    "transformations": [
+      {
+        "field": "amount",
+        "from_type": "string",
+        "to_type": "number",
+        "reason": "client_preference"
+      }
+    ]
+  }
+}</code></pre>
+
+            <h2>2.5 포맷 변환</h2>
+
+            <p>
+                포맷 변환기는 가능한 경우 무손실로 다양한 데이터 직렬화 포맷 간 변환을
+                자동으로 처리합니다.
+            </p>
+
+            <h3>지원 포맷</h3>
+            <ul>
+                <li><strong>JSON</strong>: 기본, 사람이 읽을 수 있음, 광범위하게 지원됨</li>
+                <li><strong>XML</strong>: 레거시 시스템 호환성</li>
+                <li><strong>Protobuf</strong>: 고성능, 타입 안전 바이너리</li>
+                <li><strong>MessagePack</strong>: 압축 바이너리 JSON 대안</li>
+                <li><strong>YAML</strong>: 구성 친화적</li>
+                <li><strong>CSV</strong>: 표 형식 데이터 내보내기</li>
+                <li><strong>사용자 정의</strong>: 확장 가능한 포맷 지원</li>
+            </ul>
+
+            <div class="success-box">
+                <strong>설정 불필요:</strong> 클라이언트는 즉시 모든 포맷 사용 가능.
+                어머니가 모든 변환을 투명하게 처리하며 데이터 손실 가능성이 있을 때
+                적절한 경고를 제공합니다.
+            </div>
+
+            <div class="navigation">
+                <a href="chapter1.html">← 이전: 소개</a>
+                <a href="chapter3.html">다음: API 엔드포인트 →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

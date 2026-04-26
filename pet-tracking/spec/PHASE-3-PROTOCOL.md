@@ -1,272 +1,241 @@
-# Phase 3: Pet Tracking Protocol Specification
+# WIA-pet-tracking PHASE 3 — PROTOCOL Specification
 
-## WIA-PET-TRACKING Protocol Standard
+**Standard:** WIA-pet-tracking
+**Phase:** 3 — PROTOCOL
+**Version:** 1.0
+**Status:** Stable
 
-**Version**: 1.0.0  
-**Date**: 2025-12-25  
-**Status**: Active  
-**Standard ID**: WIA-PET-008-PHASE3  
-**Primary Color**: #F59E0B (Amber)
+This document defines the canonical PROTOCOL layer for WIA-pet-tracking (Pet Tracking).
 
----
-
-## 1. Communication Protocols
-
-### 1.1 Supported Protocols
-
-| Protocol | Transport | Use Case |
-|----------|-----------|----------|
-| HTTPS/REST | TCP | Standard API calls |
-| MQTT | TCP | Real-time IoT updates |
-| CoAP | UDP | Constrained devices |
-| WebSocket | TCP | Live streaming |
-
-### 1.2 MQTT Configuration
-
-**Topics**:
-```
-wia/tracking/{trackerId}/location
-wia/tracking/{trackerId}/battery
-wia/tracking/{trackerId}/geofence
-wia/alerts/{trackerId}/lost-pet
-```
-
-**QoS Levels**:
-- QoS 0: Fire and forget (non-critical)
-- QoS 1: At least once (standard updates)
-- QoS 2: Exactly once (critical alerts)
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 2. Location Update Protocol
+## §1 Scope
 
-### 2.1 Update Frequency Modes
+This PHASE document is one of four that together define the WIA-pet-tracking
+standard. It addresses the protocol layer of the standard.
 
-| Mode | Interval | Battery Life | Use Case |
-|------|----------|--------------|----------|
-| High Performance | 10 seconds | 12-18 hours | Lost pet, active search |
-| Real-time | 30 seconds | 24-36 hours | Live tracking |
-| Normal | 2 minutes | 48-60 hours | Daily monitoring |
-| Eco | 5 minutes | 60-72 hours | Home monitoring |
-| Sleep | 30 minutes | 5-7 days | Low activity |
+## §2 Manifest
 
-### 2.2 Adaptive Updates
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-tracking"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-**Motion Detection Algorithm**:
-```python
-def determine_update_frequency(accelerometer_data):
-    movement_magnitude = calculate_movement(accelerometer_data)
-    
-    if movement_magnitude < 0.1:  # Stationary
-        return 30 * 60  # 30 minutes
-    elif movement_magnitude < 0.3:  # Resting
-        return 10 * 60  # 10 minutes
-    elif movement_magnitude < 1.0:  # Walking
-        return 2 * 60   # 2 minutes
-    else:  # Running
-        return 30       # 30 seconds
-```
+## §3 Conformance Tiers
 
----
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-## 3. Geofence Detection
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-### 3.1 Point-in-Circle Algorithm
+## §4 Discovery
 
-```python
-def check_circular_geofence(location, geofence):
-    distance = haversine(
-        location.latitude, location.longitude,
-        geofence.center.latitude, geofence.center.longitude
-    )
-    
-    accuracy = location.accuracy
-    radius = geofence.radius
-    
-    if distance + accuracy < radius:
-        return "INSIDE"
-    elif distance - accuracy > radius:
-        return "OUTSIDE"
-    else:
-        return "UNCERTAIN"
-```
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-tracking`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-### 3.2 Debouncing
+## §5 Time and Identity
 
-**Time-based debouncing**:
-- Require state change to persist for 30-60 seconds
-- Prevent alert spam from GPS jitter
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-**Hysteresis**:
-- Exit threshold: R + 10m
-- Entry threshold: R - 10m
+## §6 Versioning and Deprecation
 
----
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-## 4. Power Management
+## §7 Privacy and Security
 
-### 4.1 PSM (Power Saving Mode)
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-**LTE Cat-M1 PSM Cycle**:
-```
-1. Sleep (30 seconds): 0.5 mA
-2. Wake + GPS Fix (5 seconds): 40 mA
-3. Transmit (2 seconds): 200 mA
-4. Return to sleep
+## §8 Open Governance
 
-Average Power: ~8 mA (vs. 60 mA always-on)
-Battery Life Extension: 7.5x
-```
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-tracking` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-### 4.2 Battery Optimization Strategies
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-1. **Motion-Based GPS Sampling**
-   - Only activate GPS when movement detected
-   - Save 80% battery when stationary
 
-2. **Assisted GPS (A-GPS)**
-   - Reduce GPS fix time from 30s to 5s
-   - Download ephemeris data via cellular
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
 
-3. **Network Selection**
-   - Prefer Wi-Fi over cellular when available
-   - Use NB-IoT for periodic updates (lower power)
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
 
----
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## 5. Network Failover
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-### 5.1 Connection Priority
+## Annex F — Adoption Roadmap
 
-```
-1st: Wi-Fi (if available, trusted network)
-2nd: Cellular LTE-M (primary)
-3rd: LoRaWAN (rural areas)
-4th: Satellite (emergency, expensive)
-```
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-### 5.2 Offline Buffering
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-**Buffer Management**:
-```typescript
-class OfflineBuffer {
-  maxSize: 7 * 24 * 60;  // 7 days of 1-min intervals
-  
-  priority_levels = {
-    CRITICAL: 256,   // Geofence violations
-    HIGH: 512,       // Movement periods
-    NORMAL: 192,     // Regular updates
-    LOW: 64          // Stationary
-  };
-  
-  add(location: LocationUpdate, priority: Priority) {
-    if (buffer.isFull()) {
-      evict_low_priority_data();
-    }
-    buffer.store(location, priority);
-  }
-  
-  sync_when_online() {
-    upload_by_priority(CRITICAL_first);
-    delete_uploaded_data();
-  }
-}
-```
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
----
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## 6. Data Transmission Optimization
+## Annex G — Test Vectors and Conformance Evidence
 
-### 6.1 Binary Encoding
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-**Protocol Buffers**:
-```protobuf
-message LocationUpdate {
-  string tracker_id = 1;
-  int64 timestamp = 2;
-  double latitude = 3;
-  double longitude = 4;
-  float accuracy = 5;
-  int32 battery = 6;
-  int32 satellites = 7;
-}
-```
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-**Size Comparison**:
-- JSON: 202 bytes
-- CBOR: 65 bytes (68% reduction)
-- Protobuf: 45 bytes (78% reduction)
-- Custom binary: 23 bytes (89% reduction)
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
 
-### 6.2 Compression
+## Annex H — Versioning and Deprecation Policy
 
-**GZIP for batch uploads**:
-- Additional 30-50% size reduction
-- Trade-off: CPU power vs. data cost
-- Recommended for Wi-Fi uploads
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
----
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## 7. Security Protocols
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-### 7.1 Transport Security
+## Annex I — Interoperability Profiles
 
-**TLS 1.3 Required**:
-```
-- Minimum cipher: TLS_AES_128_GCM_SHA256
-- Certificate pinning recommended
-- No fallback to TLS 1.2 or lower
-```
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-### 7.2 Data Encryption
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-**At Rest**:
-- AES-256-GCM
-- Separate keys per user
-- Key rotation every 90 days
-
-**In Transit**:
-- TLS 1.3 mandatory
-- Perfect Forward Secrecy (PFS)
-
----
-
-## 8. Quality of Service
-
-### 8.1 Target Metrics
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Update Latency | < 5 seconds | GPS fix to client display |
-| Location Accuracy | ≤ 10 meters | 95% confidence |
-| Uptime | 99.5% | Monthly availability |
-| Battery Life | ≥ 48 hours | Normal mode |
-| Connection Success | > 95% | Update attempts |
-
-### 8.2 Network Monitoring
-
-**Real-time Diagnostics**:
-```json
-{
-  "networkStatus": {
-    "signalQuality": {
-      "rssi": -75,
-      "rsrq": -12,
-      "bars": 3
-    },
-    "connectivity": {
-      "latency": 85,
-      "packetLoss": 0.5
-    },
-    "performance": {
-      "updateSuccessRate": 0.98,
-      "averageLatency": 92
-    }
-  }
-}
-```
-
----
-
-**弘益人間 · Benefit All Humanity**  
-© 2025 WIA - World Certification Industry Association | MIT License
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

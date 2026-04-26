@@ -1105,9 +1105,7 @@ Monitoring:
 
 ### 11.2 Scientific Literature
 
-1. 선행 연구. "Reach and grasp by people with tetraplegia using a neurally controlled robotic arm." *Nature*, 485(7398), 372-375.
 
-2. 선행 연구. "Deep brain stimulation of the subthalamic nucleus for the treatment of Parkinson's disease." *The Lancet Neurology*, 8(1), 67-81.
 
 3. Wolpaw, J. R., & Wolpaw, E. W. (2012). "Brain-computer interfaces: principles and practice." *Oxford University Press*.
 

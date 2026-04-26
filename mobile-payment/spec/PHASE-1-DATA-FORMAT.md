@@ -1,898 +1,241 @@
-# WIA-FIN-013 Phase 1: Data Format Specification
+# WIA-mobile-payment PHASE 1 — DATA-FORMAT Specification
 
-**Version:** 1.0.0  
-**Status:** Stable  
-**Last Updated:** December 2025
+**Standard:** WIA-mobile-payment
+**Phase:** 1 — DATA-FORMAT
+**Version:** 1.0
+**Status:** Stable
 
----
+This document defines the canonical DATA-FORMAT layer for WIA-mobile-payment (Mobile Payment).
 
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Core Data Types](#core-data-types)
-3. [Transaction Format](#transaction-format)
-4. [Wallet Format](#wallet-format)
-5. [Token Format](#token-format)
-6. [QR Code Format](#qr-code-format)
-7. [Biometric Data Format](#biometric-data-format)
-8. [Error Format](#error-format)
-9. [Validation Rules](#validation-rules)
-10. [Examples](#examples)
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## Overview
-
-The WIA-FIN-013 Phase 1 specification defines standardized JSON schemas for all mobile payment data structures. This ensures interoperability across platforms, languages, and implementations.
-
-### Design Principles
-
-- **Extensibility:** Support for custom fields without breaking compatibility
-- **Validation:** Strict schema validation for security
-- **Versioning:** Backward-compatible schema evolution
-- **Efficiency:** Minimal data size for mobile networks
-- **Security:** No sensitive data in plain text
-
----
-
-## Core Data Types
-
-### Amount
-
-```json
-{
-  "value": "99.99",
-  "currency": "USD",
-  "minorUnits": 2
-}
-```
-
-**Fields:**
-- `value` (string, required): Decimal amount as string to avoid floating-point errors
-- `currency` (string, required): ISO 4217 3-letter currency code
-- `minorUnits` (integer, required): Number of decimal places (2 for USD, 0 for JPY)
-
-### Timestamp
-
-```json
-{
-  "timestamp": "2025-12-25T14:30:00.000Z",
-  "timezone": "UTC"
-}
-```
-
-**Format:** ISO 8601 UTC timestamp
-
-### Address
-
-```json
-{
-  "line1": "123 Main St",
-  "line2": "Apt 4B",
-  "city": "San Francisco",
-  "state": "CA",
-  "postalCode": "94102",
-  "country": "US"
-}
-```
-
-### Device Info
-
-```json
-{
-  "deviceId": "dev_abc123...",
-  "platform": "iOS",
-  "osVersion": "17.2",
-  "appVersion": "2.5.0",
-  "manufacturer": "Apple",
-  "model": "iPhone 15 Pro"
-}
-```
-
----
-
-## Transaction Format
-
-### Payment Transaction
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "transactionId": "tx_1234567890abcdef",
-  "type": "payment",
-  "method": "nfc",
-  "status": "completed",
-  "amount": {
-    "value": "99.99",
-    "currency": "USD",
-    "minorUnits": 2
-  },
-  "merchant": {
-    "id": "merchant_xyz789",
-    "name": "Coffee Shop",
-    "category": "5812",
-    "location": {
-      "latitude": 37.7749,
-      "longitude": -122.4194,
-      "address": {
-        "line1": "456 Market St",
-        "city": "San Francisco",
-        "state": "CA",
-        "postalCode": "94102",
-        "country": "US"
-      }
-    }
-  },
-  "customer": {
-    "customerId": "cust_abc123",
-    "email": "user@example.com",
-    "phone": "+1-555-0100"
-  },
-  "paymentMethod": {
-    "type": "card",
-    "brand": "visa",
-    "last4": "4242",
-    "expiryMonth": 12,
-    "expiryYear": 2028,
-    "tokenId": "tok_secure_abc123..."
-  },
-  "authentication": {
-    "method": "biometric",
-    "type": "face_id",
-    "timestamp": "2025-12-25T14:30:00.000Z",
-    "deviceCVM": true
-  },
-  "device": {
-    "deviceId": "dev_abc123...",
-    "platform": "iOS",
-    "osVersion": "17.2",
-    "appVersion": "2.5.0"
-  },
-  "network": {
-    "acquirer": "Bank of America",
-    "processor": "First Data",
-    "cardNetwork": "Visa"
-  },
-  "cryptogram": {
-    "type": "EMV_3DS",
-    "value": "AgAAAAAAAIIAAAAAVJECAA==",
-    "transactionCounter": 42
-  },
-  "timestamps": {
-    "initiated": "2025-12-25T14:30:00.000Z",
-    "authorized": "2025-12-25T14:30:01.234Z",
-    "completed": "2025-12-25T14:30:02.567Z"
-  },
-  "fees": {
-    "processing": {
-      "value": "0.29",
-      "currency": "USD"
-    },
-    "service": {
-      "value": "0.00",
-      "currency": "USD"
-    }
-  },
-  "metadata": {
-    "orderId": "ORDER-12345",
-    "receiptUrl": "https://example.com/receipts/tx_123",
-    "custom": {}
-  }
-}
-```
-
-### Transaction Status Values
-
-- `initiated`: Transaction started but not authorized
-- `authorizing`: Awaiting authorization
-- `authorized`: Approved by issuer
-- `completed`: Successfully completed
-- `failed`: Transaction failed
-- `declined`: Declined by issuer
-- `cancelled`: Cancelled by user
-- `refunded`: Payment refunded
-- `partially_refunded`: Partial refund issued
-
-### Payment Method Types
-
-- `nfc`: NFC contactless payment
-- `qr_code`: QR code payment
-- `card`: Card-not-present (online)
-- `wallet`: Mobile wallet balance
-- `bank_transfer`: Direct bank transfer
-- `crypto`: Cryptocurrency payment
-
----
-
-## Wallet Format
-
-### Digital Wallet
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "walletId": "wallet_abc123...",
-  "userId": "user_xyz789",
-  "type": "mobile_wallet",
-  "status": "active",
-  "balance": {
-    "available": {
-      "value": "1250.50",
-      "currency": "USD"
-    },
-    "pending": {
-      "value": "50.00",
-      "currency": "USD"
-    },
-    "reserved": {
-      "value": "0.00",
-      "currency": "USD"
-    }
-  },
-  "paymentMethods": [
-    {
-      "id": "pm_card_123",
-      "type": "card",
-      "brand": "visa",
-      "last4": "4242",
-      "expiryMonth": 12,
-      "expiryYear": 2028,
-      "isDefault": true,
-      "tokenId": "tok_abc123...",
-      "billingAddress": {
-        "line1": "123 Main St",
-        "city": "San Francisco",
-        "state": "CA",
-        "postalCode": "94102",
-        "country": "US"
-      }
-    },
-    {
-      "id": "pm_bank_456",
-      "type": "bank_account",
-      "bankName": "Chase",
-      "accountType": "checking",
-      "last4": "6789",
-      "routingNumber": "021000021",
-      "isDefault": false
-    }
-  ],
-  "settings": {
-    "defaultCurrency": "USD",
-    "allowNFC": true,
-    "allowQRCode": true,
-    "biometricEnabled": true,
-    "notificationsEnabled": true,
-    "autoReload": {
-      "enabled": false,
-      "threshold": "50.00",
-      "amount": "100.00",
-      "sourcePaymentMethodId": "pm_card_123"
-    }
-  },
-  "limits": {
-    "daily": {
-      "transaction": {
-        "value": "5000.00",
-        "currency": "USD"
-      },
-      "withdrawal": {
-        "value": "1000.00",
-        "currency": "USD"
-      }
-    },
-    "monthly": {
-      "transaction": {
-        "value": "50000.00",
-        "currency": "USD"
-      }
-    }
-  },
-  "created": "2025-01-01T00:00:00.000Z",
-  "updated": "2025-12-25T14:30:00.000Z"
-}
-```
-
----
-
-## Token Format
-
-### Payment Token
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "tokenId": "tok_1234567890abcdef",
-  "type": "payment_token",
-  "status": "active",
-  "deviceBinding": {
-    "deviceId": "dev_abc123...",
-    "deviceFingerprint": "fp_xyz789...",
-    "bindingMethod": "device_account_number"
-  },
-  "cardDetails": {
-    "tokenPAN": "4900000000001234",
-    "brand": "visa",
-    "last4DigitsRealPAN": "4242",
-    "expiryMonth": 12,
-    "expiryYear": 2028,
-    "cardholderName": "JOHN DOE"
-  },
-  "tokenization": {
-    "requestor": "apple_pay",
-    "requestorId": "40010000000",
-    "tokenProvider": "visa_token_service",
-    "tokenReferenceId": "DWSPMC00000000001234567890"
-  },
-  "securityCodes": {
-    "cvv": "encrypted_cvv_value",
-    "dynamicCVV": true
-  },
-  "restrictions": {
-    "singleUse": false,
-    "maxAmount": {
-      "value": "10000.00",
-      "currency": "USD"
-    },
-    "allowedMerchantCategories": ["5812", "5411"],
-    "allowedCountries": ["US", "CA", "GB"],
-    "expiresAt": "2028-12-31T23:59:59.999Z"
-  },
-  "created": "2025-01-15T10:00:00.000Z",
-  "lastUsed": "2025-12-25T14:30:00.000Z"
-}
-```
-
-### Token Lifecycle Events
-
-```json
-{
-  "tokenId": "tok_1234567890abcdef",
-  "event": "token_activated",
-  "timestamp": "2025-01-15T10:00:00.000Z",
-  "metadata": {
-    "activatedBy": "user",
-    "device": "iPhone 15 Pro"
-  }
-}
-```
-
-**Event Types:**
-- `token_created`: Token provisioned
-- `token_activated`: Token activated for use
-- `token_suspended`: Temporarily suspended
-- `token_resumed`: Reactivated after suspension
-- `token_deleted`: Permanently deleted
-- `token_expired`: Token expired
-
----
-
-## QR Code Format
-
-### Static QR Code
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "qrType": "static",
-  "merchantId": "merchant_xyz789",
-  "merchantName": "Coffee Shop",
-  "qrCodeId": "qr_static_abc123",
-  "paymentDetails": {
-    "amount": {
-      "value": "5.00",
-      "currency": "USD",
-      "editable": false
-    },
-    "description": "Coffee",
-    "reference": "MENU-ITEM-001"
-  },
-  "expiresAt": null,
-  "created": "2025-01-01T00:00:00.000Z"
-}
-```
-
-### Dynamic QR Code
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "qrType": "dynamic",
-  "transactionId": "tx_1234567890abcdef",
-  "merchantId": "merchant_xyz789",
-  "qrCodeId": "qr_dynamic_xyz123",
-  "paymentDetails": {
-    "amount": {
-      "value": "125.50",
-      "currency": "USD",
-      "editable": false
-    },
-    "description": "Restaurant bill #4231",
-    "items": [
-      {
-        "name": "Burger",
-        "quantity": 2,
-        "unitPrice": "15.00",
-        "total": "30.00"
-      },
-      {
-        "name": "Fries",
-        "quantity": 2,
-        "unitPrice": "5.00",
-        "total": "10.00"
-      }
-    ],
-    "tax": "10.05",
-    "tip": "18.00",
-    "total": "125.50"
-  },
-  "expiresAt": "2025-12-25T15:00:00.000Z",
-  "created": "2025-12-25T14:30:00.000Z",
-  "maxScans": 1,
-  "scannedCount": 0
-}
-```
-
----
-
-## Biometric Data Format
-
-### Biometric Authentication
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "authenticationId": "auth_abc123...",
-  "type": "biometric",
-  "method": "fingerprint",
-  "result": "success",
-  "confidence": 98.7,
-  "deviceInfo": {
-    "deviceId": "dev_abc123...",
-    "biometricType": "touch_id",
-    "sensorVersion": "gen3"
-  },
-  "biometricData": {
-    "templateHash": "hash_xyz789...",
-    "encryptedData": "encrypted_bio_data...",
-    "algorithm": "SHA-256"
-  },
-  "liveness": {
-    "detected": true,
-    "score": 99.2
-  },
-  "timestamp": "2025-12-25T14:30:00.000Z",
-  "expiresAt": "2025-12-25T14:35:00.000Z"
-}
-```
-
-**Biometric Methods:**
-- `fingerprint`: Fingerprint scan
-- `face_recognition`: Facial recognition
-- `iris_scan`: Iris scanning
-- `voice_recognition`: Voice biometrics
-- `palm_print`: Palm print recognition
-
----
-
-## Error Format
-
-### Error Response
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "error": {
-    "code": "insufficient_funds",
-    "message": "Insufficient funds in account",
-    "type": "payment_error",
-    "details": {
-      "availableBalance": "45.00",
-      "requestedAmount": "99.99",
-      "currency": "USD"
-    },
-    "timestamp": "2025-12-25T14:30:00.000Z",
-    "requestId": "req_abc123...",
-    "documentation": "https://docs.wiastandards.com/errors/insufficient_funds"
-  }
-}
-```
-
-**Error Types:**
-- `validation_error`: Invalid input data
-- `authentication_error`: Authentication failed
-- `payment_error`: Payment processing error
-- `network_error`: Network/connectivity issue
-- `system_error`: Internal system error
-- `security_error`: Security violation detected
-
-**Common Error Codes:**
-- `invalid_amount`: Amount is invalid
-- `invalid_currency`: Currency not supported
-- `insufficient_funds`: Not enough balance
-- `card_declined`: Card declined by issuer
-- `expired_token`: Token has expired
-- `biometric_failed`: Biometric authentication failed
-- `rate_limit_exceeded`: Too many requests
-
----
-
-## Validation Rules
-
-### Amount Validation
-
-- Must be positive decimal number
-- Maximum 2 decimal places for most currencies
-- Minimum: 0.01 (or currency equivalent)
-- Maximum: 999999.99
-
-### Currency Validation
-
-- Must be valid ISO 4217 code
-- Must be in supported currency list
-
-### Card Validation
-
-- PAN: 13-19 digits (Luhn algorithm)
-- Expiry: Month 1-12, Year >= current year
-- CVV: 3-4 digits
-
-### Token Validation
-
-- Token ID: Unique, alphanumeric, 16-64 characters
-- Must have valid expiry date
-- Device binding required
-
----
-
-## Examples
-
-### Complete Payment Flow
-
-```json
-{
-  "request": {
-    "version": "1.0.0",
-    "standard": "WIA-FIN-013",
-    "type": "payment",
-    "method": "nfc",
-    "amount": {
-      "value": "99.99",
-      "currency": "USD"
-    },
-    "merchantId": "merchant_xyz789",
-    "deviceId": "dev_abc123..."
-  },
-  "response": {
-    "success": true,
-    "transactionId": "tx_1234567890abcdef",
-    "status": "completed",
-    "timestamp": "2025-12-25T14:30:02.567Z"
-  }
-}
-```
-
----
-
-## Compliance
-
-This specification complies with:
-- ISO 20022 (Financial Services Messaging)
-- EMVCo 3.0 Specification
-- PCI DSS 4.0 Requirements
-- GDPR Data Protection Standards
-
----
-
-© 2025 WIA (World Certification Industry Association)  
-License: MIT
-
-## Advanced Data Structures
-
-### P2P Transfer Format
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "transferId": "p2p_1234567890abcdef",
-  "type": "p2p_transfer",
-  "status": "completed",
-  "sender": {
-    "userId": "user_abc123",
-    "walletId": "wallet_sender_xyz",
-    "name": "Alice Johnson",
-    "email": "alice@example.com",
-    "phone": "+1-555-0100"
-  },
-  "recipient": {
-    "userId": "user_def456",
-    "walletId": "wallet_recipient_abc",
-    "name": "Bob Smith",
-    "email": "bob@example.com",
-    "phone": "+1-555-0200",
-    "verificationStatus": "verified"
-  },
-  "amount": {
-    "value": "50.00",
-    "currency": "USD",
-    "minorUnits": 2
-  },
-  "fees": {
-    "sender": {
-      "value": "0.00",
-      "currency": "USD"
-    },
-    "recipient": {
-      "value": "0.00",
-      "currency": "USD"
-    }
-  },
-  "message": "Lunch money 🍕",
-  "memo": "Split bill from restaurant",
-  "timestamps": {
-    "initiated": "2025-12-25T14:30:00.000Z",
-    "completed": "2025-12-25T14:30:02.000Z"
-  },
-  "metadata": {
-    "referenceId": "REF-12345",
-    "groupId": "group_restaurant_split",
-    "tags": ["lunch", "split_bill"]
-  }
-}
-```
-
-### Subscription Payment
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "subscriptionId": "sub_1234567890abcdef",
-  "status": "active",
-  "customer": {
-    "customerId": "cust_abc123",
-    "email": "user@example.com"
-  },
-  "plan": {
-    "planId": "plan_premium",
-    "name": "Premium Plan",
-    "interval": "month",
-    "intervalCount": 1,
-    "amount": {
-      "value": "9.99",
-      "currency": "USD"
-    }
-  },
-  "paymentMethod": {
-    "type": "card",
-    "tokenId": "tok_abc123...",
-    "last4": "4242"
-  },
-  "billing": {
-    "nextBillingDate": "2026-01-25T00:00:00.000Z",
-    "billingDayOfMonth": 25,
-    "prorationBehavior": "create_prorations"
-  },
-  "trialPeriod": {
-    "active": false,
-    "endDate": "2025-02-25T00:00:00.000Z"
-  },
-  "created": "2025-01-25T00:00:00.000Z",
-  "currentPeriodStart": "2025-12-25T00:00:00.000Z",
-  "currentPeriodEnd": "2026-01-25T00:00:00.000Z"
-}
-```
-
-### Refund Format
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "refundId": "ref_1234567890abcdef",
-  "originalTransactionId": "tx_original_123",
-  "status": "completed",
-  "type": "full_refund",
-  "amount": {
-    "value": "99.99",
-    "currency": "USD"
-  },
-  "reason": "customer_request",
-  "reasonCode": "CUST_REQ_001",
-  "reasonDescription": "Customer requested refund within return period",
-  "initiatedBy": {
-    "type": "merchant",
-    "userId": "merchant_admin_123"
-  },
-  "refundMethod": {
-    "type": "original_payment_method",
-    "expectedArrival": "3-5_business_days"
-  },
-  "timestamps": {
-    "requested": "2025-12-26T10:00:00.000Z",
-    "approved": "2025-12-26T10:05:00.000Z",
-    "completed": "2025-12-26T10:10:00.000Z"
-  }
-}
-```
-
-### Dispute/Chargeback Format
-
-```json
-{
-  "version": "1.0.0",
-  "standard": "WIA-FIN-013",
-  "disputeId": "dis_1234567890abcdef",
-  "transactionId": "tx_disputed_123",
-  "status": "under_review",
-  "type": "chargeback",
-  "reason": "fraudulent",
-  "amount": {
-    "value": "99.99",
-    "currency": "USD"
-  },
-  "customer": {
-    "customerId": "cust_abc123",
-    "evidence": {
-      "description": "Unauthorized transaction",
-      "documents": [
-        {
-          "type": "police_report",
-          "url": "https://example.com/docs/police_report.pdf"
-        }
-      ]
-    }
-  },
-  "merchant": {
-    "merchantId": "merchant_xyz789",
-    "evidence": {
-      "description": "Transaction was authorized with biometric",
-      "documents": [
-        {
-          "type": "authentication_log",
-          "url": "https://example.com/logs/auth_log.json"
-        },
-        {
-          "type": "delivery_confirmation",
-          "url": "https://example.com/docs/delivery.pdf"
-        }
-      ]
-    }
-  },
-  "timeline": {
-    "filed": "2025-12-30T00:00:00.000Z",
-    "responseDeadline": "2026-01-15T23:59:59.999Z",
-    "resolution": null
-  }
-}
-```
-
-## Field Specifications
-
-### Required vs Optional Fields
-
-#### Transaction Object
-- **Required:** version, standard, transactionId, type, method, status, amount, timestamps
-- **Optional:** merchant, customer, metadata, fees, device, authentication
-
-#### Wallet Object
-- **Required:** version, standard, walletId, userId, type, status, balance
-- **Optional:** paymentMethods, settings, limits
-
-#### Token Object
-- **Required:** version, standard, tokenId, type, status, deviceBinding, cardDetails
-- **Optional:** restrictions, metadata
-
-### Data Type Specifications
-
-#### String Fields
-- **Maximum length:** 255 characters (unless specified)
-- **Encoding:** UTF-8
-- **Special characters:** Allowed but must be properly escaped in JSON
-
-#### Numeric Fields
-- **Amount values:** Stored as strings to preserve precision
-- **Integer fields:** 32-bit signed integers unless specified
-- **Floating point:** Avoided for monetary values
-
-#### Boolean Fields
-- **Values:** true or false (lowercase)
-- **No null:** Must be explicitly true or false
-
-#### Array Fields
-- **Maximum elements:** 1000 (unless specified)
-- **Empty arrays:** Allowed
-
-#### Object Fields
-- **Nesting depth:** Maximum 5 levels
-- **Custom fields:** Allowed in metadata objects
-
-### Timestamp Standards
-
-All timestamps must follow ISO 8601 format in UTC:
-- Format: YYYY-MM-DDTHH:mm:ss.SSSZ
-- Example: 2025-12-25T14:30:00.000Z
-- Precision: Milliseconds
-- Timezone: Always UTC (Z suffix)
-
-## Schema Versioning
-
-### Version Format
-- Format: MAJOR.MINOR.PATCH
-- Example: 1.0.0
-
-### Version Compatibility
-- **MAJOR:** Breaking changes, requires code updates
-- **MINOR:** New features, backward compatible
-- **PATCH:** Bug fixes, fully compatible
-
-### Migration Strategy
-1. New version released alongside existing version
-2. 6-month deprecation period for old version
-3. Clear migration guide provided
-4. Automated conversion tools available
-
-## Security Considerations
-
-### Sensitive Data Handling
-- **PAN (Primary Account Number):** Never stored or transmitted in plain text
-- **CVV:** Never stored, even encrypted
-- **Biometric data:** Only hashed templates, never raw data
-- **Passwords:** Never included in any data structure
-
-### Encryption Requirements
-- **In Transit:** TLS 1.3 minimum
-- **At Rest:** AES-256 encryption
-- **Key Management:** Hardware Security Module (HSM) recommended
-
-### Data Minimization
-- Only collect necessary data
-- Redact sensitive fields in logs
-- Automatic data expiration policies
-
-## Performance Optimization
-
-### Data Size Guidelines
-- **Transaction object:** ~2-5 KB
-- **Wallet object:** ~5-10 KB
-- **Token object:** ~1-3 KB
-- **QR code object:** ~500 bytes - 2 KB
-
-### Caching Strategies
-- **Static data:** Cache for 24 hours
-- **Dynamic data:** No caching
-- **Tokens:** Cache until expiry
-
-### Compression
-- **Recommended:** gzip compression for API responses
-- **Expected ratio:** 60-70% size reduction
-
-## Testing Data
-
-### Test Card Numbers
-- **Visa:** 4111111111111111
-- **Mastercard:** 5555555555554444
-- **Amex:** 378282246310005
-- **Discover:** 6011111111111117
-
-### Test Scenarios
-1. **Successful payment:** Amount < $100
-2. **Declined payment:** Amount = $100.01
-3. **Insufficient funds:** Amount = $100.02
-4. **Card error:** Amount = $100.03
-5. **Network timeout:** Amount = $100.04
-
----
-
-END OF PHASE 1 DATA FORMAT SPECIFICATION
-
-Total Pages: 25+
-Last Updated: December 25, 2025
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-mobile-payment
+standard. It addresses the data-format layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "mobile-payment"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/mobile-payment`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `mobile-payment` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

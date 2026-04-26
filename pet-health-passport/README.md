@@ -100,6 +100,41 @@ curl -X POST http://localhost:8080/api/v1/quarantine/check \
 
 ---
 
+## Interactive Simulator
+
+Try the Pet Health Passport simulator to see how the system works:
+
+- **[Simulator](simulator/index.html)** - Interactive demo with en/ko language support
+  - Create virtual pet passports
+  - Add vaccination records
+  - Check quarantine eligibility
+  - Generate QR codes
+
+---
+
+## Ebook - Complete Implementation Guide
+
+Learn how to implement the WIA Pet Health Passport standard with our comprehensive ebook:
+
+**[Ebook - $99](ebook/index.html)** - Complete 10-chapter guide
+
+| Chapter | Title | Content |
+|---------|-------|---------|
+| 1 | [Introduction](ebook/chapter-01.html) | WIA philosophy and overview (FREE) |
+| 2 | [Data Format](ebook/chapter-02.html) | JSON-LD schemas and DIDs |
+| 3 | [Algorithms](ebook/chapter-03.html) | Verification and validation |
+| 4 | [Protocol](ebook/chapter-04.html) | REST API and WebSocket |
+| 5 | [Integration](ebook/chapter-05.html) | System integration guides |
+| 6 | Rust Implementation | Production code walkthrough |
+| 7 | International Regulations | EU, US, Asia compliance |
+| 8 | Testing | Test suites and QA |
+| 9 | Deployment | Docker and Kubernetes |
+| 10 | Case Studies | Real-world implementations |
+
+**[Get Certified](https://wia.org/certification/pet-health-passport)** - WIA Implementation Specialist certification
+
+---
+
 ## Data Model
 
 ```

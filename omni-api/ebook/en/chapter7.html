@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA-OMNI-API</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chapter 7: Implementation Examples</h1>
+            <p class="subtitle">Python, TypeScript & Bash for OMNI-API</p>
+        </header>
+
+        <div class="content">
+            <h2>7.1 Python Client Implementation</h2>
+
+            <h3>Basic Usage</h3>
+            <pre><code>import omni_api
+
+# Initialize client
+client = omni_api.Client(
+    base_url="https://api.example.com/omni",
+    api_key="your-api-key"
+)
+
+# Simple intent-based request
+response = client.request(intent="get user 123")
+
+if response.success:
+    print(f"User: {response.data['name']}")
+    print(f"Protocol used: {response.meta['protocol_used']}")
+    print(f"Latency: {response.meta['latency_ms']}ms")
+else:
+    print(f"Error: {response.error['message']}")
+    print(f"Comfort: {response.error['comfort']}")
+
+    # Mother suggests recovery options
+    for option in response.error['recovery_options']:
+        print(f"  - {option['description']}")
+</code></pre>
+
+            <h3>Advanced Features</h3>
+            <pre><code>from omni_api import Client, WiaIntent
+
+client = Client("https://api.example.com/omni")
+
+# Using WIA-INTENT
+intent = WiaIntent("""
+    intent GetUserDashboard {
+        given: user_id = 123
+        want: {
+            profile: complete
+            orders: recent_10
+            activity: today
+        }
+        constraints {
+            latency: <= 200ms
+            freshness: <= 5min
+        }
+        fallback {
+            if timeout: return cached_version
+            if partial_failure: return available_data
+        }
+    }
+""")
+
+response = client.request(
+    intent=intent,
+    hints={
+        "priority": "speed",
+        "protocol": "auto"  # Let Mother choose
+    }
+)
+
+# Response includes rich metadata
+print(f"Cache hit: {response.meta['from_cache']}")
+if response.meta.get('suggestions'):
+    for suggestion in response.meta['suggestions']:
+        print(f"Tip: {suggestion}")
+</code></pre>
+
+            <h3>Async Support</h3>
+            <pre><code>import asyncio
+from omni_api import AsyncClient
+
+async def main():
+    async with AsyncClient("https://api.example.com/omni") as client:
+        # Parallel requests
+        users_task = client.request(intent="list users")
+        orders_task = client.request(intent="list recent orders")
+
+        users, orders = await asyncio.gather(users_task, orders_task)
+
+        print(f"Users: {len(users.data)}")
+        print(f"Orders: {len(orders.data)}")
+
+asyncio.run(main())
+</code></pre>
+
+            <h3>Error Handling with Recovery</h3>
+            <pre><code>from omni_api import Client, OmniError
+
+client = Client("https://api.example.com/omni")
+
+try:
+    response = client.request(intent="get user 999")
+except OmniError as e:
+    print(f"Error: {e.message}")
+    print(f"Comfort: {e.comfort}")
+
+    # Auto-recover if possible
+    if e.auto_recoverable:
+        recovery = e.auto_recover()
+        print(f"Auto-recovered: {recovery}")
+    else:
+        # Show recovery options to user
+        for option in e.recovery_options:
+            print(f"  {option['action']}: {option['description']}")
+            if option['auto_applicable']:
+                result = client.apply_recovery(option)
+                print(f"    Result: {result}")
+                break
+</code></pre>
+
+            <h3>Streaming Responses</h3>
+            <pre><code>from omni_api import Client
+
+client = Client("https://api.example.com/omni")
+
+# Stream large dataset
+for chunk in client.stream(intent="export all users"):
+    # Process chunk
+    print(f"Received {len(chunk.data)} users")
+    process_users(chunk.data)
+
+# Real-time updates via WebSocket (Mother chooses protocol)
+for event in client.subscribe(intent="user 123 activity updates"):
+    print(f"Event: {event.type} at {event.timestamp}")
+    print(f"Details: {event.data}")
+</code></pre>
+
+            <h2>7.2 TypeScript/JavaScript Client</h2>
+
+            <h3>Basic Usage (Browser)</h3>
+            <pre><code>import { OmniClient } from '@wia/omni-api-client';
+
+const client = new OmniClient({
+  baseUrl: 'https://api.example.com/omni',
+  apiKey: 'your-api-key'
+});
+
+// Simple request
+const response = await client.request({
+  intent: 'get user 123'
+});
+
+if (response.success) {
+  console.log('User:', response.data.name);
+  console.log('From cache:', response.meta.from_cache);
+} else {
+  console.error('Error:', response.error.message);
+  console.log('Comfort:', response.error.comfort);
+}
+</code></pre>
+
+            <h3>TypeScript with Type Safety</h3>
+            <pre><code>import { OmniClient, OmniRequest, OmniResponse } from '@wia/omni-api-client';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+interface UserResponse extends OmniResponse {
+  data: User;
+}
+
+const client = new OmniClient('https://api.example.com/omni');
+
+// Type-safe request
+const response = await client.request&lt;UserResponse&gt;({
+  intent: 'get user 123'
+});
+
+if (response.success) {
+  // TypeScript knows the shape of response.data
+  const user: User = response.data;
+  console.log(user.name.toUpperCase());
+}
+</code></pre>
+
+            <h3>React Hook</h3>
+            <pre><code>import { useOmni } from '@wia/omni-api-react';
+
+function UserProfile({ userId }) {
+  const { data, loading, error, refetch } = useOmni({
+    intent: `get user ${userId}`
+  });
+
+  if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+
+  if (error) return (
+    &lt;div&gt;
+      &lt;p&gt;Error: {error.message}&lt;/p&gt;
+      &lt;p&gt;{error.comfort}&lt;/p&gt;
+      {error.recovery_options.map(option =&gt; (
+        &lt;button key={option.action} onClick={() =&gt; applyRecovery(option)}&gt;
+          {option.description}
+        &lt;/button&gt;
+      ))}
+    &lt;/div&gt;
+  );
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;{data.name}&lt;/h1&gt;
+      &lt;p&gt;{data.email}&lt;/p&gt;
+      &lt;button onClick={refetch}&gt;Refresh&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+</code></pre>
+
+            <h3>Real-time Subscriptions</h3>
+            <pre><code>import { OmniClient } from '@wia/omni-api-client';
+
+const client = new OmniClient('https://api.example.com/omni');
+
+// Subscribe to real-time updates
+// Mother chooses optimal protocol (WebSocket, SSE, polling, etc.)
+const subscription = client.subscribe({
+  intent: 'user 123 activity updates'
+});
+
+subscription.on('data', (event) =&gt; {
+  console.log('New activity:', event);
+  updateUI(event);
+});
+
+subscription.on('error', (error) =&gt; {
+  console.error('Subscription error:', error);
+  // Mother auto-reconnects
+});
+
+// Unsubscribe when done
+subscription.unsubscribe();
+</code></pre>
+
+            <h3>Node.js Server-Side</h3>
+            <pre><code>import { OmniClient } from '@wia/omni-api-client';
+import express from 'express';
+
+const client = new OmniClient({
+  baseUrl: 'https://api.example.com/omni',
+  apiKey: process.env.OMNI_API_KEY,
+  hints: {
+    protocol: 'grpc',  // Prefer gRPC for server-to-server
+    priority: 'speed'
+  }
+});
+
+const app = express();
+
+app.get('/users/:id', async (req, res) =&gt; {
+  try {
+    const response = await client.request({
+      intent: `get user ${req.params.id}`
+    });
+
+    if (response.success) {
+      res.json(response.data);
+    } else {
+      res.status(response.error.http_status || 500)
+         .json(response.error);
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(3000);
+</code></pre>
+
+            <h2>7.3 Bash/CLI Usage</h2>
+
+            <h3>Command-Line Interface</h3>
+            <pre><code>#!/bin/bash
+
+# Install CLI tool
+npm install -g @wia/omni-cli
+
+# Configure
+omni config set base-url https://api.example.com/omni
+omni config set api-key your-api-key
+
+# Simple requests
+omni request "get user 123"
+
+# With output formatting
+omni request "list users" --format json | jq '.data[] | .name'
+
+# Save to file
+omni request "export all users" --output users.json
+
+# Stream data
+omni stream "user activity updates" | while read event; do
+  echo "Event: $event"
+  # Process event
+done
+</code></pre>
+
+            <h3>Bash Script Example</h3>
+            <pre><code>#!/bin/bash
+
+# Bulk operations using OMNI-API
+set -e
+
+OMNI_BASE="https://api.example.com/omni"
+API_KEY="your-api-key"
+
+# Function to make OMNI request
+omni_request() {
+  local intent="$1"
+  local payload="$2"
+
+  curl -s -X POST "$OMNI_BASE" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"intent\": \"$intent\", \"payload\": $payload}"
+}
+
+# Get user list
+users=$(omni_request "list active users" "{}")
+
+# Process each user
+echo "$users" | jq -r '.data[].id' | while read user_id; do
+  echo "Processing user $user_id..."
+
+  # Get user details (Mother handles caching)
+  user=$(omni_request "get user $user_id" "{}")
+
+  # Extract data (Mother ensures format consistency)
+  name=$(echo "$user" | jq -r '.data.name')
+
+  echo "  User: $name"
+done
+
+echo "Done!"
+</code></pre>
+
+            <h3>cURL Examples</h3>
+            <pre><code># Simple GET (REST-style)
+curl https://api.example.com/omni/users/123 \
+  -H "Authorization: Bearer your-api-key"
+
+# Intent-based request
+curl -X POST https://api.example.com/omni \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "get user 123 with orders"
+  }'
+
+# With hints
+curl -X POST https://api.example.com/omni \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "list users",
+    "hints": {
+      "priority": "speed",
+      "format": "csv"
+    }
+  }'
+
+# WIA-INTENT
+curl -X POST https://api.example.com/omni \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": {
+      "type": "wia-intent",
+      "code": "intent GetUsers { want: users constraints { active: true } }"
+    }
+  }'
+</code></pre>
+
+            <h2>7.4 Server Implementation</h2>
+
+            <h3>Python Server (FastAPI)</h3>
+            <pre><code>from fastapi import FastAPI
+from omni_api import OmniGateway, IntentHandler
+
+app = FastAPI()
+gateway = OmniGateway()
+
+# Register intent handlers
+@gateway.intent("get user {user_id}")
+async def get_user(user_id: int):
+    # Your business logic
+    user = await db.users.find_one({"id": user_id})
+    return {"success": True, "data": user}
+
+@gateway.intent("list users")
+async def list_users(filters: dict = None):
+    users = await db.users.find(filters or {})
+    return {"success": True, "data": list(users)}
+
+# Mount OMNI gateway
+app.mount("/omni", gateway.as_asgi())
+
+# Mother now handles:
+# - Protocol translation
+# - Format conversion
+# - Caching
+# - Error recovery
+# - Rate limiting
+# - Monitoring
+</code></pre>
+
+            <h3>TypeScript Server (Express)</h3>
+            <pre><code>import express from 'express';
+import { OmniGateway } from '@wia/omni-api-server';
+
+const app = express();
+const gateway = new OmniGateway({
+  evolution: {
+    enabled: true,
+    autoOptimize: ['caching', 'batching']
+  }
+});
+
+// Register backends
+gateway.registerBackend('users', {
+  url: 'https://users-service.internal',
+  protocol: 'rest'
+});
+
+gateway.registerBackend('orders', {
+  url: 'https://orders-service.internal',
+  protocol: 'grpc'
+});
+
+// Register intent handlers
+gateway.onIntent('get user dashboard', async (context) =&gt; {
+  // Mother coordinates calls to multiple backends
+  const [user, orders] = await Promise.all([
+    context.backend('users').get(context.params.user_id),
+    context.backend('orders').list({ user_id: context.params.user_id })
+  ]);
+
+  return {
+    success: true,
+    data: { user, orders }
+  };
+});
+
+// Mount gateway
+app.use('/omni', gateway.middleware());
+
+app.listen(8080);
+</code></pre>
+
+            <h2>7.5 Testing</h2>
+
+            <h3>Unit Tests (Python)</h3>
+            <pre><code>import pytest
+from omni_api import Client
+from omni_api.testing import MockOmni
+
+def test_user_retrieval():
+    # Mock OMNI responses
+    with MockOmni() as mock:
+        mock.on_intent("get user 123").returns({
+            "success": True,
+            "data": {"id": 123, "name": "Kim"}
+        })
+
+        client = Client(mock.url)
+        response = client.request(intent="get user 123")
+
+        assert response.success
+        assert response.data["name"] == "Kim"
+
+def test_error_handling():
+    with MockOmni() as mock:
+        mock.on_intent("get user 999").returns({
+            "success": False,
+            "error": {
+                "code": "USER_NOT_FOUND",
+                "message": "User not found"
+            }
+        })
+
+        client = Client(mock.url)
+        response = client.request(intent="get user 999")
+
+        assert not response.success
+        assert response.error["code"] == "USER_NOT_FOUND"
+</code></pre>
+
+            <h3>Integration Tests (TypeScript)</h3>
+            <pre><code>import { OmniClient } from '@wia/omni-api-client';
+import { describe, it, expect } from 'vitest';
+
+describe('OMNI API Integration', () =&gt; {
+  const client = new OmniClient(process.env.OMNI_TEST_URL);
+
+  it('should retrieve user by intent', async () =&gt; {
+    const response = await client.request({
+      intent: 'get user 123'
+    });
+
+    expect(response.success).toBe(true);
+    expect(response.data.id).toBe(123);
+    expect(response.meta.protocol_used).toBeTruthy();
+  });
+
+  it('should handle protocol translation', async () =&gt; {
+    // Request via REST intent
+    const restResponse = await client.request({
+      intent: 'GET /users/123',
+      hints: { protocol: 'rest' }
+    });
+
+    // Request via GraphQL intent
+    const graphqlResponse = await client.request({
+      intent: 'query { user(id: 123) { name } }',
+      hints: { protocol: 'graphql' }
+    });
+
+    // Both should return same user
+    expect(restResponse.data.id).toBe(graphqlResponse.data.id);
+  });
+});
+</code></pre>
+
+            <div class="success-box">
+                <strong>Best Practices:</strong>
+                <ul>
+                    <li>✓ Use intent-based requests for flexibility</li>
+                    <li>✓ Let Mother choose protocols automatically</li>
+                    <li>✓ Handle errors with recovery options</li>
+                    <li>✓ Leverage caching for performance</li>
+                    <li>✓ Monitor Mother's suggestions for optimization</li>
+                    <li>✓ Write tests against intent, not implementation</li>
+                </ul>
+            </div>
+
+            <div class="navigation">
+                <a href="chapter6.html">← Previous: Security & Privacy</a>
+                <a href="chapter8.html">Next: Certification & Compliance →</a>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

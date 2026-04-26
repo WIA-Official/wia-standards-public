@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 4: OAuth 2.0 and Consent Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(34, 197, 94, 0.2); padding: 2rem; text-align: center; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header h1 { font-size: 2rem; color: #22c55e; margin-bottom: 0.5rem; }
+        .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        h2 { color: #22c55e; font-size: 1.75rem; margin: 2.5rem 0 1rem; }
+        h3 { color: #10b981; font-size: 1.35rem; margin: 2rem 0 1rem; }
+        p, ul { color: #cbd5e1; margin-bottom: 1rem; }
+        ul { margin-left: 2rem; }
+        .code-block { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        .code-block code { color: #22c55e; font-family: 'Monaco', monospace; font-size: 0.9rem; }
+        .highlight { background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 1rem; margin: 1.5rem 0; border-radius: 4px; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(34, 197, 94, 0.2); }
+        .btn { padding: 0.75rem 1.5rem; background: #22c55e; color: #0f172a; border: none; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .btn:hover { background: #16a34a; }
+        .btn-secondary { background: transparent; border: 2px solid #22c55e; color: #22c55e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Chapter 4: OAuth 2.0 and Consent Management</h1>
+        <p style="color: #94a3b8;">WIA-FIN-022 Open Banking Standard</p>
+    </div>
+    <div class="container">
+        <h2>4.1 OAuth 2.0 Authorization Framework</h2>
+        <p>Open Banking uses OAuth 2.0 as the authorization framework, with specific profiles for financial services:</p>
+        <ul>
+            <li><strong>Financial-grade API (FAPI):</strong> Enhanced security profile for high-risk scenarios</li>
+            <li><strong>Authorization Code Flow with PKCE:</strong> Primary flow for web and mobile apps</li>
+            <li><strong>Client Credentials:</strong> For TPP-to-bank authentication without user context</li>
+        </ul>
+
+        <h2>4.2 Authorization Code Flow</h2>
+        <h3>Step 1: Create Consent</h3>
+        <div class="code-block"><code>POST /account-access-consents
+Authorization: Bearer {client_credentials_token}
+
+{
+  "Data": {
+    "Permissions": [
+      "ReadAccountsBasic",
+      "ReadAccountsDetail",
+      "ReadBalances",
+      "ReadTransactionsDetail"
+    ],
+    "ExpirationDateTime": "2026-12-31T23:59:59Z"
+  }
+}
+
+Response: { "Data": { "ConsentId": "AAC-123", "Status": "AwaitingAuthorisation" } }</code></div>
+
+        <h3>Step 2: Authorization Request with PKCE</h3>
+        <div class="code-block"><code>// Generate PKCE verifier and challenge
+const verifier = generateRandomString(128);
+const challenge = base64UrlEncode(sha256(verifier));
+
+// Redirect user to authorization endpoint
+GET /authorize?
+  response_type=code&
+  client_id=tpp-client-123&
+  redirect_uri=https://tpp.example.com/callback&
+  scope=accounts&
+  state=random-state-123&
+  code_challenge={challenge}&
+  code_challenge_method=S256&
+  request={signed_jwt}</code></div>
+
+        <h3>Step 3: User Authentication and Consent</h3>
+        <p>Bank authenticates user with SCA and displays consent screen showing:</p>
+        <ul>
+            <li>TPP name and regulatory details</li>
+            <li>Requested permissions and data access</li>
+            <li>Duration of access</li>
+            <li>Accounts to be shared</li>
+        </ul>
+
+        <h3>Step 4: Exchange Code for Token</h3>
+        <div class="code-block"><code>POST /token
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic {client_credentials}
+
+grant_type=authorization_code&
+code={authorization_code}&
+redirect_uri=https://tpp.example.com/callback&
+code_verifier={verifier}
+
+Response:
+{
+  "access_token": "eyJhbGci...",
+  "token_type": "Bearer",
+  "expires_in": 600,
+  "refresh_token": "refresh_abc...",
+  "scope": "accounts"
+}</code></div>
+
+        <h2>4.3 Consent Lifecycle Management</h2>
+
+        <h3>Consent States</h3>
+        <ul>
+            <li><strong>AwaitingAuthorisation:</strong> Created but not yet authorized by user</li>
+            <li><strong>Authorised:</strong> User approved, can be used for API access</li>
+            <li><strong>Rejected:</strong> User declined consent</li>
+            <li><strong>Revoked:</strong> User or TPP revoked consent</li>
+            <li><strong>Expired:</strong> Consent exceeded expiration time</li>
+            <li><strong>Consumed:</strong> One-time consent used (payments)</li>
+        </ul>
+
+        <h3>Consent Renewal</h3>
+        <p>Account access consents expire after maximum 90 days. TPPs must implement consent renewal flows:</p>
+        <div class="code-block"><code>// Check consent status
+GET /account-access-consents/{ConsentId}
+
+// If expired, create new consent and redirect user
+POST /account-access-consents
+// ... redirect user for re-authorization</code></div>
+
+        <h2>4.4 Refresh Tokens</h2>
+        <p>Use refresh tokens to obtain new access tokens without user interaction:</p>
+        <div class="code-block"><code>POST /token
+grant_type=refresh_token&
+refresh_token={refresh_token}
+
+Response:
+{
+  "access_token": "new_token...",
+  "expires_in": 600,
+  "refresh_token": "new_refresh..." // Optional: token rotation
+}</code></div>
+
+        <h2>4.5 Consent Dashboard</h2>
+        <p>Banks must provide customers with a dashboard to:</p>
+        <ul>
+            <li>View all active consents and TPPs with access</li>
+            <li>See detailed permission grants and data accessed</li>
+            <li>Review access history and API call logs</li>
+            <li>Revoke consents individually or in bulk</li>
+            <li>Receive notifications about consent expirations</li>
+        </ul>
+
+        <h2>4.6 Security Considerations</h2>
+
+        <div class="highlight">
+            <strong style="color: #22c55e;">Best Practices:</strong>
+            <ul style="margin-top: 0.5rem;">
+                <li>Always use PKCE to prevent authorization code interception</li>
+                <li>Validate state parameter to prevent CSRF attacks</li>
+                <li>Implement token rotation for refresh tokens</li>
+                <li>Use short-lived access tokens (5-10 minutes)</li>
+                <li>Store refresh tokens securely (encrypted, httpOnly cookies)</li>
+                <li>Implement token revocation endpoint</li>
+                <li>Log all consent and token operations</li>
+            </ul>
+        </div>
+
+        <h2>4.7 Advanced Patterns</h2>
+
+        <h3>Request Object (JAR)</h3>
+        <p>For enhanced security, authorization parameters can be sent as signed JWT:</p>
+        <div class="code-block"><code>// Create signed request object
+const requestObject = signJWT({
+  iss: "tpp-client-123",
+  aud: "https://bank.example.com",
+  response_type: "code",
+  client_id: "tpp-client-123",
+  redirect_uri: "https://tpp.example.com/callback",
+  scope: "accounts payments",
+  state: "xyz",
+  nonce: "abc",
+  claims: {
+    id_token: { acr: { essential: true, value: "urn:openbanking:psd2:sca" } },
+    userinfo: { openbanking_intent_id: { value: "AAC-123", essential: true } }
+  }
+}, privateKey);
+
+// Authorization request
+GET /authorize?
+  request={requestObject}&
+  client_id=tpp-client-123</code></div>
+
+        </div>
+</body>
+</html>

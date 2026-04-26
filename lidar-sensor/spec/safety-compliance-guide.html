@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WIA-SEMI-014 Safety and Compliance Guide</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 1000px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+        h1 { color: #8B5CF6; border-bottom: 3px solid #8B5CF6; padding-bottom: 10px; }
+        h2 { color: #0891B2; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; }
+        th { background: #8B5CF6; color: white; padding: 12px; }
+        td { padding: 10px; border: 1px solid #ddd; }
+        .safety-section { background: white; padding: 25px; margin: 20px 0; border-left: 4px solid #ef4444; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .warning { background: #fee2e2; padding: 15px; border-left: 4px solid #ef4444; margin: 15px 0; }
+        pre { background: #f0f0f0; padding: 15px; border-radius: 5px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>WIA-SEMI-014: Safety and Compliance Guide for Automotive LiDAR</h1>
+    
+    <div class="warning">
+        <strong>⚠️ SAFETY CRITICAL:</strong> This document provides guidance on laser safety, functional safety, and regulatory compliance for automotive LiDAR systems. All implementers MUST comply with applicable national and international standards. This guide is informational and does not replace official standards documentation.
+    </div>
+
+    <div class="safety-section">
+        <h2>1. Laser Safety (IEC 60825-1:2014)</h2>
+        
+        <h3>1.1 Laser Classification Requirements</h3>
+        <p>Automotive LiDAR systems MUST comply with IEC 60825-1:2014 "Safety of laser products - Part 1: Equipment classification and requirements".</p>
+        
+        <table>
+            <tr>
+                <th>Wavelength</th>
+                <th>Target Classification</th>
+                <th>Maximum AEL (Accessible Emission Limit)</th>
+                <th>Viewing Condition</th>
+            </tr>
+            <tr>
+                <td>905nm</td>
+                <td>Class 1</td>
+                <td>0.39 mW (CW equivalent)</td>
+                <td>Direct viewing</td>
+            </tr>
+            <tr>
+                <td>905nm</td>
+                <td>Class 1M</td>
+                <td>Varies by beam divergence</td>
+                <td>Safe for naked eye; hazardous with magnifying optics</td>
+            </tr>
+            <tr>
+                <td>1550nm</td>
+                <td>Class 1</td>
+                <td>10 mW (CW equivalent)</td>
+                <td>All viewing conditions (cornea absorbs)</td>
+            </tr>
+        </table>
+
+        <h3>1.2 MPE (Maximum Permissible Exposure) Calculation</h3>
+        <pre>
+For pulsed lasers @ 905nm:
+
+MPE = 5 × 10^-7 × C_A × C_E  [J/cm²]
+
+Where:
+C_A = 10^((α-0.7)/100)  (wavelength correction factor)
+    α = 700nm to 1050nm: α = λ (nm)
+    For 905nm: C_A = 10^((905-700)/100) = 10^2.05 = 112.2
+
+C_E = 1 for pulse duration ≤ 10 seconds
+
+Example Calculation:
+LiDAR with 5ns pulse @ 905nm:
+MPE = 5 × 10^-7 × 112.2 × 1 = 5.61 × 10^-5 J/cm²
+
+For 7mm diameter pupil (worst case):
+Area = π × (0.35cm)² = 0.385 cm²
+Maximum pulse energy at eye = 5.61 × 10^-5 × 0.385 = 2.16 × 10^-5 J = 21.6 μJ
+
+Class 1M limit @ 905nm with 100mm viewing optics:
+AEL increases by factor of (100mm/7mm)² = 204
+Permitted energy = 21.6 μJ × 204 = 4.4 mJ per pulse
+        </pre>
+
+        <h3>1.3 Safety Labeling Requirements</h3>
+        <p>LiDAR enclosures MUST display appropriate safety labels:</p>
+        <ul>
+            <li><strong>Class 1:</strong> Label not required but recommended: "CLASS 1 LASER PRODUCT"</li>
+            <li><strong>Class 1M:</strong> MANDATORY warning label:
+                <br><em>"LASER RADIATION - DO NOT VIEW DIRECTLY WITH OPTICAL INSTRUMENTS - CLASS 1M LASER PRODUCT"</em>
+            </li>
+            <li>Wavelength, pulse duration, and maximum output power MUST be documented</li>
+            <li>Manufacturer name, model number, date of manufacture, serial number</li>
+        </ul>
+    </div>
+
+    <div class="safety-section">
+        <h2>2. Functional Safety (ISO 26262:2018)</h2>
+        
+        <h3>2.1 ASIL Classification for LiDAR-Based Functions</h3>
+        <table>
+            <tr>
+                <th>Function</th>
+                <th>SAE Automation Level</th>
+                <th>Required ASIL</th>
+                <th>Rationale</th>
+            </tr>
+            <tr>
+                <td>Adaptive Cruise Control</td>
+                <td>Level 1</td>
+                <td>ASIL-B</td>
+                <td>Driver always monitors, can override</td>
+            </tr>
+            <tr>
+                <td>Automatic Emergency Braking</td>
+                <td>Level 1-2</td>
+                <td>ASIL-B or ASIL-C</td>
+                <td>Safety-critical intervention</td>
+            </tr>
+            <tr>
+                <td>Traffic Jam Pilot (Highway)</td>
+                <td>Level 3</td>
+                <td>ASIL-C or ASIL-D</td>
+                <td>System controls vehicle; driver not monitoring</td>
+            </tr>
+            <tr>
+                <td>Urban Autonomous Driving</td>
+                <td>Level 4</td>
+                <td>ASIL-D</td>
+                <td>Full responsibility for safety-critical decisions</td>
+            </tr>
+            <tr>
+                <td>Robotaxi (No Driver)</td>
+                <td>Level 5</td>
+                <td>ASIL-D</td>
+                <td>No human oversight; passengers at risk</td>
+            </tr>
+        </table>
+
+        <h3>2.2 Safety Mechanisms for LiDAR Sensors</h3>
+        <ul>
+            <li><strong>Redundant Processing:</strong> Dual microcontrollers with cross-checking for ASIL-C/D</li>
+            <li><strong>Diagnostic Coverage:</strong> Self-test routines detecting ≥99% of safety-relevant faults</li>
+            <li><strong>Safe State Transition:</strong> Automatic shutdown or degraded mode upon fault detection</li>
+            <li><strong>Watchdog Timers:</strong> Reset system if software becomes unresponsive</li>
+            <li><strong>CRC/Checksum:</strong> Data integrity verification for all communication channels</li>
+            <li><strong>Temperature Monitoring:</strong> Shutdown if junction temperature exceeds +150°C</li>
+            <li><strong>Laser Power Monitoring:</strong> Feedback loop ensures output within safe limits</li>
+        </ul>
+
+        <h3>2.3 Fault Metrics Requirements</h3>
+        <table>
+            <tr>
+                <th>ASIL Level</th>
+                <th>PMHF Target (Probabilistic Metric for Hardware Failures)</th>
+                <th>SPFM (Single-Point Fault Metric)</th>
+                <th>LFM (Latent Fault Metric)</th>
+            </tr>
+            <tr>
+                <td>ASIL-B</td>
+                <td><100 FIT</td>
+                <td>≥90%</td>
+                <td>≥60%</td>
+            </tr>
+            <tr>
+                <td>ASIL-C</td>
+                <td><100 FIT</td>
+                <td>≥97%</td>
+                <td>≥80%</td>
+            </tr>
+            <tr>
+                <td>ASIL-D</td>
+                <td><10 FIT</td>
+                <td>≥99%</td>
+                <td>≥90%</td>
+            </tr>
+        </table>
+        <p><em>Note: 1 FIT = 1 failure in 10^9 device-hours</em></p>
+    </div>
+
+    <div class="safety-section">
+        <h2>3. Electromagnetic Compatibility (EMC)</h2>
+        
+        <h3>3.1 EMI Emissions (CISPR 25)</h3>
+        <p>LiDAR sensors MUST meet CISPR 25 Class 5 limits for conducted and radiated emissions:</p>
+        <ul>
+            <li><strong>Frequency Range:</strong> 150 kHz to 2.5 GHz</li>
+            <li><strong>Limits:</strong> Narrowband and broadband emissions per CISPR 25 Class 5 tables</li>
+            <li><strong>Test Setup:</strong> LISN (Line Impedance Stabilization Network), 1m antenna distance</li>
+        </ul>
+
+        <h3>3.2 EMI Immunity (ISO 11452 Series)</h3>
+        <table>
+            <tr>
+                <th>Test Standard</th>
+                <th>Test Type</th>
+                <th>Level</th>
+            </tr>
+            <tr>
+                <td>ISO 11452-2</td>
+                <td>Radiated immunity (80 MHz - 6 GHz)</td>
+                <td>100 V/m</td>
+            </tr>
+            <tr>
+                <td>ISO 11452-4</td>
+                <td>Bulk current injection (BCI)</td>
+                <td>200 mA</td>
+            </tr>
+            <tr>
+                <td>ISO 7637-2</td>
+                <td>Electrical transients (power lines)</td>
+                <td>Level IV</td>
+            </tr>
+            <tr>
+                <td>ISO 10605</td>
+                <td>Electrostatic discharge (ESD)</td>
+                <td>±8kV contact, ±15kV air</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="safety-section">
+        <h2>4. Environmental Protection (IP Rating)</h2>
+        
+        <h3>4.1 Ingress Protection per IEC 60529</h3>
+        <table>
+            <tr>
+                <th>IP Rating</th>
+                <th>Dust Protection</th>
+                <th>Water Protection</th>
+                <th>Application</th>
+            </tr>
+            <tr>
+                <td>IP67</td>
+                <td>Dust-tight (6)</td>
+                <td>Immersion up to 1m, 30 minutes (7)</td>
+                <td>Minimum for automotive use</td>
+            </tr>
+            <tr>
+                <td>IP68</td>
+                <td>Dust-tight (6)</td>
+                <td>Continuous immersion >1m (8)</td>
+                <td>Recommended for harsh environments</td>
+            </tr>
+            <tr>
+                <td>IP69K</td>
+                <td>Dust-tight (6)</td>
+                <td>High-pressure, high-temp wash (9K)</td>
+                <td>Commercial vehicles, frequent washing</td>
+            </tr>
+        </table>
+
+        <h3>4.2 Environmental Testing Requirements</h3>
+        <ul>
+            <li><strong>Salt Spray (ISO 9227):</strong> 96 hours neutral salt spray test, no corrosion</li>
+            <li><strong>Thermal Shock (IEC 60068-2-14):</strong> -40°C to +85°C, 100 cycles</li>
+            <li><strong>Vibration (ISO 16750-3):</strong> Random vibration profile per automotive standard</li>
+            <li><strong>Mechanical Shock (ISO 16750-3):</strong> 50G shock pulse, half-sine, 11ms duration</li>
+        </ul>
+    </div>
+
+    <div class="safety-section">
+        <h2>5. Cybersecurity (ISO/SAE 21434)</h2>
+        
+        <h3>5.1 Threat Analysis and Risk Assessment</h3>
+        <p>LiDAR systems MUST undergo cybersecurity risk assessment per ISO/SAE 21434:</p>
+        <ul>
+            <li><strong>Spoofing Attack:</strong> Injecting false laser returns to create phantom objects</li>
+            <li><strong>Jamming Attack:</strong> Saturating detector with laser to blind sensor</li>
+            <li><strong>Firmware Tampering:</strong> Unauthorized firmware modifications</li>
+            <li><strong>Data Injection:</strong> Malicious point cloud data via Ethernet interface</li>
+        </ul>
+
+        <h3>5.2 Security Measures</h3>
+        <ul>
+            <li><strong>Secure Boot:</strong> Verify firmware integrity via cryptographic signature before execution</li>
+            <li><strong>Firmware Encryption:</strong> AES-256 encrypted firmware images</li>
+            <li><strong>Communication Authentication:</strong> MAC (Message Authentication Code) for CAN/Ethernet messages</li>
+            <li><strong>Intrusion Detection:</strong> Monitor for anomalous laser returns or data patterns</li>
+            <li><strong>Update Security:</strong> Signed firmware updates with rollback protection</li>
+        </ul>
+    </div>
+
+    <div class="safety-section">
+        <h2>6. Compliance Documentation Checklist</h2>
+        
+        <h3>6.1 Required Documentation for Certification</h3>
+        <ul>
+            <li>☐ IEC 60825-1 Laser Safety Test Report (from accredited lab)</li>
+            <li>☐ ISO 26262 Functional Safety Case (ASIL decomposition, FMEA, FTA)</li>
+            <li>☐ CISPR 25 EMI Emissions Test Report</li>
+            <li>☐ ISO 11452 EMI Immunity Test Report</li>
+            <li>☐ IEC 60529 IP Rating Test Report</li>
+            <li>☐ AEC-Q100 Qualification Test Report (temperature cycling, HTOL, etc.)</li>
+            <li>☐ ISO 16750 Environmental Test Report</li>
+            <li>☐ ISO/SAE 21434 Cybersecurity Risk Assessment</li>
+            <li>☐ Declaration of Conformity (signed by authorized representative)</li>
+            <li>☐ Technical File (design documents, schematics, BOM, software architecture)</li>
+        </ul>
+
+        <h3>6.2 Ongoing Compliance Obligations</h3>
+        <ul>
+            <li>Annual safety review and audit per ISO 26262 Part 8</li>
+            <li>Field failure monitoring and reporting (IATF 16949 quality management)</li>
+            <li>Cybersecurity vulnerability monitoring and patching</li>
+            <li>Maintain traceability of all production units (serial numbers, test data)</li>
+            <li>Periodic re-certification if design changes significantly</li>
+        </ul>
+    </div>
+
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ddd; color: #666; text-align: center;">
+        <p>&copy; 2025 WIA | WIA-SEMI-014 Safety and Compliance Guide</p>
+        <p><strong>Disclaimer:</strong> This guide provides general information only. Consult official standards and qualified legal/engineering professionals for certification.</p>
+    </footer>
+</body>
+</html>

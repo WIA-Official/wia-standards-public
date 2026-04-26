@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 영상 압축 기술 - WIA 의료 영상 표준</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { padding: 2rem 0; border-bottom: 2px solid #14B8A6; margin-bottom: 2rem; }
+        .chapter-number { font-size: 1rem; color: #14B8A6; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #f8fafc; margin-bottom: 1rem; }
+        h2 { color: #14B8A6; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(20, 184, 166, 0.3); }
+        h3 { color: #14B8A6; font-size: 1.3rem; margin: 2rem 0 1rem 0; }
+        p { margin-bottom: 1.2rem; color: #cbd5e1; }
+        .chapter-nav { background: #1e293b; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .nav-button { padding: 0.75rem 1.5rem; background: #334155; color: #14B8A6; text-decoration: none; border-radius: 6px; transition: all 0.3s ease; border: 1px solid #14B8A6; }
+        .nav-button:hover { background: #14B8A6; color: #0f172a; transform: translateY(-2px); }
+        .highlight-box { background: rgba(20, 184, 166, 0.1); border-left: 4px solid #14B8A6; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #14B8A6; color: #0f172a; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #334155; }
+        .code-block { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; overflow-x: auto; }
+        .code-header { color: #14B8A6; font-size: 0.9rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; }
+        pre { margin: 0; color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 0.9rem; line-height: 1.6; }
+        .string { color: #fbbf24; }
+        .number { color: #a78bfa; }
+        .comment { color: #64748b; font-style: italic; }
+        ul, ol { margin: 1rem 0 1rem 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+        .stat-card { background: #1e293b; padding: 1.5rem; border-radius: 8px; border: 1px solid #334155; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #14B8A6; margin-bottom: 0.5rem; }
+        .stat-label { color: #94a3b8; font-size: 0.9rem; }
+        footer { margin-top: 4rem; padding: 2rem 0; text-align: center; border-top: 2px solid #334155; color: #64748b; }
+        .footer-tagline { font-size: 1.1rem; color: #14B8A6; margin-bottom: 0.5rem; }
+        @media (max-width: 768px) { h1 { font-size: 2rem; } .container { padding: 1rem; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">3장</div>
+            <h1>영상 압축 기술</h1>
+        </header>
+
+        <div class="highlight-box">
+            <strong>장 개요:</strong> 의료 영상 데이터는 방대한 용량을 차지하므로, 효율적인 저장과 전송을 위해 압축이 필수적입니다. 이 장에서는 무손실/손실 압축 기술, JPEG, JPEG 2000, JPEG-LS, RLE 등 DICOM 표준 압축 방식과 압축률 최적화, 품질 관리 전략을 다룹니다.
+        </div>
+
+        <h2>의료 영상 압축의 필요성</h2>
+
+        <p>현대 의료 기관은 매일 수천 건의 검사를 수행하며, 각 검사는 수십에서 수백 개의 영상을 생성합니다. CT 한 번에 500장, MRI 한 번에 1,000장 이상의 영상이 생성될 수 있으며, 이는 압축 없이는 관리가 불가능한 데이터 양입니다.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">1PB+</div>
+                <div class="stat-label">대형 병원 연간 데이터</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">70-90%</div>
+                <div class="stat-label">압축률 (손실 압축)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">50-70%</div>
+                <div class="stat-label">압축률 (무손실 압축)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">$M</div>
+                <div class="stat-label">연간 스토리지 비용 절감</div>
+            </div>
+        </div>
+
+        <h2>무손실 vs 손실 압축</h2>
+
+        <h3>무손실 압축 (Lossless Compression)</h3>
+
+        <p>무손실 압축은 압축 해제 후 원본 데이터를 완벽하게 복원할 수 있는 압축 방식입니다. 의료 영상에서는 진단 정확도를 위해 무손실 압축이 선호됩니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>압축 방식</th>
+                    <th>DICOM TS UID</th>
+                    <th>일반적 압축률</th>
+                    <th>장점</th>
+                    <th>단점</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>RLE</td>
+                    <td>1.2.840.10008.1.2.5</td>
+                    <td>30-50%</td>
+                    <td>빠름, 간단</td>
+                    <td>낮은 압축률</td>
+                </tr>
+                <tr>
+                    <td>JPEG-LS</td>
+                    <td>1.2.840.10008.1.2.4.80</td>
+                    <td>50-60%</td>
+                    <td>우수한 압축률</td>
+                    <td>느림</td>
+                </tr>
+                <tr>
+                    <td>JPEG 2000 Lossless</td>
+                    <td>1.2.840.10008.1.2.4.90</td>
+                    <td>40-70%</td>
+                    <td>확장성, ROI</td>
+                    <td>복잡, 느림</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>손실 압축 (Lossy Compression)</h3>
+
+        <p>손실 압축은 인간의 시각적 인지 한계를 활용하여 높은 압축률을 달성하지만, 원본 데이터는 완벽히 복원되지 않습니다. 법적, 의학적 책임 문제로 신중하게 사용해야 합니다.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>압축 방식</th>
+                    <th>DICOM TS UID</th>
+                    <th>일반적 압축률</th>
+                    <th>품질 파라미터</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>JPEG Lossy</td>
+                    <td>1.2.840.10008.1.2.4.50</td>
+                    <td>70-90%</td>
+                    <td>Quality: 80-95</td>
+                </tr>
+                <tr>
+                    <td>JPEG 2000 Lossy</td>
+                    <td>1.2.840.10008.1.2.4.91</td>
+                    <td>80-95%</td>
+                    <td>Compression Ratio: 10:1 - 50:1</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>RLE (Run-Length Encoding)</h2>
+
+        <p>RLE은 연속된 동일한 값을 (값, 개수)의 쌍으로 표현하는 가장 간단한 압축 방식입니다.</p>
+
+        <div class="code-block">
+            <div class="code-header">RLE 압축 예시</div>
+            <pre><span class="comment">// 원본 데이터</span>
+[0, 0, 0, 0, 0, 255, 255, 128, 128, 128, 128, 0, 0, 0]
+
+<span class="comment">// RLE 압축 결과</span>
+[(0, 5), (255, 2), (128, 4), (0, 3)]
+
+<span class="comment">// DICOM RLE 구조</span>
+{
+  <span class="string">"RLE Header"</span>: {
+    <span class="string">"Number of Segments"</span>: <span class="number">1</span>,
+    <span class="string">"Offset Table"</span>: [<span class="number">64</span>, <span class="number">0</span>, <span class="number">0</span>, ..., <span class="number">0</span>]
+  },
+  <span class="string">"RLE Segments"</span>: [
+    {
+      <span class="string">"segment"</span>: <span class="number">0</span>,
+      <span class="string">"data"</span>: <span class="string">"[compressed byte stream]"</span>
+    }
+  ]
+}</pre>
+        </div>
+
+        <h3>RLE 특성</h3>
+
+        <ul>
+            <li><strong>압축 속도:</strong> 매우 빠름 (실시간 가능)</li>
+            <li><strong>압축률:</strong> 영상 내용에 따라 크게 변동 (30-50%)</li>
+            <li><strong>적용 대상:</strong> X-Ray, CR 등 균일한 배경이 많은 영상</li>
+            <li><strong>한계:</strong> 복잡한 영상에서는 압축률 저하</li>
+            <li><strong>장점:</strong> 구현 간단, CPU 부하 낮음</li>
+        </ul>
+
+        <h2>JPEG (Joint Photographic Experts Group)</h2>
+
+        <p>JPEG은 가장 널리 사용되는 영상 압축 표준으로, DCT(Discrete Cosine Transform) 기반 손실/무손실 압축을 지원합니다.</p>
+
+        <h3>JPEG 압축 과정</h3>
+
+        <div class="code-block">
+            <div class="code-header">JPEG 압축 파이프라인</div>
+            <pre>
+1. <span class="string">Color Space Transformation</span>
+   RGB → YCbCr (밝기와 색상 분리)
+
+2. <span class="string">Downsampling</span>
+   4:2:0, 4:2:2, 4:4:4 (색상 서브샘플링)
+
+3. <span class="string">Block Division</span>
+   8×8 픽셀 블록으로 분할
+
+4. <span class="string">DCT (Discrete Cosine Transform)</span>
+   공간 영역 → 주파수 영역 변환
+
+5. <span class="string">Quantization</span>
+   고주파 성분 제거 (손실 발생 단계)
+
+6. <span class="string">Entropy Coding</span>
+   Huffman 또는 Arithmetic 코딩
+
+7. <span class="string">Bitstream Generation</span>
+   JPEG 파일 생성
+</pre>
+        </div>
+
+        <h3>JPEG 품질 파라미터</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>품질 설정</th>
+                    <th>압축률</th>
+                    <th>시각적 품질</th>
+                    <th>의료 영상 권장 사용</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>95-100</td>
+                    <td>5:1 - 10:1</td>
+                    <td>거의 원본급</td>
+                    <td>진단 영상 (CR, DX)</td>
+                </tr>
+                <tr>
+                    <td>90-94</td>
+                    <td>10:1 - 15:1</td>
+                    <td>우수</td>
+                    <td>일반 진단 영상</td>
+                </tr>
+                <tr>
+                    <td>80-89</td>
+                    <td>15:1 - 25:1</td>
+                    <td>양호</td>
+                    <td>참고 영상, 교육용</td>
+                </tr>
+                <tr>
+                    <td>70-79</td>
+                    <td>25:1 - 40:1</td>
+                    <td>보통</td>
+                    <td>웹 전송, 썸네일</td>
+                </tr>
+                <tr>
+                    <td>&lt;70</td>
+                    <td>&gt;40:1</td>
+                    <td>낮음</td>
+                    <td>의료용 부적합</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>JPEG 2000</h2>
+
+        <p>JPEG 2000은 Wavelet 변환 기반의 차세대 압축 표준으로, JPEG보다 우수한 압축 효율과 다양한 기능을 제공합니다.</p>
+
+        <h3>JPEG 2000 주요 기능</h3>
+
+        <ul>
+            <li><strong>무손실/손실 통합:</strong> 하나의 코덱으로 두 모드 지원</li>
+            <li><strong>Progressive Transmission:</strong> 점진적 품질 개선 전송</li>
+            <li><strong>ROI (Region of Interest):</strong> 관심 영역 고품질 압축</li>
+            <li><strong>Error Resilience:</strong> 데이터 손상 시 복원력 향상</li>
+            <li><strong>Scalability:</strong> 해상도, 품질, 공간 확장성</li>
+        </ul>
+
+        <div class="code-block">
+            <div class="code-header">JPEG 2000 DICOM 설정</div>
+            <pre>{
+  <span class="string">"Transfer Syntax"</span>: <span class="string">"1.2.840.10008.1.2.4.90"</span>, <span class="comment">// Lossless</span>
+  <span class="string">"Wavelet Transform"</span>: <span class="string">"9/7 irreversible"</span>, <span class="comment">// or 5/3 reversible</span>
+  <span class="string">"Decomposition Levels"</span>: <span class="number">5</span>,
+  <span class="string">"Code Block Size"</span>: <span class="string">"64x64"</span>,
+  <span class="string">"Precinct Size"</span>: <span class="string">"256x256"</span>,
+  <span class="string">"Progression Order"</span>: <span class="string">"LRCP"</span>, <span class="comment">// Layer-Resolution-Component-Position</span>
+  <span class="string">"Number of Quality Layers"</span>: <span class="number">8</span>,
+  <span class="string">"ROI"</span>: {
+    <span class="string">"enabled"</span>: <span class="number">true</span>,
+    <span class="string">"shift"</span>: <span class="number">5</span>,
+    <span class="string">"coordinates"</span>: [<span class="number">100</span>, <span class="number">100</span>, <span class="number">300</span>, <span class="number">300</span>]
+  }
+}</pre>
+        </div>
+
+        <h3>JPEG vs JPEG 2000 비교</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>특성</th>
+                    <th>JPEG</th>
+                    <th>JPEG 2000</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>압축 알고리즘</td>
+                    <td>DCT</td>
+                    <td>DWT (Wavelet)</td>
+                </tr>
+                <tr>
+                    <td>압축률 (손실)</td>
+                    <td>10:1 - 30:1</td>
+                    <td>20:1 - 100:1</td>
+                </tr>
+                <tr>
+                    <td>무손실 지원</td>
+                    <td>제한적</td>
+                    <td>우수</td>
+                </tr>
+                <tr>
+                    <td>압축 속도</td>
+                    <td>빠름</td>
+                    <td>느림</td>
+                </tr>
+                <tr>
+                    <td>화질 (동일 압축률)</td>
+                    <td>양호</td>
+                    <td>우수</td>
+                </tr>
+                <tr>
+                    <td>ROI 지원</td>
+                    <td>없음</td>
+                    <td>있음</td>
+                </tr>
+                <tr>
+                    <td>Progressive 전송</td>
+                    <td>제한적</td>
+                    <td>우수</td>
+                </tr>
+                <tr>
+                    <td>복잡도</td>
+                    <td>낮음</td>
+                    <td>높음</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>JPEG-LS</h2>
+
+        <p>JPEG-LS는 무손실/거의 무손실(near-lossless) 압축에 특화된 표준으로, 의료 영상에 이상적입니다.</p>
+
+        <div class="code-block">
+            <div class="code-header">JPEG-LS 특성</div>
+            <pre>
+<span class="string">알고리즘:</span> LOCO-I (Low Complexity Lossless Compression for Images)
+
+<span class="string">압축 모드:</span>
+  • Lossless: 완벽한 원본 복원
+  • Near-lossless: 최대 오차 제한 (예: MAXVAL=3)
+
+<span class="string">예측 모델:</span>
+  Current Pixel = f(N, W, NW)
+
+  N  = North pixel
+  W  = West pixel
+  NW = North-West pixel
+
+<span class="string">컨텍스트 모델링:</span>
+  365개의 컨텍스트 사용
+
+<span class="string">Golomb-Rice 코딩:</span>
+  효율적인 엔트로피 코딩
+
+<span class="string">압축률:</span>
+  • CT/MRI: 50-60% 크기 감소
+  • X-Ray: 40-50% 크기 감소
+  • 초음파: 30-40% 크기 감소
+</pre>
+        </div>
+
+        <h2>압축 방식 선택 가이드라인</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>영상 타입</th>
+                    <th>1차 권장</th>
+                    <th>2차 권장</th>
+                    <th>이유</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>CT (진단)</td>
+                    <td>JPEG-LS</td>
+                    <td>JPEG 2000 Lossless</td>
+                    <td>정밀한 HU 값 필요</td>
+                </tr>
+                <tr>
+                    <td>MRI (진단)</td>
+                    <td>JPEG-LS</td>
+                    <td>JPEG 2000 Lossless</td>
+                    <td>다양한 시퀀스 품질 유지</td>
+                </tr>
+                <tr>
+                    <td>X-Ray (진단)</td>
+                    <td>JPEG Quality 90+</td>
+                    <td>JPEG-LS</td>
+                    <td>균형잡힌 압축/품질</td>
+                </tr>
+                <tr>
+                    <td>초음파</td>
+                    <td>JPEG 2000</td>
+                    <td>JPEG Quality 85+</td>
+                    <td>동영상 데이터 효율성</td>
+                </tr>
+                <tr>
+                    <td>유방촬영</td>
+                    <td>무압축</td>
+                    <td>JPEG-LS</td>
+                    <td>법적 요구사항</td>
+                </tr>
+                <tr>
+                    <td>병리 (WSI)</td>
+                    <td>JPEG 2000</td>
+                    <td>JPEG Quality 95+</td>
+                    <td>초대용량, ROI 필요</td>
+                </tr>
+                <tr>
+                    <td>내시경</td>
+                    <td>JPEG Quality 90</td>
+                    <td>JPEG 2000</td>
+                    <td>RGB 컬러 최적화</td>
+                </tr>
+                <tr>
+                    <td>PET/SPECT</td>
+                    <td>JPEG-LS</td>
+                    <td>JPEG 2000 Lossless</td>
+                    <td>정량 분석 필요</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>압축 품질 평가</h2>
+
+        <h3>객관적 평가 지표</h3>
+
+        <div class="code-block">
+            <div class="code-header">영상 품질 측정 지표</div>
+            <pre>
+1. <span class="string">PSNR (Peak Signal-to-Noise Ratio)</span>
+   PSNR = 10 × log₁₀(MAX²/MSE)
+
+   일반적 기준:
+   • PSNR > 40 dB: 우수 (의료 영상 권장)
+   • PSNR 30-40 dB: 양호
+   • PSNR < 30 dB: 부적합
+
+2. <span class="string">MSE (Mean Squared Error)</span>
+   MSE = (1/N) × Σ(original - compressed)²
+
+   낮을수록 좋음
+
+3. <span class="string">SSIM (Structural Similarity Index)</span>
+   SSIM(x,y) = [l(x,y)]^α × [c(x,y)]^β × [s(x,y)]^γ
+
+   범위: -1 ~ 1 (1이 완벽)
+   • SSIM > 0.95: 우수
+   • SSIM 0.90-0.95: 양호
+   • SSIM < 0.90: 주의 필요
+
+4. <span class="string">Compression Ratio</span>
+   CR = Original Size / Compressed Size
+
+   예: 10:1 = 90% 크기 감소
+</pre>
+        </div>
+
+        <h3>주관적 평가</h3>
+
+        <ul>
+            <li><strong>5단계 척도:</strong> 1 (품질 저하 심함) ~ 5 (원본과 구별 불가)</li>
+            <li><strong>ABX 테스트:</strong> 원본 vs 압축 영상 블라인드 비교</li>
+            <li><strong>진단 정확도:</strong> 압축이 진단 결과에 미치는 영향 평가</li>
+            <li><strong>병변 검출률:</strong> 압축 전후 병변 발견율 비교</li>
+        </ul>
+
+        <h2>PACS 압축 정책 예시</h2>
+
+        <div class="code-block">
+            <div class="code-header">병원 PACS 압축 정책</div>
+            <pre>{
+  <span class="string">"compression_policy"</span>: {
+    <span class="string">"short_term_archive"</span>: {
+      <span class="string">"duration"</span>: <span class="string">"1 year"</span>,
+      <span class="string">"compression"</span>: <span class="string">"lossless or uncompressed"</span>,
+      <span class="string">"modalities"</span>: {
+        <span class="string">"CT"</span>: <span class="string">"JPEG-LS"</span>,
+        <span class="string">"MR"</span>: <span class="string">"JPEG-LS"</span>,
+        <span class="string">"CR/DX"</span>: <span class="string">"JPEG Quality 95"</span>,
+        <span class="string">"MG"</span>: <span class="string">"uncompressed"</span>,
+        <span class="string">"US"</span>: <span class="string">"JPEG 2000 Lossless"</span>
+      }
+    },
+    <span class="string">"long_term_archive"</span>: {
+      <span class="string">"duration"</span>: <span class="string">"2-10 years"</span>,
+      <span class="string">"compression"</span>: <span class="string">"moderate lossy allowed"</span>,
+      <span class="string">"modalities"</span>: {
+        <span class="string">"CT"</span>: <span class="string">"JPEG 2000 10:1"</span>,
+        <span class="string">"MR"</span>: <span class="string">"JPEG 2000 15:1"</span>,
+        <span class="string">"CR/DX"</span>: <span class="string">"JPEG Quality 90"</span>,
+        <span class="string">"MG"</span>: <span class="string">"JPEG-LS"</span>
+      }
+    },
+    <span class="string">"permanent_archive"</span>: {
+      <span class="string">"duration"</span>: <span class="string">"10+ years"</span>,
+      <span class="string">"compression"</span>: <span class="string">"high compression"</span>,
+      <span class="string">"modalities"</span>: {
+        <span class="string">"CT"</span>: <span class="string">"JPEG 2000 20:1"</span>,
+        <span class="string">"MR"</span>: <span class="string">"JPEG 2000 25:1"</span>,
+        <span class="string">"CR/DX"</span>: <span class="string">"JPEG Quality 85"</span>
+      }
+    }
+  },
+  <span class="string">"exceptions"</span>: {
+    <span class="string">"legal_cases"</span>: <span class="string">"uncompressed"</span>,
+    <span class="string">"research_data"</span>: <span class="string">"lossless only"</span>,
+    <span class="string">"teaching_files"</span>: <span class="string">"JPEG Quality 90+"</span>
+  }
+}</pre>
+        </div>
+
+        <h2>압축 구현 모범 사례</h2>
+
+        <ol>
+            <li><strong>모달리티별 최적화:</strong> 각 영상 타입의 특성에 맞는 압축 방식 선택</li>
+            <li><strong>법적 요구사항 준수:</strong> 지역 규제에 따른 압축 제한 확인</li>
+            <li><strong>정기적 품질 검증:</strong> 압축 영상의 진단 품질 모니터링</li>
+            <li><strong>원본 보존:</strong> 중요 케이스는 원본 무압축 백업 유지</li>
+            <li><strong>점진적 전환:</strong> 압축 정책 변경 시 점진적으로 적용</li>
+            <li><strong>사용자 교육:</strong> 의료진에게 압축 효과 교육</li>
+            <li><strong>성능 모니터링:</strong> 압축/해제 속도가 워크플로우에 미치는 영향 평가</li>
+            <li><strong>스토리지 최적화:</strong> 압축률과 액세스 속도 균형 유지</li>
+        </ol>
+
+        <div class="highlight-box">
+            <strong>핵심 요약:</strong> 의료 영상 압축은 스토리지 비용 절감과 전송 효율성 향상에 필수적이지만, 진단 품질을 유지하는 것이 최우선입니다. JPEG-LS와 JPEG 2000 무손실 모드가 대부분의 의료 영상에 적합하며, 손실 압축은 신중한 검증 후 장기 아카이브에 제한적으로 사용해야 합니다.
+        </div>
+
+        </div>
+</body>
+</html>

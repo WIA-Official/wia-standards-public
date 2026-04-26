@@ -1,522 +1,241 @@
-# WIA-PET-007 PHASE 1: DATA FORMAT SPECIFICATION
+# WIA-pet-wearable PHASE 1 — DATA-FORMAT Specification
 
-**Version:** 1.0.0  
-**Date:** 2025-12-25  
-**Status:** Active Standard
+**Standard:** WIA-pet-wearable
+**Phase:** 1 — DATA-FORMAT
+**Version:** 1.0
+**Status:** Stable
 
----
+This document defines the canonical DATA-FORMAT layer for WIA-pet-wearable (Pet Wearable).
 
-## 1. Overview
-
-PHASE 1 defines the core data formats and structures for WIA-PET-007 Pet Wearable devices. All compliant devices must use these standardized JSON formats for data storage, transmission, and API communication.
-
-### 1.1 Design Principles
-
-- **Human-Readable:** JSON format for easy inspection and debugging
-- **Self-Describing:** Clear field names and structure
-- **Extensible:** Forward-compatible with future additions
-- **Compact:** Optimized for bandwidth efficiency
-- **Versioned:** Schema version tracking for compatibility
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## 2. Base Data Structure
-
-All WIA-PET-007 data objects share a common base structure:
-
-```json
-{
-  "schemaVersion": "1.0.0",
-  "standard": "WIA-PET-007",
-  "deviceId": "PW-{SPECIES}-{SERIAL}",
-  "timestamp": "ISO8601 UTC",
-  "petProfile": { },
-  "metadata": { }
-}
-```
-
-### 2.1 Field Specifications
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| schemaVersion | string | Yes | Format: MAJOR.MINOR.PATCH |
-| standard | string | Yes | Always "WIA-PET-007" |
-| deviceId | string | Yes | Unique device identifier |
-| timestamp | string | Yes | ISO 8601 UTC format |
-| petProfile | object | Yes | Pet information (see §3) |
-| metadata | object | Yes | Device metadata (see §4) |
-
----
-
-## 3. Pet Profile Format
-
-```json
-{
-  "petProfile": {
-    "petId": "PET-UUID-12345",
-    "name": "Max",
-    "species": "dog",
-    "breed": "Golden Retriever",
-    "birthdate": "YYYY-MM-DD",
-    "gender": "male|female|neutered_male|spayed_female",
-    "weight": 30.5,
-    "weightUnit": "kg|lbs",
-    "microchipId": "985112345678901",
-    "color": "Golden",
-    "distinguishingMarks": "White patch on chest"
-  }
-}
-```
-
-### 3.1 Species Values
-
-**Standard species codes:**
-- `dog` - Canis familiaris
-- `cat` - Felis catus
-- `rabbit` - Oryctolagus cuniculus
-- `ferret` - Mustela putorius furo
-- `other` - Other companion animals
-
----
-
-## 4. Health Data Format
-
-```json
-{
-  "healthData": {
-    "timestamp": "2025-12-25T10:30:00.000Z",
-    "heartRate": {
-      "value": 95,
-      "unit": "bpm",
-      "quality": 92,
-      "qualityScale": "0-100",
-      "context": "resting|light|moderate|vigorous"
-    },
-    "temperature": {
-      "value": 38.5,
-      "unit": "celsius|fahrenheit",
-      "quality": 88,
-      "qualityScale": "0-100",
-      "measurementSite": "collar_contact|rectal|ear"
-    },
-    "respiratoryRate": {
-      "value": 22,
-      "unit": "breaths_per_minute",
-      "quality": 78,
-      "qualityScale": "0-100",
-      "measurementDuration": 60
-    },
-    "heartRateVariability": {
-      "sdnn": 52,
-      "rmssd": 38,
-      "pnn50": 15.5,
-      "unit": "milliseconds"
-    }
-  }
-}
-```
-
-### 4.1 Quality Score Definition
-
-Quality scores (0-100) indicate data reliability:
-
-- **90-100:** Excellent - Clinical-grade accuracy
-- **70-89:** Good - Suitable for wellness tracking
-- **50-69:** Fair - General trends only
-- **0-49:** Poor - Should be discarded
-
----
-
-## 5. Activity Data Format
-
-```json
-{
-  "activityData": {
-    "date": "YYYY-MM-DD",
-    "summary": {
-      "totalSteps": 8523,
-      "distance": {
-        "value": 6.2,
-        "unit": "kilometers|miles"
-      },
-      "calories": {
-        "value": 245,
-        "unit": "kcal"
-      },
-      "activeMinutes": 87,
-      "restMinutes": 1353,
-      "goalAchievement": {
-        "steps": 85,
-        "activeMinutes": 72,
-        "unit": "percent"
-      }
-    },
-    "hourlyBreakdown": [
-      {
-        "hour": 0-23,
-        "steps": 520,
-        "distance": 0.4,
-        "calories": 18,
-        "dominantActivity": "resting|standing|walking|running|playing"
-      }
-    ],
-    "activities": [
-      {
-        "startTime": "ISO8601",
-        "endTime": "ISO8601",
-        "type": "walking|running|playing|resting|eating|drinking",
-        "duration": 900,
-        "durationUnit": "seconds",
-        "intensity": "low|moderate|high|vigorous",
-        "steps": 1200,
-        "distance": 0.8,
-        "calories": 45
-      }
-    ]
-  }
-}
-```
-
----
-
-## 6. Location Data Format
-
-```json
-{
-  "locationData": {
-    "timestamp": "ISO8601",
-    "coordinates": {
-      "latitude": 37.5665,
-      "longitude": 126.9780,
-      "altitude": 35.0,
-      "accuracy": 5.0,
-      "altitudeAccuracy": 12.0,
-      "unit": "meters"
-    },
-    "source": "gps|wifi|cell|bluetooth|fusion",
-    "satellites": 12,
-    "hdop": 1.2,
-    "speed": {
-      "value": 4.5,
-      "unit": "km_per_hour|mph",
-      "heading": 234,
-      "headingUnit": "degrees"
-    },
-    "address": {
-      "formatted": "Seoul, South Korea",
-      "street": "123 Main Street",
-      "locality": "Seoul",
-      "region": "Seoul",
-      "postalCode": "12345",
-      "country": "KR"
-    },
-    "geofenceStatus": {
-      "insideZone": true,
-      "zoneName": "Home Safe Zone",
-      "zoneId": "FENCE-HOME-001"
-    }
-  }
-}
-```
-
----
-
-## 7. Alert Data Format
-
-```json
-{
-  "alert": {
-    "alertId": "ALERT-UUID",
-    "timestamp": "ISO8601",
-    "severity": "critical|high|medium|low",
-    "type": "health|geofence|battery|device|behavior",
-    "category": {
-      "health": ["elevated_heart_rate", "fever", "low_activity", "abnormal_breathing"],
-      "geofence": ["zone_exit", "zone_entry", "escape"],
-      "battery": ["low_battery", "critical_battery", "charging"],
-      "device": ["connection_lost", "sensor_error", "firmware_update"],
-      "behavior": ["excessive_scratching", "prolonged_rest", "unusual_activity"]
-    },
-    "metric": {
-      "name": "heartRate",
-      "value": 180,
-      "unit": "bpm",
-      "normalRange": "60-120"
-    },
-    "duration": 320,
-    "durationUnit": "seconds",
-    "context": {
-      "activityLevel": "moderate",
-      "ambientTemperature": 28,
-      "recentActivity": "running"
-    },
-    "recommendation": "Monitor closely. Contact vet if sustained > 30 minutes.",
-    "acknowledged": false,
-    "acknowledgedAt": null,
-    "resolvedAt": null
-  }
-}
-```
-
----
-
-## 8. Battery and Device Status Format
-
-```json
-{
-  "deviceStatus": {
-    "timestamp": "ISO8601",
-    "battery": {
-      "level": 87,
-      "levelUnit": "percent",
-      "voltage": 4.05,
-      "voltageUnit": "volts",
-      "charging": false,
-      "timeToEmpty": 9.5,
-      "timeToFull": null,
-      "timeUnit": "days",
-      "health": 95,
-      "healthUnit": "percent",
-      "cycles": 123,
-      "temperature": 25,
-      "temperatureUnit": "celsius"
-    },
-    "connectivity": {
-      "bluetooth": {
-        "connected": true,
-        "signalStrength": -65,
-        "signalUnit": "dBm"
-      },
-      "wifi": {
-        "connected": false,
-        "ssid": null,
-        "signalStrength": null
-      },
-      "cellular": {
-        "connected": true,
-        "signalStrength": -85,
-        "signalUnit": "dBm",
-        "operator": "AT&T",
-        "technology": "LTE"
-      },
-      "gps": {
-        "available": true,
-        "satellites": 12,
-        "accuracy": 5.0
-      }
-    },
-    "firmware": {
-      "version": "2.3.1",
-      "buildNumber": "20251215-abc123",
-      "lastUpdate": "ISO8601"
-    },
-    "sensors": {
-      "accelerometer": "operational|degraded|failed",
-      "heartRateSensor": "operational|degraded|failed",
-      "temperatureSensor": "operational|degraded|failed",
-      "gpsModule": "operational|degraded|failed"
-    }
-  }
-}
-```
-
----
-
-## 9. Data Type Specifications
-
-### 9.1 Timestamp Format
-
-**ISO 8601 UTC format required:**
-```
-YYYY-MM-DDTHH:MM:SS.sssZ
-```
-
-Examples:
-- `2025-12-25T10:30:00.000Z`
-- `2025-01-15T14:22:15.123Z`
-
-### 9.2 Numeric Precision
-
-| Data Type | Precision | Range |
-|-----------|-----------|-------|
-| Heart Rate | Integer | 0-300 bpm |
-| Temperature | Float (1 decimal) | 35.0-42.0 °C |
-| Respiratory Rate | Integer | 0-100 breaths/min |
-| GPS Coordinates | Float (6 decimals) | Lat: -90 to 90, Lng: -180 to 180 |
-| Distance | Float (2 decimals) | 0-999.99 km |
-| Battery | Integer | 0-100% |
-
----
-
-## 10. Error Handling
-
-### 10.1 Missing Data Representation
-
-Use `null` for missing optional fields:
-
-```json
-{
-  "temperature": {
-    "value": null,
-    "unit": "celsius",
-    "quality": 0,
-    "measurementSite": "collar_contact"
-  }
-}
-```
-
-### 10.2 Invalid Data Flags
-
-Use quality score of 0 for invalid measurements:
-
-```json
-{
-  "heartRate": {
-    "value": 95,
-    "unit": "bpm",
-    "quality": 0,
-    "context": "sensor_error"
-  }
-}
-```
-
----
-
-## 11. Compression and Optimization
-
-### 11.1 Field Omission
-
-Optional fields may be omitted if not applicable:
-
-```json
-{
-  "healthData": {
-    "heartRate": { ... },
-    "temperature": { ... }
-    // respiratory rate omitted if not measured
-  }
-}
-```
-
-### 11.2 Batch Data Format
-
-For bulk transfers, use array format:
-
-```json
-{
-  "batchData": {
-    "schemaVersion": "1.0.0",
-    "deviceId": "PW-DOG-12345",
-    "dataType": "health",
-    "samples": [
-      {"timestamp": "...", "heartRate": {...}},
-      {"timestamp": "...", "heartRate": {...}},
-      ...
-    ]
-  }
-}
-```
-
----
-
-## 12. Validation Rules
-
-### 12.1 Required Field Validation
-
-All `required: true` fields must be present and non-null.
-
-### 12.2 Range Validation
-
-Numeric values must fall within specified ranges. Out-of-range values should be rejected.
-
-### 12.3 Format Validation
-
-- Timestamps must be valid ISO 8601
-- Device IDs must match pattern: `^PW-[A-Z]+-[0-9A-Z]+$`
-- Email addresses must be valid RFC 5322
-
----
-
-## 13. Version Compatibility
-
-### 13.1 Forward Compatibility
-
-Parsers must ignore unknown fields:
-
-```json
-{
-  "heartRate": {...},
-  "newMetricInV2": {...}  // Ignored by v1.0 parsers
-}
-```
-
-### 13.2 Backward Compatibility
-
-New versions must not remove required fields from previous versions.
-
----
-
-## Appendix A: Complete Example
-
-```json
-{
-  "schemaVersion": "1.0.0",
-  "standard": "WIA-PET-007",
-  "deviceId": "PW-DOG-12345",
-  "timestamp": "2025-12-25T10:30:00.000Z",
-  "petProfile": {
-    "petId": "PET-ABC-789",
-    "name": "Max",
-    "species": "dog",
-    "breed": "Golden Retriever",
-    "birthdate": "2020-03-15",
-    "gender": "male",
-    "weight": 30.5,
-    "weightUnit": "kg"
-  },
-  "metadata": {
-    "firmwareVersion": "2.3.1",
-    "batteryLevel": 87,
-    "signalStrength": -65
-  },
-  "healthData": {
-    "timestamp": "2025-12-25T10:30:00.000Z",
-    "heartRate": {
-      "value": 95,
-      "unit": "bpm",
-      "quality": 92,
-      "context": "resting"
-    },
-    "temperature": {
-      "value": 38.5,
-      "unit": "celsius",
-      "quality": 88,
-      "measurementSite": "collar_contact"
-    }
-  },
-  "locationData": {
-    "coordinates": {
-      "latitude": 37.5665,
-      "longitude": 126.9780,
-      "accuracy": 5.0
-    },
-    "source": "gps",
-    "satellites": 12
-  },
-  "activityData": {
-    "date": "2025-12-25",
-    "summary": {
-      "totalSteps": 8523,
-      "distance": {"value": 6.2, "unit": "kilometers"},
-      "calories": {"value": 245, "unit": "kcal"}
-    }
-  }
-}
-```
-
----
-
-**弘益人間 (홍익인간) · Benefit All Humanity**
-
-© 2025 SmileStory Inc. / WIA  
-WIA-PET-007 PHASE 1 Specification
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pet-wearable
+standard. It addresses the data-format layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-wearable"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-wearable`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-wearable` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

@@ -1,546 +1,241 @@
-# WIA-AGRI-013: Pest Detection Standard
-## Phase 2: API Interface Specification
-
-### 2.1 Overview
-
-Phase 2 defines the RESTful API interfaces for pest detection systems, enabling communication between mobile apps, AI detection engines, monitoring networks, and agricultural management platforms.
-
-**Duration**: 4-6 months
-**Key Outcome**: Production-ready API specification and reference implementation
-
-### 2.2 API Architecture
-
-#### 2.2.1 Base URL Structure
-
-```
-Production: https://api.wia-pest-detection.org/v1
-Staging: https://staging-api.wia-pest-detection.org/v1
-Development: http://localhost:8080/v1
-```
-
-#### 2.2.2 Authentication
-
-All API requests MUST include authentication via Bearer token:
-
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-JWT token payload:
-```json
-{
-  "sub": "user_id",
-  "role": "enum [farmer, inspector, researcher, extension_officer, admin]",
-  "organization": "string",
-  "region": "string",
-  "exp": "unix_timestamp",
-  "iat": "unix_timestamp"
-}
-```
-
-### 2.3 Core API Endpoints
-
-#### 2.3.1 Pest Detection Submission
-
-**POST /detections**
-
-Submit a new pest detection record.
-
-Request:
-```json
-{
-  "detection_method": "image_ai",
-  "location": {
-    "field_id": "field-12345",
-    "coordinates": {
-      "latitude": 35.8219,
-      "longitude": 127.1489
-    }
-  },
-  "pest_identification": {
-    "pest_type": "insect",
-    "species_id": "Nilaparvata_lugens",
-    "confidence_score": 0.92
-  },
-  "severity_assessment": {
-    "level": "high",
-    "infestation_percent": 65.0,
-    "population_density": 45
-  },
-  "crop_information": {
-    "crop_type": "rice",
-    "variety": "Koshihikari",
-    "growth_stage": "tillering"
-  },
-  "images": [
-    {
-      "image_url": "string (S3 URL)",
-      "capture_timestamp": "2025-06-15T14:30:00Z"
-    }
-  ]
-}
-```
-
-Response (201 Created):
-```json
-{
-  "detection_id": "det-7f8a9b0c",
-  "status": "submitted",
-  "timestamp": "2025-06-15T14:32:15Z",
-  "verification_required": true,
-  "risk_level": "high",
-  "recommended_action": "immediate_treatment",
-  "next_steps": [
-    "Alert sent to local extension service",
-    "Expert verification requested",
-    "Neighboring farmers notified"
-  ]
-}
-```
-
-#### 2.3.2 Image Upload for AI Analysis
-
-**POST /analyze/image**
-
-Upload image for AI-powered pest detection.
-
-Request (multipart/form-data):
-```
-image: binary (max 20MB)
-location: {"latitude": 35.8219, "longitude": 127.1489}
-crop_type: "rice"
-metadata: {
-  "camera_model": "iPhone 14 Pro",
-  "capture_date": "2025-06-15T14:30:00Z"
-}
-```
-
-Response (200 OK):
-```json
-{
-  "analysis_id": "ana-9d2e1f3a",
-  "processing_time_ms": 842,
-  "detections": [
-    {
-      "pest_id": "Nilaparvata_lugens",
-      "common_name": {
-        "en": "Rice Planthopper",
-        "ko": "벼멸구"
-      },
-      "confidence": 0.94,
-      "bounding_box": {
-        "x": 120,
-        "y": 85,
-        "width": 45,
-        "height": 38
-      },
-      "severity": "high",
-      "count_estimate": 12
-    }
-  ],
-  "overall_assessment": {
-    "total_pests_detected": 12,
-    "highest_confidence": 0.94,
-    "risk_level": "high",
-    "treatment_recommended": true
-  },
-  "image_quality": {
-    "resolution": "4032x3024",
-    "clarity_score": 0.88,
-    "lighting_score": 0.91,
-    "usable": true
-  }
-}
-```
-
-#### 2.3.3 Risk Assessment
-
-**POST /risk/calculate**
-
-Calculate pest risk based on environmental and crop conditions.
-
-Request:
-```json
-{
-  "location_id": "field-12345",
-  "pest_species": "Nilaparvata_lugens",
-  "crop_type": "rice",
-  "growth_stage": "tillering",
-  "current_density": 35,
-  "weather_forecast": {
-    "temperature_avg_c": 27,
-    "humidity_avg_percent": 78,
-    "rainfall_expected_mm": 15
-  },
-  "days_since_last_treatment": 21,
-  "nearby_outbreaks": true
-}
-```
-
-Response (200 OK):
-```json
-{
-  "risk_score": 78,
-  "risk_level": "high",
-  "outbreak_probability": 0.72,
-  "economic_threshold": {
-    "current_density": 35,
-    "threshold": 20,
-    "exceeded": true,
-    "days_to_threshold": -7
-  },
-  "recommendations": {
-    "action": "immediate_treatment",
-    "urgency": "24-48 hours",
-    "ipm_strategy": {
-      "biological_control": "Limited effectiveness at current density",
-      "chemical_control": "Recommended - see treatment options",
-      "cultural_practices": "Monitor adjacent fields, adjust water management"
-    }
-  },
-  "forecast": {
-    "7_day_risk_trend": "increasing",
-    "peak_expected": "day 3-4",
-    "factors": [
-      "High temperature favorable for reproduction",
-      "High humidity increases survival",
-      "Nearby outbreaks indicate regional pressure"
-    ]
-  }
-}
-```
-
-#### 2.3.4 Treatment Recommendations
-
-**GET /treatments/recommend**
-
-Get IPM treatment recommendations for detected pest.
-
-Query Parameters:
-- `pest_id`: string (required)
-- `severity`: enum [low, medium, high, critical] (required)
-- `crop_type`: string (required)
-- `organic`: boolean (optional, default: false)
-- `region`: string (optional)
-
-Response (200 OK):
-```json
-{
-  "pest_id": "Nilaparvata_lugens",
-  "pest_name": {
-    "en": "Rice Planthopper",
-    "ko": "벼멸구"
-  },
-  "severity": "high",
-  "ipm_recommendations": {
-    "immediate_actions": [
-      "Deploy pheromone traps for monitoring",
-      "Scout fields every 2-3 days",
-      "Alert neighboring farmers"
-    ],
-    "biological_control": {
-      "recommended": false,
-      "reason": "Population exceeds biological control effectiveness threshold",
-      "alternatives": [
-        {
-          "method": "Predatory spiders (Lycosa pseudoannulata)",
-          "effectiveness": "Limited at current density",
-          "cost_per_ha": "$50-80"
-        }
-      ]
-    },
-    "chemical_control": {
-      "recommended": true,
-      "options": [
-        {
-          "product": "Imidacloprid 20% SC",
-          "registration_number": "KR-농약-2021-0534",
-          "application_rate": "1.0 L/ha",
-          "water_volume": "100-150 L/ha",
-          "phi_days": 14,
-          "efficacy_rating": 0.92,
-          "resistance_risk": "medium",
-          "environmental_impact": "moderate",
-          "cost_per_ha": "$25-35"
-        },
-        {
-          "product": "Buprofezin 25% SC",
-          "registration_number": "KR-농약-2020-0891",
-          "application_rate": "0.8 kg/ha",
-          "water_volume": "100-150 L/ha",
-          "phi_days": 21,
-          "efficacy_rating": 0.88,
-          "resistance_risk": "low",
-          "environmental_impact": "low",
-          "cost_per_ha": "$30-40"
-        }
-      ],
-      "application_timing": "Early morning or late evening, avoid rain within 6 hours",
-      "spray_guidelines": {
-        "nozzle_type": "Hollow cone",
-        "pressure_bar": "2.5-3.5",
-        "droplet_size": "Medium (200-300 μm)"
-      }
-    },
-    "cultural_practices": {
-      "water_management": "Drain fields for 2-3 days to reduce habitat",
-      "fertilizer_adjustment": "Reduce nitrogen to slow pest reproduction",
-      "crop_rotation": "Consider different variety next season",
-      "sanitation": "Remove weeds that serve as alternate hosts"
-    }
-  },
-  "resistance_management": {
-    "current_resistance_status": "Moderate resistance reported in region",
-    "rotation_plan": [
-      "Use Imidacloprid (Group 4A) for first application",
-      "Rotate to Buprofezin (Group 16) after 21 days if needed",
-      "Avoid consecutive applications of same mode of action"
-    ]
-  },
-  "cost_benefit_analysis": {
-    "estimated_yield_loss_untreated": "35-50%",
-    "estimated_yield_loss_treated": "5-10%",
-    "treatment_cost_per_ha": "$25-40",
-    "expected_yield_protection_value": "$800-1200"
-  }
-}
-```
-
-#### 2.3.5 Alert Subscription
-
-**POST /alerts/subscribe**
-
-Subscribe to pest alerts for specific region or pest types.
-
-Request:
-```json
-{
-  "user_id": "user-abc123",
-  "subscription_type": "regional",
-  "filters": {
-    "regions": ["Jeonbuk", "Jeonnam"],
-    "pest_types": ["insect", "fungal"],
-    "severity_min": "medium",
-    "crop_types": ["rice", "corn"]
-  },
-  "notification_channels": [
-    {
-      "type": "sms",
-      "contact": "+82-10-1234-5678",
-      "priority": ["high", "critical"]
-    },
-    {
-      "type": "email",
-      "contact": "farmer@example.com",
-      "priority": ["low", "medium", "high", "critical"]
-    },
-    {
-      "type": "app_push",
-      "device_id": "device-xyz789",
-      "priority": ["medium", "high", "critical"]
-    }
-  ]
-}
-```
-
-Response (201 Created):
-```json
-{
-  "subscription_id": "sub-f4e7d8c2",
-  "status": "active",
-  "created_at": "2025-06-15T15:00:00Z",
-  "estimated_alerts_per_month": 8,
-  "coverage": {
-    "regions": 2,
-    "monitored_area_ha": 125000,
-    "active_monitoring_stations": 47
-  }
-}
-```
-
-#### 2.3.6 Historical Data Query
-
-**GET /detections/history**
-
-Query historical pest detection records.
-
-Query Parameters:
-- `field_id`: string (optional)
-- `pest_species`: string (optional)
-- `start_date`: ISO 8601 date (required)
-- `end_date`: ISO 8601 date (required)
-- `severity_min`: enum (optional)
-- `limit`: integer (default: 50, max: 200)
-- `offset`: integer (default: 0)
-
-Response (200 OK):
-```json
-{
-  "total_records": 237,
-  "returned": 50,
-  "offset": 0,
-  "detections": [
-    {
-      "detection_id": "det-a1b2c3",
-      "timestamp": "2025-05-20T10:15:00Z",
-      "pest_species": "Nilaparvata_lugens",
-      "severity": "medium",
-      "location": {
-        "field_id": "field-12345",
-        "region": "Jeonbuk"
-      },
-      "population_density": 18,
-      "treatment_applied": true,
-      "outcome": "controlled"
-    }
-  ],
-  "summary_statistics": {
-    "most_common_pest": "Nilaparvata_lugens",
-    "average_severity": "medium",
-    "treatment_success_rate": 0.87,
-    "total_affected_area_ha": 1250
-  }
-}
-```
-
-### 2.4 Extension Service Integration
-
-#### 2.4.1 RDA Pest Monitoring System Integration
-
-**POST /integrate/rda**
-
-Submit data to Korean Rural Development Administration (RDA) pest monitoring system (농촌진흥청 병해충예찰정보시스템).
-
-Request:
-```json
-{
-  "detection_id": "det-7f8a9b0c",
-  "rda_region_code": "JB-01",
-  "reporting_organization": "Jeonbuk Agricultural Extension",
-  "detection_summary": {
-    "pest_korean_name": "벼멸구",
-    "발생면적_ha": 25.5,
-    "발생정도": "다발생",
-    "예찰일자": "2025-06-15"
-  }
-}
-```
-
-Response (200 OK):
-```json
-{
-  "rda_submission_id": "RDA-2025-0615-001",
-  "status": "submitted",
-  "rda_confirmation": "접수완료",
-  "follow_up_actions": [
-    "지역 방제 권고 발령",
-    "인근 지역 예찰 강화"
-  ]
-}
-```
-
-### 2.5 Real-time Data Streaming
-
-#### 2.5.1 WebSocket Connection
-
-```
-wss://stream.wia-pest-detection.org/v1/live
-```
-
-Subscribe to real-time pest detection events:
-
-```json
-{
-  "action": "subscribe",
-  "channels": ["detections", "alerts"],
-  "filters": {
-    "region": "Jeonbuk",
-    "severity_min": "high"
-  }
-}
-```
-
-Incoming messages:
-```json
-{
-  "event_type": "new_detection",
-  "timestamp": "2025-06-15T15:30:45Z",
-  "data": {
-    "detection_id": "det-x9y8z7",
-    "pest_species": "Nilaparvata_lugens",
-    "severity": "critical",
-    "location": {"latitude": 35.8219, "longitude": 127.1489}
-  }
-}
-```
-
-### 2.6 Error Handling
-
-#### 2.6.1 Error Response Format
-
-```json
-{
-  "error": {
-    "code": "PEST_NOT_FOUND",
-    "message": "The specified pest species was not found in the database",
-    "details": "Species ID 'unknown_pest' is not recognized",
-    "timestamp": "2025-06-15T15:35:00Z",
-    "request_id": "req-abc123"
-  }
-}
-```
-
-#### 2.6.2 Common Error Codes
-
-- `AUTH_REQUIRED` (401): Missing or invalid authentication
-- `FORBIDDEN` (403): Insufficient permissions
-- `NOT_FOUND` (404): Resource not found
-- `VALIDATION_ERROR` (400): Invalid request data
-- `RATE_LIMIT_EXCEEDED` (429): Too many requests
-- `IMAGE_TOO_LARGE` (413): Image exceeds size limit
-- `PROCESSING_ERROR` (500): Server-side processing error
-- `AI_MODEL_UNAVAILABLE` (503): AI detection service unavailable
-
-### 2.7 Rate Limiting
-
-- Free tier: 100 requests/hour
-- Basic tier: 1,000 requests/hour
-- Professional tier: 10,000 requests/hour
-- Enterprise tier: Unlimited (contact sales)
-
-Headers returned:
-```
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 847
-X-RateLimit-Reset: 1623852000
-```
-
-### 2.8 API Versioning
-
-- Current version: v1
-- Version included in URL path
-- Deprecated versions supported for 12 months
-- Breaking changes require new major version
-
-### 2.9 SDK Availability
-
-Official SDKs:
-- Python: `pip install wia-pest-detection`
-- JavaScript/Node: `npm install @wia/pest-detection`
-- Java: Maven/Gradle artifact
-- Swift (iOS): CocoaPods/SPM
-- Kotlin (Android): Maven
-
-### 2.10 Testing Environment
-
-Sandbox API available at:
-```
-https://sandbox-api.wia-pest-detection.org/v1
-```
-
-Features:
-- Test data generation
-- No rate limits
-- Mock AI responses
-- No real alerts sent
-- Data reset daily
+# WIA-pest-detection PHASE 2 — API-INTERFACE Specification
+
+**Standard:** WIA-pest-detection
+**Phase:** 2 — API-INTERFACE
+**Version:** 1.0
+**Status:** Stable
+
+This document defines the canonical API-INTERFACE layer for WIA-pest-detection (Pest Detection).
+
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
+
+---
+
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pest-detection
+standard. It addresses the api-interface layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pest-detection"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pest-detection`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pest-detection` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

@@ -545,14 +545,14 @@ The future of computing is neuromorphic. The future is now. Go build amazing thi
 2. Izhikevich (2003) - Simple Model of Spiking Neurons
 3. Bi & Poo (1998) - Synaptic Plasticity in the Brain
 
-**Neuromorphic Hardware:**
-4. 선행 연구 - Loihi: A Neuromorphic Manycore Processor
-5. 선행 연구 - TrueNorth: Design and Tool Flow
-6. 선행 연구 - The SpiNNaker Project
+**Neuromorphic Hardware Platforms (vendor official documentation):**
+4. Intel Loihi 2 — Intel Neuromorphic Research Community official site: https://intel.com/content/www/us/en/research/neuromorphic-computing.html
+5. IBM TrueNorth — IBM Research official architecture documentation.
+6. SpiNNaker / SpiNNaker2 — University of Manchester APT Group official project page: https://apt.cs.manchester.ac.uk/projects/SpiNNaker/
 
-**Applications:**
-7. 선행 연구 - Deep Learning with Spiking Neurons
-8. 선행 연구 - Direct Training for Spiking Neural Networks
+**Applications (open data and standards):**
+7. Neuromorphic-vision public benchmarks — N-MNIST, DVS128 Gesture, CIFAR10-DVS (open datasets).
+8. SNN training toolchains — Norse (PyTorch-based open source), Nengo (Applied Brain Research).
 
 ---
 

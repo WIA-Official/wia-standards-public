@@ -289,11 +289,23 @@ Accuracy = Correct_Predictions / Total_Predictions
 
 ## 9. References
 
-- [1] Maass, W. (1997). Networks of spiking neurons: the third generation of neural network models.
-- [2] Gerstner, W., & Kistler, W. M. (2002). Spiking neuron models.
-- [3] 선행 연구. Loihi: A neuromorphic manycore processor with on-chip learning.
-- [4] WIA-OMNI-API Specification v1.0
-- [5] IEEE Standard for Floating-Point Arithmetic (IEEE 754)
+### 9.1 Normative References
+
+- [1] IEEE Std 754-2019 — IEEE Standard for Floating-Point Arithmetic.
+- [2] WIA-OMNI-API Specification v1.0.
+- [3] Address Event Representation (AER) — community-standard event-encoding format used by neuromorphic-vision sensors and processors.
+
+### 9.2 Vendor / Project Documentation (Informative)
+
+- [4] Intel Neuromorphic Research Community — Intel Loihi 2 architecture documentation: https://intel.com/content/www/us/en/research/neuromorphic-computing.html
+- [5] IBM Research — TrueNorth chip official architecture documentation.
+- [6] University of Manchester APT Group — SpiNNaker / SpiNNaker2 project page: https://apt.cs.manchester.ac.uk/projects/SpiNNaker/
+
+### 9.3 Open Toolchains and Datasets
+
+- [7] Norse — PyTorch-based open-source spiking-neural-network library.
+- [8] Nengo — Applied Brain Research neural-simulation framework.
+- [9] N-MNIST, DVS128 Gesture, CIFAR10-DVS — public neuromorphic-vision benchmark datasets.
 
 ## 10. Appendix A: Example Implementation
 

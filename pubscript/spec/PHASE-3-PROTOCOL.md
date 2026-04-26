@@ -1,1067 +1,241 @@
-# WIA PubScript Protocol Specification
+# WIA-pubscript PHASE 3 — PROTOCOL Specification
 
-**Phase 3: Communication Protocol Standard**
+**Standard:** WIA-pubscript
+**Phase:** 3 — PROTOCOL
+**Version:** 1.0
+**Status:** Stable
 
-**Version**: 1.0.0
-**Status**: Draft
-**Date**: 2025-01
-**Primary Color**: #8B5CF6 (Violet)
+This document defines the canonical PROTOCOL layer for WIA-pubscript (Pubscript).
 
----
-
-## Overview
-
-### 1.1 Purpose
-
-WIA PubScript Protocol defines real-time communication standards for document processing pipelines, collaborative editing, and distributed publishing workflows. This specification enables multiple users, systems, and services to work together seamlessly on document creation, editing, and publishing.
-
-### 1.2 Design Goals
-
-1. **Real-time Collaboration**: Multiple users editing simultaneously
-2. **Operational Transformation**: Conflict-free concurrent editing
-3. **Event-Driven**: Reactive architecture for instant updates
-4. **Scalable**: Support for large documents and many collaborators
-5. **Resilient**: Graceful handling of network issues
-6. **Secure**: End-to-end encryption for sensitive documents
-
-### 1.3 Protocol Architecture
-
-```mermaid
-graph TB
-    Client1[Client 1] --> WS1[WebSocket Gateway]
-    Client2[Client 2] --> WS1
-    Client3[Client 3] --> WS1
-
-    WS1 --> LB[Load Balancer]
-    LB --> Server1[Protocol Server 1]
-    LB --> Server2[Protocol Server 2]
-    LB --> Server3[Protocol Server 3]
-
-    Server1 --> Redis[Redis Pub/Sub]
-    Server2 --> Redis
-    Server3 --> Redis
-
-    Server1 --> CRDT[CRDT Engine]
-    Server2 --> CRDT
-    Server3 --> CRDT
-
-    CRDT --> DB[(PostgreSQL)]
-    Redis --> Queue[Job Queue]
-    Queue --> Worker[Background Workers]
-```
+References (CITATION-POLICY ALLOW only):
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## WebSocket Protocol
-
-### 2.1 Connection Establishment
-
-```javascript
-const socket = new WebSocket('wss://pubscript.org/v1/ws');
-
-socket.onopen = () => {
-  socket.send(JSON.stringify({
-    type: 'auth',
-    token: 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
-    protocol_version: '1.0.0'
-  }));
-};
-```
-
-**Server Response:**
-```json
-{
-  "type": "auth_success",
-  "session_id": "sess-20250115-001",
-  "server_time": "2025-01-15T10:00:00.000Z",
-  "capabilities": ["editing", "commenting", "presence", "notifications"]
-}
-```
-
-### 2.2 Message Format
-
-```typescript
-interface WebSocketMessage {
-  type: MessageType;
-  message_id: string;
-  timestamp: number;
-  session_id: string;
-  payload: any;
-  signature?: string;
-}
-
-type MessageType =
-  | 'auth'
-  | 'auth_success'
-  | 'join_document'
-  | 'leave_document'
-  | 'edit_operation'
-  | 'cursor_position'
-  | 'selection'
-  | 'comment'
-  | 'presence_update'
-  | 'notification'
-  | 'error';
-```
-
-### 2.3 Heartbeat Protocol
-
-```json
-{
-  "type": "ping",
-  "message_id": "msg-001",
-  "timestamp": 1642248000000
-}
-```
-
-**Server Response:**
-```json
-{
-  "type": "pong",
-  "message_id": "msg-001",
-  "timestamp": 1642248001000,
-  "server_time": 1642248001000
-}
-```
-
----
-
-## Collaborative Editing Protocol
-
-### 3.1 Join Document Session
-
-```json
-{
-  "type": "join_document",
-  "message_id": "msg-002",
-  "timestamp": 1642248000000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "user_id": "user-001",
-    "user_name": "Sarah Chen",
-    "permissions": ["read", "write", "comment"],
-    "cursor_color": "#8B5CF6"
-  }
-}
-```
-
-**Server Response:**
-```json
-{
-  "type": "document_joined",
-  "message_id": "msg-002",
-  "timestamp": 1642248001000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "document_version": "1.2.0",
-    "current_state": {
-      "sections": [...],
-      "metadata": {...}
-    },
-    "active_users": [
-      {
-        "user_id": "user-002",
-        "user_name": "James Wilson",
-        "cursor_color": "#10B981",
-        "last_active": "2025-01-15T09:58:00Z"
-      }
-    ],
-    "pending_operations": []
-  }
-}
-```
-
-### 3.2 Edit Operation
-
-```json
-{
-  "type": "edit_operation",
-  "message_id": "msg-003",
-  "timestamp": 1642248002000,
-  "payload": {
-    "operation_id": "op-001",
-    "document_id": "doc-20250115-001",
-    "section_id": "section-01-02",
-    "operation": {
-      "type": "insert",
-      "position": 125,
-      "content": "New paragraph text.",
-      "attributes": {
-        "bold": false,
-        "italic": false,
-        "font_size": 12
-      }
-    },
-    "user_id": "user-001",
-    "parent_operation_id": null,
-    "vector_clock": {
-      "user-001": 5,
-      "user-002": 3
-    }
-  }
-}
-```
-
-### 3.3 Operation Types
-
-```typescript
-interface Operation {
-  type: OperationType;
-  position: number;
-  content?: string;
-  length?: number;
-  attributes?: Record<string, any>;
-}
-
-type OperationType =
-  | 'insert'
-  | 'delete'
-  | 'replace'
-  | 'format'
-  | 'move'
-  | 'split'
-  | 'merge';
-
-// Examples:
-const insertOp: Operation = {
-  type: 'insert',
-  position: 100,
-  content: 'New text',
-  attributes: { bold: true }
-};
-
-const deleteOp: Operation = {
-  type: 'delete',
-  position: 100,
-  length: 10
-};
-
-const formatOp: Operation = {
-  type: 'format',
-  position: 100,
-  length: 20,
-  attributes: { italic: true }
-};
-```
-
-### 3.4 Operational Transformation
-
-```typescript
-interface OperationalTransform {
-  // Transform operation A against operation B
-  transform(opA: Operation, opB: Operation): [Operation, Operation];
-
-  // Compose two operations
-  compose(op1: Operation, op2: Operation): Operation;
-
-  // Invert an operation
-  invert(op: Operation): Operation;
-}
-
-// Example transformation
-function transformInsertInsert(
-  op1: Insert,
-  op2: Insert
-): [Insert, Insert] {
-  if (op1.position < op2.position) {
-    return [op1, { ...op2, position: op2.position + op1.content.length }];
-  } else if (op1.position > op2.position) {
-    return [{ ...op1, position: op1.position + op2.content.length }, op2];
-  } else {
-    // Tie-breaker using user_id
-    if (op1.user_id < op2.user_id) {
-      return [op1, { ...op2, position: op2.position + op1.content.length }];
-    } else {
-      return [{ ...op1, position: op1.position + op2.content.length }, op2];
-    }
-  }
-}
-```
-
----
-
-## CRDT (Conflict-free Replicated Data Type)
-
-### 4.1 CRDT Implementation
-
-```typescript
-interface CRDTDocument {
-  id: string;
-  version: string;
-  content: CRDTString;
-  metadata: Map<string, CRDTRegister>;
-  sections: Map<string, CRDTSection>;
-}
-
-interface CRDTString {
-  characters: CRDTChar[];
-
-  insert(position: number, char: string, siteId: string, clock: number): void;
-  delete(position: number): void;
-  toString(): string;
-}
-
-interface CRDTChar {
-  id: CharId;
-  value: string;
-  visible: boolean;
-  attributes: Map<string, any>;
-}
-
-interface CharId {
-  siteId: string;
-  clock: number;
-  offset: number;
-}
-```
-
-### 4.2 CRDT Operations
-
-```json
-{
-  "type": "crdt_operation",
-  "message_id": "msg-004",
-  "timestamp": 1642248003000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "operation": {
-      "type": "insert_char",
-      "char_id": {
-        "site_id": "user-001",
-        "clock": 5,
-        "offset": 0
-      },
-      "position_after": {
-        "site_id": "user-001",
-        "clock": 4,
-        "offset": 0
-      },
-      "position_before": {
-        "site_id": "user-002",
-        "clock": 3,
-        "offset": 0
-      },
-      "value": "A",
-      "attributes": {
-        "bold": true
-      }
-    }
-  }
-}
-```
-
----
-
-## Presence Protocol
-
-### 5.1 Cursor Position
-
-```json
-{
-  "type": "cursor_position",
-  "message_id": "msg-005",
-  "timestamp": 1642248004000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "user_id": "user-001",
-    "section_id": "section-01-02",
-    "position": 125,
-    "cursor_color": "#8B5CF6"
-  }
-}
-```
-
-### 5.2 Selection
-
-```json
-{
-  "type": "selection",
-  "message_id": "msg-006",
-  "timestamp": 1642248005000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "user_id": "user-001",
-    "section_id": "section-01-02",
-    "start": 125,
-    "end": 150,
-    "selection_color": "#8B5CF666"
-  }
-}
-```
-
-### 5.3 Presence Update
-
-```json
-{
-  "type": "presence_update",
-  "message_id": "msg-007",
-  "timestamp": 1642248006000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "user_id": "user-001",
-    "status": "active",
-    "last_active": "2025-01-15T10:00:06Z",
-    "current_section": "section-01-02",
-    "activity": "editing"
-  }
-}
-```
-
----
-
-## Comment Protocol
-
-### 6.1 Add Comment
-
-```json
-{
-  "type": "comment",
-  "message_id": "msg-008",
-  "timestamp": 1642248007000,
-  "payload": {
-    "action": "create",
-    "comment_id": "comment-001",
-    "document_id": "doc-20250115-001",
-    "section_id": "section-01-02",
-    "thread_id": null,
-    "position": {
-      "start": 125,
-      "end": 150
-    },
-    "user_id": "user-002",
-    "user_name": "James Wilson",
-    "text": "Consider adding more examples here",
-    "mentions": ["@user-001"],
-    "attachments": []
-  }
-}
-```
-
-### 6.2 Reply to Comment
-
-```json
-{
-  "type": "comment",
-  "message_id": "msg-009",
-  "timestamp": 1642248008000,
-  "payload": {
-    "action": "reply",
-    "comment_id": "comment-002",
-    "thread_id": "comment-001",
-    "document_id": "doc-20250115-001",
-    "user_id": "user-001",
-    "user_name": "Sarah Chen",
-    "text": "Good idea, I'll add them now",
-    "mentions": ["@user-002"]
-  }
-}
-```
-
-### 6.3 Resolve Comment
-
-```json
-{
-  "type": "comment",
-  "message_id": "msg-010",
-  "timestamp": 1642248009000,
-  "payload": {
-    "action": "resolve",
-    "comment_id": "comment-001",
-    "document_id": "doc-20250115-001",
-    "user_id": "user-001",
-    "resolved": true
-  }
-}
-```
-
----
-
-## Notification Protocol
-
-### 7.1 Document Change Notification
-
-```json
-{
-  "type": "notification",
-  "message_id": "msg-011",
-  "timestamp": 1642248010000,
-  "payload": {
-    "notification_type": "document_changed",
-    "document_id": "doc-20250115-001",
-    "user_id": "user-002",
-    "user_name": "James Wilson",
-    "action": "edited",
-    "section_id": "section-02-01",
-    "summary": "James Wilson edited Introduction section"
-  }
-}
-```
-
-### 7.2 Mention Notification
-
-```json
-{
-  "type": "notification",
-  "message_id": "msg-012",
-  "timestamp": 1642248011000,
-  "payload": {
-    "notification_type": "mention",
-    "document_id": "doc-20250115-001",
-    "comment_id": "comment-001",
-    "user_id": "user-002",
-    "user_name": "James Wilson",
-    "mentioned_user_id": "user-001",
-    "text": "Consider adding more examples here @Sarah"
-  }
-}
-```
-
-### 7.3 Version Published Notification
-
-```json
-{
-  "type": "notification",
-  "message_id": "msg-013",
-  "timestamp": 1642248012000,
-  "payload": {
-    "notification_type": "version_published",
-    "document_id": "doc-20250115-001",
-    "version": "1.3.0",
-    "published_by": "user-001",
-    "formats": ["html", "pdf", "epub3"],
-    "download_urls": {
-      "html": "https://cdn.pubscript.org/doc-001/v1.3.0/index.html",
-      "pdf": "https://cdn.pubscript.org/doc-001/v1.3.0/document.pdf",
-      "epub3": "https://cdn.pubscript.org/doc-001/v1.3.0/document.epub"
-    }
-  }
-}
-```
-
----
-
-## Sync Protocol
-
-### 8.1 Request Full Sync
-
-```json
-{
-  "type": "sync_request",
-  "message_id": "msg-014",
-  "timestamp": 1642248013000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "last_known_version": "1.2.0",
-    "last_operation_id": "op-042"
-  }
-}
-```
-
-**Server Response:**
-```json
-{
-  "type": "sync_response",
-  "message_id": "msg-014",
-  "timestamp": 1642248014000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "current_version": "1.3.0",
-    "missing_operations": [
-      {
-        "operation_id": "op-043",
-        "type": "insert",
-        "section_id": "section-01-03",
-        "position": 200,
-        "content": "Additional text"
-      },
-      {
-        "operation_id": "op-044",
-        "type": "delete",
-        "section_id": "section-02-01",
-        "position": 50,
-        "length": 10
-      }
-    ],
-    "checksum": "a1b2c3d4e5f6"
-  }
-}
-```
-
-### 8.2 Incremental Sync
-
-```json
-{
-  "type": "incremental_sync",
-  "message_id": "msg-015",
-  "timestamp": 1642248015000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "operations": [
-      {
-        "operation_id": "op-045",
-        "type": "insert",
-        "section_id": "section-01-04",
-        "position": 300,
-        "content": "More content",
-        "user_id": "user-001",
-        "timestamp": 1642248015000
-      }
-    ]
-  }
-}
-```
-
----
-
-## Conflict Resolution
-
-### 9.1 Conflict Detection
-
-```json
-{
-  "type": "conflict_detected",
-  "message_id": "msg-016",
-  "timestamp": 1642248016000,
-  "payload": {
-    "document_id": "doc-20250115-001",
-    "conflict_id": "conflict-001",
-    "operation_a": {
-      "operation_id": "op-046",
-      "user_id": "user-001",
-      "type": "delete",
-      "position": 100,
-      "length": 20
-    },
-    "operation_b": {
-      "operation_id": "op-047",
-      "user_id": "user-002",
-      "type": "format",
-      "position": 110,
-      "length": 15,
-      "attributes": { "bold": true }
-    },
-    "resolution_strategy": "operational_transformation"
-  }
-}
-```
-
-### 9.2 Conflict Resolution
-
-```typescript
-interface ConflictResolver {
-  // Strategy pattern for conflict resolution
-  resolve(opA: Operation, opB: Operation): Resolution;
-}
-
-interface Resolution {
-  strategy: 'ot' | 'crdt' | 'last_write_wins' | 'manual';
-  operations: Operation[];
-  metadata: {
-    resolved_at: string;
-    resolved_by?: string;
-    strategy_used: string;
-  };
-}
-
-// Operational Transformation strategy
-class OTResolver implements ConflictResolver {
-  resolve(opA: Operation, opB: Operation): Resolution {
-    const [transformedA, transformedB] = this.transform(opA, opB);
-    return {
-      strategy: 'ot',
-      operations: [transformedA, transformedB],
-      metadata: {
-        resolved_at: new Date().toISOString(),
-        strategy_used: 'operational_transformation'
-      }
-    };
-  }
-
-  private transform(opA: Operation, opB: Operation): [Operation, Operation] {
-    // OT algorithm implementation
-    // ...
-  }
-}
-```
-
----
-
-## Document Processing Pipeline
-
-### 10.1 Pipeline Event
-
-```json
-{
-  "type": "pipeline_event",
-  "message_id": "msg-017",
-  "timestamp": 1642248017000,
-  "payload": {
-    "pipeline_id": "pipeline-001",
-    "document_id": "doc-20250115-001",
-    "stage": "conversion",
-    "status": "processing",
-    "progress": 45,
-    "eta_seconds": 30,
-    "current_step": "Generating EPUB3 file",
-    "total_steps": 5
-  }
-}
-```
-
-### 10.2 Pipeline Stages
-
-```typescript
-type PipelineStage =
-  | 'parsing'
-  | 'validation'
-  | 'conversion'
-  | 'optimization'
-  | 'publishing';
-
-interface PipelineStatus {
-  pipeline_id: string;
-  document_id: string;
-  stages: StageStatus[];
-  overall_progress: number;
-  estimated_completion: string;
-}
-
-interface StageStatus {
-  stage: PipelineStage;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  started_at?: string;
-  completed_at?: string;
-  error?: string;
-}
-```
-
----
-
-## Error Handling Protocol
-
-### 11.1 Error Message
-
-```json
-{
-  "type": "error",
-  "message_id": "msg-018",
-  "timestamp": 1642248018000,
-  "payload": {
-    "error_code": "OPERATION_FAILED",
-    "error_message": "Failed to apply operation: invalid position",
-    "details": {
-      "operation_id": "op-048",
-      "section_id": "section-01-02",
-      "position": 9999,
-      "max_position": 500
-    },
-    "recoverable": true,
-    "suggested_action": "Sync document and retry operation"
-  }
-}
-```
-
-### 11.2 Reconnection Protocol
-
-```typescript
-interface ReconnectionStrategy {
-  maxAttempts: number;
-  backoff: 'exponential' | 'linear' | 'constant';
-  baseDelay: number;
-  maxDelay: number;
-}
-
-class WebSocketClient {
-  private reconnectionStrategy: ReconnectionStrategy = {
-    maxAttempts: 10,
-    backoff: 'exponential',
-    baseDelay: 1000,
-    maxDelay: 30000
-  };
-
-  private async reconnect(attempt: number): Promise<void> {
-    if (attempt > this.reconnectionStrategy.maxAttempts) {
-      throw new Error('Max reconnection attempts reached');
-    }
-
-    const delay = this.calculateDelay(attempt);
-    await this.sleep(delay);
-
-    try {
-      await this.connect();
-      await this.syncDocument();
-    } catch (error) {
-      await this.reconnect(attempt + 1);
-    }
-  }
-
-  private calculateDelay(attempt: number): number {
-    const { backoff, baseDelay, maxDelay } = this.reconnectionStrategy;
-
-    if (backoff === 'exponential') {
-      return Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
-    } else if (backoff === 'linear') {
-      return Math.min(baseDelay * attempt, maxDelay);
-    } else {
-      return baseDelay;
-    }
-  }
-}
-```
-
----
-
-## Security Protocol
-
-### 12.1 Message Signing
-
-```typescript
-interface SignedMessage {
-  type: MessageType;
-  payload: any;
-  signature: string;
-  timestamp: number;
-}
-
-function signMessage(message: any, privateKey: string): SignedMessage {
-  const payload = JSON.stringify(message);
-  const signature = crypto
-    .createSign('RSA-SHA256')
-    .update(payload)
-    .sign(privateKey, 'base64');
-
-  return {
-    ...message,
-    signature,
-    timestamp: Date.now()
-  };
-}
-
-function verifyMessage(message: SignedMessage, publicKey: string): boolean {
-  const { signature, ...payload } = message;
-  const payloadString = JSON.stringify(payload);
-
-  return crypto
-    .createVerify('RSA-SHA256')
-    .update(payloadString)
-    .verify(publicKey, signature, 'base64');
-}
-```
-
-### 12.2 End-to-End Encryption
-
-```json
-{
-  "type": "encrypted_message",
-  "message_id": "msg-019",
-  "timestamp": 1642248019000,
-  "payload": {
-    "encrypted_data": "AES256_ENCRYPTED_BASE64_STRING",
-    "encryption_algorithm": "AES-256-GCM",
-    "key_id": "key-001",
-    "iv": "INITIALIZATION_VECTOR_BASE64",
-    "auth_tag": "AUTHENTICATION_TAG_BASE64"
-  }
-}
-```
-
----
-
-## Performance Monitoring
-
-### 13.1 Performance Metrics
-
-```json
-{
-  "type": "performance_metrics",
-  "message_id": "msg-020",
-  "timestamp": 1642248020000,
-  "payload": {
-    "session_id": "sess-20250115-001",
-    "metrics": {
-      "latency_ms": 45,
-      "operations_per_second": 12,
-      "bandwidth_kbps": 128,
-      "memory_usage_mb": 256,
-      "active_connections": 5,
-      "queue_depth": 3
-    }
-  }
-}
-```
-
----
-
-## TypeScript Client Implementation
-
-```typescript
-import { WebSocket } from 'ws';
-import { EventEmitter } from 'events';
-
-class PubScriptClient extends EventEmitter {
-  private ws: WebSocket;
-  private sessionId: string;
-  private documentId: string;
-  private operationQueue: Operation[] = [];
-
-  constructor(private config: ClientConfig) {
-    super();
-  }
-
-  async connect(): Promise<void> {
-    this.ws = new WebSocket(this.config.url);
-
-    this.ws.on('open', () => {
-      this.authenticate();
-    });
-
-    this.ws.on('message', (data) => {
-      const message = JSON.parse(data.toString());
-      this.handleMessage(message);
-    });
-
-    this.ws.on('close', () => {
-      this.emit('disconnected');
-      this.reconnect();
-    });
-  }
-
-  async joinDocument(documentId: string): Promise<void> {
-    this.documentId = documentId;
-
-    this.send({
-      type: 'join_document',
-      payload: {
-        document_id: documentId,
-        user_id: this.config.userId,
-        user_name: this.config.userName
-      }
-    });
-  }
-
-  async sendOperation(operation: Operation): Promise<void> {
-    const message = {
-      type: 'edit_operation',
-      payload: {
-        operation_id: this.generateOperationId(),
-        document_id: this.documentId,
-        operation,
-        user_id: this.config.userId
-      }
-    };
-
-    this.send(message);
-  }
-
-  private handleMessage(message: WebSocketMessage): void {
-    switch (message.type) {
-      case 'edit_operation':
-        this.handleEditOperation(message.payload);
-        break;
-      case 'cursor_position':
-        this.handleCursorPosition(message.payload);
-        break;
-      case 'comment':
-        this.handleComment(message.payload);
-        break;
-      // ... more handlers
-    }
-  }
-
-  private send(message: any): void {
-    this.ws.send(JSON.stringify({
-      ...message,
-      message_id: this.generateMessageId(),
-      timestamp: Date.now(),
-      session_id: this.sessionId
-    }));
-  }
-}
-```
-
----
-
-## Python Client Implementation
-
-```python
-import asyncio
-import websockets
-import json
-from typing import Dict, Callable, Any
-
-class PubScriptClient:
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.ws = None
-        self.session_id = None
-        self.document_id = None
-        self.handlers: Dict[str, Callable] = {}
-
-    async def connect(self):
-        self.ws = await websockets.connect(self.config['url'])
-        await self.authenticate()
-
-        # Start message handler loop
-        asyncio.create_task(self.message_loop())
-
-    async def join_document(self, document_id: str):
-        self.document_id = document_id
-
-        await self.send({
-            'type': 'join_document',
-            'payload': {
-                'document_id': document_id,
-                'user_id': self.config['user_id'],
-                'user_name': self.config['user_name']
-            }
-        })
-
-    async def send_operation(self, operation: Dict[str, Any]):
-        message = {
-            'type': 'edit_operation',
-            'payload': {
-                'operation_id': self.generate_operation_id(),
-                'document_id': self.document_id,
-                'operation': operation,
-                'user_id': self.config['user_id']
-            }
-        }
-        await self.send(message)
-
-    async def message_loop(self):
-        async for message in self.ws:
-            data = json.loads(message)
-            await self.handle_message(data)
-
-    async def handle_message(self, message: Dict[str, Any]):
-        msg_type = message.get('type')
-
-        if msg_type in self.handlers:
-            await self.handlers[msg_type](message['payload'])
-
-    async def send(self, message: Dict[str, Any]):
-        message.update({
-            'message_id': self.generate_message_id(),
-            'timestamp': int(time.time() * 1000),
-            'session_id': self.session_id
-        })
-        await self.ws.send(json.dumps(message))
-```
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-01 | Initial specification |
-
----
-
-**Document Version**: 1.0.0
-**Last Updated**: 2025-01-15
-**Author**: WIA PubScript Working Group
-
----
-
-弘益人間 - *Benefit All Humanity*
+## §1 Scope
+
+This PHASE document is one of four that together define the WIA-pubscript
+standard. It addresses the protocol layer of the standard.
+
+## §2 Manifest
+
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pubscript"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
+
+## §3 Conformance Tiers
+
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
+
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
+
+## §4 Discovery
+
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pubscript`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
+
+## §5 Time and Identity
+
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+
+## §6 Versioning and Deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
+
+## §7 Privacy and Security
+
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
+
+## §8 Open Governance
+
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pubscript` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
+
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+
+
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

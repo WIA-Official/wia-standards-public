@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 2: Data Schema - WIA-FIN-012</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">CHAPTER 2</div>
+    <h1>Data Schema</h1>
+    <p class="subtitle">Payment Data Structures & Card Formats</p>
+  </header>
+
+  <section>
+    <h2>2.1 Card Data Structure</h2>
+
+    <p>Understanding how payment card data is structured is fundamental to implementing secure payment systems. This chapter covers the data formats, validation rules, and security requirements for handling card information.</p>
+
+    <h3>Primary Account Number (PAN)</h3>
+
+    <p>The Primary Account Number is the unique identifier for a payment card account. It follows a structured format defined by ISO/IEC 7812.</p>
+
+    <h4>PAN Structure</h4>
+    <pre><code>Card Number: 4532 1234 5678 9010
+│    │              │         └── Check Digit (Luhn)
+│    │              └──────────── Account Identifier
+│    └─────────────────────────── Issuer Identification (BIN/IIN)
+└──────────────────────────────── Major Industry Identifier (MII)
+
+Breakdown:
+Position 1:      MII (Major Industry Identifier)
+Positions 1-6:   BIN/IIN (Bank/Issuer Identification Number)
+Positions 7-15:  Account Number
+Position 16:     Check Digit (Luhn algorithm)
+</code></pre>
+
+    <h4>Major Industry Identifiers (MII)</h4>
+    <table>
+      <tr>
+        <th>MII</th>
+        <th>Industry</th>
+        <th>Examples</th>
+      </tr>
+      <tr>
+        <td>0</td>
+        <td>ISO/TC 68 and other</td>
+        <td>Future use</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Airlines</td>
+        <td>Airline cards</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Airlines and financial</td>
+        <td>Airline financial cards</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Travel and entertainment</td>
+        <td>American Express (34, 37), Diners Club, JCB</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Banking and financial</td>
+        <td>Visa</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Banking and financial</td>
+        <td>Mastercard (51-55), Maestro</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Merchandising and banking</td>
+        <td>Discover (6011, 644-649, 65), UnionPay (62)</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Petroleum</td>
+        <td>Fuel cards</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Healthcare, telecommunications</td>
+        <td>Specific industry cards</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>National assignment</td>
+        <td>Government, postal</td>
+      </tr>
+    </table>
+
+    <h4>Luhn Algorithm Validation</h4>
+    <p>The Luhn algorithm (also called modulus 10 or mod 10 algorithm) validates card numbers and detects simple errors in digit entry.</p>
+
+    <pre><code>Algorithm Steps:
+1. Starting from rightmost digit (excluding check digit), double every second digit
+2. If doubling results in two digits, add them together (e.g., 16 → 1+6 = 7)
+3. Sum all the digits
+4. If sum modulo 10 equals 0, the number is valid
+
+Example: Validate 4532 1234 5678 9010
+
+Card number:  4  5  3  2  1  2  3  4  5  6  7  8  9  0  1  0
+Double alt:   4 10  3  4  1  4  3  8  5 12  7 16  9  0  1  0
+Add digits:   4  1  3  4  1  4  3  8  5  3  7  7  9  0  1  0
+Sum: 4+1+3+4+1+4+3+8+5+3+7+7+9+0+1+0 = 60
+60 % 10 = 0 ✓ Valid
+
+Implementation:
+function luhnCheck(cardNumber) {
+  const digits = cardNumber.replace(/\D/g, '').split('').reverse();
+  const checksum = digits.reduce((sum, digit, index) => {
+    let value = parseInt(digit);
+    if (index % 2 === 1) {
+      value *= 2;
+      if (value > 9) value -= 9;
+    }
+    return sum + value;
+  }, 0);
+  return checksum % 10 === 0;
+}
+</code></pre>
+
+    <h3>Card Network Identification</h3>
+
+    <table>
+      <tr>
+        <th>Card Network</th>
+        <th>BIN Ranges</th>
+        <th>Length</th>
+        <th>CVV Location</th>
+      </tr>
+      <tr>
+        <td>Visa</td>
+        <td>4</td>
+        <td>13, 16, 19</td>
+        <td>Back (3 digits)</td>
+      </tr>
+      <tr>
+        <td>Mastercard</td>
+        <td>51-55, 2221-2720</td>
+        <td>16</td>
+        <td>Back (3 digits)</td>
+      </tr>
+      <tr>
+        <td>American Express</td>
+        <td>34, 37</td>
+        <td>15</td>
+        <td>Front (4 digits)</td>
+      </tr>
+      <tr>
+        <td>Discover</td>
+        <td>6011, 622126-622925, 644-649, 65</td>
+        <td>16</td>
+        <td>Back (3 digits)</td>
+      </tr>
+      <tr>
+        <td>Diners Club</td>
+        <td>300-305, 36, 38</td>
+        <td>14</td>
+        <td>Back (3 digits)</td>
+      </tr>
+      <tr>
+        <td>JCB</td>
+        <td>3528-3589</td>
+        <td>16</td>
+        <td>Back (3 digits)</td>
+      </tr>
+      <tr>
+        <td>UnionPay</td>
+        <td>62</td>
+        <td>16-19</td>
+        <td>Back (3 digits)</td>
+      </tr>
+      <tr>
+        <td>Maestro</td>
+        <td>50, 56-69</td>
+        <td>12-19</td>
+        <td>Back (3 digits)</td>
+      </tr>
+    </table>
+
+    <h2>2.2 Magnetic Stripe Data</h2>
+
+    <p>Magnetic stripe cards store data on three tracks. Most payment systems use Track 2 data.</p>
+
+    <h3>Track 1 Format</h3>
+    <pre><code>Format: %B{PAN}^{Name}^{Expiry}{Service Code}{Discretionary Data}?{LRC}
+
+Example: %B4532123456789010^DOE/JOHN^2512101123456789012345?
+
+Components:
+%B            : Start sentinel for Track 1
+4532...9010   : Primary Account Number (PAN)
+^             : Field separator
+DOE/JOHN      : Cardholder name (surname/firstname)
+^             : Field separator
+25            : Expiry year (2025)
+12            : Expiry month (December)
+101           : Service code
+123456789012345 : Discretionary data (optional)
+?             : End sentinel
+LRC           : Longitudinal Redundancy Check
+
+Track 1 Specs:
+- Density: 210 bits per inch
+- Character set: ALPHA (alphanumeric)
+- Max length: 79 characters
+- Encoding: 7-bit including parity
+</code></pre>
+
+    <h3>Track 2 Format</h3>
+    <pre><code>Format: ;{PAN}={Expiry}{Service Code}{Discretionary Data}?{LRC}
+
+Example: ;4532123456789010=25121011234?
+
+Components:
+;             : Start sentinel for Track 2
+4532...9010   : Primary Account Number (PAN)
+=             : Field separator
+25            : Expiry year (2025)
+12            : Expiry month (December)
+101           : Service code
+1234          : Discretionary data (PIN verification key indicator, etc.)
+?             : End sentinel
+LRC           : Longitudinal Redundancy Check
+
+Track 2 Specs:
+- Density: 75 bits per inch
+- Character set: NUMERIC only (0-9, =, ?)
+- Max length: 40 characters
+- Encoding: 5-bit including parity
+- Most commonly used for transactions
+</code></pre>
+
+    <h3>Service Code</h3>
+    <p>The 3-digit service code defines card usage restrictions and authorization requirements.</p>
+
+    <table>
+      <tr>
+        <th>Position</th>
+        <th>Digit</th>
+        <th>Meaning</th>
+      </tr>
+      <tr>
+        <td rowspan="4">1st Digit<br>(Authorization)</td>
+        <td>1</td>
+        <td>International use, ICC (chip)</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>International use, magnetic stripe</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>National use, ICC</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>National use, magnetic stripe</td>
+      </tr>
+      <tr>
+        <td rowspan="3">2nd Digit<br>(PIN)</td>
+        <td>0</td>
+        <td>Normal authorization, no PIN required</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Online PIN required</td>
+      </tr>
+      <tr>
+        <td>3, 5, 6</td>
+        <td>Offline PIN required</td>
+      </tr>
+      <tr>
+        <td rowspan="3">3rd Digit<br>(Restrictions)</td>
+        <td>0</td>
+        <td>No restrictions, PIN required if digit 2 indicates</td>
+      </tr>
+      <tr>
+        <td>1, 3, 5</td>
+        <td>Restrictions apply (goods/services)</td>
+      </tr>
+      <tr>
+        <td>2, 4, 6</td>
+        <td>Restrictions apply (ATM/cash)</td>
+      </tr>
+    </table>
+
+    <h4>Common Service Codes</h4>
+    <ul>
+      <li><strong>101:</strong> International, no restrictions, no PIN (most credit cards)</li>
+      <li><strong>121:</strong> International, no restrictions, online PIN required (debit cards)</li>
+      <li><strong>201:</strong> International, magnetic stripe, no restrictions, no PIN</li>
+      <li><strong>221:</strong> International, magnetic stripe, online PIN required</li>
+    </ul>
+
+    <h2>2.3 EMV Chip Data</h2>
+
+    <p>EMV chip cards use embedded microprocessors that generate dynamic authentication data for each transaction, making card cloning virtually impossible.</p>
+
+    <h3>EMV Data Elements</h3>
+
+    <table>
+      <tr>
+        <th>Tag</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td>5A</td>
+        <td>Application PAN</td>
+        <td>Primary Account Number from chip</td>
+      </tr>
+      <tr>
+        <td>5F24</td>
+        <td>Application Expiration Date</td>
+        <td>YYMMDD format</td>
+      </tr>
+      <tr>
+        <td>5F25</td>
+        <td>Application Effective Date</td>
+        <td>When card becomes valid</td>
+      </tr>
+      <tr>
+        <td>5F28</td>
+        <td>Issuer Country Code</td>
+        <td>ISO 3166-1 numeric code</td>
+      </tr>
+      <tr>
+        <td>5F2A</td>
+        <td>Transaction Currency Code</td>
+        <td>ISO 4217 numeric code</td>
+      </tr>
+      <tr>
+        <td>5F34</td>
+        <td>Application PAN Sequence Number</td>
+        <td>Distinguishes multiple cards with same PAN</td>
+      </tr>
+      <tr>
+        <td>82</td>
+        <td>Application Interchange Profile (AIP)</td>
+        <td>Card capabilities and requirements</td>
+      </tr>
+      <tr>
+        <td>84</td>
+        <td>Dedicated File (DF) Name</td>
+        <td>Application identifier (AID)</td>
+      </tr>
+      <tr>
+        <td>8C</td>
+        <td>Card Risk Management Data Object List 1 (CDOL1)</td>
+        <td>Data required for card risk management</td>
+      </tr>
+      <tr>
+        <td>8E</td>
+        <td>Cardholder Verification Method (CVM) List</td>
+        <td>Supported verification methods (PIN, signature)</td>
+      </tr>
+      <tr>
+        <td>95</td>
+        <td>Terminal Verification Results (TVR)</td>
+        <td>Results of terminal verification checks</td>
+      </tr>
+      <tr>
+        <td>9A</td>
+        <td>Transaction Date</td>
+        <td>YYMMDD format</td>
+      </tr>
+      <tr>
+        <td>9C</td>
+        <td>Transaction Type</td>
+        <td>Purchase, cash advance, refund, etc.</td>
+      </tr>
+      <tr>
+        <td>9F02</td>
+        <td>Amount, Authorized (Numeric)</td>
+        <td>Authorized amount in minor units</td>
+      </tr>
+      <tr>
+        <td>9F03</td>
+        <td>Amount, Other (Numeric)</td>
+        <td>Cashback or other amounts</td>
+      </tr>
+      <tr>
+        <td>9F10</td>
+        <td>Issuer Application Data</td>
+        <td>Issuer-specific data</td>
+      </tr>
+      <tr>
+        <td>9F26</td>
+        <td>Application Cryptogram</td>
+        <td>ARQC, TC, or AAC cryptogram</td>
+      </tr>
+      <tr>
+        <td>9F27</td>
+        <td>Cryptogram Information Data</td>
+        <td>Type of cryptogram generated</td>
+      </tr>
+      <tr>
+        <td>9F33</td>
+        <td>Terminal Capabilities</td>
+        <td>Terminal's technical capabilities</td>
+      </tr>
+      <tr>
+        <td>9F36</td>
+        <td>Application Transaction Counter (ATC)</td>
+        <td>Counter incremented for each transaction</td>
+      </tr>
+      <tr>
+        <td>9F37</td>
+        <td>Unpredictable Number</td>
+        <td>Terminal-generated random number</td>
+      </tr>
+    </table>
+
+    <h3>EMV Transaction Cryptograms</h3>
+
+    <p>EMV chips generate cryptographic validation codes for each transaction:</p>
+
+    <h4>ARQC - Authorization Request Cryptogram</h4>
+    <ul>
+      <li>Generated by card for online authorization</li>
+      <li>Sent to issuer for validation</li>
+      <li>Proves card authenticity to issuer</li>
+      <li>Includes transaction data in cryptogram calculation</li>
+      <li>Cannot be reused for another transaction</li>
+    </ul>
+
+    <h4>TC - Transaction Certificate</h4>
+    <ul>
+      <li>Card approves transaction offline</li>
+      <li>Generated when issuer parameters allow offline approval</li>
+      <li>Transaction completes without real-time authorization</li>
+      <li>Submitted in batch for clearing</li>
+    </ul>
+
+    <h4>AAC - Application Authentication Cryptogram</h4>
+    <ul>
+      <li>Card declines transaction offline</li>
+      <li>Card determines transaction too risky</li>
+      <li>Transaction does not proceed</li>
+      <li>Merchant receives decline message</li>
+    </ul>
+
+    <h4>ARPC - Authorization Response Cryptogram</h4>
+    <ul>
+      <li>Generated by issuer in response to ARQC</li>
+      <li>Sent back to card via terminal</li>
+      <li>Card validates issuer response</li>
+      <li>Ensures response came from legitimate issuer</li>
+    </ul>
+
+    <h3>Cardholder Verification Methods (CVM)</h3>
+
+    <p>EMV defines multiple ways to verify the cardholder:</p>
+
+    <table>
+      <tr>
+        <th>CVM Code</th>
+        <th>Method</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td>00</td>
+        <td>Fail CVM Processing</td>
+        <td>No further CVM to be performed</td>
+      </tr>
+      <tr>
+        <td>01</td>
+        <td>Plaintext PIN by ICC</td>
+        <td>PIN verified by chip (offline)</td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td>Enciphered PIN Online</td>
+        <td>PIN verified by issuer (online)</td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td>Plaintext PIN by ICC and signature</td>
+        <td>Both PIN and signature required</td>
+      </tr>
+      <tr>
+        <td>04</td>
+        <td>Enciphered PIN by ICC</td>
+        <td>Encrypted PIN verified by chip</td>
+      </tr>
+      <tr>
+        <td>05</td>
+        <td>Enciphered PIN by ICC and signature</td>
+        <td>Both encrypted PIN and signature</td>
+      </tr>
+      <tr>
+        <td>1E</td>
+        <td>Signature (paper)</td>
+        <td>Traditional handwritten signature</td>
+      </tr>
+      <tr>
+        <td>1F</td>
+        <td>No CVM Required</td>
+        <td>No verification needed (contactless small value)</td>
+      </tr>
+      <tr>
+        <td>3F</td>
+        <td>Not Available</td>
+        <td>CVM not available for this transaction</td>
+      </tr>
+    </table>
+
+    <h3>EMV Application Identifiers (AID)</h3>
+
+    <pre><code>Common Payment Application AIDs:
+
+Visa:
+A0000000031010  - Visa Credit/Debit
+A0000000032010  - Visa Electron
+A0000000033010  - Visa Interlink (V PAY)
+A0000000038010  - Visa Plus
+
+Mastercard:
+A0000000041010  - Mastercard Credit/Debit
+A0000000042010  - Maestro
+A0000000043010  - Cirrus
+
+American Express:
+A00000002501    - American Express
+
+Discover:
+A0000001523010  - Discover
+
+JCB:
+A0000000651010  - JCB
+
+UnionPay:
+A000000333010101 - UnionPay Credit
+A000000333010102 - UnionPay Debit
+</code></pre>
+
+    <h2>2.4 PCI-DSS Data Classification</h2>
+
+    <p>The Payment Card Industry Data Security Standard (PCI-DSS) classifies card data into different categories with specific security requirements.</p>
+
+    <h3>Cardholder Data (CHD)</h3>
+
+    <h4>Primary Account Number (PAN)</h4>
+    <div class="warning-box">
+      <h4>⚠️ Highest Security Level</h4>
+      <p>PAN must be protected at all times. If stored, it must be encrypted or tokenized. Never store full PAN in plain text.</p>
+    </div>
+
+    <ul>
+      <li><strong>Storage:</strong> Encrypted or tokenized only</li>
+      <li><strong>Transmission:</strong> Encrypted (TLS 1.2+)</li>
+      <li><strong>Display:</strong> Masked (show last 4 digits only)</li>
+      <li><strong>Logging:</strong> Never log full PAN</li>
+      <li><strong>Retention:</strong> Minimize storage duration</li>
+    </ul>
+
+    <h4>Cardholder Name</h4>
+    <ul>
+      <li><strong>Storage:</strong> Allowed if business need justified</li>
+      <li><strong>Protection:</strong> Encrypt if stored with PAN</li>
+      <li><strong>Access:</strong> Restrict to authorized personnel</li>
+    </ul>
+
+    <h4>Expiration Date</h4>
+    <ul>
+      <li><strong>Storage:</strong> Allowed if business need justified</li>
+      <li><strong>Protection:</strong> Encrypt if stored with PAN</li>
+      <li><strong>Usage:</strong> Required for recurring billing</li>
+    </ul>
+
+    <h4>Service Code</h4>
+    <ul>
+      <li><strong>Storage:</strong> Allowed if business need justified</li>
+      <li><strong>Protection:</strong> Encrypt if stored with PAN</li>
+      <li><strong>Usage:</strong> Defines card authorization rules</li>
+    </ul>
+
+    <h3>Sensitive Authentication Data (SAD)</h3>
+
+    <div class="warning-box">
+      <h4>🚫 NEVER STORE AFTER AUTHORIZATION</h4>
+      <p>Sensitive authentication data must NEVER be stored after authorization, even if encrypted. Violation is grounds for immediate decertification.</p>
+    </div>
+
+    <h4>Full Magnetic Stripe Data</h4>
+    <ul>
+      <li><strong>Storage:</strong> ❌ NEVER (not even encrypted)</li>
+      <li><strong>Usage:</strong> For authorization only</li>
+      <li><strong>Transmission:</strong> Encrypted, immediately purged</li>
+      <li><strong>Violation Penalty:</strong> Up to $500,000 per incident</li>
+    </ul>
+
+    <h4>CAV2/CVC2/CVV2/CID (Card Verification Value)</h4>
+    <ul>
+      <li><strong>Storage:</strong> ❌ NEVER (not even encrypted)</li>
+      <li><strong>Usage:</strong> For authorization only</li>
+      <li><strong>Purpose:</strong> Proves physical card possession</li>
+      <li><strong>Location:</strong> 3 digits on back (4 on front for Amex)</li>
+    </ul>
+
+    <h4>PIN / PIN Block</h4>
+    <ul>
+      <li><strong>Storage:</strong> ❌ NEVER (not even encrypted)</li>
+      <li><strong>Transmission:</strong> Triple DES or stronger encryption</li>
+      <li><strong>Purpose:</strong> Cardholder verification</li>
+      <li><strong>Processing:</strong> Only in secure cryptographic devices (HSM)</li>
+    </ul>
+
+    <h3>Data Masking Requirements</h3>
+
+    <pre><code>PAN Masking Examples:
+
+Full PAN:        4532 1234 5678 9010
+Masked Display:  •••• •••• •••• 9010
+Masked Display:  ****-****-****-9010
+Masked Display:  XXXX-XXXX-XXXX-9010
+Masked Display:  4532-****-****-9010 (first 6 + last 4 for support)
+
+Rules:
+- Maximum first 6 + last 4 digits can be displayed
+- Middle digits must be masked
+- Use consistent masking character (•, *, X)
+- Masking applies to:
+  * Web pages and forms
+  * Mobile applications
+  * Email communications
+  * SMS notifications
+  * Printed receipts
+  * Call center displays
+  * Log files and databases
+</code></pre>
+
+    <h2>2.5 Tokenization</h2>
+
+    <p>Tokenization replaces sensitive card data with non-sensitive tokens, reducing PCI-DSS scope and enhancing security.</p>
+
+    <h3>Tokenization Process</h3>
+
+    <pre><code>1. Initial Transaction:
+   Customer:        4532 1234 5678 9010
+   ↓ (secure transmission)
+   Token Vault:     Creates token
+   ↓
+   Token:           tok_7h3k2m9p4x1q8n5w
+
+2. Subsequent Transactions:
+   Merchant sends:  tok_7h3k2m9p4x1q8n5w
+   ↓
+   Token Vault:     Detokenizes → 4532 1234 5678 9010
+   ↓
+   Card Network:    Processes real PAN
+   ↓
+   Response:        Authorization approved/declined
+
+Benefits:
+✓ Merchant never stores real PAN
+✓ Reduced PCI-DSS scope
+✓ Lower compliance costs
+✓ Enhanced security
+✓ Breach protection (tokens useless to attackers)
+</code></pre>
+
+    <h3>Token Formats</h3>
+
+    <h4>Format-Preserving Tokens</h4>
+    <pre><code>Real PAN:  4532 1234 5678 9010
+Token:     4532 9876 5432 1098
+
+Characteristics:
+- Maintains PAN format (same length, Luhn valid)
+- First 6 digits preserved for BIN routing
+- Last 4 digits may be preserved for display
+- Allows use in legacy systems expecting PAN format
+</code></pre>
+
+    <h4>Non-Format-Preserving Tokens</h4>
+    <pre><code>Real PAN:  4532 1234 5678 9010
+Token:     tok_7h3k2m9p4x1q8n5w
+
+Characteristics:
+- Different format from PAN
+- More flexible token structure
+- Clearly distinguishable from real PAN
+- Prevents accidental PAN exposure
+</code></pre>
+
+    <h3>Network Tokenization</h3>
+
+    <p>Card networks provide tokenization services that create network-specific tokens:</p>
+
+    <ul>
+      <li><strong>Visa Token Service (VTS)</strong></li>
+      <li><strong>Mastercard Digital Enablement Service (MDES)</strong></li>
+      <li><strong>American Express Token Service</strong></li>
+    </ul>
+
+    <h4>Network Token Benefits</h4>
+    <ul>
+      <li>Higher authorization rates (issuer recognizes token)</li>
+      <li>Automatic card updates (token persists through reissue)</li>
+      <li>Enhanced security (dynamic CVV)</li>
+      <li>Mobile wallet integration (Apple Pay, Google Pay)</li>
+      <li>Fraud reduction (tokens cannot be used outside domain)</li>
+    </ul>
+
+    <h2>2.6 Data Encryption Standards</h2>
+
+    <h3>Encryption at Rest</h3>
+
+    <h4>Required Standards</h4>
+    <ul>
+      <li><strong>AES-256:</strong> Advanced Encryption Standard with 256-bit keys (recommended)</li>
+      <li><strong>AES-128:</strong> 128-bit keys (minimum acceptable)</li>
+      <li><strong>RSA-2048:</strong> For key encryption (minimum)</li>
+    </ul>
+
+    <div class="warning-box">
+      <h4>⚠️ Deprecated Algorithms</h4>
+      <p>The following are NO LONGER ACCEPTABLE:</p>
+      <ul>
+        <li>DES (Data Encryption Standard)</li>
+        <li>3DES/TDEA (after 2023)</li>
+        <li>RSA-1024 or lower</li>
+        <li>MD5 hashing</li>
+        <li>SHA-1 hashing</li>
+      </ul>
+    </div>
+
+    <h3>Encryption in Transit</h3>
+
+    <h4>TLS Requirements</h4>
+    <pre><code>Required:
+✓ TLS 1.2 (minimum)
+✓ TLS 1.3 (recommended)
+
+Prohibited:
+✗ SSL 2.0
+✗ SSL 3.0
+✗ TLS 1.0
+✗ TLS 1.1
+
+Cipher Suites (Examples of Strong):
+- TLS_AES_256_GCM_SHA384
+- TLS_CHACHA20_POLY1305_SHA256
+- TLS_AES_128_GCM_SHA256
+- ECDHE-RSA-AES256-GCM-SHA384
+- ECDHE-RSA-AES128-GCM-SHA256
+</code></pre>
+
+    <h3>Key Management</h3>
+
+    <p>Proper cryptographic key management is critical for encryption security:</p>
+
+    <h4>Key Generation</h4>
+    <ul>
+      <li>Use cryptographically secure random number generator (CSRNG)</li>
+      <li>Generate keys in secure Hardware Security Module (HSM)</li>
+      <li>Minimum key strength: 128-bit for symmetric, 2048-bit for asymmetric</li>
+      <li>Never use predictable or hardcoded keys</li>
+    </ul>
+
+    <h4>Key Storage</h4>
+    <ul>
+      <li>Store keys in HSM or secure key vault</li>
+      <li>Encrypt data encryption keys with key encryption keys</li>
+      <li>Maintain air gap between keys and encrypted data</li>
+      <li>Never store keys in application code or configuration files</li>
+    </ul>
+
+    <h4>Key Rotation</h4>
+    <ul>
+      <li>Rotate encryption keys annually at minimum</li>
+      <li>Rotate immediately if compromise suspected</li>
+      <li>Maintain versioned keys for data re-encryption</li>
+      <li>Automate rotation process where possible</li>
+    </ul>
+
+    <h4>Key Destruction</h4>
+    <ul>
+      <li>Securely destroy retired keys</li>
+      <li>Overwrite key material multiple times</li>
+      <li>Document key destruction in audit logs</li>
+      <li>Use cryptographic erasure for data destruction</li>
+    </ul>
+
+    <h2>2.7 Data Retention and Disposal</h2>
+
+    <h3>Retention Policies</h3>
+
+    <table>
+      <tr>
+        <th>Data Type</th>
+        <th>Retention Period</th>
+        <th>Justification Required</th>
+      </tr>
+      <tr>
+        <td>PAN (encrypted/tokenized)</td>
+        <td>Business need only</td>
+        <td>Yes - minimize duration</td>
+      </tr>
+      <tr>
+        <td>Cardholder name</td>
+        <td>Business need only</td>
+        <td>Yes</td>
+      </tr>
+      <tr>
+        <td>Transaction history</td>
+        <td>7 years (regulatory)</td>
+        <td>Yes - tax/audit requirements</td>
+      </tr>
+      <tr>
+        <td>Authorization logs</td>
+        <td>90 days minimum</td>
+        <td>Yes - fraud investigation</td>
+      </tr>
+      <tr>
+        <td>Full magnetic stripe</td>
+        <td>❌ Never store</td>
+        <td>N/A - Prohibited</td>
+      </tr>
+      <tr>
+        <td>CVV/CVC/CVV2/CID</td>
+        <td>❌ Never store</td>
+        <td>N/A - Prohibited</td>
+      </tr>
+      <tr>
+        <td>PIN/PIN Block</td>
+        <td>❌ Never store</td>
+        <td>N/A - Prohibited</td>
+      </tr>
+    </table>
+
+    <h3>Secure Data Disposal</h3>
+
+    <h4>Electronic Media</h4>
+    <ul>
+      <li><strong>Degaussing:</strong> Magnetic field disruption for HDDs</li>
+      <li><strong>Physical Destruction:</strong> Shredding, pulverizing, incinerating</li>
+      <li><strong>Cryptographic Erasure:</strong> Destroy encryption keys</li>
+      <li><strong>Secure Wipe:</strong> DoD 5220.22-M (7-pass overwrite) minimum</li>
+    </ul>
+
+    <h4>Paper Media</h4>
+    <ul>
+      <li><strong>Cross-Cut Shredding:</strong> Minimum 1mm x 5mm particles</li>
+      <li><strong>Pulping:</strong> Industrial paper pulping</li>
+      <li><strong>Incineration:</strong> Complete combustion</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>Best Practice: Minimize Data Collection</h4>
+      <p>The most secure data is data you don't collect. Implement "data minimization" principles:</p>
+      <ul>
+        <li>Collect only data necessary for business purpose</li>
+        <li>Use tokenization to avoid storing real PANs</li>
+        <li>Purge data as soon as business need expires</li>
+        <li>Never collect sensitive authentication data</li>
+        <li>Implement automatic data retention enforcement</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="navigation">
+    <a href="chapter1.html" class="nav-button">← Previous: Introduction</a>
+    <a href="chapter3.html" class="nav-button next">Next: API Endpoints →</a>
+  </div>
+</body>
+</html>
