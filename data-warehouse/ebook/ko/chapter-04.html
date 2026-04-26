@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4장: 차원 모델링 - WIA-DATA-003</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-003 v1.0</div>
+    <h1>4장</h1>
+    <p class="subtitle">차원 모델링 (Kimball & Inmon)</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>4.1 차원 모델링의 기초</h2>
+      <p>차원 모델링(Dimensional Modeling)은 데이터 웨어하우스를 설계하는 핵심 기법으로, 비즈니스 사용자가 이해하기 쉽고 쿼리 성능이 우수한 구조를 제공합니다. Ralph Kimball이 처음 제안한 이 방법론은 현재 데이터 웨어하우스 설계의 사실상 표준으로 자리잡았습니다.</p>
+
+      <p>차원 모델링의 핵심 개념은 다음과 같습니다:</p>
+      <ul>
+        <li><strong>팩트(Facts)</strong>: 비즈니스 프로세스의 측정 가능한 이벤트</li>
+        <li><strong>차원(Dimensions)</strong>: 팩트를 설명하는 컨텍스트 정보</li>
+        <li><strong>세분화 수준(Grain)</strong>: 팩트 테이블에서 표현하는 가장 원자적인 수준</li>
+        <li><strong>비즈니스 프로세스</strong>: 조직의 핵심 운영 활동</li>
+      </ul>
+
+      <p>차원 모델링은 OLTP(Online Transaction Processing) 시스템에서 사용하는 정규화된 엔티티-관계(ER) 모델과는 다른 목적을 가집니다. OLTP는 트랜잭션 처리와 데이터 무결성에 초점을 맞추는 반면, 차원 모델은 쿼리 성능과 비즈니스 이해도에 중점을 둡니다.</p>
+
+      <h3>차원 모델링 vs ER 모델링</h3>
+      <table>
+        <caption>차원 모델링과 ER 모델링 비교</caption>
+        <thead>
+          <tr>
+            <th>특성</th>
+            <th>차원 모델링</th>
+            <th>ER 모델링</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>목적</td>
+            <td>분석 및 리포팅</td>
+            <td>트랜잭션 처리</td>
+          </tr>
+          <tr>
+            <td>정규화</td>
+            <td>비정규화 (대부분)</td>
+            <td>고도로 정규화</td>
+          </tr>
+          <tr>
+            <td>쿼리 패턴</td>
+            <td>복잡한 집계 및 조인</td>
+            <td>단순한 CRUD 작업</td>
+          </tr>
+          <tr>
+            <td>데이터 중복</td>
+            <td>허용 (성능 위해)</td>
+            <td>최소화</td>
+          </tr>
+          <tr>
+            <td>이해도</td>
+            <td>비즈니스 사용자 친화적</td>
+            <td>기술적</td>
+          </tr>
+          <tr>
+            <td>쿼리 성능</td>
+            <td>빠름</td>
+            <td>복잡한 분석 쿼리에는 느림</td>
+          </tr>
+          <tr>
+            <td>스키마 유형</td>
+            <td>스타 또는 스노우플레이크</td>
+            <td>복잡한 관계 네트워크</td>
+          </tr>
+          <tr>
+            <td>변경 빈도</td>
+            <td>안정적</td>
+            <td>자주 변경됨</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4.2 Kimball 방법론 (상향식 접근법)</h2>
+      <p>Ralph Kimball의 차원 모델링 방법론은 <strong>상향식(Bottom-Up)</strong> 접근 방식을 채택합니다. 이 방법은 개별 비즈니스 프로세스에 대한 데이터 마트를 먼저 구축한 후, 이를 점진적으로 통합하여 엔터프라이즈 데이터 웨어하우스를 완성합니다.</p>
+
+      <h3>Kimball의 4단계 설계 프로세스</h3>
+
+      <h4>1단계: 비즈니스 프로세스 선택</h4>
+      <p>가장 먼저 모델링할 비즈니스 프로세스를 선택합니다. 일반적으로 다음 기준을 고려합니다:</p>
+      <ul>
+        <li>비즈니스 가치가 높은 프로세스</li>
+        <li>데이터 품질이 좋은 프로세스</li>
+        <li>실현 가능성이 높은 프로세스</li>
+        <li>정치적 지지를 받을 수 있는 프로세스</li>
+      </ul>
+
+      <p>예시: 소매 업체의 경우 판매(Sales), 재고(Inventory), 구매(Procurement) 등의 비즈니스 프로세스가 있을 수 있습니다.</p>
+
+      <h4>2단계: 세분화 수준(Grain) 선언</h4>
+      <p>팩트 테이블의 각 행이 나타내는 가장 원자적인 수준을 정의합니다. 세분화 수준은 가능한 한 낮게 설정하는 것이 좋습니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 잘못된 세분화 수준 (너무 집계됨)
+-- "일별 제품 카테고리 판매 요약"
+-- 문제: 개별 거래 분석 불가능
+
+-- 올바른 세분화 수준 (원자적)
+-- "각 판매 거래의 각 제품 라인 아이템"
+CREATE TABLE fact_sales (
+    transaction_id VARCHAR(20),
+    line_item_number INT,
+    date_key INT,
+    product_key INT,
+    customer_key INT,
+    store_key INT,
+    quantity INT,
+    unit_price DECIMAL(10,2),
+    line_total DECIMAL(12,2),
+    PRIMARY KEY (transaction_id, line_item_number)
+);
+
+-- 이 세분화 수준으로:
+-- ✓ 개별 거래 분석 가능
+-- ✓ 제품별 분석 가능
+-- ✓ 고객별 분석 가능
+-- ✓ 원하는 수준으로 집계 가능</code></pre>
+      </div>
+
+      <h4>3단계: 차원 식별</h4>
+      <p>비즈니스 프로세스를 설명하는 차원을 식별합니다. 차원은 "누가, 무엇을, 언제, 어디서, 왜, 어떻게"에 해당합니다.</p>
+
+      <table>
+        <caption>판매 프로세스의 차원 예시</caption>
+        <thead>
+          <tr>
+            <th>질문</th>
+            <th>차원</th>
+            <th>예시 속성</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>언제?</td>
+            <td>날짜/시간 차원</td>
+            <td>날짜, 요일, 월, 분기, 년도, 공휴일 여부</td>
+          </tr>
+          <tr>
+            <td>무엇을?</td>
+            <td>제품 차원</td>
+            <td>제품명, 카테고리, 브랜드, 색상, 크기</td>
+          </tr>
+          <tr>
+            <td>누가?</td>
+            <td>고객 차원</td>
+            <td>고객명, 세그먼트, 지역, 가입일</td>
+          </tr>
+          <tr>
+            <td>어디서?</td>
+            <td>매장 차원</td>
+            <td>매장명, 위치, 지역, 매장 유형</td>
+          </tr>
+          <tr>
+            <td>어떻게?</td>
+            <td>판매 채널 차원</td>
+            <td>온라인, 오프라인, 모바일</td>
+          </tr>
+          <tr>
+            <td>왜?</td>
+            <td>프로모션 차원</td>
+            <td>프로모션 유형, 할인율, 기간</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>4단계: 팩트 식별</h4>
+      <p>비즈니스 프로세스에서 측정 가능한 수치를 팩트로 식별합니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 판매 팩트 테이블의 팩트들
+CREATE TABLE fact_sales (
+    -- 외래 키 (차원 참조)
+    date_key INT,
+    product_key INT,
+    customer_key INT,
+    store_key INT,
+    promotion_key INT,
+
+    -- 팩트 (측정값)
+    quantity INT,                    -- 가산 팩트
+    unit_price DECIMAL(10,2),        -- 비가산 팩트
+    gross_amount DECIMAL(12,2),      -- 가산 팩트
+    discount_amount DECIMAL(10,2),   -- 가산 팩트
+    tax_amount DECIMAL(10,2),        -- 가산 팩트
+    net_amount DECIMAL(12,2),        -- 가산 팩트
+    cost_amount DECIMAL(12,2),       -- 가산 팩트
+    profit_amount DECIMAL(12,2)      -- 가산 팩트
+);</code></pre>
+      </div>
+
+      <h3>Kimball 버스 아키텍처</h3>
+      <p>Kimball의 핵심 개념 중 하나는 <strong>버스 아키텍처(Bus Architecture)</strong>입니다. 이는 여러 데이터 마트가 컨포먼드 디멘전(Conformed Dimensions)을 공유하여 통합된 엔터프라이즈 뷰를 제공하는 구조입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 컨포먼드 디멘전: 여러 팩트 테이블에서 공유
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,
+    full_date DATE,
+    day_of_week VARCHAR(10),
+    month INT,
+    quarter INT,
+    year INT,
+    fiscal_year INT,
+    is_holiday BOOLEAN
+);
+
+CREATE TABLE dim_product (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20),
+    product_name VARCHAR(200),
+    category VARCHAR(100),
+    brand VARCHAR(100)
+);
+
+-- 판매 팩트 테이블
+CREATE TABLE fact_sales (
+    date_key INT REFERENCES dim_date,
+    product_key INT REFERENCES dim_product,
+    customer_key INT,
+    net_amount DECIMAL(12,2)
+);
+
+-- 재고 팩트 테이블 (동일한 차원 공유)
+CREATE TABLE fact_inventory (
+    date_key INT REFERENCES dim_date,
+    product_key INT REFERENCES dim_product,
+    warehouse_key INT,
+    quantity_on_hand INT
+);
+
+-- 구매 팩트 테이블 (동일한 차원 공유)
+CREATE TABLE fact_procurement (
+    date_key INT REFERENCES dim_date,
+    product_key INT REFERENCES dim_product,
+    supplier_key INT,
+    order_quantity INT,
+    order_amount DECIMAL(12,2)
+);
+
+-- 교차 프로세스 분석 가능
+SELECT
+    d.year,
+    d.quarter,
+    p.category,
+    SUM(s.net_amount) as sales,
+    AVG(i.quantity_on_hand) as avg_inventory,
+    SUM(pr.order_amount) as procurement_cost
+FROM dim_date d
+JOIN dim_product p ON 1=1
+LEFT JOIN fact_sales s ON d.date_key = s.date_key
+    AND p.product_key = s.product_key
+LEFT JOIN fact_inventory i ON d.date_key = i.date_key
+    AND p.product_key = i.product_key
+LEFT JOIN fact_procurement pr ON d.date_key = pr.date_key
+    AND p.product_key = pr.product_key
+WHERE d.year = 2025
+GROUP BY d.year, d.quarter, p.category;</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>4.3 Inmon 방법론 (하향식 접근법)</h2>
+      <p>Bill Inmon의 데이터 웨어하우스 방법론은 <strong>하향식(Top-Down)</strong> 접근 방식을 취합니다. 이 방법은 먼저 정규화된 엔터프라이즈 데이터 웨어하우스(EDW)를 구축한 후, 여기서 부서별 데이터 마트를 추출합니다.</p>
+
+      <h3>Inmon 방법론의 핵심 원칙</h3>
+      <ul>
+        <li><strong>주제 지향적(Subject-Oriented)</strong>: 비즈니스 프로세스가 아닌 주제(고객, 제품, 주문 등)를 중심으로 구성</li>
+        <li><strong>통합적(Integrated)</strong>: 다양한 소스의 데이터를 일관된 형식으로 통합</li>
+        <li><strong>시간 가변적(Time-Variant)</strong>: 역사적 데이터를 보존</li>
+        <li><strong>비휘발성(Non-Volatile)</strong>: 데이터는 읽기 전용이며 삭제되지 않음</li>
+      </ul>
+
+      <h3>Inmon 아키텍처 구조</h3>
+      <div class="code-block">
+        <pre><code>-- Inmon 방식: 정규화된 EDW
+
+-- 고객 엔티티 (3NF 정규화)
+CREATE TABLE customer (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(200),
+    customer_type_id INT REFERENCES customer_type,
+    address_id INT REFERENCES address,
+    created_date DATE,
+    updated_date DATE
+);
+
+CREATE TABLE customer_type (
+    customer_type_id INT PRIMARY KEY,
+    type_name VARCHAR(50),
+    type_description VARCHAR(500)
+);
+
+CREATE TABLE address (
+    address_id INT PRIMARY KEY,
+    street VARCHAR(200),
+    city_id INT REFERENCES city
+);
+
+CREATE TABLE city (
+    city_id INT PRIMARY KEY,
+    city_name VARCHAR(100),
+    state_id INT REFERENCES state
+);
+
+CREATE TABLE state (
+    state_id INT PRIMARY KEY,
+    state_name VARCHAR(50),
+    country_id INT REFERENCES country
+);
+
+-- 제품 엔티티 (3NF 정규화)
+CREATE TABLE product (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(200),
+    category_id INT REFERENCES category,
+    brand_id INT REFERENCES brand,
+    unit_price DECIMAL(10,2)
+);
+
+CREATE TABLE category (
+    category_id INT PRIMARY KEY,
+    category_name VARCHAR(100),
+    parent_category_id INT REFERENCES category
+);
+
+CREATE TABLE brand (
+    brand_id INT PRIMARY KEY,
+    brand_name VARCHAR(100),
+    manufacturer_id INT REFERENCES manufacturer
+);
+
+-- 판매 트랜잭션 (정규화)
+CREATE TABLE sales_transaction (
+    transaction_id INT PRIMARY KEY,
+    customer_id INT REFERENCES customer,
+    transaction_date DATE,
+    store_id INT REFERENCES store,
+    total_amount DECIMAL(12,2)
+);
+
+CREATE TABLE sales_line_item (
+    line_item_id INT PRIMARY KEY,
+    transaction_id INT REFERENCES sales_transaction,
+    product_id INT REFERENCES product,
+    quantity INT,
+    unit_price DECIMAL(10,2),
+    line_total DECIMAL(12,2)
+);
+
+-- 데이터 마트는 EDW에서 추출하여 차원 모델로 변환
+CREATE VIEW datamart_sales AS
+SELECT
+    st.transaction_date,
+    c.customer_name,
+    ct.type_name as customer_type,
+    ci.city_name,
+    s.state_name,
+    p.product_name,
+    cat.category_name,
+    b.brand_name,
+    sli.quantity,
+    sli.line_total
+FROM sales_line_item sli
+JOIN sales_transaction st ON sli.transaction_id = st.transaction_id
+JOIN customer c ON st.customer_id = c.customer_id
+JOIN customer_type ct ON c.customer_type_id = ct.customer_type_id
+JOIN address a ON c.address_id = a.address_id
+JOIN city ci ON a.city_id = ci.city_id
+JOIN state s ON ci.state_id = s.state_id
+JOIN product p ON sli.product_id = p.product_id
+JOIN category cat ON p.category_id = cat.category_id
+JOIN brand b ON p.brand_id = b.brand_id;</code></pre>
+      </div>
+
+      <h3>Corporate Information Factory (CIF)</h3>
+      <p>Inmon은 CIF(Corporate Information Factory)라는 포괄적인 아키텍처를 제안했습니다. 이는 다음 계층으로 구성됩니다:</p>
+      <ul>
+        <li><strong>운영 시스템</strong>: 소스 데이터</li>
+        <li><strong>통합 계층</strong>: ETL 프로세스</li>
+        <li><strong>EDW</strong>: 정규화된 엔터프라이즈 웨어하우스</li>
+        <li><strong>데이터 마트</strong>: 부서별/주제별 비정규화된 마트</li>
+        <li><strong>분석 도구</strong>: BI, 리포팅, OLAP</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4.4 Kimball vs Inmon 상세 비교</h2>
+
+      <table>
+        <caption>Kimball과 Inmon 방법론 비교</caption>
+        <thead>
+          <tr>
+            <th>측면</th>
+            <th>Kimball (상향식)</th>
+            <th>Inmon (하향식)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>접근 방식</td>
+            <td>Bottom-Up (데이터 마트 먼저)</td>
+            <td>Top-Down (EDW 먼저)</td>
+          </tr>
+          <tr>
+            <td>초점</td>
+            <td>비즈니스 프로세스</td>
+            <td>주제 영역</td>
+          </tr>
+          <tr>
+            <td>데이터 구조</td>
+            <td>비정규화 (스타 스키마)</td>
+            <td>정규화 (3NF)</td>
+          </tr>
+          <tr>
+            <td>구현 시간</td>
+            <td>빠름 (6-12개월)</td>
+            <td>느림 (1-3년)</td>
+          </tr>
+          <tr>
+            <td>초기 비용</td>
+            <td>낮음</td>
+            <td>높음</td>
+          </tr>
+          <tr>
+            <td>ROI 시점</td>
+            <td>빠름 (점진적)</td>
+            <td>느림 (전체 완성 후)</td>
+          </tr>
+          <tr>
+            <td>쿼리 성능</td>
+            <td>매우 빠름</td>
+            <td>데이터 마트에서는 빠름, EDW에서는 느림</td>
+          </tr>
+          <tr>
+            <td>데이터 일관성</td>
+            <td>컨포먼드 디멘전으로 보장</td>
+            <td>EDW에서 강하게 보장</td>
+          </tr>
+          <tr>
+            <td>유연성</td>
+            <td>높음 (변경 용이)</td>
+            <td>낮음 (변경 어려움)</td>
+          </tr>
+          <tr>
+            <td>ETL 복잡도</td>
+            <td>중간</td>
+            <td>높음</td>
+          </tr>
+          <tr>
+            <td>적합한 조직</td>
+            <td>중소기업, 빠른 결과 필요</td>
+            <td>대기업, 장기 투자 가능</td>
+          </tr>
+          <tr>
+            <td>위험 수준</td>
+            <td>낮음 (점진적 구축)</td>
+            <td>높음 (대규모 선행 투자)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>실제 프로젝트 비교</h3>
+      <table>
+        <caption>프로젝트 특성 비교 (동일한 규모 가정)</caption>
+        <thead>
+          <tr>
+            <th>항목</th>
+            <th>Kimball</th>
+            <th>Inmon</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1차 배포 기간</td>
+            <td>3-6개월</td>
+            <td>12-18개월</td>
+          </tr>
+          <tr>
+            <td>전체 완성 기간</td>
+            <td>12-24개월</td>
+            <td>24-36개월</td>
+          </tr>
+          <tr>
+            <td>초기 개발 비용</td>
+            <td>$200K - $500K</td>
+            <td>$1M - $3M</td>
+          </tr>
+          <tr>
+            <td>팀 규모</td>
+            <td>3-5명</td>
+            <td>10-20명</td>
+          </tr>
+          <tr>
+            <td>비즈니스 가치 실현</td>
+            <td>6개월 후부터 점진적</td>
+            <td>18개월 후 본격화</td>
+          </tr>
+          <tr>
+            <td>실패 위험</td>
+            <td>낮음 (10-20%)</td>
+            <td>높음 (40-60%)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4.5 컨포먼드 디멘전 (Conformed Dimensions)</h2>
+      <p>컨포먼드 디멘전은 Kimball 방법론의 핵심 개념으로, 여러 팩트 테이블이나 데이터 마트에서 공유하는 표준화된 차원을 의미합니다. 이를 통해 서로 다른 비즈니스 프로세스의 데이터를 일관성 있게 분석할 수 있습니다.</p>
+
+      <h3>컨포먼드 디멘전의 특징</h3>
+      <ul>
+        <li><strong>동일한 구조</strong>: 모든 팩트 테이블에서 동일한 속성 사용</li>
+        <li><strong>동일한 값</strong>: 코드와 설명이 일관성 있게 유지</li>
+        <li><strong>동일한 의미</strong>: 비즈니스 정의가 통일됨</li>
+        <li><strong>단일 소스</strong>: 하나의 마스터 차원에서 관리</li>
+      </ul>
+
+      <h3>컨포먼드 디멘전 구현 예시</h3>
+      <div class="code-block">
+        <pre><code>-- 마스터 날짜 차원 (컨포먼드)
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,
+    full_date DATE NOT NULL,
+    day_of_week VARCHAR(10),
+    day_of_month INT,
+    day_of_year INT,
+    week_of_year INT,
+    month INT,
+    month_name VARCHAR(10),
+    quarter INT,
+    quarter_name VARCHAR(10),
+    year INT,
+    fiscal_year INT,
+    fiscal_quarter INT,
+    is_weekend BOOLEAN,
+    is_holiday BOOLEAN,
+    holiday_name VARCHAR(100)
+);
+
+-- 마스터 제품 차원 (컨포먼드)
+CREATE TABLE dim_product (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20) UNIQUE NOT NULL,
+    product_name VARCHAR(200),
+    brand VARCHAR(100),
+    category VARCHAR(100),
+    subcategory VARCHAR(100),
+    department VARCHAR(100),
+    unit_cost DECIMAL(10,2),
+    list_price DECIMAL(10,2)
+);
+
+-- 판매 데이터 마트 (컨포먼드 차원 사용)
+CREATE TABLE sales_mart.fact_sales (
+    date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    customer_key INT,
+    store_key INT,
+    net_amount DECIMAL(12,2)
+);
+
+-- 재고 데이터 마트 (동일한 컨포먼드 차원 사용)
+CREATE TABLE inventory_mart.fact_inventory (
+    date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    warehouse_key INT,
+    quantity_on_hand INT,
+    inventory_value DECIMAL(12,2)
+);
+
+-- 마케팅 데이터 마트 (동일한 컨포먼드 차원 사용)
+CREATE TABLE marketing_mart.fact_campaigns (
+    date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    campaign_key INT,
+    impressions BIGINT,
+    clicks BIGINT,
+    conversions INT,
+    campaign_cost DECIMAL(12,2)
+);
+
+-- 교차 분석 쿼리 (컨포먼드 차원 덕분에 가능)
+SELECT
+    d.year,
+    d.quarter,
+    p.category,
+    p.brand,
+    SUM(s.net_amount) as total_sales,
+    AVG(i.quantity_on_hand) as avg_inventory,
+    SUM(m.campaign_cost) as marketing_spend,
+    SUM(s.net_amount) / NULLIF(SUM(m.campaign_cost), 0) as roi
+FROM dim_date d
+CROSS JOIN dim_product p
+LEFT JOIN sales_mart.fact_sales s
+    ON d.date_key = s.date_key AND p.product_key = s.product_key
+LEFT JOIN inventory_mart.fact_inventory i
+    ON d.date_key = i.date_key AND p.product_key = i.product_key
+LEFT JOIN marketing_mart.fact_campaigns m
+    ON d.date_key = m.date_key AND p.product_key = m.product_key
+WHERE d.year = 2025
+GROUP BY d.year, d.quarter, p.category, p.brand;</code></pre>
+      </div>
+
+      <h3>컨포먼드 디멘전 관리</h3>
+      <p>컨포먼드 디멘전을 효과적으로 관리하기 위한 모범 사례:</p>
+      <ul>
+        <li><strong>중앙 집중식 관리</strong>: 단일 팀이 마스터 차원을 소유하고 관리</li>
+        <li><strong>거버넌스 프로세스</strong>: 변경 요청 및 승인 절차 수립</li>
+        <li><strong>버전 관리</strong>: SCD Type 2로 변경 이력 추적</li>
+        <li><strong>문서화</strong>: 각 차원의 비즈니스 정의와 규칙 명확히 기술</li>
+        <li><strong>품질 검증</strong>: 일관성 검사 자동화</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4.6 데이터 웨어하우스 버스 매트릭스</h2>
+      <p>버스 매트릭스(Bus Matrix)는 Kimball 방법론에서 엔터프라이즈 데이터 웨어하우스를 계획하는 핵심 도구입니다. 이는 비즈니스 프로세스와 차원의 관계를 시각화합니다.</p>
+
+      <table>
+        <caption>데이터 웨어하우스 버스 매트릭스 예시</caption>
+        <thead>
+          <tr>
+            <th>비즈니스 프로세스</th>
+            <th>날짜</th>
+            <th>제품</th>
+            <th>고객</th>
+            <th>매장</th>
+            <th>프로모션</th>
+            <th>공급업체</th>
+            <th>창고</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>소매 판매</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>재고 관리</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>✓</td>
+          </tr>
+          <tr>
+            <td><strong>구매/조달</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>✓</td>
+            <td>✓</td>
+          </tr>
+          <tr>
+            <td><strong>고객 서비스</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>마케팅 캠페인</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td></td>
+            <td>✓</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>배송/물류</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>✓</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>버스 매트릭스를 사용하면:</p>
+      <ul>
+        <li>어떤 차원을 컨포먼드로 만들어야 하는지 식별</li>
+        <li>데이터 마트 구축 우선순위 결정</li>
+        <li>프로젝트 로드맵 수립</li>
+        <li>차원의 재사용성 극대화</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4.7 하이브리드 접근법</h2>
+      <p>실무에서는 순수한 Kimball이나 Inmon 방법론을 따르기보다는, 두 접근법의 장점을 결합한 하이브리드 방식을 많이 채택합니다.</p>
+
+      <h3>하이브리드 아키텍처</h3>
+      <div class="code-block">
+        <pre><code>-- 계층 1: 스테이징 영역 (정규화, Inmon 스타일)
+CREATE SCHEMA staging;
+
+CREATE TABLE staging.customer (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    address_id INT,
+    created_date TIMESTAMP,
+    updated_date TIMESTAMP
+);
+
+-- 계층 2: 통합 데이터 영역 (부분 정규화, 하이브리드)
+CREATE SCHEMA integration;
+
+CREATE TABLE integration.customer_master (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50),
+    customer_segment VARCHAR(50),
+    effective_date DATE,
+    expiration_date DATE,
+    is_current BOOLEAN
+);
+
+-- 계층 3: 프레젠테이션 영역 (비정규화, Kimball 스타일)
+CREATE SCHEMA presentation;
+
+-- 데이터 마트 1: 판매 분석
+CREATE TABLE presentation.dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50),
+    segment VARCHAR(50),
+    lifetime_value DECIMAL(12,2)
+);
+
+CREATE TABLE presentation.fact_sales (
+    date_key INT,
+    product_key INT,
+    customer_key INT REFERENCES presentation.dim_customer,
+    store_key INT,
+    quantity INT,
+    net_amount DECIMAL(12,2)
+);
+
+-- 데이터 마트 2: 고객 행동 분석
+CREATE TABLE presentation.fact_customer_activity (
+    date_key INT,
+    customer_key INT REFERENCES presentation.dim_customer,
+    website_visits INT,
+    page_views INT,
+    time_spent_minutes INT,
+    items_viewed INT
+);</code></pre>
+      </div>
+
+      <h3>하이브리드 접근법의 장점</h3>
+      <ul>
+        <li><strong>유연성</strong>: 프로젝트 요구사항에 맞게 조정 가능</li>
+        <li><strong>단계적 구축</strong>: 빠른 가치 제공 + 장기 확장성</li>
+        <li><strong>데이터 품질</strong>: 통합 계층에서 품질 보장</li>
+        <li><strong>성능</strong>: 프레젠테이션 계층에서 최적 성능</li>
+        <li><strong>재사용성</strong>: 통합 계층을 여러 마트에서 재사용</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4.8 방법론 선택 가이드</h2>
+
+      <h3>Kimball을 선택해야 하는 경우</h3>
+      <ul>
+        <li>빠른 ROI가 필요한 경우</li>
+        <li>중소 규모 조직</li>
+        <li>제한된 예산과 리소스</li>
+        <li>비즈니스 사용자 중심의 리포팅 필요</li>
+        <li>데이터 마트 중심의 분석</li>
+        <li>BI 도구 활용이 주 목적</li>
+        <li>프로젝트 실패 위험을 최소화하려는 경우</li>
+      </ul>
+
+      <h3>Inmon을 선택해야 하는 경우</h3>
+      <ul>
+        <li>대기업 환경</li>
+        <li>장기적 데이터 일관성이 중요</li>
+        <li>엄격한 데이터 거버넌스 요구</li>
+        <li>복잡한 데이터 통합 필요</li>
+        <li>규제가 엄격한 산업 (금융, 의료)</li>
+        <li>충분한 예산과 시간</li>
+        <li>경험 많은 데이터 팀 보유</li>
+      </ul>
+
+      <h3>하이브리드를 선택해야 하는 경우</h3>
+      <ul>
+        <li>중대형 조직</li>
+        <li>빠른 가치 제공 + 장기 확장성 모두 필요</li>
+        <li>다양한 분석 요구사항</li>
+        <li>기존 시스템과의 통합 필요</li>
+        <li>데이터 품질이 중요하면서도 성능도 필요</li>
+        <li>유연한 아키텍처 선호</li>
+      </ul>
+
+      <h3>의사결정 플로우차트</h3>
+      <div class="code-block">
+        <pre><code>프로젝트 시작
+    |
+    ├─ ROI 목표가 6개월 이내?
+    |  └─ 예 → Kimball 방법론
+    |
+    ├─ 데이터 일관성이 최우선?
+    |  └─ 예 → Inmon 방법론
+    |
+    ├─ 예산 > $1M 이고 시간 > 1년?
+    |  ├─ 예 → Inmon 또는 하이브리드
+    |  └─ 아니오 → Kimball
+    |
+    ├─ 팀 규모 > 10명?
+    |  ├─ 예 → Inmon 또는 하이브리드
+    |  └─ 아니오 → Kimball
+    |
+    └─ 기존 DW가 있고 확장 필요?
+       ├─ 정규화됨 → Inmon 유지 또는 하이브리드
+       └─ 비정규화됨 → Kimball 유지</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>4.9 현대적 차원 모델링 트렌드</h2>
+      <p>최근 클라우드 데이터 웨어하우스와 빅데이터 기술의 발전으로 차원 모델링 방법론도 진화하고 있습니다.</p>
+
+      <h3>Data Vault 2.0</h3>
+      <p>Dan Linstedt가 제안한 Data Vault는 Kimball과 Inmon의 중간 형태로, 다음과 같은 특징이 있습니다:</p>
+      <ul>
+        <li><strong>Hub</strong>: 비즈니스 키를 저장하는 핵심 엔티티</li>
+        <li><strong>Link</strong>: Hub 간의 관계</li>
+        <li><strong>Satellite</strong>: 설명적 속성과 이력</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Data Vault 예시
+
+-- Hub: 고객 비즈니스 키
+CREATE TABLE hub_customer (
+    customer_hash_key CHAR(32) PRIMARY KEY,
+    customer_id VARCHAR(20) UNIQUE,
+    load_date TIMESTAMP,
+    record_source VARCHAR(50)
+);
+
+-- Satellite: 고객 속성
+CREATE TABLE sat_customer (
+    customer_hash_key CHAR(32) REFERENCES hub_customer,
+    load_date TIMESTAMP,
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    segment VARCHAR(50),
+    PRIMARY KEY (customer_hash_key, load_date)
+);
+
+-- Link: 고객-주문 관계
+CREATE TABLE link_customer_order (
+    link_hash_key CHAR(32) PRIMARY KEY,
+    customer_hash_key CHAR(32) REFERENCES hub_customer,
+    order_hash_key CHAR(32) REFERENCES hub_order,
+    load_date TIMESTAMP,
+    record_source VARCHAR(50)
+);</code></pre>
+      </div>
+
+      <h3>Anchor Modeling</h3>
+      <p>시간 변화에 매우 유연한 모델링 기법으로, 모든 속성을 독립적으로 관리합니다.</p>
+
+      <h3>클라우드 네이티브 접근법</h3>
+      <p>Snowflake, BigQuery 등 클라우드 플랫폼에서는 다음과 같은 새로운 패턴이 등장했습니다:</p>
+      <ul>
+        <li><strong>ELT over ETL</strong>: 웨어하우스 내에서 변환</li>
+        <li><strong>dbt (data build tool)</strong>: SQL 기반 변환 자동화</li>
+        <li><strong>Metrics Layer</strong>: 비즈니스 메트릭 중앙 관리</li>
+        <li><strong>Semantic Layer</strong>: 비즈니스 용어와 기술 구현 분리</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4.10 요약</h2>
+      <p>차원 모델링은 데이터 웨어하우스 설계의 핵심이며, Kimball과 Inmon이라는 두 가지 주요 방법론이 있습니다:</p>
+
+      <ul>
+        <li><strong>Kimball 방법론</strong>은 상향식 접근으로 비정규화된 스타 스키마를 사용하며, 빠른 구현과 우수한 쿼리 성능을 제공합니다. 중소 규모 프로젝트나 빠른 ROI가 필요한 경우에 적합합니다.</li>
+        <li><strong>Inmon 방법론</strong>은 하향식 접근으로 정규화된 엔터프라이즈 데이터 웨어하우스를 구축하며, 장기적 데이터 일관성을 보장합니다. 대기업이나 엄격한 거버넌스가 필요한 경우에 적합합니다.</li>
+        <li><strong>컨포먼드 디멘전</strong>은 Kimball 방법론의 핵심 개념으로, 여러 데이터 마트 간의 일관성을 보장하여 교차 분석을 가능하게 합니다.</li>
+        <li><strong>버스 매트릭스</strong>는 엔터프라이즈 데이터 웨어하우스 계획의 핵심 도구로, 비즈니스 프로세스와 차원의 관계를 시각화합니다.</li>
+        <li>실무에서는 <strong>하이브리드 접근법</strong>을 많이 채택하여, 두 방법론의 장점을 결합하고 조직의 요구사항에 맞게 조정합니다.</li>
+        <li>클라우드 시대에는 <strong>Data Vault, dbt, Metrics Layer</strong> 등 새로운 패턴과 도구가 등장하여 차원 모델링이 계속 진화하고 있습니다.</li>
+      </ul>
+
+      <p>방법론 선택은 조직의 크기, 예산, 시간, 데이터 일관성 요구사항, 팀 역량 등을 종합적으로 고려해야 합니다. 가장 중요한 것은 비즈니스 가치를 제공하고, 유지보수 가능하며, 확장 가능한 데이터 웨어하우스를 구축하는 것입니다.</p>
+    </section>
+
+    <section>
+      <h2>복습 문제</h2>
+      <ol>
+        <li><strong>Kimball의 4단계 차원 모델링 프로세스를 설명하고, 각 단계에서 중요한 의사결정 포인트는 무엇인지 논하시오.</strong></li>
+        <li><strong>컨포먼드 디멘전이 무엇이며, 왜 중요한지 설명하시오. 컨포먼드 디멘전이 없다면 어떤 문제가 발생할 수 있는가?</strong></li>
+        <li><strong>데이터 웨어하우스 버스 매트릭스를 작성하는 방법과 이를 통해 얻을 수 있는 이점을 설명하시오.</strong></li>
+        <li><strong>Kimball과 Inmon 방법론의 주요 차이점을 설명하고, 각각 어떤 조직과 프로젝트에 적합한지 구체적인 예를 들어 논하시오.</strong></li>
+        <li><strong>하이브리드 접근법이 무엇이며, 왜 많은 조직이 순수한 Kimball이나 Inmon 대신 하이브리드를 선택하는지 설명하시오.</strong></li>
+        <li><strong>클라우드 데이터 웨어하우스 시대에 전통적인 차원 모델링 방법론이 어떻게 진화하고 있는지, dbt나 Metrics Layer 같은 새로운 도구와 패턴을 예로 들어 설명하시오.</strong></li>
+      </ol>
+    </section>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-03.html" class="nav-button prev">이전 장</a>
+    <a href="chapter-05.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

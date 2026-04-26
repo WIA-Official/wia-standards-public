@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Phase 3 - Protocol | WIA-ROB-013</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-secondary:#cbd5e1;--companion-color:#A855F7;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--companion-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--companion-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--companion-color);margin:40px 0 20px;border-bottom:2px solid var(--companion-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--companion-color);margin:30px 0 15px}
+        p{margin:15px 0;font-size:17px;text-align:justify}
+        .philosophy{text-align:center;color:var(--companion-color);margin:20px 0;font-size:18px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--companion-color);text-decoration:none;padding:10px 20px;border:2px solid var(--companion-color);border-radius:5px}
+        .nav a:hover{background:var(--companion-color);color:var(--bg)}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--companion-color)}
+        .highlight-box{background:var(--bg-tertiary);border-left:4px solid var(--companion-color);padding:20px;margin:25px 0;border-radius:5px}
+        strong{color:var(--companion-color)}
+        ul,ol{margin:15px 0 15px 30px}
+        li{margin:8px 0}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;color:#c084fc;font-size:14px;line-height:1.6}
+        code{font-family:'Courier New',monospace}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Phase 3 - Protocol</h1>
+        <div class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</div>
+
+        <h2>6.1 Protocol Architecture Overview</h2>
+        <p>Phase 3 of WIA-ROB-013 establishes communication protocols that enable real-time interaction, multi-modal data synchronization, and seamless coordination between companion robots, cloud services, and edge devices. These protocols prioritize low latency, reliability, and privacy while supporting diverse communication patterns.</p>
+
+        <h3>6.1.1 Protocol Design Goals</h3>
+        <ul>
+            <li><strong>Real-Time Performance:</strong> Sub-second latency for interactive experiences</li>
+            <li><strong>Reliability:</strong> Guaranteed message delivery for critical operations</li>
+            <li><strong>Scalability:</strong> Support for thousands of concurrent robot connections</li>
+            <li><strong>Security:</strong> End-to-end encryption and authentication</li>
+            <li><strong>Bandwidth Efficiency:</strong> Optimized for varied network conditions</li>
+            <li><strong>Offline Resilience:</strong> Graceful degradation when connectivity is lost</li>
+        </ul>
+
+        <h2>6.2 Real-Time Messaging Protocol</h2>
+        <p>WIA-ROB-013 uses WebSocket and MQTT protocols for real-time bidirectional communication between robots and cloud services.</p>
+
+        <h3>6.2.1 WebSocket Connection Establishment</h3>
+        <pre><code>// Client connection request
+wss://realtime.companion-robot.wia.org/v1/connect
+
+Connection Headers:
+  Authorization: Bearer {access_token}
+  Sec-WebSocket-Protocol: wia-rob-013-v1
+  X-Robot-ID: {robot_serial_number}
+  X-User-ID: {user_id}
+
+// Server handshake response
+{
+  "type": "connection_established",
+  "connectionId": "conn-uuid",
+  "serverTime": "2025-01-15T14:30:00Z",
+  "protocolVersion": "1.0.0",
+  "capabilities": [
+    "real_time_emotions",
+    "streaming_audio",
+    "behavior_control"
+  ]
+}</code></pre>
+
+        <h3>6.2.2 Message Frame Structure</h3>
+        <p>All WebSocket messages follow a standardized frame format:</p>
+        <pre><code>{
+  "messageId": "msg-uuid",
+  "timestamp": "2025-01-15T14:30:00.123Z",
+  "type": "emotion_detected|user_utterance|robot_response|behavior_command",
+  "priority": "critical|high|normal|low",
+  "sequenceNumber": 12345,
+
+  "payload": {
+    // Type-specific data
+  },
+
+  "metadata": {
+    "sessionId": "session-uuid",
+    "userId": "user-uuid",
+    "robotId": "robot-serial"
+  },
+
+  "acknowledgment": {
+    "required": true,
+    "timeout": 5000
+  }
+}</code></pre>
+
+        <h3>6.2.3 Message Types and Flow</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Message Type</th>
+                    <th>Direction</th>
+                    <th>Description</th>
+                    <th>Priority</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>emotion_detected</strong></td>
+                    <td>Robot → Cloud</td>
+                    <td>Real-time emotion detection results</td>
+                    <td>Normal</td>
+                </tr>
+                <tr>
+                    <td><strong>user_utterance</strong></td>
+                    <td>Robot → Cloud</td>
+                    <td>Streaming speech transcription</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td><strong>robot_response</strong></td>
+                    <td>Cloud → Robot</td>
+                    <td>Generated response with behavior</td>
+                    <td>High</td>
+                </tr>
+                <tr>
+                    <td><strong>behavior_command</strong></td>
+                    <td>Cloud → Robot</td>
+                    <td>Execute specific behavior</td>
+                    <td>Normal</td>
+                </tr>
+                <tr>
+                    <td><strong>emergency_alert</strong></td>
+                    <td>Robot → Cloud</td>
+                    <td>Critical incident notification</td>
+                    <td>Critical</td>
+                </tr>
+                <tr>
+                    <td><strong>heartbeat</strong></td>
+                    <td>Bidirectional</td>
+                    <td>Connection keep-alive</td>
+                    <td>Low</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 MQTT for IoT Integration</h2>
+        <p>For resource-constrained devices and IoT ecosystem integration, WIA-ROB-013 supports MQTT protocol alongside WebSocket.</p>
+
+        <h3>6.3.1 MQTT Topic Hierarchy</h3>
+        <pre><code>Topic Structure:
+  wia/rob013/{robot_id}/{category}/{subcategory}
+
+Examples:
+  wia/rob013/robot-001/emotions/detected
+  wia/rob013/robot-001/speech/utterance
+  wia/rob013/robot-001/behaviors/command
+  wia/rob013/robot-001/health/vitals
+  wia/rob013/robot-001/alerts/emergency</code></pre>
+
+        <h3>6.3.2 Quality of Service Levels</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Message Category</th>
+                    <th>QoS Level</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Emotion detections</td>
+                    <td>QoS 0 (At most once)</td>
+                    <td>High frequency, tolerance for occasional loss</td>
+                </tr>
+                <tr>
+                    <td>User utterances</td>
+                    <td>QoS 1 (At least once)</td>
+                    <td>Important conversational data, duplicates acceptable</td>
+                </tr>
+                <tr>
+                    <td>Emergency alerts</td>
+                    <td>QoS 2 (Exactly once)</td>
+                    <td>Critical safety events, no loss or duplication</td>
+                </tr>
+                <tr>
+                    <td>Behavior commands</td>
+                    <td>QoS 1 (At least once)</td>
+                    <td>Ensure delivery, idempotent execution</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.3.3 MQTT Message Example</h3>
+        <pre><code>// Publishing emotion detection
+Topic: wia/rob013/robot-001/emotions/detected
+QoS: 0
+Retain: false
+
+Payload:
+{
+  "emotionId": "emotion-uuid",
+  "timestamp": "2025-01-15T14:30:00Z",
+  "primaryEmotion": {
+    "category": "joy",
+    "confidence": 0.87
+  },
+  "sessionId": "session-uuid"
+}</code></pre>
+
+        <h2>6.4 Multi-Modal Data Synchronization</h2>
+        <p>Companion robots collect data from multiple sensors simultaneously. The synchronization protocol ensures temporal alignment of multi-modal streams.</p>
+
+        <h3>6.4.1 Timestamp Synchronization</h3>
+        <p>All devices must synchronize their clocks using NTP (Network Time Protocol) or PTP (Precision Time Protocol) to ensure accurate temporal correlation.</p>
+
+        <div class="highlight-box">
+            <h3>Synchronization Requirements</h3>
+            <ul>
+                <li><strong>Clock Accuracy:</strong> ±50ms maximum drift from UTC</li>
+                <li><strong>Sync Frequency:</strong> Clock synchronization every 5 minutes minimum</li>
+                <li><strong>Timestamp Format:</strong> ISO 8601 with millisecond precision</li>
+                <li><strong>Timezone:</strong> All timestamps in UTC</li>
+            </ul>
+        </div>
+
+        <h3>6.4.2 Multi-Modal Frame Alignment</h3>
+        <pre><code>{
+  "alignedFrame": {
+    "frameId": "frame-uuid",
+    "referenceTimestamp": "2025-01-15T14:30:00.000Z",
+    "alignmentWindow": 100,
+
+    "modalityData": [
+      {
+        "modality": "video",
+        "timestamp": "2025-01-15T14:30:00.015Z",
+        "dataId": "video-frame-123",
+        "syncOffset": 15
+      },
+      {
+        "modality": "audio",
+        "timestamp": "2025-01-15T14:30:00.008Z",
+        "dataId": "audio-chunk-456",
+        "syncOffset": 8
+      },
+      {
+        "modality": "physiological",
+        "timestamp": "2025-01-15T14:30:00.002Z",
+        "dataId": "sensor-reading-789",
+        "syncOffset": 2
+      }
+    ],
+
+    "synchronizationQuality": {
+      "maxOffset": 15,
+      "meanOffset": 8.3,
+      "confidence": 0.95
+    }
+  }
+}</code></pre>
+
+        <h2>6.5 Streaming Audio Protocol</h2>
+        <p>For real-time voice conversations, WIA-ROB-013 defines efficient audio streaming protocols supporting various codecs and quality levels.</p>
+
+        <h3>6.5.1 Audio Stream Configuration</h3>
+        <pre><code>{
+  "streamConfig": {
+    "streamId": "audio-stream-uuid",
+    "direction": "bidirectional",
+
+    "encoding": {
+      "codec": "opus|pcm|aac",
+      "sampleRate": 16000,
+      "bitRate": 24000,
+      "channels": 1,
+      "frameSize": 20
+    },
+
+    "transport": {
+      "protocol": "webrtc|websocket",
+      "encryption": "SRTP|TLS",
+      "bufferSize": 500
+    },
+
+    "adaptiveQuality": {
+      "enabled": true,
+      "minBitRate": 12000,
+      "maxBitRate": 48000
+    }
+  }
+}</code></pre>
+
+        <h3>6.5.2 Audio Chunk Format</h3>
+        <pre><code>{
+  "type": "audio_chunk",
+  "streamId": "audio-stream-uuid",
+  "chunkId": 12345,
+  "timestamp": "2025-01-15T14:30:00.020Z",
+
+  "audioData": "base64-encoded-audio-data",
+  "duration": 20,
+
+  "metadata": {
+    "energyLevel": 0.65,
+    "silenceDetected": false,
+    "voiceActivityDetection": true
+  }
+}</code></pre>
+
+        <h2>6.6 Edge-Cloud Coordination Protocol</h2>
+        <p>Many companion robots use hybrid edge-cloud architectures. The coordination protocol enables intelligent workload distribution between local processing and cloud services.</p>
+
+        <h3>6.6.1 Task Distribution Strategy</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Task Type</th>
+                    <th>Processing Location</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Face detection</td>
+                    <td>Edge (on-device)</td>
+                    <td>Low latency, privacy preservation</td>
+                </tr>
+                <tr>
+                    <td>Basic emotion recognition</td>
+                    <td>Edge (on-device)</td>
+                    <td>Real-time feedback, offline capability</td>
+                </tr>
+                <tr>
+                    <td>Advanced emotion analysis</td>
+                    <td>Cloud</td>
+                    <td>Complex models, higher accuracy</td>
+                </tr>
+                <tr>
+                    <td>Speech recognition</td>
+                    <td>Hybrid</td>
+                    <td>Local for simple commands, cloud for complex</td>
+                </tr>
+                <tr>
+                    <td>Conversational AI</td>
+                    <td>Cloud</td>
+                    <td>Large language models, knowledge access</td>
+                </tr>
+                <tr>
+                    <td>Behavior execution</td>
+                    <td>Edge (on-device)</td>
+                    <td>Real-time motor control</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.6.2 Task Handoff Protocol</h3>
+        <pre><code>// Edge to Cloud handoff
+{
+  "type": "task_handoff",
+  "taskId": "task-uuid",
+  "handoffReason": "complexity_threshold|resource_exhaustion|accuracy_required",
+
+  "edgeResults": {
+    "preliminaryEmotion": "neutral",
+    "confidence": 0.62,
+    "processingTime": 85
+  },
+
+  "cloudRequest": {
+    "taskType": "advanced_emotion_analysis",
+    "inputData": "...",
+    "priority": "high",
+    "maxLatency": 500
+  }
+}
+
+// Cloud response
+{
+  "type": "task_result",
+  "taskId": "task-uuid",
+  "refinedResults": {
+    "emotion": "contentment",
+    "confidence": 0.88
+  },
+  "processingTime": 245,
+  "totalLatency": 330
+}</code></pre>
+
+        <h2>6.7 Robot-to-Robot Communication</h2>
+        <p>In multi-robot environments (e.g., eldercare facilities), companion robots may need to coordinate and share information.</p>
+
+        <h3>6.7.1 Robot Discovery Protocol</h3>
+        <pre><code>// Broadcast discovery message (mDNS/Bonjour)
+{
+  "type": "robot_announcement",
+  "robotId": "robot-001",
+  "model": "WIA-Companion-X1",
+  "capabilities": [
+    "emotion_detection",
+    "conversation",
+    "mobility"
+  ],
+  "location": "room_105",
+  "status": "active",
+  "protocolVersion": "1.0.0"
+}</code></pre>
+
+        <h3>6.7.2 User Context Sharing</h3>
+        <p>With explicit user consent, robots can share limited context to provide continuity across different locations:</p>
+        <pre><code>{
+  "type": "context_share",
+  "userId": "user-uuid",
+  "sourceRobotId": "robot-001",
+  "targetRobotId": "robot-002",
+
+  "consentId": "consent-uuid",
+  "expirationTime": "2025-01-15T15:00:00Z",
+
+  "sharedContext": {
+    "currentMood": "cheerful",
+    "conversationTopic": "gardening",
+    "preferredActivities": ["conversation", "music"],
+    "recentAlerts": []
+  },
+
+  "privacyLevel": "minimal|standard|full"
+}</code></pre>
+
+        <h2>6.8 Offline Operation Protocol</h2>
+        <p>Companion robots must continue functioning when internet connectivity is unavailable, with graceful synchronization upon reconnection.</p>
+
+        <h3>6.8.1 Offline Data Queue</h3>
+        <pre><code>{
+  "offlineQueue": {
+    "queueId": "queue-uuid",
+    "deviceId": "robot-001",
+    "offlinePeriod": {
+      "start": "2025-01-15T14:00:00Z",
+      "end": "2025-01-15T14:45:00Z"
+    },
+
+    "queuedItems": [
+      {
+        "itemId": "item-001",
+        "type": "interaction_log",
+        "timestamp": "2025-01-15T14:15:00Z",
+        "priority": "normal",
+        "data": {...}
+      },
+      {
+        "itemId": "item-002",
+        "type": "emotion_detection",
+        "timestamp": "2025-01-15T14:20:00Z",
+        "priority": "low",
+        "data": {...}
+      }
+    ],
+
+    "totalSize": 2.5,
+    "compressionApplied": true
+  }
+}</code></pre>
+
+        <h3>6.8.2 Reconnection and Sync</h3>
+        <div class="highlight-box">
+            <h3>Synchronization Procedure</h3>
+            <ol>
+                <li><strong>Reconnect:</strong> Establish secure connection to cloud services</li>
+                <li><strong>Time Sync:</strong> Resynchronize device clock with NTP</li>
+                <li><strong>State Exchange:</strong> Compare local and cloud state versions</li>
+                <li><strong>Conflict Resolution:</strong> Apply conflict resolution rules (latest-write-wins, manual review, merge)</li>
+                <li><strong>Queue Upload:</strong> Upload queued data in priority order</li>
+                <li><strong>Confirmation:</strong> Receive acknowledgment and delete local queue</li>
+            </ol>
+        </div>
+
+        <h2>6.9 Security and Encryption Protocols</h2>
+        <p>All protocol communications must be secured using industry-standard encryption and authentication mechanisms.</p>
+
+        <h3>6.9.1 Transport Layer Security</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Protocol</th>
+                    <th>Encryption Method</th>
+                    <th>Minimum Version</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>WebSocket</td>
+                    <td>TLS</td>
+                    <td>TLS 1.3</td>
+                </tr>
+                <tr>
+                    <td>MQTT</td>
+                    <td>TLS</td>
+                    <td>TLS 1.3</td>
+                </tr>
+                <tr>
+                    <td>HTTP/REST</td>
+                    <td>HTTPS</td>
+                    <td>TLS 1.3</td>
+                </tr>
+                <tr>
+                    <td>WebRTC (audio)</td>
+                    <td>DTLS-SRTP</td>
+                    <td>DTLS 1.2</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.9.2 Message-Level Encryption</h3>
+        <p>For sensitive data, additional message-level encryption provides end-to-end security:</p>
+        <pre><code>{
+  "type": "encrypted_message",
+  "messageId": "msg-uuid",
+  "timestamp": "2025-01-15T14:30:00Z",
+
+  "encryption": {
+    "algorithm": "AES-256-GCM",
+    "keyId": "key-version-123",
+    "iv": "base64-initialization-vector"
+  },
+
+  "encryptedPayload": "base64-encrypted-data",
+  "authTag": "base64-authentication-tag",
+
+  "metadata": {
+    // Unencrypted metadata for routing
+    "userId": "user-uuid",
+    "priority": "high"
+  }
+}</code></pre>
+
+        <h2>6.10 Protocol Monitoring and Diagnostics</h2>
+        <p>Built-in monitoring capabilities enable performance tracking and troubleshooting of protocol communications.</p>
+
+        <h3>6.10.1 Connection Health Metrics</h3>
+        <pre><code>{
+  "healthReport": {
+    "connectionId": "conn-uuid",
+    "reportTime": "2025-01-15T14:30:00Z",
+
+    "latency": {
+      "mean": 85,
+      "p50": 78,
+      "p95": 142,
+      "p99": 210
+    },
+
+    "throughput": {
+      "messagesSent": 1523,
+      "messagesReceived": 1489,
+      "bytesTransferred": 2458624
+    },
+
+    "reliability": {
+      "deliverySuccess": 0.998,
+      "retransmissions": 3,
+      "timeouts": 0
+    },
+
+    "errors": {
+      "protocolErrors": 0,
+      "authenticationFailures": 0,
+      "malformedMessages": 1
+    }
+  }
+}</code></pre>
+
+        <h3>6.10.2 Performance Thresholds</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Target</th>
+                    <th>Warning Threshold</th>
+                    <th>Critical Threshold</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Mean latency</td>
+                    <td>&lt; 100ms</td>
+                    <td>&gt; 200ms</td>
+                    <td>&gt; 500ms</td>
+                </tr>
+                <tr>
+                    <td>P99 latency</td>
+                    <td>&lt; 300ms</td>
+                    <td>&gt; 500ms</td>
+                    <td>&gt; 1000ms</td>
+                </tr>
+                <tr>
+                    <td>Delivery success</td>
+                    <td>&gt; 99.9%</td>
+                    <td>&lt; 99%</td>
+                    <td>&lt; 95%</td>
+                </tr>
+                <tr>
+                    <td>Connection uptime</td>
+                    <td>&gt; 99.5%</td>
+                    <td>&lt; 99%</td>
+                    <td>&lt; 95%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li>Phase 3 protocols enable real-time bidirectional communication using WebSocket and MQTT</li>
+                <li>Standardized message frames ensure consistent structure across all protocol communications</li>
+                <li>MQTT topic hierarchy organizes data streams with appropriate Quality of Service levels</li>
+                <li>Multi-modal synchronization protocols align data from different sensors with sub-100ms precision</li>
+                <li>Streaming audio protocol supports real-time voice conversations with adaptive quality</li>
+                <li>Edge-cloud coordination optimizes workload distribution between local and remote processing</li>
+                <li>Robot-to-robot communication enables multi-device coordination in shared environments</li>
+                <li>Offline operation protocol ensures graceful degradation and synchronization upon reconnection</li>
+                <li>TLS 1.3 encryption mandatory for all protocol communications with optional message-level encryption</li>
+                <li>Built-in monitoring provides real-time performance metrics and health diagnostics</li>
+            </ul>
+        </div>
+
+        <div class="highlight-box">
+            <h3>Review Questions</h3>
+            <ol>
+                <li>What are the six core protocol design goals in WIA-ROB-013?</li>
+                <li>Describe the standardized message frame structure for WebSocket communications.</li>
+                <li>What are the three MQTT Quality of Service levels, and when is each appropriate?</li>
+                <li>How does the multi-modal synchronization protocol achieve temporal alignment?</li>
+                <li>What audio codecs and configurations are supported for streaming voice?</li>
+                <li>Compare edge vs. cloud processing decisions for different task types.</li>
+                <li>How do robots discover and communicate with each other in shared environments?</li>
+                <li>Explain the offline operation queue and synchronization procedure.</li>
+                <li>What encryption methods are required for different protocol types?</li>
+                <li>What performance metrics are monitored, and what are the target thresholds?</li>
+            </ol>
+        </div>
+
+        </div>
+</body>
+</html>

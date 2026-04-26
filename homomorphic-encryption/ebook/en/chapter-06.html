@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Privacy-Preserving ML | WIA-SEC-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .ebook-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .back-link { display: inline-block; color: #EF4444; text-decoration: none; margin-bottom: 30px; font-size: 16px; transition: color 0.3s; }
+        .back-link:hover { color: #f87171; }
+        .chapter-header { text-align: center; padding: 60px 40px; background: linear-gradient(135deg, #EF4444 0%, #dc2626 100%); border-radius: 20px; margin-bottom: 60px; box-shadow: 0 20px 60px rgba(239, 68, 68, 0.4); }
+        .chapter-number { color: #fecaca; font-size: 16px; font-weight: 600; letter-spacing: 3px; margin-bottom: 15px; }
+        .chapter-header h1 { font-size: 42px; color: white; margin-bottom: 20px; font-weight: 700; }
+        .chapter h2 { font-size: 32px; color: #EF4444; margin: 50px 0 25px; font-weight: 700; border-bottom: 3px solid #EF4444; padding-bottom: 10px; }
+        .chapter h3 { font-size: 26px; color: #f87171; margin: 35px 0 20px; font-weight: 600; }
+        .chapter h4 { font-size: 22px; color: #fca5a5; margin: 25px 0 15px; font-weight: 600; }
+        .chapter p { margin-bottom: 20px; font-size: 18px; color: #cbd5e1; text-align: justify; }
+        .chapter ul, .chapter ol { margin: 20px 0 20px 40px; color: #cbd5e1; }
+        .chapter li { margin-bottom: 12px; font-size: 18px; }
+        .highlight-box { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #EF4444; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        .highlight-box h4 { color: #EF4444; margin-top: 0; margin-bottom: 15px; }
+        .info-box { background: #1e293b; border: 2px solid #334155; padding: 25px; margin: 30px 0; border-radius: 12px; }
+        .info-box h4 { color: #EF4444; margin-top: 0; margin-bottom: 15px; }
+        code { background: #1e293b; padding: 3px 8px; border-radius: 4px; font-family: 'Courier New', monospace; color: #94f3b0; font-size: 16px; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 25px; overflow-x: auto; margin: 25px 0; }
+        pre code { background: none; padding: 0; display: block; line-height: 1.6; }
+        table { width: 100%; border-collapse: collapse; margin: 30px 0; background: #1e293b; border-radius: 12px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #EF4444; color: white; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+        .summary-box { background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%); border: 2px solid #EF4444; padding: 30px; margin: 40px 0; border-radius: 12px; }
+        .summary-box h3 { color: #EF4444; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 30px; margin: 40px 0; border-radius: 12px; border: 2px solid #334155; }
+        .review-questions h3 { color: #EF4444; margin-top: 0; }
+        .review-questions ol { margin-left: 20px; }
+        footer { text-align: center; padding: 60px 20px; margin-top: 100px; border-top: 2px solid #334155; }
+        .philosophy { font-size: 24px; color: #EF4444; margin-bottom: 15px; font-weight: 600; }
+        @media (max-width: 768px) { .chapter-header h1 { font-size: 32px; } .chapter h2 { font-size: 26px; } }
+    </style>
+</head>
+<body>
+    <div class="ebook-container">
+        <a href="index.html" class="back-link">← Back to Table of Contents</a>
+
+        <div class="chapter-header">
+            <div class="chapter-number">CHAPTER 6</div>
+            <h1>Privacy-Preserving Machine Learning</h1>
+        </div>
+
+        <div class="chapter">
+            <h2>The ML Privacy Challenge</h2>
+
+            <p>Machine learning thrives on data—the more, the better. Yet privacy regulations, competitive concerns, and ethical obligations often prevent data sharing. Homomorphic encryption offers a revolutionary solution: train and deploy ML models on encrypted data, preserving privacy throughout the entire pipeline from training to inference.</p>
+
+            <p>This chapter explores how HE enables privacy-preserving machine learning (PPML), from simple linear models to deep neural networks, with practical implementations and real-world case studies.</p>
+
+            <h2>Privacy-Preserving Inference</h2>
+
+            <h3>The Basic Problem</h3>
+
+            <p>Consider a medical diagnosis model. A hospital wants to use a pharmaceutical company's AI model, but neither party wants to expose their data:</p>
+
+            <ul>
+                <li><strong>Hospital:</strong> Has patient data (sensitive, regulated)</li>
+                <li><strong>Pharma:</strong> Has valuable model (trade secret, competitive advantage)</li>
+                <li><strong>Traditional solution:</strong> Hospital sends plaintext data to Pharma → Privacy violation!</li>
+                <li><strong>HE solution:</strong> Hospital encrypts data, Pharma computes on encrypted data, returns encrypted prediction</li>
+            </ul>
+
+            <h3>Linear Regression with HE</h3>
+
+            <p>The simplest ML model translates naturally to HE:</p>
+
+            <pre><code>// Model: y = w₀ + w₁x₁ + w₂x₂ + ... + wₙxₙ
+
+// Client (has data x)
+encrypt_vector(x) → ct_x
+
+// Server (has weights w)
+ct_result = w₀  // Plaintext constant
+for i in 1..n:
+    ct_result += multiply_plain(ct_x[i], w[i])
+
+// Client
+y = decrypt(ct_result)
+
+// Performance: ~10ms for n=100 features (CKKS)</code></pre>
+
+            <h3>Logistic Regression</h3>
+
+            <p>Requires approximating the sigmoid function:</p>
+
+            <pre><code>// Sigmoid: σ(x) = 1 / (1 + e^(-x))
+// Polynomial approximation (degree 3):
+// σ(x) ≈ 0.5 + 0.125x - 0.0078125x³
+
+def encrypted_sigmoid_approx(ct_x):
+    ct_x_squared = multiply(ct_x, ct_x)
+    ct_x_cubed = multiply(ct_x_squared, ct_x)
+    
+    result = 0.5  // Plaintext constant
+    result += multiply_plain(ct_x, 0.125)
+    result -= multiply_plain(ct_x_cubed, 0.0078125)
+    
+    return result
+
+// Accuracy: ~98% match to true sigmoid in range [-4, 4]
+// Depth: 2 multiplications</code></pre>
+
+            <h2>Neural Networks on Encrypted Data</h2>
+
+            <h3>Forward Propagation</h3>
+
+            <p>Neural network inference consists of matrix operations and activation functions:</p>
+
+            <div class="highlight-box">
+                <h4>Layer Structure</h4>
+                <pre><code>// Dense layer: y = activation(Wx + b)
+
+function encrypted_dense_layer(ct_x, W, b, activation):
+    // Matrix multiplication (W is plaintext)
+    ct_y = matrix_multiply_plain(W, ct_x)
+    
+    // Add bias
+    ct_y = add_plain(ct_y, b)
+    
+    // Apply activation
+    ct_activated = encrypted_activation(ct_y)
+    
+    return ct_activated</code></pre>
+            </div>
+
+            <h3>Activation Functions</h3>
+
+            <p>Activation functions require polynomial approximations:</p>
+
+            <table>
+                <tr><th>Function</th><th>Approximation</th><th>Degree</th><th>Accuracy</th></tr>
+                <tr><td>ReLU</td><td>0.5x + 0.25x - 0.0625x³</td><td>3</td><td>95% [-2, 2]</td></tr>
+                <tr><td>Sigmoid</td><td>0.5 + 0.125x - 0.0078125x³</td><td>3</td><td>98% [-4, 4]</td></tr>
+                <tr><td>Tanh</td><td>x - x³/3</td><td>3</td><td>97% [-2, 2]</td></tr>
+                <tr><td>Softmax</td><td>Requires comparison (TFHE)</td><td>Deep</td><td>Exact</td></tr>
+            </table>
+
+            <h3>Complete Neural Network Example</h3>
+
+            <pre><code>// 2-layer network: 784 → 128 → 10 (MNIST digit classification)
+
+class EncryptedNeuralNetwork:
+    def __init__(self, W1, b1, W2, b2):
+        self.W1 = W1  // 784 × 128
+        self.W2 = W2  // 128 × 10
+        self.b1 = b1
+        self.b2 = b2
+    
+    def predict(self, ct_input):
+        // Layer 1: 784 → 128
+        ct_hidden = matrix_mult_plain(self.W1, ct_input)
+        ct_hidden = add_plain(ct_hidden, self.b1)
+        ct_hidden = encrypted_relu(ct_hidden)  // Polynomial approx
+        
+        // Layer 2: 128 → 10
+        ct_output = matrix_mult_plain(self.W2, ct_hidden)
+        ct_output = add_plain(ct_output, self.b2)
+        
+        // No activation on output (softmax done by client)
+        return ct_output
+    
+    def encrypted_relu(self, ct_x):
+        // ReLU approximation: max(0, x) ≈ polynomial
+        ct_squared = multiply(ct_x, ct_x)
+        ct_cubed = multiply(ct_squared, ct_x)
+        
+        result = multiply_plain(ct_x, 0.5)
+        result = add_plain(result, multiply_plain(ct_squared, 0.25))
+        result = subtract_plain(result, multiply_plain(ct_cubed, 0.0625))
+        
+        return result
+
+// Performance: ~3 seconds per image on GPU (CKKS)
+// Accuracy: 97.2% (vs 98.1% plaintext)</code></pre>
+
+            <h2>Privacy-Preserving Training</h2>
+
+            <h3>Encrypted Gradient Descent</h3>
+
+            <p>Training models on encrypted data is more complex but possible:</p>
+
+            <pre><code>// Linear regression training: minimize ||Xw - y||²
+
+function encrypted_gradient_descent(ct_X, ct_y, epochs, learning_rate):
+    w = initialize_weights()  // Plaintext weights
+    
+    for epoch in 1..epochs:
+        // Compute encrypted predictions
+        ct_predictions = matrix_mult_plain(w, ct_X)
+        
+        // Compute encrypted error
+        ct_error = subtract(ct_predictions, ct_y)
+        
+        // Compute gradient: ∇w = X^T · error / n
+        ct_gradient = matrix_mult_plain(X_transpose, ct_error)
+        
+        // Decrypt gradient (only gradients, not data!)
+        gradient = decrypt(ct_gradient)
+        
+        // Update weights (plaintext operation)
+        w -= learning_rate * gradient / n
+    
+    return w
+
+// Hybrid approach: data encrypted, weights plaintext
+// Privacy: Training data never revealed
+// Performance: 10-100x slower than plaintext training</code></pre>
+
+            <h3>Federated Learning with HE</h3>
+
+            <p>Combine federated learning and HE for maximum privacy:</p>
+
+            <div class="info-box">
+                <h4>Federated HE Training</h4>
+                <pre><code>// Multiple clients, one server
+// Each client has private data, trains locally
+
+# Each client
+local_model = train_locally(private_data)
+encrypted_updates = encrypt(local_model.gradients)
+send_to_server(encrypted_updates)
+
+# Server (aggregates without seeing individual updates)
+encrypted_aggregate = sum([client1_update, client2_update, ...])
+global_update = decrypt_aggregate(encrypted_aggregate)
+update_global_model(global_update)
+
+# Privacy guarantees:
+# - Server never sees individual client data
+# - Server never sees individual client gradients
+# - Only aggregate statistics revealed</code></pre>
+            </div>
+
+            <h2>Convolutional Neural Networks</h2>
+
+            <h3>Encrypted Convolution</h3>
+
+            <p>Convolution is matrix multiplication in disguise, perfect for HE:</p>
+
+            <pre><code>// 2D convolution with HE
+function encrypted_conv2d(ct_image, kernel, stride):
+    // Image: h × w encrypted in batched ciphertext
+    // Kernel: k × k plaintext filter
+    
+    ct_output = []
+    for i in range(0, h-k+1, stride):
+        for j in range(0, w-k+1, stride):
+            // Extract patch via rotations
+            ct_patch = extract_patch(ct_image, i, j, k)
+            
+            // Multiply patch by kernel (plaintext)
+            ct_conv_result = multiply_plain(ct_patch, kernel)
+            
+            // Sum to get single output value
+            ct_sum = sum_slots(ct_conv_result)
+            
+            ct_output.append(ct_sum)
+    
+    return ct_output
+
+// Optimization: Use im2col transformation
+// Converts convolution to matrix multiplication
+// Enables batching across multiple images</code></pre>
+
+            <h3>Pooling Operations</h3>
+
+            <p>Max pooling requires comparisons (use TFHE) or approximations (use CKKS):</p>
+
+            <pre><code>// Approximate max pooling (CKKS)
+// max(a, b) ≈ (a + b + |a - b|) / 2
+
+function encrypted_max_pool(ct_values):
+    n = len(ct_values)
+    
+    if n == 1:
+        return ct_values[0]
+    
+    // Pairwise max
+    ct_pairs = []
+    for i in range(0, n, 2):
+        if i+1 < n:
+            ct_max = approximate_max(ct_values[i], ct_values[i+1])
+        else:
+            ct_max = ct_values[i]
+        ct_pairs.append(ct_max)
+    
+    // Recursive max
+    return encrypted_max_pool(ct_pairs)
+
+function approximate_max(ct_a, ct_b):
+    ct_sum = add(ct_a, ct_b)
+    ct_diff = subtract(ct_a, ct_b)
+    ct_abs_diff = approximate_abs(ct_diff)
+    ct_result = add(ct_sum, ct_abs_diff)
+    ct_result = multiply_plain(ct_result, 0.5)
+    return ct_result</code></pre>
+
+            <h2>CryptoNets: Complete Example</h2>
+
+            <h3>CryptoNets Architecture</h3>
+
+            <p>Microsoft's CryptoNets demonstrated practical encrypted neural networks:</p>
+
+            <table>
+                <tr><th>Layer</th><th>Type</th><th>Size</th><th>Operation</th></tr>
+                <tr><td>Input</td><td>Image</td><td>28×28</td><td>Encrypt pixels</td></tr>
+                <tr><td>Conv1</td><td>Convolution</td><td>5×5, 5 filters</td><td>Encrypted conv</td></tr>
+                <tr><td>Pool1</td><td>Mean pool</td><td>2×2</td><td>Averaging (easy in HE)</td></tr>
+                <tr><td>Conv2</td><td>Convolution</td><td>5×5, 50 filters</td><td>Encrypted conv</td></tr>
+                <tr><td>Pool2</td><td>Mean pool</td><td>2×2</td><td>Averaging</td></tr>
+                <tr><td>FC1</td><td>Dense</td><td>100 neurons</td><td>Matrix mult + sigmoid</td></tr>
+                <tr><td>Output</td><td>Dense</td><td>10 classes</td><td>Matrix mult</td></tr>
+            </table>
+
+            <p><strong>Performance:</strong> 250ms per prediction (GPU), <strong>Accuracy:</strong> 99% (same as plaintext)</p>
+
+            <h2>Real-World Applications</h2>
+
+            <h3>Medical Diagnosis</h3>
+
+            <div class="highlight-box">
+                <h4>Cancer Detection from Genomic Data</h4>
+                <p>A hospital uses an AI model to detect cancer from patient genomic sequences without exposing patient data to the model provider:</p>
+                <ul>
+                    <li><strong>Data:</strong> Patient genomic sequences (30GB per patient)</li>
+                    <li><strong>Model:</strong> Deep neural network (proprietary)</li>
+                    <li><strong>HE Scheme:</strong> CKKS (approximate computation)</li>
+                    <li><strong>Performance:</strong> 5 minutes per patient (acceptable for diagnosis)</li>
+                    <li><strong>Privacy:</strong> Complete—neither genomic data nor model weights revealed</li>
+                </ul>
+            </div>
+
+            <h3>Financial Fraud Detection</h3>
+
+            <pre><code>// Banks collaborate on fraud detection without sharing transactions
+
+// Bank A
+transactions_A = get_customer_transactions()
+ct_features_A = extract_and_encrypt_features(transactions_A)
+send_to_consortium(ct_features_A)
+
+// Consortium (aggregates across banks)
+ct_all_features = aggregate([ct_features_A, ct_features_B, ct_features_C])
+ct_fraud_scores = fraud_detection_model(ct_all_features)
+
+// Bank A
+fraud_scores_A = decrypt(ct_fraud_scores_A)
+flag_suspicious_transactions(fraud_scores_A)
+
+// Privacy: No bank sees other banks' customer data
+// Accuracy: Same as centralized model (collective knowledge)</code></pre>
+
+            <h3>Cloud-Based ML-as-a-Service</h3>
+
+            <p>Users query cloud ML models without revealing their queries:</p>
+
+            <ul>
+                <li><strong>User:</strong> Encrypts sensitive image/text</li>
+                <li><strong>Cloud:</strong> Runs ML model on encrypted input</li>
+                <li><strong>User:</strong> Decrypts prediction</li>
+                <li><strong>Benefit:</strong> Cloud provider never sees user data</li>
+            </ul>
+
+            <h2>Optimization Techniques for PPML</h2>
+
+            <h3>Model Compression</h3>
+
+            <ul>
+                <li><strong>Pruning:</strong> Remove less important weights (reduces depth)</li>
+                <li><strong>Quantization:</strong> Use lower precision (faster HE operations)</li>
+                <li><strong>Knowledge distillation:</strong> Train smaller model that mimics large one</li>
+            </ul>
+
+            <h3>Hybrid Execution</h3>
+
+            <pre><code>// Mix plaintext and encrypted computation strategically
+
+// Cheap operations in plaintext
+preprocessing = plaintext_normalize(raw_data)
+features = plaintext_feature_extraction(preprocessing)
+
+// Expensive/sensitive operations encrypted
+ct_features = encrypt(features)
+ct_prediction = encrypted_model(ct_features)
+
+// Cheap post-processing in plaintext
+prediction = decrypt(ct_prediction)
+formatted_result = plaintext_formatting(prediction)
+
+// Trade-off: Some information leakage, much better performance</code></pre>
+
+            <h3>Transfer Learning</h3>
+
+            <p>Train base model on plaintext public data, fine-tune on encrypted private data:</p>
+
+            <pre><code>// Pre-train on ImageNet (public data, plaintext)
+base_model = train_on_imagenet()
+
+// Fine-tune last layer on hospital data (encrypted)
+ct_hospital_data = encrypt(sensitive_patient_images)
+fine_tuned_model = encrypted_fine_tune(base_model, ct_hospital_data)
+
+// Result: Better accuracy, less encrypted training time</code></pre>
+
+            <h2>Challenges and Future Directions</h2>
+
+            <h3>Current Limitations</h3>
+
+            <ul>
+                <li><strong>Performance:</strong> Still 10-1000x slower than plaintext</li>
+                <li><strong>Activation functions:</strong> Polynomial approximations lose accuracy</li>
+                <li><strong>Deep networks:</strong> Many layers consume noise budget quickly</li>
+                <li><strong>Batch normalization:</strong> Requires division (expensive in HE)</li>
+            </ul>
+
+            <h3>Emerging Solutions</h3>
+
+            <ul>
+                <li><strong>Custom activation functions:</strong> Polynomials designed for HE</li>
+                <li><strong>Architecture search:</strong> Auto-design networks optimized for HE</li>
+                <li><strong>Hardware acceleration:</strong> Specialized chips for FHE operations</li>
+                <li><strong>Hybrid protocols:</strong> Combine HE with MPC and differential privacy</li>
+            </ul>
+
+            <div class="summary-box">
+                <h3>Chapter Summary</h3>
+                <ul>
+                    <li>HE enables ML inference on encrypted data: client encrypts input, server computes, client decrypts prediction</li>
+                    <li>Linear and logistic regression translate naturally to HE with minimal modifications</li>
+                    <li>Neural networks require polynomial approximations for activation functions</li>
+                    <li>Encrypted training possible via gradient descent with hybrid encryption</li>
+                    <li>Federated learning + HE provides maximum privacy for collaborative ML</li>
+                    <li>CNNs work via encrypted convolution (matrix ops) and approximate pooling</li>
+                    <li>CryptoNets demonstrated practical encrypted deep learning (250ms, 99% accuracy)</li>
+                    <li>Real applications: medical diagnosis, fraud detection, cloud ML services</li>
+                    <li>Optimization: model compression, hybrid execution, transfer learning</li>
+                    <li>Future: Better activations, hardware acceleration, hybrid protocols improving practicality</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h3>Review Questions</h3>
+                <ol>
+                    <li>Explain the basic workflow of privacy-preserving ML inference with HE.</li>
+                    <li>Why is linear regression well-suited for homomorphic encryption?</li>
+                    <li>How are activation functions approximated in encrypted neural networks?</li>
+                    <li>Describe the trade-offs in encrypted gradient descent training.</li>
+                    <li>How does federated learning combine with HE to enhance privacy?</li>
+                    <li>What makes convolution operations compatible with HE?</li>
+                    <li>Compare max pooling approximations in CKKS vs exact computation in TFHE.</li>
+                    <li>What optimizations made CryptoNets achieve 250ms inference time?</li>
+                    <li>Describe a real-world medical application of PPML.</li>
+                    <li>What are the main limitations of current PPML systems and how might they be addressed?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

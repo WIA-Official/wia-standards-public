@@ -1,134 +1,533 @@
-# Hyperloop — Phase 1: Data Format Specification
+# WIA-AUTO-019 PHASE 1 — Data Format Specification
 
+**Standard:** WIA-AUTO-019
+**Phase:** 1 — Data Format
+**Version:** 1.0
+**Status:** Stable
+**Source:** synthesized from the original `PHASE-1-DATA-FORMAT.md` (quarter 1 of 4)
+
+---
+
+# WIA-AUTO-019: Hyperloop Transportation Specification v1.0
+
+> **Standard ID:** WIA-AUTO-019
 > **Version:** 1.0.0
-> **Status:** Official
-> **Last Updated:** 2025-01-01
-> **Philosophy:** 弘益人間 (Benefit All Humanity)
+> **Published:** 2025-12-26
+> **Status:** Active
+> **Authors:** WIA Mobility Research Group
 
 ---
 
-## 1. Overview
+## Table of Contents
 
-Phase 1 defines standardized data formats for Hyperloop systems. This specification establishes the core data model, field definitions, validation rules, and serialization formats to ensure interoperability across management systems and technology platforms.
+1. [Introduction](#1-introduction)
+2. [Tube Infrastructure](#2-tube-infrastructure)
+3. [Pod Design and Aerodynamics](#3-pod-design-and-aerodynamics)
+4. [Magnetic Levitation Systems](#4-magnetic-levitation-systems)
+5. [Linear Induction Motors](#5-linear-induction-motors)
+6. [Station and Boarding Systems](#6-station-and-boarding-systems)
+7. [Emergency Systems](#7-emergency-systems)
+8. [Data Formats](#8-data-formats)
+9. [API Interface](#9-api-interface)
+10. [Safety Protocols](#10-safety-protocols)
+11. [References](#11-references)
 
 ---
 
-## 2. Data Model
+## 1. Introduction
 
-### 2.1 Core Schema
+### 1.1 Purpose
 
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "WIA Hyperloop Data Format",
-  "type": "object",
-  "required": ["standard", "version", "timestamp", "data"],
-  "properties": {
-    "standard": {
-      "type": "string",
-      "const": "hyperloop"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "metadata": {
-      "type": "object",
-      "properties": {
-        "source": {"type": "string"},
-        "encoding": {"type": "string", "enum": ["utf-8", "binary", "base64"]},
-        "checksum": {"type": "string"}
-      }
-    },
-    "data": {
-      "type": "object",
-      "description": "Primary operational data payload"
-    }
-  }
-}
+This specification defines the technical framework for hyperloop transportation systems, enabling ultra-high-speed ground travel through evacuated tubes using magnetic levitation and linear electric propulsion.
+
+### 1.2 Scope
+
+The standard covers:
+- Vacuum tube infrastructure and pressure management
+- Pod aerodynamics and structural design
+- Magnetic levitation and propulsion systems
+- Station infrastructure and passenger boarding
+- Emergency procedures and safety systems
+- Control systems and communication protocols
+
+### 1.3 Philosophy
+
+**弘익人間 (Benefit All Humanity)** - This standard aims to revolutionize transportation by providing sustainable, efficient, and accessible high-speed travel that benefits all of humanity while minimizing environmental impact.
+
+### 1.4 Terminology
+
+- **Hyperloop**: High-speed transportation system using pods in low-pressure tubes
+- **Pod**: Passenger or cargo capsule that travels through the tube
+- **Tube**: Evacuated tunnel providing the travel pathway
+- **Vacuum Pressure**: Reduced atmospheric pressure (typically 100 Pa or 0.1% of sea level)
+- **Magnetic Levitation (Maglev)**: Suspension using electromagnetic forces
+- **Linear Induction Motor (LIM)**: Propulsion system using electromagnetic fields
+- **Station**: Boarding and departure facility with airlock systems
+
+---
+
+## 2. Tube Infrastructure
+
+### 2.1 Tube Geometry
+
+#### 2.1.1 Cross-Section
+
+The tube provides the physical pathway and vacuum environment:
+
+```
+Inner Diameter: D = 3.3 meters
+Wall Thickness: t = 20-30 mm
+Cross-sectional Area: A = π(D/2)²
 ```
 
-### 2.2 Field Definitions
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| standard | string | Yes | Standard identifier (hyperloop) |
-| version | string | Yes | Specification version (SemVer) |
-| timestamp | string | Yes | ISO 8601 timestamp |
-| metadata.source | string | No | Data source identifier |
-| metadata.encoding | string | No | Content encoding type |
-| metadata.checksum | string | No | SHA-256 integrity hash |
-| data | object | Yes | Domain-specific operational data |
-
----
-
-## 3. Data Types
-
-### 3.1 Enumerations
-
-| Enum | Values | Description |
-|------|--------|-------------|
-| Status | `active`, `inactive`, `pending`, `error` | Operational status |
-| Priority | `critical`, `high`, `medium`, `low` | Processing priority |
-| DataQuality | `verified`, `provisional`, `estimated` | Data quality level |
-
-### 3.2 Measurement Units
-
-All measurements follow SI units unless domain-specific conventions apply. Timestamps use ISO 8601 with UTC timezone.
-
----
-
-## 4. Validation Rules
-
-Implementations MUST:
-1. Validate all required fields before processing
-2. Reject payloads with unknown `standard` identifiers
-3. Verify version compatibility (major version must match)
-4. Validate timestamp format and reject future-dated entries beyond tolerance
-5. Compute and verify checksums when provided
-
-Implementations SHOULD:
-1. Support partial updates via JSON Patch (RFC 6902)
-2. Log validation failures with diagnostic details
-3. Provide human-readable error descriptions
-
----
-
-## 5. Serialization
-
-### 5.1 JSON (Primary)
-- UTF-8 encoding required
-- Maximum payload size: 16 MB
-- Compression: gzip or brotli recommended for payloads > 1 KB
-
-### 5.2 Binary (Protocol Buffers)
-- Protobuf schema provided for high-throughput applications
-- Compatible with gRPC transport (see Phase 3)
-
-### 5.3 File Extensions
-- `.wia-hyperloop.json` — JSON format
-- `.wia-hyperloop.pb` — Protocol Buffers
-
----
-
-## 6. Examples
-
-### Minimal Valid Payload
-
-```json
-{
-  "standard": "hyperloop",
-  "version": "1.0.0",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "data": {}
-}
+For standard tube:
+```
+A = π × (1.65)² ≈ 8.55 m²
 ```
 
+#### 2.1.2 Tube Material
+
+Primary materials:
+- **Steel**: High-strength, welded construction
+- **Aluminum**: Lightweight alternative for elevated sections
+- **Composite**: Carbon fiber for specialized segments
+
+Material requirements:
+```
+Yield Strength: σ_y ≥ 250 MPa
+Fatigue Life: N ≥ 10⁷ cycles
+Corrosion Resistance: Class C4 (ISO 12944)
+Thermal Expansion: α ≈ 12 × 10⁻⁶ /°C
+```
+
+### 2.2 Vacuum System
+
+#### 2.2.1 Operating Pressure
+
+Target operating pressure:
+```
+P_operating = 100 Pa (0.1% atmospheric)
+P_atmospheric = 101,325 Pa (sea level)
+Pressure Ratio: P_operating / P_atmospheric = 1/1000
+```
+
+#### 2.2.2 Air Density
+
+At operating pressure:
+```
+ρ = (P × M) / (R × T)
+```
+
+Where:
+- `ρ` = Air density (kg/m³)
+- `P` = Pressure (100 Pa)
+- `M` = Molar mass of air (0.029 kg/mol)
+- `R` = Gas constant (8.314 J/mol·K)
+- `T` = Temperature (293 K = 20°C)
+
+Calculation:
+```
+ρ = (100 × 0.029) / (8.314 × 293)
+ρ ≈ 0.0012 kg/m³
+```
+
+**Comparison**: This is approximately 1/1000th of normal air density (1.225 kg/m³)
+
+#### 2.2.3 Vacuum Pumps
+
+Pump system requirements:
+
+**Primary Pumps**:
+```
+Type: Rotary Vane or Scroll
+Flow Rate: 1000-5000 m³/hr per pump
+Spacing: Every 5-10 km along tube
+Power: 50-100 kW per pump
+```
+
+**Secondary Pumps**:
+```
+Type: Turbomolecular
+Ultimate Pressure: 10⁻³ Pa
+Flow Rate: 100-500 l/s
+Application: Station airlocks
+```
+
+#### 2.2.4 Pressure Maintenance
+
+Leak rate calculation:
+```
+Q_leak = (V × dP/dt)
+```
+
+Where:
+- `Q_leak` = Total leak rate (Pa·m³/s)
+- `V` = Tube volume (m³)
+- `dP/dt` = Pressure rise rate (Pa/s)
+
+For acceptable operation:
+```
+dP/dt ≤ 1 Pa/hour = 2.78 × 10⁻⁴ Pa/s
+```
+
+### 2.3 Thermal Management
+
+#### 2.3.1 Solar Heating
+
+Temperature rise from solar radiation:
+```
+ΔT = (α × I × A) / (m × c_p × h)
+```
+
+Where:
+- `α` = Absorptivity (0.6 for steel)
+- `I` = Solar irradiance (1000 W/m²)
+- `A` = Exposed surface area
+- `m` = Air mass in tube
+- `c_p` = Specific heat capacity (1005 J/kg·K)
+- `h` = Heat transfer coefficient
+
+Mitigation strategies:
+- Reflective coating (α = 0.2-0.3)
+- Active cooling at critical sections
+- Thermal expansion joints every 100-500m
+
+#### 2.3.2 Frictional Heating
+
+Heat generated by pod passage:
+```
+Q_friction = F_drag × v × t
+```
+
+Where:
+- `Q_friction` = Heat generated (joules)
+- `F_drag` = Drag force (newtons)
+- `v` = Pod velocity (m/s)
+- `t` = Time duration (s)
+
+### 2.4 Structural Support
+
+#### 2.4.1 Pylon Design
+
+Support structure spacing:
+```
+Underground: Continuous support
+Elevated: Pylons every 30-50 meters
+Bridge Sections: Pylons every 50-100 meters
+```
+
+Load calculations:
+```
+Total Load = Tube Weight + Pod Weight + Wind Load + Seismic Load
+```
+
+#### 2.4.2 Seismic Considerations
+
+Earthquake resistance:
+```
+Design Acceleration: a_design = 0.3-0.5g
+Damping Ratio: ζ = 0.05-0.10
+Natural Frequency: f_n = 0.5-2.0 Hz
+```
+
+Seismic isolation:
+- Elastomeric bearings
+- Friction pendulum systems
+- Expansion joints with ±300mm travel
+
 ---
 
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+## 3. Pod Design and Aerodynamics
+
+### 3.1 Pod Geometry
+
+#### 3.1.1 Dimensions
+
+Standard passenger pod:
+```
+Length: L = 15-30 meters
+Diameter: D = 2.7 meters
+Cross-sectional Area: A_pod = 5.72 m²
+Frontal Area Ratio: β = A_pod / A_tube = 0.67
+```
+
+#### 3.1.2 Aerodynamic Profile
+
+The pod must minimize drag in low-pressure environment:
+
+**Nose Cone**:
+```
+Shape: Ellipsoidal or Von Karman ogive
+Length: 3-5 meters
+Fineness Ratio: L_nose / D = 1.5-2.0
+```
+
+**Main Body**:
+```
+Shape: Cylindrical
+Surface Roughness: R_a < 1.6 μm
+```
+
+**Tail Cone**:
+```
+Shape: Tapered cylinder
+Length: 2-3 meters
+Taper Angle: 5-10 degrees
+```
+
+### 3.2 Drag Force
+
+#### 3.2.1 Pressure Drag
+
+At operating conditions:
+```
+F_drag = ½ × ρ × v² × C_d × A
+```
+
+Where:
+- `ρ` = Air density (0.0012 kg/m³ at 100 Pa)
+- `v` = Velocity (m/s)
+- `C_d` = Drag coefficient (0.15-0.25)
+- `A` = Cross-sectional area (5.72 m²)
+
+Example at cruising speed (300 m/s):
+```
+F_drag = 0.5 × 0.0012 × (300)² × 0.15 × 5.72
+F_drag ≈ 46.5 N
+```
+
+**Comparison**: At atmospheric pressure, drag would be:
+```
+F_drag_atm ≈ 46,500 N (1000× higher)
+```
+
+#### 3.2.2 Kantrowitz Limit
+
+Maximum velocity before choking:
+```
+v_max = c × √[(A_tube / A_pod) - 1]
+```
+
+Where:
+- `c` = Speed of sound in low-pressure air (≈ 340 m/s)
+- `A_tube` = Tube cross-sectional area
+- `A_pod` = Pod cross-sectional area
+
+For β = 0.67:
+```
+v_max = 340 × √[(1/0.67) - 1]
+v_max ≈ 237 m/s
+```
+
+**Solution**: Compressor fan or larger tube diameter
+
+#### 3.2.3 Power Requirements
+
+Power to overcome drag:
+```
+P_drag = F_drag × v
+```
+
+At 300 m/s:
+```
+P_drag = 46.5 × 300 = 13,950 W ≈ 14 kW
+```
+
+### 3.3 Pod Structure
+
+#### 3.3.1 Materials
+
+Primary structure:
+- **Aluminum Alloy 7075**: High strength-to-weight ratio
+- **Carbon Fiber Composite**: Selective reinforcement
+- **Titanium**: High-stress connection points
+
+Material properties:
+```
+Aluminum 7075:
+  Density: ρ = 2810 kg/m³
+  Yield Strength: σ_y = 503 MPa
+
+
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
+
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
+
+## Annex F — Adoption Roadmap
+
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.
+
+## Annex J — Reference Implementation Topology
+
+The reference implementation topology described in this annex is
+non-normative; it documents the deployment shape that the WIA
+Standards working group used to validate the test vectors in Annex G
+and is intended as a starting point, not a recommendation against
+alternative topologies.
+
+- **Single-tenant edge** — one runtime per organization, no shared
+  state. Used for early-pilot deployments where conformance evidence
+  is published manually. Sufficient for PHASE-1-DATA-FORMAT validation when the
+  organization signs the manifest itself.
+- **Multi-tenant gateway** — one shared runtime serves multiple
+  tenants via header-based isolation. Typically backed by a
+  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
+  identity provider. The manifest is per-tenant; the runtime
+  publishes a federation manifest that aggregates tenant manifests.
+- **Federated mesh** — multiple runtimes peer to one another and
+  publish their manifests to a directory service. Each peer signs
+  its own manifest; the directory service signs the aggregated
+  index. This is the topology used by cross-organization deployments
+  that need to compose conformance.
+- **Air-gapped batch** — no network connection between the runtime
+  and the directory service. The runtime emits a signed evidence
+  package on each batch and the operator transports the package via
+  out-of-band channels. This is the topology used by regulators that
+  prohibit live connectivity from sensitive environments.
+
+Implementations declare their topology in the manifest (see Annex I).
+A topology change MUST be reflected in a new manifest signature; the
+prior topology's manifest remains valid for the deprecation window
+described in Annex H to preserve audit traceability.

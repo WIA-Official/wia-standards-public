@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 5: E-Commerce - WIA-HOME</title>
+</head>
+<body>
+<h1>Chapter 5: E-Commerce</h1>
+
+<blockquote>
+"Hongik Ingan: Small businesses worldwide deserve commission-free selling."
+</blockquote>
+
+<hr>
+
+<h2>5.1 Shop Setup</h2>
+
+<pre>
+Enable Shop
+===========
+
+const home = new WIAHome({
+  name: 'Happy Bakery',
+  features: {
+    shop: true
+  }
+});
+
+// Shop is ready!
+
+
+Product Structure
+=================
+
+interface Product {
+  name: string;
+  price: number;
+  currency: string;
+  description: string;
+  images: MediaRef[];
+  inventory: number;
+  sku?: string;
+  categories: string[];
+  variants?: ProductVariant[];
+}
+
+
+Add Products
+============
+
+await home.shop.addProduct({
+  name: 'Chocolate Cake',
+  price: 35000,
+  currency: 'KRW',
+  description: 'Rich chocolate cake made with...',
+  images: [cakeImage1, cakeImage2],
+  inventory: 10,
+  categories: ['cakes', 'chocolate']
+});
+
+
+Product Variants
+================
+
+await home.shop.addProduct({
+  name: 'T-Shirt',
+  price: 25000,
+  currency: 'KRW',
+  images: [shirtImage],
+  inventory: 100,
+  variants: [
+    { name: 'Small', attributes: { size: 'S' }, inventory: 30 },
+    { name: 'Medium', attributes: { size: 'M' }, inventory: 40 },
+    { name: 'Large', attributes: { size: 'L' }, inventory: 30 }
+  ]
+});
+</pre>
+
+<hr>
+
+<h2>5.2 Global Payment Integration</h2>
+
+<pre>
+Payment by Region
+=================
+
+WIA-HOME supports payments worldwide:
+
+
+Korea:
+  - Kakao Pay
+  - Naver Pay
+  - Toss Pay
+  - Payco
+
+Africa (Mobile Money):
+  - M-Pesa (Kenya, Tanzania)
+  - Airtel Money
+  - Orange Money
+  - MTN Money
+  - Telebirr (Ethiopia)
+
+India (UPI):
+  - UPI (1 billion users)
+  - Paytm
+  - PhonePe
+  - Google Pay India
+
+Southeast Asia:
+  - GrabPay
+  - GoPay (Indonesia)
+  - GCash (Philippines)
+  - PromptPay (Thailand)
+  - MoMo (Vietnam)
+
+Latin America:
+  - Pix (Brazil)
+  - Mercado Pago
+  - OXXO (Mexico)
+
+Middle East:
+  - STC Pay (Saudi)
+  - Fawry (Egypt)
+
+Global:
+  - Stripe
+  - PayPal
+  - Cryptocurrency
+
+
+Payment Setup
+=============
+
+home.shop.setPayment({
+  // Korea
+  korean: {
+    kakaoPay: true,
+    naverPay: true
+  },
+
+  // Africa
+  africa: {
+    mPesa: true,
+    telebirr: true
+  },
+
+  // Bank transfer
+  bankTransfer: {
+    enabled: true,
+    accounts: [{
+      bank: 'Shinhan Bank',
+      number: '110-xxx-xxx',
+      holder: 'Hong Gildong'
+    }]
+  }
+});
+
+
+Why So Many Options?
+====================
+
+Hongik Ingan means serving ALL humanity:
+
+In Kenya:
+  - M-Pesa users: 30 million+
+  - Bank accounts: Much fewer
+  - Mobile money IS banking
+
+In India:
+  - UPI transactions: 10 billion/month
+  - Instant, free transfers
+  - Everyone uses it
+
+In Brazil:
+  - Pix: 150 million users
+  - Instant, 24/7
+  - Replaced cash
+
+WIA-HOME serves them all.
+</pre>
+
+<hr>
+
+<h2>5.3 Order Management</h2>
+
+<pre>
+Order Structure
+===============
+
+interface Order {
+  id: string;
+  items: OrderItem[];
+  customer: CustomerInfo;
+  shipping: ShippingInfo;
+  payment: PaymentInfo;
+  status: OrderStatus;
+  total: number;
+  createdAt: Timestamp;
+}
+
+
+Order Status Flow
+=================
+
+pending -> confirmed -> processing -> shipped -> delivered
+    |                                    |
+    v                                    v
+cancelled                            refunded
+
+
+Order Events
+============
+
+home.on('order_received', async (event) => {
+  const order = event.data;
+
+  console.log('New order!');
+  console.log('Customer:', order.customer.name);
+  console.log('Total:', order.total);
+
+  // Send notification
+  await sendKakaoNotification(order);
+});
+
+
+Order Operations
+================
+
+// List orders
+const orders = await home.shop.orders.list({
+  status: 'pending'
+});
+
+// Update status
+await home.shop.orders.updateStatus(
+  orderId,
+  'shipped',
+  { trackingNumber: 'ABC123' }
+);
+
+// Process refund
+await home.shop.orders.refund(orderId, {
+  reason: 'Customer request',
+  amount: 35000
+});
+</pre>
+
+<hr>
+
+<h2>5.4 Inventory Management</h2>
+
+<pre>
+Automatic Tracking
+==================
+
+WIA-HOME automatically:
+  - Decrements on order
+  - Alerts on low stock
+  - Prevents overselling
+
+
+Inventory Operations
+====================
+
+// Check inventory
+const stock = await home.shop.inventory.get(productId);
+
+// Update inventory
+await home.shop.inventory.set(productId, 50);
+
+// Adjust (add/subtract)
+await home.shop.inventory.adjust(productId, -5, 'Sold offline');
+
+// Bulk update
+await home.shop.inventory.bulkUpdate([
+  { productId: 'prod_1', quantity: 100 },
+  { productId: 'prod_2', quantity: 50 }
+]);
+
+
+Low Stock Alerts
+================
+
+home.shop.inventory.setAlert({
+  threshold: 5,
+  notification: ['kakao', 'email']
+});
+
+// When stock reaches 5 or below:
+// [Alert] Chocolate Cake: Only 5 left!
+
+
+Out of Stock Handling
+=====================
+
+Options:
+  - Hide product
+  - Show "Out of Stock"
+  - Allow backorders
+  - Show "Notify me"
+
+home.shop.setOutOfStockBehavior('notify');
+// Shows "Notify when available" button
+</pre>
+
+<hr>
+
+<h2>5.5 Platform Integration</h2>
+
+<pre>
+Naver/Kakao Integration
+=======================
+
+await home.integrate({
+  naver: {
+    place: true,
+    placeId: 'xxxxx',
+    smartstore: true
+  },
+  kakao: {
+    channel: true,
+    channelId: '@myshop',
+    pay: true
+  }
+});
+
+
+Delivery Integration
+====================
+
+For restaurants/food businesses:
+
+await home.integrate({
+  delivery: {
+    baemin: true,
+    yogiyo: true,
+    coupangeats: true
+  }
+});
+
+// Orders from all platforms appear in one place
+
+
+Social Media
+============
+
+await home.integrate({
+  social: {
+    instagram: {
+      feed: true,
+      shop: true
+    },
+    facebook: {
+      page: true,
+      shop: true
+    }
+  }
+});
+
+
+Benefits
+========
+
+[OK] Single dashboard for all orders
+[OK] Inventory synced everywhere
+[OK] No per-platform login
+[OK] Unified analytics
+[OK] Time savings
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Full e-commerce with products, variants, and inventory</li>
+<li>[OK] Global payment support from Korea to Africa to Brazil</li>
+<li>[OK] Complete order management with status tracking</li>
+<li>[OK] Automatic inventory management with alerts</li>
+<li>[OK] Platform integration with Naver, Kakao, delivery apps</li>
+</ul>
+</body>
+</html>

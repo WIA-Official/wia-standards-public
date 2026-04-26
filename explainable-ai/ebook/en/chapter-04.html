@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: LIME and Local Explanations | WIA-AI-009</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #10B981, #34d399); color: white; padding: 3rem 2rem; margin: -2rem -2rem 3rem -2rem; }
+        .chapter-number { font-size: 1.2rem; opacity: 0.9; }
+        h1 { font-size: 2.5rem; margin-top: 0.5rem; }
+        .content { background: white; padding: 3rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        h2 { color: #10B981; margin: 2.5rem 0 1rem 0; font-size: 1.8rem; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
+        h3 { color: #059669; margin: 1.5rem 0 0.75rem 0; font-size: 1.3rem; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight { background: #f0fdf4; border-left: 4px solid #10B981; padding: 1rem; margin: 1.5rem 0; }
+        .example { background: #f1f5f9; border-left: 4px solid #3b82f6; padding: 1rem; margin: 1.5rem 0; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; color: inherit; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        .summary { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 3rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        .questions { background: #fefce8; border: 2px solid #eab308; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .questions h2 { color: #ca8a04; border-bottom: 2px solid #eab308; }
+        .nav { display: flex; justify-content: space-between; margin-top: 3rem; }
+        .nav a { background: #10B981; color: white; padding: 1rem 2rem; text-decoration: none; border-radius: 6px; }
+        .nav a:hover { background: #059669; }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #e2e8f0; color: #64748b; }
+        .philosophy { color: #10B981; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
+        th { background: #10B981; color: white; }
+        tr:nth-child(even) { background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">WIA-AI-009 | Chapter 4</div>
+            <h1>LIME and Local Explanations</h1>
+        </header>
+
+        <div class="content">
+            <h2>Introduction to LIME</h2>
+            <p>
+                LIME (Local Interpretable Model-agnostic Explanations), introduced by Marco Ribeiro, Sameer Singh, and
+                Carlos Guestrin in 2016, pioneered the concept of explaining individual predictions through local approximations.
+                The central insight is elegant: even if a model is globally complex, we can understand its behavior locally—in
+                the neighborhood of a specific prediction—using a simple, interpretable model.
+            </p>
+
+            <p>
+                Think of it like understanding Earth's curvature. Globally, Earth is a sphere, which is complex to describe
+                mathematically. But locally—in your neighborhood—it appears flat, which is much simpler. LIME applies this
+                same principle to machine learning: approximate a complex model locally with a simple linear model that's
+                easy to understand.
+            </p>
+
+            <div class="highlight">
+                <strong>弘益人間 Principle:</strong> LIME democratizes AI explainability by working with any model type,
+                making transparency accessible regardless of the underlying technology. This universality serves humanity
+                by ensuring no one is excluded from understanding AI decisions.
+            </div>
+
+            <h2>The LIME Algorithm</h2>
+            <p>
+                LIME operates through a four-step process that creates a local linear approximation around a specific prediction:
+            </p>
+
+            <h3>Step 1: Perturbation - Creating Synthetic Neighbors</h3>
+            <p>
+                Given an instance you want to explain, LIME generates thousands of synthetic "neighbors" by randomly
+                perturbing features. For tabular data, this might mean randomly changing feature values while keeping them
+                realistic. For images, it might mean turning superpixels on or off.
+            </p>
+
+            <div class="example">
+                <strong>Example: Loan Application</strong><br>
+                Original instance: {credit_score: 720, debt_ratio: 0.35, employment_years: 8}<br><br>
+                Perturbed instances:<br>
+                1. {credit_score: 685, debt_ratio: 0.35, employment_years: 8}<br>
+                2. {credit_score: 720, debt_ratio: 0.42, employment_years: 8}<br>
+                3. {credit_score: 745, debt_ratio: 0.35, employment_years: 6}<br>
+                ... (generate 5,000 such perturbations)
+            </div>
+
+            <h3>Step 2: Prediction - Query the Black Box</h3>
+            <p>
+                Feed all perturbed instances through the black-box model to get predictions. LIME doesn't need to know how
+                the model works internally—it just needs input-output pairs.
+            </p>
+
+            <h3>Step 3: Weighting - Emphasize Nearby Points</h3>
+            <p>
+                Weight each perturbed instance by its distance from the original. Closer instances get higher weights
+                because they're more relevant for understanding local behavior. This ensures the linear model focuses on
+                the immediate neighborhood, not distant regions where the approximation might be poor.
+            </p>
+
+            <h3>Step 4: Linear Model Fitting</h3>
+            <p>
+                Fit a weighted linear regression model using the perturbed instances as training data. The coefficients of
+                this linear model become your explanation—they show how each feature locally affects the prediction.
+            </p>
+
+            <pre><code>// LIME algorithm pseudocode (WIA-AI-009)
+function explainWithLIME(instance, model, numSamples=5000) {
+  const perturbations = [];
+  const predictions = [];
+  const weights = [];
+
+  // Generate perturbations
+  for (let i = 0; i < numSamples; i++) {
+    const perturbed = perturbInstance(instance);
+    perturbations.push(perturbed);
+
+    // Get model prediction
+    predictions.push(model.predict(perturbed));
+
+    // Weight by distance to original
+    const distance = computeDistance(instance, perturbed);
+    weights.push(kernelWeight(distance));
+  }
+
+  // Fit weighted linear model
+  const linearModel = fitWeightedLinearRegression(
+    perturbations,
+    predictions,
+    weights
+  );
+
+  // Coefficients are the explanation
+  return linearModel.coefficients;
+}</code></pre>
+
+            <h2>LIME for Different Data Types</h2>
+            <p>
+                LIME's model-agnostic nature extends across data modalities, but each requires domain-specific adaptations:
+            </p>
+
+            <h3>Tabular LIME</h3>
+            <p>
+                For structured data with numeric and categorical features:
+            </p>
+
+            <ul>
+                <li><strong>Numeric features:</strong> Perturb by sampling from a normal distribution around the original value</li>
+                <li><strong>Categorical features:</strong> Randomly select different categories based on training data distribution</li>
+                <li><strong>Distance metric:</strong> Euclidean distance in normalized feature space</li>
+                <li><strong>Interpretable representation:</strong> The original features themselves</li>
+            </ul>
+
+            <h3>Image LIME</h3>
+            <p>
+                Explaining image classifications presents unique challenges—individual pixels are too fine-grained to be
+                interpretable. LIME addresses this through superpixel segmentation:
+            </p>
+
+            <ol>
+                <li>Segment the image into superpixels (coherent regions of similar color/texture)</li>
+                <li>Treat each superpixel as a binary feature (present or absent)</li>
+                <li>Generate perturbations by randomly turning superpixels on (original) or off (gray/blur)</li>
+                <li>Fit a linear model predicting class probability from superpixel presence</li>
+                <li>Highlight superpixels with positive coefficients as "supporting" the prediction</li>
+            </ol>
+
+            <div class="example">
+                <strong>Image Classification Example:</strong><br>
+                Model predicts: "Husky" (95% confidence)<br>
+                LIME explanation: Highlights the dog's face, pointy ears, and blue eyes as supporting evidence.<br>
+                Removes background snow, which doesn't contribute to classification.<br><br>
+                This reveals the model correctly focuses on relevant features rather than spurious correlations.
+            </div>
+
+            <h3>Text LIME</h3>
+            <p>
+                For text classification and sentiment analysis:
+            </p>
+
+            <ul>
+                <li><strong>Interpretable units:</strong> Words or phrases, not character n-grams</li>
+                <li><strong>Perturbation:</strong> Randomly remove words from the text</li>
+                <li><strong>Binary representation:</strong> Each word is a feature (present/absent)</li>
+                <li><strong>Output:</strong> Words that most strongly support or contradict the prediction</li>
+            </ul>
+
+            <div class="example">
+                <strong>Sentiment Analysis:</strong><br>
+                Text: "The movie was absolutely terrible, but the acting was superb."<br>
+                Model prediction: Negative (65%)<br>
+                LIME explanation:<br>
+                + "terrible" (+0.45) strongly supports negative<br>
+                - "superb" (-0.28) contradicts negative<br>
+                + "but" (+0.12) introduces contrast, supports negative<br>
+                Other words have minimal impact
+            </div>
+
+            <h2>Key Parameters and Tuning</h2>
+            <p>
+                LIME's effectiveness depends on proper parameter configuration:
+            </p>
+
+            <h3>Number of Samples</h3>
+            <p>
+                How many perturbations to generate. More samples improve accuracy but increase computation time.
+            </p>
+
+            <ul>
+                <li><strong>Quick debugging:</strong> 100-500 samples</li>
+                <li><strong>Production:</strong> 5,000-10,000 samples</li>
+                <li><strong>Critical applications:</strong> 50,000+ samples</li>
+            </ul>
+
+            <h3>Kernel Width</h3>
+            <p>
+                Controls the "locality" of the explanation—how quickly weights decay with distance. Smaller widths create
+                tighter, more local approximations. Larger widths incorporate broader context but may miss local nonlinearity.
+            </p>
+
+            <p>
+                The WIA-AI-009 standard recommends: kernel_width = sqrt(num_features) × 0.75 as a starting point, then
+                tune based on validation.
+            </p>
+
+            <h3>Number of Features in Explanation</h3>
+            <p>
+                Limit explanations to the top K most important features (typically 5-10) to avoid overwhelming users with
+                information. More features provide completeness, fewer provide clarity.
+            </p>
+
+            <h3>Perturbation Strategy</h3>
+            <p>
+                How to generate realistic perturbations:
+            </p>
+
+            <ul>
+                <li><strong>Random sampling:</strong> Sample from training data distributions</li>
+                <li><strong>Gaussian perturbation:</strong> Add noise to numeric features</li>
+                <li><strong>Categorical sampling:</strong> Use empirical frequencies from training data</li>
+            </ul>
+
+            <h2>LIME vs. SHAP: A Comparison</h2>
+            <p>
+                Both LIME and SHAP provide local explanations, but they differ in approach and guarantees:
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>LIME</th>
+                        <th>SHAP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Theoretical Foundation</td>
+                        <td>Local linear approximation</td>
+                        <td>Game theory (Shapley values)</td>
+                    </tr>
+                    <tr>
+                        <td>Consistency</td>
+                        <td>Not guaranteed</td>
+                        <td>Provably consistent</td>
+                    </tr>
+                    <tr>
+                        <td>Additivity</td>
+                        <td>Approximate</td>
+                        <td>Exact (sum = prediction - baseline)</td>
+                    </tr>
+                    <tr>
+                        <td>Speed</td>
+                        <td>Fast (1-10s typically)</td>
+                        <td>Varies (TreeSHAP fast, KernelSHAP slow)</td>
+                    </tr>
+                    <tr>
+                        <td>Stability</td>
+                        <td>Variable (depends on sampling)</td>
+                        <td>More stable</td>
+                    </tr>
+                    <tr>
+                        <td>Interpretability</td>
+                        <td>Linear model, very intuitive</td>
+                        <td>Contribution scores, slightly less intuitive</td>
+                    </tr>
+                    <tr>
+                        <td>Model-agnostic</td>
+                        <td>Yes</td>
+                        <td>Yes (but specialized versions faster)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>When to Use LIME</h3>
+            <ul>
+                <li>You need fast explanations and can tolerate approximations</li>
+                <li>You want maximum interpretability (linear models are intuitive)</li>
+                <li>You're explaining images or text (LIME has excellent support)</li>
+                <li>You need quick prototyping before committing to a method</li>
+            </ul>
+
+            <h3>When to Use SHAP</h3>
+            <ul>
+                <li>You need theoretically guaranteed consistency</li>
+                <li>You're using tree-based models (TreeSHAP is very efficient)</li>
+                <li>You need explanations that sum exactly to predictions</li>
+                <li>You want both local and global explanations from the same method</li>
+            </ul>
+
+            <h2>Implementing LIME in Production</h2>
+            <p>
+                Deploying LIME effectively requires attention to several practical considerations:
+            </p>
+
+            <h3>WIA-AI-009 LIME Implementation</h3>
+            <pre><code>import { LIMEExplainer } from 'wia-ai-009';
+
+// Initialize explainer
+const explainer = new LIMEExplainer({
+  featureNames: ['credit_score', 'debt_ratio', 'employment_years'],
+  numSamples: 5000,
+  kernelWidth: Math.sqrt(3) * 0.75,
+  numFeatures: 5
+});
+
+// Explain a prediction
+const instance = {
+  credit_score: 720,
+  debt_ratio: 0.35,
+  employment_years: 8
+};
+
+const explanation = await explainer.explain(
+  instance,
+  (x) => model.predict(x)  // Black-box model function
+);
+
+// WIA-AI-009 standardized output
+console.log(explanation);
+// {
+//   "standard": "WIA-AI-009",
+//   "explanation_type": "lime",
+//   "instance": {...},
+//   "prediction": 0.32,
+//   "intercept": 0.15,
+//   "feature_weights": {
+//     "debt_ratio": 0.42,
+//     "credit_score": -0.28,
+//     "employment_years": -0.15
+//   },
+//   "r_squared": 0.89,
+//   "num_samples_used": 5000
+// }</code></pre>
+
+            <h3>Caching Strategies</h3>
+            <p>
+                LIME requires running thousands of model predictions per explanation, which can be expensive. Caching helps:
+            </p>
+
+            <ul>
+                <li><strong>Result caching:</strong> Cache complete explanations for identical inputs</li>
+                <li><strong>Perturbation caching:</strong> Reuse perturbations across similar instances</li>
+                <li><strong>Model prediction caching:</strong> Cache model outputs for seen inputs</li>
+            </ul>
+
+            <h3>Validation and Quality Metrics</h3>
+            <p>
+                How do we know if a LIME explanation is good? The WIA-AI-009 standard defines quality metrics:
+            </p>
+
+            <ul>
+                <li><strong>R² score:</strong> How well the linear model fits the local region (aim for &gt; 0.8)</li>
+                <li><strong>Stability:</strong> Running LIME multiple times should yield similar explanations</li>
+                <li><strong>Fidelity:</strong> The linear model should closely match the black-box model locally</li>
+            </ul>
+
+            <h2>Advanced LIME Techniques</h2>
+            <h3>Anchor Explanations</h3>
+            <p>
+                An extension of LIME, Anchor explanations provide rule-based explanations with coverage guarantees: "IF
+                credit_score > 700 AND debt_ratio < 0.40 THEN approve (with 95% confidence over 85% of similar cases)"
+            </p>
+
+            <h3>Submodular Pick LIME (SP-LIME)</h3>
+            <p>
+                Instead of explaining individual instances, SP-LIME selects a small set of representative instances that,
+                when explained together, provide global understanding of the model. This bridges local and global
+                explainability.
+            </p>
+
+            <h3>Constrained LIME</h3>
+            <p>
+                Incorporate domain knowledge as constraints: "Age cannot be negative," "Sum of probabilities = 1," etc.
+                This ensures perturbations remain realistic and explanations respect known relationships.
+            </p>
+
+            <h2>Limitations and Pitfalls</h2>
+            <h3>Instability</h3>
+            <p>
+                Because LIME uses random sampling, running it twice on the same instance can yield different explanations.
+                This randomness can confuse users who expect consistency. Mitigation: use large sample counts and set
+                random seeds for reproducibility.
+            </p>
+
+            <h3>Locality Calibration</h3>
+            <p>
+                Choosing the right kernel width is tricky. Too small, and the linear approximation fits perfectly but only
+                over a tiny region that may not generalize. Too large, and the linear model fails to capture local nonlinearity.
+            </p>
+
+            <h3>Unrealistic Perturbations</h3>
+            <p>
+                Naive perturbation can create impossible instances: "Age = 25, Years of Employment = 40." Such instances
+                confuse the model and degrade explanation quality. Solution: use domain-aware perturbation strategies.
+            </p>
+
+            <h3>Feature Correlation</h3>
+            <p>
+                When features are correlated, perturbing them independently creates unrealistic combinations. For example,
+                randomly varying house size and number of bedrooms independently might generate "1,000 sq ft house with
+                10 bedrooms." Advanced LIME implementations handle this by learning and respecting feature correlations.
+            </p>
+
+            <h2>LIME for Fairness Auditing</h2>
+            <p>
+                LIME can help detect bias and unfairness in models:
+            </p>
+
+            <h3>Demographic Parity Testing</h3>
+            <p>
+                Generate LIME explanations for instances that differ only in protected attributes (race, gender, etc.). If
+                these attributes receive high weights, the model may be discriminating improperly.
+            </p>
+
+            <h3>Counterfactual Fairness</h3>
+            <p>
+                Use LIME to identify what changes would flip a decision. If the changes involve protected attributes, this
+                signals potential fairness issues.
+            </p>
+
+            <h3>Disparate Impact Analysis</h3>
+            <p>
+                Compare LIME explanations across demographic groups. Do features have different importance for different
+                groups? This could indicate the model treats groups differently, potentially unfairly.
+            </p>
+
+            <h2>Integration with WIA-AI-009 Protocol</h2>
+            <p>
+                The WIA-AI-009 standard defines a protocol for requesting and receiving LIME explanations:
+            </p>
+
+            <pre><code>// Explanation request (WIA-AI-009)
+{
+  "protocol": "XAI-REQUEST-v1",
+  "method": "lime",
+  "instance": {
+    "credit_score": 720,
+    "debt_ratio": 0.35,
+    "employment_years": 8
+  },
+  "config": {
+    "num_samples": 5000,
+    "num_features": 5,
+    "kernel_width": "auto"
+  }
+}
+
+// Explanation response (WIA-AI-009)
+{
+  "protocol": "XAI-RESPONSE-v1",
+  "method": "lime",
+  "timestamp": "2025-01-20T15:45:00Z",
+  "prediction": {
+    "value": 0.32,
+    "class": "low_risk"
+  },
+  "explanation": {
+    "feature_weights": {
+      "debt_ratio": 0.42,
+      "credit_score": -0.28,
+      "employment_years": -0.15,
+      "age": -0.08,
+      "loan_amount": 0.12
+    },
+    "intercept": 0.15,
+    "local_model_r2": 0.91
+  },
+  "metadata": {
+    "samples_generated": 5000,
+    "computation_time_ms": 1250,
+    "kernel_width_used": 1.30
+  },
+  "quality_metrics": {
+    "fidelity": 0.91,
+    "stability_score": 0.87
+  }
+}</code></pre>
+
+            <div class="summary">
+                <h2>Chapter Summary</h2>
+                <p>
+                    LIME (Local Interpretable Model-agnostic Explanations) provides an elegant approach to explaining complex
+                    models through local linear approximations. By perturbing an instance, querying the black-box model, and
+                    fitting a weighted linear model, LIME creates interpretable explanations that reveal what features drove
+                    a specific prediction.
+                </p>
+                <p>
+                    LIME's model-agnostic nature makes it universally applicable across tabular, image, and text data. For
+                    images, superpixel-based perturbations highlight which regions influenced classification. For text, word
+                    removal identifies sentiment-driving phrases. This versatility makes LIME accessible regardless of model
+                    architecture.
+                </p>
+                <p>
+                    While LIME lacks the theoretical guarantees of SHAP (consistency, exact additivity), it offers practical
+                    advantages: fast computation, highly interpretable linear explanations, and excellent support for images
+                    and text. The choice between LIME and SHAP depends on whether you prioritize speed and simplicity (LIME)
+                    or theoretical rigor and consistency (SHAP).
+                </p>
+                <p>
+                    Effective LIME deployment requires careful parameter tuning: sufficient samples for stable explanations,
+                    appropriate kernel width for meaningful locality, and domain-aware perturbation strategies to avoid
+                    unrealistic instances. The WIA-AI-009 standard provides guidelines for these parameters and defines
+                    quality metrics (R², fidelity, stability) to validate explanation quality.
+                </p>
+                <p>
+                    LIME's limitations—instability from random sampling, sensitivity to kernel width, challenges with correlated
+                    features—are manageable through proper engineering. Advanced techniques like Anchor explanations and
+                    SP-LIME extend LIME's capabilities for rule-based explanations and global model understanding.
+                </p>
+            </div>
+
+            <div class="questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Explain the four-step LIME algorithm. Why is weighting by distance important?</li>
+                    <li>How does LIME adapt to different data types (tabular, image, text)? What changes for each?</li>
+                    <li>What is a superpixel, and why does Image LIME use superpixels rather than individual pixels?</li>
+                    <li>Compare LIME and SHAP across three dimensions: theoretical foundation, guarantees, and practical performance.</li>
+                    <li>What does the kernel width parameter control in LIME? What happens if it's too small or too large?</li>
+                    <li>Why might LIME produce different explanations when run twice on the same instance? How can this be mitigated?</li>
+                    <li>What is the R² score in the context of LIME, and why is it a useful quality metric?</li>
+                    <li>Describe two ways LIME can be used for fairness auditing.</li>
+                    <li>What are "unrealistic perturbations" and why are they problematic? Give an example.</li>
+                    <li>When would you choose LIME over SHAP? When would you choose SHAP over LIME?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

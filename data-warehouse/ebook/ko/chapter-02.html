@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2장: OLAP vs OLTP 시스템 - WIA-DATA-003</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-003 v1.0</div>
+    <h1>2장</h1>
+    <p class="subtitle">OLAP vs OLTP 시스템</p>
+    <p class="subtitle">분석형 vs 트랜잭션형 처리</p>
+  </header>
+
+  <main>
+    <h2>2.1 OLTP (Online Transaction Processing) 이해하기</h2>
+    <p>
+      OLTP 시스템은 대량의 짧고 원자적인 트랜잭션을 처리하도록 설계되었습니다. 이들은 전자상거래 플랫폼, 은행 애플리케이션, 재고 관리 시스템과 같은 운영 시스템을 구동합니다. OLTP의 핵심은 데이터의 무결성을 유지하면서 빠르고 안정적인 트랜잭션 처리를 보장하는 것입니다.
+    </p>
+
+    <h3>OLTP의 기원과 발전</h3>
+    <p>
+      OLTP라는 용어는 1960년대 말에 등장했으며, IBM의 IMS (Information Management System)가 최초의 상용 OLTP 시스템 중 하나였습니다. 이후 관계형 데이터베이스의 등장과 함께 OLTP는 비즈니스 운영의 핵심이 되었습니다.
+    </p>
+
+    <h3>OLTP 시스템의 핵심 특성</h3>
+    <ul>
+      <li><strong>빠른 응답 시간:</strong> 밀리초 수준의 쿼리 실행. 사용자는 즉각적인 피드백을 기대합니다. 예를 들어, ATM 거래는 2-3초 이내에 완료되어야 합니다.</li>
+      <li><strong>높은 동시성:</strong> 수천 명의 동시 사용자를 지원. 블랙 프라이데이 같은 이벤트 시즌에는 초당 수만 건의 트랜잭션을 처리해야 합니다.</li>
+      <li><strong>정규화된 스키마:</strong> 데이터 중복을 줄이기 위한 제3정규형(3NF). 스토리지를 절약하고 업데이트 이상을 방지합니다.</li>
+      <li><strong>ACID 준수:</strong> Atomicity(원자성), Consistency(일관성), Isolation(격리성), Durability(지속성)를 보장합니다.</li>
+      <li><strong>쓰기 중심:</strong> INSERT, UPDATE, DELETE 작업이 빈번합니다.</li>
+      <li><strong>현재 데이터:</strong> 대부분 최신 상태의 데이터를 다룹니다.</li>
+    </ul>
+
+    <div class="example-box">
+      <h4>📱 OLTP 사용 사례: 전자상거래</h4>
+      <p><strong>시나리오:</strong> 고객이 온라인 쇼핑몰에서 상품을 구매합니다.</p>
+      <p><strong>트랜잭션 흐름:</strong></p>
+      <ol>
+        <li>장바구니에 상품 추가 (INSERT into cart table)</li>
+        <li>재고 확인 (SELECT from inventory)</li>
+        <li>주문 생성 (INSERT into orders)</li>
+        <li>재고 차감 (UPDATE inventory SET quantity = quantity - 1)</li>
+        <li>결제 처리 (INSERT into payments)</li>
+        <li>배송 정보 생성 (INSERT into shipments)</li>
+      </ol>
+      <p><strong>요구사항:</strong></p>
+      <ul>
+        <li>전체 트랜잭션이 2초 이내에 완료</li>
+        <li>재고는 정확해야 함 (과판매 방지)</li>
+        <li>모든 단계가 성공하거나 전체 롤백 (ACID)</li>
+      </ul>
+    </div>
+
+    <h3>OLTP 데이터베이스 설계 패턴</h3>
+    <p>
+      OLTP 시스템은 정규화된 스키마를 사용하여 데이터 무결성을 보장하고 중복을 최소화합니다.
+    </p>
+    <pre><code>-- OLTP 스키마 예시: 전자상거래
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE products (
+    product_id INT PRIMARY KEY,
+    name VARCHAR(200),
+    price DECIMAL(10,2),
+    stock_quantity INT,
+    category_id INT
+);
+
+CREATE TABLE orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT REFERENCES customers(customer_id),
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_amount DECIMAL(10,2),
+    status VARCHAR(20)
+);
+
+CREATE TABLE order_items (
+    order_item_id INT PRIMARY KEY,
+    order_id INT REFERENCES orders(order_id),
+    product_id INT REFERENCES products(product_id),
+    quantity INT,
+    unit_price DECIMAL(10,2)
+);</code></pre>
+
+    <h2>2.2 OLAP (Online Analytical Processing) 이해하기</h2>
+    <p>
+      OLAP 시스템은 대량의 데이터셋을 집계하고 분석하는 복잡한 분석 쿼리에 최적화되어 있습니다. 비즈니스 인텔리전스, 리포팅, 데이터 마이닝 애플리케이션을 지원합니다.
+    </p>
+
+    <h3>OLAP의 역사와 진화</h3>
+    <p>
+      OLAP이라는 용어는 1993년 E.F. Codd에 의해 만들어졌습니다. Codd는 OLAP 시스템이 12가지 규칙을 충족해야 한다고 정의했으며, 이는 다차원 분석, 직관적인 데이터 조작, 유연한 리포팅을 강조했습니다.
+    </p>
+
+    <h3>OLAP 시스템의 핵심 특성</h3>
+    <ul>
+      <li><strong>복잡한 쿼리:</strong> 집계, 조인, 계산이 포함된 쿼리. 여러 테이블을 조인하고 복잡한 비즈니스 로직을 적용합니다.</li>
+      <li><strong>이력 데이터:</strong> 수년간의 데이터를 보존하여 추세 분석을 가능하게 합니다. 시계열 분석, 연도별 비교, 계절성 패턴 파악이 가능합니다.</li>
+      <li><strong>비정규화된 스키마:</strong> 쿼리 성능을 위한 스타/스노우플레이크 스키마. 조인을 최소화하고 쿼리를 간소화합니다.</li>
+      <li><strong>읽기 중심:</strong> 대부분 SELECT 쿼리. 데이터는 주기적인 배치 프로세스를 통해 업데이트됩니다.</li>
+      <li><strong>배치 업데이트:</strong> 야간 ETL 작업이나 주기적인 증분 로드를 통해 데이터를 갱신합니다.</li>
+      <li><strong>대량의 데이터:</strong> 테라바이트에서 페타바이트 규모의 데이터를 처리합니다.</li>
+    </ul>
+
+    <div class="example-box">
+      <h4>📊 OLAP 사용 사례: 판매 분석</h4>
+      <p><strong>비즈니스 질문:</strong> "지난 3년간 분기별, 지역별, 제품 카테고리별 판매 추세는?"</p>
+      <p><strong>OLAP 쿼리:</strong></p>
+      <pre><code>SELECT
+    d.year,
+    d.quarter,
+    s.region,
+    p.category,
+    SUM(f.sales_amount) as total_sales,
+    SUM(f.quantity) as total_quantity,
+    SUM(f.profit_amount) as total_profit,
+    AVG(f.unit_price) as avg_price
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_store s ON f.store_key = s.store_key
+JOIN dim_product p ON f.product_key = p.product_key
+WHERE d.year BETWEEN 2022 AND 2024
+GROUP BY d.year, d.quarter, s.region, p.category
+ORDER BY d.year, d.quarter, total_sales DESC;</code></pre>
+      <p><strong>특징:</strong></p>
+      <ul>
+        <li>수백만 개의 거래 레코드 스캔</li>
+        <li>여러 차원에 걸친 집계</li>
+        <li>실행 시간: 5-30초 (데이터 볼륨에 따라)</li>
+        <li>결과: 수백 개의 요약 행</li>
+      </ul>
+    </div>
+
+    <h2>2.3 OLTP vs OLAP: 상세 비교</h2>
+    <p>
+      두 시스템은 서로 다른 목적을 위해 설계되었으며, 각각의 강점이 있습니다.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>측면</th>
+          <th>OLTP</th>
+          <th>OLAP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>주요 목적</strong></td>
+          <td>일일 운영 지원</td>
+          <td>분석 및 리포팅</td>
+        </tr>
+        <tr>
+          <td><strong>데이터 볼륨</strong></td>
+          <td>GB ~ TB</td>
+          <td>TB ~ PB</td>
+        </tr>
+        <tr>
+          <td><strong>쿼리 유형</strong></td>
+          <td>단순, 사전 정의됨</td>
+          <td>복잡, 애드혹</td>
+        </tr>
+        <tr>
+          <td><strong>응답 시간</strong></td>
+          <td>밀리초</td>
+          <td>초 ~ 분</td>
+        </tr>
+        <tr>
+          <td><strong>동시 사용자</strong></td>
+          <td>수천 명</td>
+          <td>수십 ~ 수백 명</td>
+        </tr>
+        <tr>
+          <td><strong>트랜잭션 특성</strong></td>
+          <td>짧고 빠름</td>
+          <td>길고 복잡함</td>
+        </tr>
+        <tr>
+          <td><strong>데이터 정규화</strong></td>
+          <td>높음 (3NF)</td>
+          <td>낮음 (스타/스노우플레이크)</td>
+        </tr>
+        <tr>
+          <td><strong>인덱스 전략</strong></td>
+          <td>B-tree, 쓰기 최적화</td>
+          <td>비트맵, 컬럼 저장, 읽기 최적화</td>
+        </tr>
+        <tr>
+          <td><strong>데이터 신선도</strong></td>
+          <td>실시간</td>
+          <td>배치 (시간/일 단위 지연)</td>
+        </tr>
+        <tr>
+          <td><strong>백업 전략</strong></td>
+          <td>빈번한 증분 백업</td>
+          <td>주기적 전체 백업</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2.4 작업 부하 패턴 분석</h2>
+
+    <h3>OLTP 작업 부하</h3>
+    <p>
+      OLTP 시스템은 예측 가능한 작업 부하 패턴을 가집니다:
+    </p>
+    <ul>
+      <li><strong>피크 시간:</strong> 업무 시간, 점심시간, 이벤트 기간</li>
+      <li><strong>트랜잭션 크기:</strong> 소량의 행 (1-100행)</li>
+      <li><strong>작업 유형:</strong> 70% SELECT, 20% INSERT, 10% UPDATE/DELETE</li>
+      <li><strong>쿼리 복잡도:</strong> 간단한 WHERE 절, 1-3개 테이블 조인</li>
+    </ul>
+
+    <h3>OLAP 작업 부하</h3>
+    <p>
+      OLAP 시스템은 가변적이고 복잡한 작업 부하를 처리합니다:
+    </p>
+    <ul>
+      <li><strong>피크 시간:</strong> 월말, 분기말, 연말 리포팅 기간</li>
+      <li><strong>데이터 스캔:</strong> 수백만~수십억 행</li>
+      <li><strong>작업 유형:</strong> 95% SELECT, 5% INSERT/UPDATE (ETL)</li>
+      <li><strong>쿼리 복잡도:</strong> 복잡한 집계, 5-10개 이상 테이블 조인, 윈도우 함수</li>
+    </ul>
+
+    <h2>2.5 스토리지 및 인덱싱 전략</h2>
+
+    <h3>OLTP 스토리지</h3>
+    <p>
+      OLTP 시스템은 행 기반 스토리지를 사용하여 빠른 트랜잭션 처리를 지원합니다.
+    </p>
+    <div class="info-box">
+      <h4>📦 행 기반 스토리지 (Row-Oriented)</h4>
+      <p><strong>저장 방식:</strong></p>
+      <pre><code>행1: [customer_id=1, name="김철수", email="kim@example.com", city="서울"]
+행2: [customer_id=2, name="이영희", email="lee@example.com", city="부산"]
+행3: [customer_id=3, name="박민수", email="park@example.com", city="대구"]</code></pre>
+      <p><strong>장점:</strong></p>
+      <ul>
+        <li>전체 행을 빠르게 읽기/쓰기</li>
+        <li>INSERT/UPDATE에 효율적</li>
+        <li>트랜잭션 처리에 최적</li>
+      </ul>
+    </div>
+
+    <h3>OLAP 스토리지</h3>
+    <p>
+      OLAP 시스템은 컬럼 기반 스토리지를 사용하여 분석 쿼리를 최적화합니다.
+    </p>
+    <div class="info-box">
+      <h4>📊 컬럼 기반 스토리지 (Column-Oriented)</h4>
+      <p><strong>저장 방식:</strong></p>
+      <pre><code>customer_id: [1, 2, 3, ...]
+name: ["김철수", "이영희", "박민수", ...]
+email: ["kim@example.com", "lee@example.com", "park@example.com", ...]
+city: ["서울", "부산", "대구", ...]</code></pre>
+      <p><strong>장점:</strong></p>
+      <ul>
+        <li>필요한 컬럼만 읽기 (I/O 최소화)</li>
+        <li>압축 효율 높음 (유사한 데이터 함께 저장)</li>
+        <li>집계 연산에 최적</li>
+        <li>벡터화된 실행 가능</li>
+      </ul>
+    </div>
+
+    <h2>2.6 하드웨어 및 인프라 요구사항</h2>
+
+    <h3>OLTP 인프라</h3>
+    <ul>
+      <li><strong>CPU:</strong> 높은 코어 클럭 속도 (빠른 단일 쓰레드 성능)</li>
+      <li><strong>메모리:</strong> 충분한 RAM (버퍼 풀, 캐시)</li>
+      <li><strong>스토리지:</strong> 빠른 SSD, 낮은 지연시간</li>
+      <li><strong>네트워크:</strong> 낮은 레이턴시</li>
+      <li><strong>고가용성:</strong> 복제, 페일오버, 클러스터링</li>
+    </ul>
+
+    <h3>OLAP 인프라</h3>
+    <ul>
+      <li><strong>CPU:</strong> 많은 코어 수 (병렬 쿼리 실행)</li>
+      <li><strong>메모리:</strong> 대용량 RAM (인메모리 집계)</li>
+      <li><strong>스토리지:</strong> 대용량 스토리지, 높은 처리량</li>
+      <li><strong>네트워크:</strong> 높은 대역폭 (분산 쿼리)</li>
+      <li><strong>확장성:</strong> MPP 아키텍처, 수평 확장</li>
+    </ul>
+
+    <h2>2.7 언제 각각을 사용하는가?</h2>
+
+    <div class="info-box">
+      <h4>🎯 OLTP를 사용해야 할 때</h4>
+      <ul>
+        <li><strong>고객 주문 처리:</strong> 전자상거래, 음식 배달, 예약 시스템</li>
+        <li><strong>재고 관리:</strong> 실시간 재고 추적, 창고 관리</li>
+        <li><strong>뱅킹 거래:</strong> ATM, 계좌 이체, 결제 처리</li>
+        <li><strong>IoT 데이터 수집:</strong> 센서 데이터 저장, 디바이스 상태 관리</li>
+        <li><strong>CRM 시스템:</strong> 고객 정보 관리, 상호작용 기록</li>
+      </ul>
+    </div>
+
+    <div class="info-box">
+      <h4>📊 OLAP을 사용해야 할 때</h4>
+      <ul>
+        <li><strong>판매 추세 분석:</strong> 월별, 분기별, 연도별 비교</li>
+        <li><strong>경영진 대시보드:</strong> KPI 모니터링, 성과 측정</li>
+        <li><strong>예측 분석:</strong> 수요 예측, 재고 계획</li>
+        <li><strong>재무 리포팅:</strong> 손익계산서, 대차대조표, 현금흐름</li>
+        <li><strong>고객 세분화:</strong> 행동 패턴 분석, 타겟 마케팅</li>
+      </ul>
+    </div>
+
+    <h2>2.8 하이브리드 접근: HTAP (Hybrid Transactional/Analytical Processing)</h2>
+    <p>
+      현대 시스템은 점점 더 OLTP와 OLAP의 경계를 흐리게 합니다. HTAP 시스템은 실시간 분석을 트랜잭션 데이터에서 직접 수행할 수 있게 하여 ETL 지연을 제거합니다.
+    </p>
+
+    <h3>HTAP 플랫폼</h3>
+    <ul>
+      <li><strong>SAP HANA:</strong> 인메모리 데이터베이스, 실시간 분석</li>
+      <li><strong>MemSQL (SingleStore):</strong> 분산 SQL 데이터베이스</li>
+      <li><strong>Oracle Database In-Memory:</strong> 듀얼 포맷 데이터베이스</li>
+      <li><strong>TiDB:</strong> MySQL 호환 분산 HTAP 데이터베이스</li>
+    </ul>
+
+    <h3>HTAP의 장점</h3>
+    <ul>
+      <li>실시간 분석 (ETL 지연 없음)</li>
+      <li>단일 데이터 복사본 (일관성 보장)</li>
+      <li>운영 간소화 (하나의 시스템)</li>
+    </ul>
+
+    <h3>HTAP의 도전 과제</h3>
+    <ul>
+      <li>리소스 경쟁 (OLTP와 OLAP 워크로드)</li>
+      <li>복잡한 최적화 필요</li>
+      <li>높은 하드웨어 요구사항</li>
+    </ul>
+
+    <h2>2.9 실제 아키텍처 패턴</h2>
+
+    <h3>전통적 분리 아키텍처</h3>
+    <pre><code>┌─────────────┐
+│ OLTP 시스템  │ (운영 데이터베이스)
+└──────┬──────┘
+       │ ETL (야간 배치)
+       ↓
+┌─────────────┐
+│ OLAP 시스템  │ (데이터 웨어하우스)
+└──────┬──────┘
+       ↓
+   BI 도구/대시보드</code></pre>
+
+    <h3>현대 실시간 아키텍처</h3>
+    <pre><code>┌─────────────┐
+│ OLTP 시스템  │
+└──────┬──────┘
+       │ CDC (실시간 스트리밍)
+       ↓
+┌─────────────┐
+│ 스트리밍     │ (Kafka, Kinesis)
+│ 플랫폼       │
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│ OLAP 시스템  │ (클라우드 DW)
+└──────┬──────┘
+       ↓
+   실시간 대시보드</code></pre>
+
+    <h2>2.10 성능 최적화 전략</h2>
+
+    <h3>OLTP 최적화</h3>
+    <ul>
+      <li><strong>인덱싱:</strong> 적절한 B-tree 인덱스 생성</li>
+      <li><strong>파티셔닝:</strong> 대형 테이블을 파티션으로 분할</li>
+      <li><strong>커넥션 풀링:</strong> 데이터베이스 연결 재사용</li>
+      <li><strong>캐싱:</strong> Redis, Memcached로 자주 접근하는 데이터 캐시</li>
+      <li><strong>쿼리 최적화:</strong> 실행 계획 분석, 인덱스 힌트 사용</li>
+    </ul>
+
+    <h3>OLAP 최적화</h3>
+    <ul>
+      <li><strong>파티셔닝:</strong> 날짜별로 데이터 분할</li>
+      <li><strong>클러스터링:</strong> 자주 필터링되는 컬럼으로 데이터 정렬</li>
+      <li><strong>Materialized Views:</strong> 사전 계산된 집계 저장</li>
+      <li><strong>압축:</strong> 컬럼 압축으로 스토리지와 I/O 최소화</li>
+      <li><strong>병렬 처리:</strong> MPP 아키텍처 활용</li>
+    </ul>
+
+    <div class="info-box">
+      <h4>🎯 핵심 요점 정리</h4>
+      <ul>
+        <li>OLTP는 빠른 트랜잭션 처리에, OLAP은 복잡한 분석에 최적화됨</li>
+        <li>OLTP는 정규화된 스키마를, OLAP은 비정규화된 스키마를 사용</li>
+        <li>OLTP는 행 기반, OLAP은 컬럼 기반 스토리지가 효율적</li>
+        <li>현대 HTAP 시스템은 두 워크로드를 하나의 플랫폼에서 처리</li>
+        <li>대부분의 조직은 두 시스템을 분리하여 운영하는 것이 최적</li>
+      </ul>
+    </div>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-01.html" class="nav-button prev">이전 장</a>
+    <a href="chapter-03.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Phase 2 - Export API Interface | WIA-LEG-008</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; padding: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .breadcrumb { margin-bottom: 2rem; color: #94a3b8; }
+        .breadcrumb a { color: #8B5CF6; text-decoration: none; }
+        h1 { font-size: 2.5rem; color: #A78BFA; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #A78BFA; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid rgba(139, 92, 246, 0.3); }
+        h3 { font-size: 1.3rem; color: #8B5CF6; margin-top: 2rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-bottom: 1.5rem; margin-left: 2rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight { background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8B5CF6; padding: 1.5rem; margin: 2rem 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 2rem 0; background: rgba(30, 41, 59, 0.5); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+        th { background: rgba(139, 92, 246, 0.2); color: #A78BFA; font-weight: 600; }
+        pre { background: #1e293b; border: 1px solid rgba(139, 92, 246, 0.3); padding: 1.5rem; border-radius: 8px; overflow-x: auto; margin: 1.5rem 0; font-size: 0.9rem; }
+        code { font-family: 'Courier New', monospace; color: #A78BFA; }
+        .summary-box { background: rgba(139, 92, 246, 0.1); border: 2px solid #8B5CF6; padding: 2rem; border-radius: 12px; margin: 3rem 0; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(139, 92, 246, 0.3); }
+        .btn { padding: 1rem 2rem; background: #8B5CF6; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        .btn:hover { background: #A78BFA; }
+        .btn-secondary { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
+        footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(139, 92, 246, 0.3); text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="index.html">📦 Data Portability Standard</a> &gt; Chapter 5
+        </div>
+
+        <h1>Chapter 5: Phase 2 - Export API Interface</h1>
+
+        <div class="highlight">
+            <strong>Chapter Overview:</strong> This chapter details the RESTful API design for programmatic data export, including OAuth 2.0 authentication, rate limiting, pagination, bulk export capabilities, and security best practices.
+        </div>
+
+        <h2>5.1 API Design Principles</h2>
+
+        <p>The WIA-LEG-008 Export API follows RESTful principles with these design goals:</p>
+
+        <ul>
+            <li><strong>Resource-Oriented:</strong> Each data type is a distinct resource with standard CRUD operations</li>
+            <li><strong>Stateless:</strong> Each request contains all information needed for processing</li>
+            <li><strong>Cacheable:</strong> Responses include appropriate cache headers for efficiency</li>
+            <li><strong>Consistent:</strong> Uniform URL patterns, response formats, and error codes</li>
+            <li><strong>Discoverable:</strong> HATEOAS links enable API navigation</li>
+            <li><strong>Versioned:</strong> API version in URL path (/api/v1/, /api/v2/)</li>
+        </ul>
+
+        <h2>5.2 Endpoint Specification</h2>
+
+        <h3>5.2.1 Core Export Endpoints</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>/api/v1/export</td>
+                    <td>GET</td>
+                    <td>Get export job status and capabilities</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/profile</td>
+                    <td>GET</td>
+                    <td>Export user profile data</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/activity</td>
+                    <td>GET</td>
+                    <td>Export activity stream (posts, comments)</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/relationships</td>
+                    <td>GET</td>
+                    <td>Export social graph and connections</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/preferences</td>
+                    <td>GET</td>
+                    <td>Export user settings and preferences</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/media</td>
+                    <td>GET</td>
+                    <td>Export media files (photos, videos)</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/messages</td>
+                    <td>GET</td>
+                    <td>Export private messages and conversations</td>
+                </tr>
+                <tr>
+                    <td>/api/v1/export/all</td>
+                    <td>POST</td>
+                    <td>Request complete data export (async)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.2.2 Example API Request</h3>
+
+        <pre><code>GET /api/v1/export/activity?from=2024-01-01&to=2025-12-31&limit=100
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Accept: application/json
+WIA-Standard: LEG-008
+WIA-Version: 2.0</code></pre>
+
+        <h3>5.2.3 Example API Response</h3>
+
+        <pre><code>{
+  "status": "success",
+  "data": {
+    "activities": [...],
+    "pagination": {
+      "cursor": "eyJpZCI6MTIzNDU2fQ==",
+      "hasMore": true,
+      "total": 4567
+    }
+  },
+  "metadata": {
+    "standard": "WIA-LEG-008",
+    "version": "2.0",
+    "generated": "2025-12-25T14:30:00Z",
+    "rateLimitRemaining": 95,
+    "rateLimitReset": "2025-12-25T15:00:00Z"
+  },
+  "links": {
+    "self": "/api/v1/export/activity?from=2024-01-01&limit=100",
+    "next": "/api/v1/export/activity?cursor=eyJpZCI6MTIzNDU2fQ==",
+    "first": "/api/v1/export/activity?from=2024-01-01&limit=100",
+    "documentation": "https://wiastandards.com/leg-008/api-docs"
+  }
+}</code></pre>
+
+        <h2>5.3 OAuth 2.0 Authentication</h2>
+
+        <p>WIA-LEG-008 mandates OAuth 2.0 for API authentication, ensuring secure delegated access:</p>
+
+        <h3>5.3.1 Authorization Flow</h3>
+
+        <ol>
+            <li><strong>Authorization Request:</strong> Client redirects user to authorization server</li>
+            <li><strong>User Consent:</strong> User approves data export permissions (scopes)</li>
+            <li><strong>Authorization Grant:</strong> Server issues authorization code to client</li>
+            <li><strong>Token Request:</strong> Client exchanges code for access token</li>
+            <li><strong>API Access:</strong> Client uses bearer token for API requests</li>
+            <li><strong>Token Refresh:</strong> Use refresh token to obtain new access tokens</li>
+        </ol>
+
+        <h3>5.3.2 Required Scopes</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Permission</th>
+                    <th>Access Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>read:profile</td>
+                    <td>Read user profile data</td>
+                    <td>Basic</td>
+                </tr>
+                <tr>
+                    <td>read:activity</td>
+                    <td>Read posts, comments, reactions</td>
+                    <td>Standard</td>
+                </tr>
+                <tr>
+                    <td>read:relationships</td>
+                    <td>Read friends, followers, connections</td>
+                    <td>Standard</td>
+                </tr>
+                <tr>
+                    <td>read:preferences</td>
+                    <td>Read user settings and preferences</td>
+                    <td>Basic</td>
+                </tr>
+                <tr>
+                    <td>read:media</td>
+                    <td>Download photos, videos, files</td>
+                    <td>Media</td>
+                </tr>
+                <tr>
+                    <td>read:messages</td>
+                    <td>Read private messages</td>
+                    <td>Sensitive</td>
+                </tr>
+                <tr>
+                    <td>export:all</td>
+                    <td>Complete data export</td>
+                    <td>Full Access</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>5.4 Rate Limiting</h2>
+
+        <p>Fair usage policies prevent abuse while enabling legitimate automation:</p>
+
+        <h3>5.4.1 Rate Limit Tiers</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tier</th>
+                    <th>Requests/Hour</th>
+                    <th>Requests/Day</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Free</td>
+                    <td>100</td>
+                    <td>1,000</td>
+                    <td>Individual users, testing</td>
+                </tr>
+                <tr>
+                    <td>Standard</td>
+                    <td>1,000</td>
+                    <td>10,000</td>
+                    <td>Third-party apps, research</td>
+                </tr>
+                <tr>
+                    <td>Premium</td>
+                    <td>10,000</td>
+                    <td>100,000</td>
+                    <td>Enterprise migration tools</td>
+                </tr>
+                <tr>
+                    <td>Unlimited</td>
+                    <td>No limit</td>
+                    <td>No limit</td>
+                    <td>Platform partnerships</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.4.2 Rate Limit Headers</h3>
+
+        <pre><code>X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 987
+X-RateLimit-Reset: 1640095200
+Retry-After: 3600</code></pre>
+
+        <h2>5.5 Pagination</h2>
+
+        <p>Large datasets require pagination to prevent timeouts and memory issues:</p>
+
+        <h3>5.5.1 Cursor-Based Pagination (Recommended)</h3>
+
+        <pre><code>GET /api/v1/export/activity?limit=100&cursor=eyJpZCI6MTIzNDU2fQ==
+
+{
+  "data": [...],
+  "pagination": {
+    "cursor": "eyJpZCI6MTIzNDU3fQ==",
+    "hasMore": true
+  }
+}</code></pre>
+
+        <h3>5.5.2 Offset-Based Pagination (Alternative)</h3>
+
+        <pre><code>GET /api/v1/export/activity?limit=100&offset=200
+
+{
+  "data": [...],
+  "pagination": {
+    "offset": 200,
+    "limit": 100,
+    "total": 4567
+  }
+}</code></pre>
+
+        <h2>5.6 Bulk Export Jobs</h2>
+
+        <p>Complete data exports are handled asynchronously:</p>
+
+        <h3>5.6.1 Creating Export Job</h3>
+
+        <pre><code>POST /api/v1/export/all
+Content-Type: application/json
+
+{
+  "format": "json",
+  "compression": "zip",
+  "encryption": "aes256gcm",
+  "dateRange": {
+    "from": "2020-01-01T00:00:00Z",
+    "to": "2025-12-31T23:59:59Z"
+  },
+  "include": ["profile", "activity", "relationships", "media"]
+}
+
+Response:
+{
+  "jobId": "export_abc123",
+  "status": "processing",
+  "estimatedCompletion": "2025-12-25T16:00:00Z",
+  "links": {
+    "status": "/api/v1/export/jobs/export_abc123"
+  }
+}</code></pre>
+
+        <h3>5.6.2 Checking Job Status</h3>
+
+        <pre><code>GET /api/v1/export/jobs/export_abc123
+
+{
+  "jobId": "export_abc123",
+  "status": "completed",
+  "progress": 100,
+  "createdAt": "2025-12-25T14:30:00Z",
+  "completedAt": "2025-12-25T15:45:00Z",
+  "download": {
+    "url": "https://exports.example.com/packages/export_abc123.zip",
+    "expiresAt": "2026-01-24T15:45:00Z",
+    "size": 524288000,
+    "checksum": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}</code></pre>
+
+        <h2>5.7 Error Handling</h2>
+
+        <p>Standardized error responses enable robust client implementation:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Status Code</th>
+                    <th>Error Type</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>400</td>
+                    <td>Bad Request</td>
+                    <td>Invalid parameters or malformed request</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>Unauthorized</td>
+                    <td>Missing or invalid authentication token</td>
+                </tr>
+                <tr>
+                    <td>403</td>
+                    <td>Forbidden</td>
+                    <td>Insufficient permissions for requested resource</td>
+                </tr>
+                <tr>
+                    <td>404</td>
+                    <td>Not Found</td>
+                    <td>Requested resource doesn't exist</td>
+                </tr>
+                <tr>
+                    <td>429</td>
+                    <td>Too Many Requests</td>
+                    <td>Rate limit exceeded</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>Internal Server Error</td>
+                    <td>Server-side error during processing</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.7.1 Error Response Format</h3>
+
+        <pre><code>{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "API rate limit exceeded. Please retry after 3600 seconds.",
+    "details": {
+      "limit": 1000,
+      "reset": "2025-12-25T16:00:00Z"
+    },
+    "documentation": "https://wiastandards.com/leg-008/errors#rate-limits"
+  }
+}</code></pre>
+
+        <h2>5.8 Webhooks</h2>
+
+        <p>Asynchronous notifications for export job completion:</p>
+
+        <h3>5.8.1 Webhook Registration</h3>
+
+        <pre><code>POST /api/v1/webhooks
+{
+  "url": "https://your-app.com/webhooks/export-complete",
+  "events": ["export.completed", "export.failed"],
+  "secret": "whsec_abc123..."
+}</code></pre>
+
+        <h3>5.8.2 Webhook Payload</h3>
+
+        <pre><code>{
+  "event": "export.completed",
+  "timestamp": "2025-12-25T15:45:00Z",
+  "data": {
+    "jobId": "export_abc123",
+    "userId": "user_12345",
+    "downloadUrl": "https://exports.example.com/packages/export_abc123.zip",
+    "expiresAt": "2026-01-24T15:45:00Z"
+  },
+  "signature": "sha256=..."
+}</code></pre>
+
+        <h2>5.9 Security Best Practices</h2>
+
+        <ul>
+            <li><strong>TLS 1.3:</strong> All API traffic over HTTPS with modern TLS</li>
+            <li><strong>Token Expiration:</strong> Access tokens expire after 1 hour, refresh tokens after 30 days</li>
+            <li><strong>Scope Minimization:</strong> Request only necessary scopes</li>
+            <li><strong>CORS Policies:</strong> Restrict cross-origin requests to approved domains</li>
+            <li><strong>Request Signing:</strong> HMAC signatures for webhook verification</li>
+            <li><strong>IP Whitelisting:</strong> Optional restriction to trusted IP ranges</li>
+            <li><strong>Audit Logging:</strong> All API access logged for security monitoring</li>
+        </ul>
+
+        <div class="summary-box">
+            <h3>📝 Chapter Summary: Key Takeaways</h3>
+            <ul>
+                <li>RESTful API design with resource-oriented endpoints for each data type</li>
+                <li>OAuth 2.0 mandatory authentication with granular scope-based permissions</li>
+                <li>Tiered rate limiting (100-10,000 req/hour) prevents abuse while enabling legitimate use</li>
+                <li>Cursor-based pagination for efficient handling of large datasets</li>
+                <li>Asynchronous bulk export jobs with webhook notifications for completion</li>
+            </ul>
+        </div>
+
+        <div class="summary-box">
+            <h3>❓ Review Questions</h3>
+            <ol>
+                <li>What are the seven core export endpoints defined in WIA-LEG-008 Phase 2?</li>
+                <li>Explain the OAuth 2.0 authorization flow for API access.</li>
+                <li>What is the difference between cursor-based and offset-based pagination?</li>
+                <li>Why are bulk exports handled asynchronously rather than synchronously?</li>
+                <li>What HTTP status code is returned when rate limits are exceeded?</li>
+                <li>How are webhooks used to notify clients of export completion?</li>
+            </ol>
+        </div>
+
+        <div class="highlight">
+            <strong>🔜 Looking Ahead:</strong>
+            <p style="margin-top: 1rem;">Chapter 6 explores Phase 3: Transfer Protocol, covering direct platform-to-platform migration, schema mapping, data transformation, and automated transfer workflows.</p>
+        </div>
+
+        </div>
+</body>
+</html>

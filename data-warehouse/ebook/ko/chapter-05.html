@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5장: 팩트 테이블과 차원 테이블 - WIA-DATA-003</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-003 v1.0</div>
+    <h1>5장</h1>
+    <p class="subtitle">팩트 테이블과 차원 테이블</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>5.1 팩트 테이블의 이해</h2>
+      <p>팩트 테이블(Fact Table)은 데이터 웨어하우스의 핵심으로, 비즈니스 프로세스에서 발생하는 측정 가능한 이벤트를 저장합니다. 팩트 테이블은 일반적으로 데이터 웨어하우스에서 가장 큰 테이블이며, 수백만에서 수십억 개의 행을 포함할 수 있습니다.</p>
+
+      <h3>팩트 테이블의 구조</h3>
+      <p>팩트 테이블은 크게 두 가지 유형의 컬럼으로 구성됩니다:</p>
+      <ul>
+        <li><strong>외래 키(Foreign Keys)</strong>: 차원 테이블을 참조하는 키</li>
+        <li><strong>측정값(Measures/Metrics)</strong>: 수치적 비즈니스 측정 데이터</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 전형적인 팩트 테이블 구조
+CREATE TABLE fact_sales (
+    -- 기본 키 (선택적)
+    sales_fact_key BIGSERIAL PRIMARY KEY,
+
+    -- 외래 키 (차원 참조)
+    date_key INT NOT NULL REFERENCES dim_date(date_key),
+    product_key INT NOT NULL REFERENCES dim_product(product_key),
+    customer_key INT NOT NULL REFERENCES dim_customer(customer_key),
+    store_key INT NOT NULL REFERENCES dim_store(store_key),
+    promotion_key INT REFERENCES dim_promotion(promotion_key),
+
+    -- 퇴화 차원 (차원 테이블이 없는 차원 속성)
+    transaction_id VARCHAR(50) NOT NULL,
+    line_item_number INT NOT NULL,
+
+    -- 측정값 (팩트)
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    gross_amount DECIMAL(12,2) NOT NULL,
+    discount_amount DECIMAL(10,2),
+    tax_amount DECIMAL(10,2),
+    net_amount DECIMAL(12,2) NOT NULL,
+    cost_amount DECIMAL(12,2),
+    profit_amount DECIMAL(12,2),
+
+    -- 감사 컬럼
+    etl_inserted_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    etl_updated_timestamp TIMESTAMP
+);
+
+-- 성능 최적화를 위한 인덱스
+CREATE INDEX idx_fact_sales_date ON fact_sales(date_key);
+CREATE INDEX idx_fact_sales_product ON fact_sales(product_key);
+CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_key);
+CREATE INDEX idx_fact_sales_store ON fact_sales(store_key);
+
+-- 복합 인덱스 (자주 함께 사용되는 차원)
+CREATE INDEX idx_fact_sales_date_product
+ON fact_sales(date_key, product_key);
+
+-- 트랜잭션 ID 조회용
+CREATE INDEX idx_fact_sales_transaction
+ON fact_sales(transaction_id, line_item_number);</code></pre>
+      </div>
+
+      <h3>팩트 테이블 설계 원칙</h3>
+      <table>
+        <caption>팩트 테이블 설계 모범 사례</caption>
+        <thead>
+          <tr>
+            <th>원칙</th>
+            <th>설명</th>
+            <th>예시</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>세분화 수준 정의</td>
+            <td>가장 원자적인 수준으로 설정</td>
+            <td>"각 거래의 각 제품 라인"</td>
+          </tr>
+          <tr>
+            <td>측정값만 저장</td>
+            <td>수치적, 가산 가능한 데이터</td>
+            <td>판매액, 수량, 비용</td>
+          </tr>
+          <tr>
+            <td>외래 키 필수</td>
+            <td>모든 관련 차원에 대한 외래 키</td>
+            <td>날짜, 제품, 고객, 매장</td>
+          </tr>
+          <tr>
+            <td>NULL 최소화</td>
+            <td>NOT NULL 제약조건 사용</td>
+            <td>필수 외래 키와 측정값</td>
+          </tr>
+          <tr>
+            <td>대리 키 사용</td>
+            <td>차원 테이블의 대리 키 참조</td>
+            <td>자연 키 대신 정수형 키</td>
+          </tr>
+          <tr>
+            <td>파티셔닝</td>
+            <td>대용량 테이블은 파티션 분할</td>
+            <td>날짜 기준 월별 파티션</td>
+          </tr>
+          <tr>
+            <td>인덱싱 전략</td>
+            <td>외래 키와 자주 필터링되는 컬럼</td>
+            <td>date_key, product_key</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5.2 팩트의 유형: 가산성, 반가산성, 비가산성</h2>
+      <p>팩트는 집계(aggregation) 가능 여부에 따라 세 가지 유형으로 분류됩니다. 이 분류는 데이터 분석 시 매우 중요합니다.</p>
+
+      <h3>가산성 팩트 (Additive Facts)</h3>
+      <p>모든 차원에 대해 합계를 계산할 수 있는 팩트입니다. 대부분의 팩트가 이 범주에 속합니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 가산성 팩트 예시
+CREATE TABLE fact_sales (
+    date_key INT,
+    product_key INT,
+    store_key INT,
+
+    -- 가산성 팩트들
+    quantity INT,              -- 모든 차원에서 합산 가능
+    gross_amount DECIMAL(12,2), -- 모든 차원에서 합산 가능
+    discount_amount DECIMAL(10,2), -- 모든 차원에서 합산 가능
+    net_amount DECIMAL(12,2)   -- 모든 차원에서 합산 가능
+);
+
+-- 가산성 팩트 사용 예시
+-- 제품별, 매장별, 날짜별로 모두 합산 가능
+SELECT
+    p.category,
+    s.region,
+    SUM(f.quantity) as total_quantity,      -- OK
+    SUM(f.net_amount) as total_sales        -- OK
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_store s ON f.store_key = s.store_key
+WHERE f.date_key BETWEEN 20250101 AND 20250131
+GROUP BY p.category, s.region;</code></pre>
+      </div>
+
+      <h3>반가산성 팩트 (Semi-Additive Facts)</h3>
+      <p>일부 차원에 대해서만 합계를 계산할 수 있는 팩트입니다. 특히 시간 차원에 대해서는 합산이 불가능한 경우가 많습니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 반가산성 팩트 예시: 계좌 잔액
+CREATE TABLE fact_account_balance (
+    date_key INT,
+    account_key INT,
+    branch_key INT,
+
+    -- 반가산성 팩트
+    balance_amount DECIMAL(15,2),  -- 시간에 대해서는 합산 불가
+    available_balance DECIMAL(15,2)
+);
+
+-- 올바른 사용: 특정 날짜의 지점별 합계
+SELECT
+    b.branch_name,
+    SUM(f.balance_amount) as total_balance  -- OK (지점에 대해서는 가산)
+FROM fact_account_balance f
+JOIN dim_branch b ON f.branch_key = b.branch_key
+WHERE f.date_key = 20250131  -- 특정 날짜
+GROUP BY b.branch_name;
+
+-- 잘못된 사용: 여러 날짜에 걸쳐 합산
+SELECT
+    d.month,
+    SUM(f.balance_amount) as monthly_total  -- 잘못됨! 이중 계산됨
+FROM fact_account_balance f
+JOIN dim_date d ON f.date_key = d.date_key
+WHERE d.year = 2025
+GROUP BY d.month;
+
+-- 올바른 사용: 평균 또는 최종 잔액 사용
+SELECT
+    d.month,
+    AVG(f.balance_amount) as avg_balance,   -- OK
+    MAX(CASE WHEN d.day_of_month = d.last_day_of_month
+        THEN f.balance_amount END) as month_end_balance  -- OK
+FROM fact_account_balance f
+JOIN dim_date d ON f.date_key = d.date_key
+WHERE d.year = 2025
+GROUP BY d.month;</code></pre>
+      </div>
+
+      <h3>비가산성 팩트 (Non-Additive Facts)</h3>
+      <p>어떤 차원에 대해서도 합계를 계산할 수 없는 팩트입니다. 주로 비율, 퍼센트, 단가 등이 이에 해당합니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 비가산성 팩트 예시
+CREATE TABLE fact_sales (
+    date_key INT,
+    product_key INT,
+    customer_key INT,
+
+    quantity INT,               -- 가산성
+    unit_price DECIMAL(10,2),   -- 비가산성 (합산 의미 없음)
+    discount_rate DECIMAL(5,2), -- 비가산성 (퍼센트)
+    profit_margin DECIMAL(5,2), -- 비가산성 (비율)
+    total_amount DECIMAL(12,2)  -- 가산성
+);
+
+-- 비가산성 팩트의 올바른 사용
+SELECT
+    p.category,
+    AVG(f.unit_price) as avg_unit_price,        -- OK (평균)
+    MIN(f.unit_price) as min_price,             -- OK
+    MAX(f.unit_price) as max_price,             -- OK
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY f.unit_price)
+        as median_price,                         -- OK
+    SUM(f.total_amount) / SUM(f.quantity)
+        as weighted_avg_price                    -- OK (가중 평균)
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+GROUP BY p.category;</code></pre>
+      </div>
+
+      <h3>팩트 유형 비교</h3>
+      <table>
+        <caption>팩트 유형별 특성 및 사용법</caption>
+        <thead>
+          <tr>
+            <th>팩트 유형</th>
+            <th>설명</th>
+            <th>예시</th>
+            <th>집계 방법</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>가산성</td>
+            <td>모든 차원에서 합산 가능</td>
+            <td>판매액, 수량, 비용</td>
+            <td>SUM, COUNT</td>
+          </tr>
+          <tr>
+            <td>반가산성</td>
+            <td>일부 차원에서만 합산 가능</td>
+            <td>계좌 잔액, 재고량</td>
+            <td>AVG, MAX, MIN, 마지막 값</td>
+          </tr>
+          <tr>
+            <td>비가산성</td>
+            <td>합산 불가능</td>
+            <td>단가, 비율, 퍼센트</td>
+            <td>AVG, MIN, MAX, 가중평균</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5.3 팩트 테이블 설계 패턴</h2>
+      <p>팩트 테이블은 비즈니스 프로세스의 특성에 따라 여러 패턴으로 설계할 수 있습니다.</p>
+
+      <h3>1. 트랜잭션 팩트 테이블 (Transaction Fact Table)</h3>
+      <p>가장 일반적인 패턴으로, 각 비즈니스 이벤트를 개별 행으로 저장합니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 트랜잭션 팩트 테이블: 판매
+CREATE TABLE fact_sales_transaction (
+    sale_id BIGINT,
+    date_key INT,
+    time_key INT,
+    product_key INT,
+    customer_key INT,
+    store_key INT,
+
+    -- 트랜잭션 발생 시점의 측정값
+    quantity INT,
+    unit_price DECIMAL(10,2),
+    net_amount DECIMAL(12,2),
+
+    -- 세분화 수준: 각 판매 거래의 각 제품 라인
+    PRIMARY KEY (sale_id, product_key)
+);
+
+-- 특징:
+-- ✓ 가장 낮은 세분화 수준
+-- ✓ 시간에 따라 계속 증가
+-- ✓ 대부분 INSERT만 발생 (UPDATE 거의 없음)</code></pre>
+      </div>
+
+      <h3>2. 주기적 스냅샷 팩트 테이블 (Periodic Snapshot Fact Table)</h3>
+      <p>정해진 시간 간격으로 상태를 기록하는 팩트 테이블입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 주기적 스냅샷: 일별 재고
+CREATE TABLE fact_inventory_daily_snapshot (
+    date_key INT,
+    product_key INT,
+    warehouse_key INT,
+
+    -- 해당 일자 종료 시점의 상태
+    quantity_on_hand INT,
+    quantity_reserved INT,
+    quantity_available INT,
+    inventory_value DECIMAL(12,2),
+
+    -- 해당 일자의 활동
+    quantity_received INT,
+    quantity_shipped INT,
+    quantity_adjusted INT,
+
+    PRIMARY KEY (date_key, product_key, warehouse_key)
+);
+
+-- 특징:
+-- ✓ 정기적인 간격 (일별, 주별, 월별)
+-- ✓ 행의 수가 예측 가능
+-- ✓ 반가산성 팩트 포함 가능
+-- ✓ 트렌드 분석에 적합</code></pre>
+      </div>
+
+      <h3>3. 누적 스냅샷 팩트 테이블 (Accumulating Snapshot Fact Table)</h3>
+      <p>시작부터 종료까지의 프로세스 전체를 추적하는 팩트 테이블입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 누적 스냅샷: 주문 이행 프로세스
+CREATE TABLE fact_order_fulfillment (
+    order_key INT PRIMARY KEY,
+    customer_key INT,
+    product_key INT,
+
+    -- 프로세스의 각 단계별 날짜 (역할 수행 차원)
+    order_date_key INT,
+    payment_date_key INT,
+    shipment_date_key INT,
+    delivery_date_key INT,
+
+    -- 각 단계의 담당자
+    order_clerk_key INT,
+    payment_processor_key INT,
+    shipper_key INT,
+
+    -- 측정값
+    order_amount DECIMAL(12,2),
+    quantity INT,
+
+    -- 프로세스 단계별 소요 시간 (일)
+    order_to_payment_days INT,
+    payment_to_shipment_days INT,
+    shipment_to_delivery_days INT,
+    total_cycle_days INT,
+
+    -- 상태
+    current_status VARCHAR(50),
+    is_completed BOOLEAN
+);
+
+-- 특징:
+-- ✓ 프로세스가 진행되면서 행이 UPDATE됨
+-- ✓ 여러 날짜 차원 참조 (역할 수행 차원)
+-- ✓ 프로세스 성과 측정에 적합
+-- ✓ 파이프라인 분석 가능</code></pre>
+      </div>
+
+      <h3>4. 팩트 없는 팩트 테이블 (Factless Fact Table)</h3>
+      <p>측정값 없이 이벤트의 발생 여부만 기록하는 특수한 팩트 테이블입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 팩트 없는 팩트 테이블: 학생 출석
+CREATE TABLE fact_student_attendance (
+    date_key INT,
+    student_key INT,
+    course_key INT,
+    classroom_key INT,
+    instructor_key INT,
+
+    -- 팩트 (측정값)가 없음 - 존재 자체가 의미
+    -- 행의 존재 = 출석
+
+    PRIMARY KEY (date_key, student_key, course_key)
+);
+
+-- 사용 예시: 출석률 계산
+SELECT
+    c.course_name,
+    COUNT(DISTINCT fa.student_key) as students_attended,
+    COUNT(DISTINCT e.student_key) as total_enrolled,
+    COUNT(DISTINCT fa.student_key)::DECIMAL /
+        COUNT(DISTINCT e.student_key) * 100 as attendance_rate
+FROM dim_course c
+JOIN enrollment e ON c.course_key = e.course_key
+LEFT JOIN fact_student_attendance fa
+    ON c.course_key = fa.course_key
+    AND e.student_key = fa.student_key
+    AND fa.date_key BETWEEN 20250101 AND 20250131
+GROUP BY c.course_name;
+
+-- 또 다른 예시: 프로모션 적용 가능성
+CREATE TABLE fact_promotion_eligibility (
+    date_key INT,
+    customer_key INT,
+    product_key INT,
+    promotion_key INT,
+
+    -- 고객이 프로모션을 받을 자격이 있었음을 나타냄
+    PRIMARY KEY (date_key, customer_key, product_key, promotion_key)
+);</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>5.4 차원 테이블의 이해</h2>
+      <p>차원 테이블(Dimension Table)은 팩트에 대한 설명적 컨텍스트를 제공합니다. 차원 테이블은 "누가, 무엇을, 언제, 어디서, 왜, 어떻게"라는 질문에 답합니다.</p>
+
+      <h3>차원 테이블의 특징</h3>
+      <ul>
+        <li><strong>비정규화</strong>: 계층 구조도 단일 테이블에 평면화</li>
+        <li><strong>설명적 속성</strong>: 풍부한 텍스트와 비즈니스 용어</li>
+        <li><strong>상대적으로 작음</strong>: 팩트 테이블에 비해 행 수가 적음</li>
+        <li><strong>많은 컬럼</strong>: 20~100개 이상의 속성 포함 가능</li>
+        <li><strong>느린 변경</strong>: 팩트에 비해 업데이트 빈도가 낮음</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 포괄적인 제품 차원 테이블
+CREATE TABLE dim_product (
+    -- 대리 키 (기본 키)
+    product_key INT PRIMARY KEY,
+
+    -- 자연 키 (비즈니스 키)
+    product_id VARCHAR(20) UNIQUE NOT NULL,
+    sku VARCHAR(50),
+
+    -- 제품 기본 정보
+    product_name VARCHAR(200) NOT NULL,
+    product_description TEXT,
+    product_long_description TEXT,
+
+    -- 계층 구조 (비정규화)
+    department VARCHAR(100),
+    department_id VARCHAR(20),
+    category VARCHAR(100),
+    category_id VARCHAR(20),
+    subcategory VARCHAR(100),
+    subcategory_id VARCHAR(20),
+
+    -- 브랜드 정보
+    brand VARCHAR(100),
+    brand_id VARCHAR(20),
+    manufacturer VARCHAR(100),
+    manufacturer_country VARCHAR(50),
+
+    -- 제품 특성
+    color VARCHAR(50),
+    size VARCHAR(20),
+    weight_kg DECIMAL(10,3),
+    dimensions VARCHAR(50),
+    material VARCHAR(100),
+
+    -- 가격 정보
+    unit_cost DECIMAL(10,2),
+    list_price DECIMAL(10,2),
+    wholesale_price DECIMAL(10,2),
+
+    -- 상태 및 분류
+    product_status VARCHAR(20),  -- Active, Discontinued, etc.
+    is_taxable BOOLEAN,
+    is_perishable BOOLEAN,
+    requires_refrigeration BOOLEAN,
+    hazmat_code VARCHAR(20),
+
+    -- 비즈니스 분류
+    product_line VARCHAR(50),
+    product_class VARCHAR(50),
+    product_family VARCHAR(50),
+
+    -- 공급망 정보
+    lead_time_days INT,
+    minimum_order_quantity INT,
+    reorder_point INT,
+
+    -- SCD Type 2 컬럼 (이력 관리)
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    is_current BOOLEAN DEFAULT TRUE,
+
+    -- 감사 컬럼
+    created_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_timestamp TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100)
+);
+
+-- 인덱스
+CREATE INDEX idx_dim_product_id ON dim_product(product_id);
+CREATE INDEX idx_dim_product_category ON dim_product(category);
+CREATE INDEX idx_dim_product_brand ON dim_product(brand);
+CREATE INDEX idx_dim_product_current ON dim_product(is_current)
+    WHERE is_current = TRUE;</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>5.5 대리 키 vs 자연 키</h2>
+
+      <h3>대리 키 (Surrogate Key)</h3>
+      <p>시스템이 생성한 인공적인 식별자로, 데이터 웨어하우스에서 강력히 권장되는 방식입니다.</p>
+
+      <table>
+        <caption>대리 키 vs 자연 키 비교</caption>
+        <thead>
+          <tr>
+            <th>특성</th>
+            <th>대리 키</th>
+            <th>자연 키</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>정의</td>
+            <td>시스템 생성 식별자</td>
+            <td>비즈니스 의미 있는 식별자</td>
+          </tr>
+          <tr>
+            <td>데이터 타입</td>
+            <td>정수 (INT, BIGINT)</td>
+            <td>문자열, 복합 키</td>
+          </tr>
+          <tr>
+            <td>크기</td>
+            <td>작음 (4-8 바이트)</td>
+            <td>큼 (가변)</td>
+          </tr>
+          <tr>
+            <td>조인 성능</td>
+            <td>빠름</td>
+            <td>느림</td>
+          </tr>
+          <tr>
+            <td>변경 가능성</td>
+            <td>불변</td>
+            <td>변경 가능</td>
+          </tr>
+          <tr>
+            <td>SCD 지원</td>
+            <td>쉬움</td>
+            <td>복잡함</td>
+          </tr>
+          <tr>
+            <td>통합</td>
+            <td>다양한 소스 통합 용이</td>
+            <td>소스 간 충돌 가능</td>
+          </tr>
+          <tr>
+            <td>의미</td>
+            <td>비즈니스 의미 없음</td>
+            <td>비즈니스 의미 있음</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <pre><code>-- 대리 키 사용 예시
+CREATE TABLE dim_customer (
+    -- 대리 키 (기본 키)
+    customer_key INT PRIMARY KEY,  -- 시스템 생성
+
+    -- 자연 키 (비즈니스 키) - 참조용으로 보존
+    customer_id VARCHAR(20) UNIQUE NOT NULL,  -- 비즈니스에서 사용
+
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+
+    -- SCD Type 2 지원
+    effective_date DATE,
+    expiration_date DATE,
+    is_current BOOLEAN
+);
+
+-- 대리 키의 장점 예시
+-- 1. 고객 ID가 변경되어도 대리 키는 불변
+INSERT INTO dim_customer VALUES
+    (1, 'CUST001', 'John Doe', 'john@email.com', '123-456-7890',
+     '2020-01-01', '2023-12-31', FALSE);  -- 구 버전
+
+INSERT INTO dim_customer VALUES
+    (2, 'CUST002', 'John Doe', 'john@email.com', '123-456-7890',
+     '2024-01-01', '9999-12-31', TRUE);   -- 새 ID로 변경
+
+-- 2. 여러 소스 시스템 통합
+INSERT INTO dim_customer VALUES
+    (3, 'WEB-12345', 'Jane Smith', 'jane@email.com', NULL,
+     '2024-01-01', '9999-12-31', TRUE);  -- 웹사이트 소스
+
+INSERT INTO dim_customer VALUES
+    (4, 'CRM-98765', 'Jane Smith', 'jane@email.com', NULL,
+     '2024-01-01', '9999-12-31', TRUE);  -- CRM 소스
+
+-- 대리 키 할당 전략
+CREATE SEQUENCE dim_customer_key_seq START WITH 1;
+
+-- ETL 프로세스에서 대리 키 할당
+INSERT INTO dim_customer (customer_key, customer_id, customer_name, ...)
+SELECT
+    NEXTVAL('dim_customer_key_seq'),
+    src.customer_id,
+    src.customer_name,
+    ...
+FROM staging.customers src
+WHERE NOT EXISTS (
+    SELECT 1 FROM dim_customer dim
+    WHERE dim.customer_id = src.customer_id
+    AND dim.is_current = TRUE
+);</code></pre>
+      </div>
+
+      <h3>대리 키 모범 사례</h3>
+      <ul>
+        <li>모든 차원 테이블에 대리 키 사용</li>
+        <li>정수형 사용 (INT 또는 BIGINT)</li>
+        <li>의미 없는 순차 번호 사용</li>
+        <li>자연 키는 별도 컬럼으로 보존</li>
+        <li>ETL 프로세스에서 중앙 집중식으로 생성</li>
+        <li>특수 대리 키값 예약 (예: -1 = Unknown, 0 = N/A)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5.6 특수 차원 패턴</h2>
+
+      <h3>1. 퇴화 차원 (Degenerate Dimension)</h3>
+      <p>별도의 차원 테이블 없이 팩트 테이블에 직접 저장되는 차원입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 퇴화 차원: 주문 번호, 송장 번호
+CREATE TABLE fact_sales (
+    date_key INT,
+    product_key INT,
+    customer_key INT,
+    store_key INT,
+
+    -- 퇴화 차원 (별도 차원 테이블 없음)
+    order_number VARCHAR(50),
+    invoice_number VARCHAR(50),
+    receipt_number VARCHAR(50),
+
+    -- 측정값
+    quantity INT,
+    net_amount DECIMAL(12,2)
+);
+
+-- 퇴화 차원의 사용
+SELECT
+    f.order_number,
+    SUM(f.quantity) as total_items,
+    SUM(f.net_amount) as order_total
+FROM fact_sales f
+WHERE f.order_number = 'ORD-2025-12345'
+GROUP BY f.order_number;</code></pre>
+      </div>
+
+      <h3>2. 역할 수행 차원 (Role-Playing Dimension)</h3>
+      <p>하나의 차원 테이블이 팩트 테이블에서 여러 역할로 사용되는 패턴입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 하나의 날짜 차원 테이블
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,
+    full_date DATE,
+    day_of_week VARCHAR(10),
+    month INT,
+    year INT,
+    quarter INT
+);
+
+-- 여러 역할로 사용되는 날짜 차원
+CREATE TABLE fact_order (
+    order_key INT PRIMARY KEY,
+
+    -- 동일한 dim_date를 여러 역할로 참조
+    order_date_key INT REFERENCES dim_date(date_key),
+    payment_date_key INT REFERENCES dim_date(date_key),
+    ship_date_key INT REFERENCES dim_date(date_key),
+    delivery_date_key INT REFERENCES dim_date(date_key),
+
+    customer_key INT,
+    order_amount DECIMAL(12,2)
+);
+
+-- 역할 수행 차원 사용
+SELECT
+    od.year as order_year,
+    od.quarter as order_quarter,
+    dd.year as delivery_year,
+    COUNT(*) as order_count,
+    AVG(dd.date_key - od.date_key) as avg_delivery_days
+FROM fact_order f
+JOIN dim_date od ON f.order_date_key = od.date_key
+JOIN dim_date dd ON f.delivery_date_key = dd.date_key
+WHERE od.year = 2025
+GROUP BY od.year, od.quarter, dd.year;
+
+-- 또는 VIEW로 명확한 이름 제공
+CREATE VIEW v_dim_order_date AS
+SELECT * FROM dim_date;
+
+CREATE VIEW v_dim_ship_date AS
+SELECT * FROM dim_date;
+
+CREATE VIEW v_dim_delivery_date AS
+SELECT * FROM dim_date;</code></pre>
+      </div>
+
+      <h3>3. 정크 차원 (Junk Dimension)</h3>
+      <p>여러 개의 저카디널리티 플래그와 지표를 하나의 차원 테이블로 통합한 패턴입니다.</p>
+
+      <div class="code-block">
+        <pre><code>-- 팩트 테이블에 많은 플래그가 있는 경우 (안 좋은 설계)
+CREATE TABLE fact_sales_bad (
+    date_key INT,
+    product_key INT,
+
+    -- 너무 많은 플래그 컬럼들
+    is_weekend_sale BOOLEAN,
+    is_promotion BOOLEAN,
+    is_online BOOLEAN,
+    is_express_shipping BOOLEAN,
+    is_gift_wrapped BOOLEAN,
+    payment_method VARCHAR(20),
+
+    net_amount DECIMAL(12,2)
+);
+
+-- 개선: 정크 차원 사용
+CREATE TABLE dim_transaction_type (
+    transaction_type_key INT PRIMARY KEY,
+    is_weekend_sale BOOLEAN,
+    is_promotion BOOLEAN,
+    is_online BOOLEAN,
+    is_express_shipping BOOLEAN,
+    is_gift_wrapped BOOLEAN,
+    payment_method VARCHAR(20),
+
+    -- 설명 컬럼 (선택적)
+    transaction_type_description VARCHAR(200)
+);
+
+-- 정크 차원 데이터 (모든 조합)
+INSERT INTO dim_transaction_type VALUES
+    (1, FALSE, FALSE, FALSE, FALSE, FALSE, 'Cash', 'Regular in-store cash'),
+    (2, FALSE, TRUE, FALSE, FALSE, FALSE, 'Cash', 'Promo in-store cash'),
+    (3, TRUE, FALSE, TRUE, FALSE, FALSE, 'Credit', 'Weekend online credit'),
+    (4, TRUE, TRUE, TRUE, TRUE, TRUE, 'Credit', 'Weekend promo online express gift credit'),
+    -- ... 기타 조합들
+
+-- 개선된 팩트 테이블
+CREATE TABLE fact_sales_good (
+    date_key INT,
+    product_key INT,
+    transaction_type_key INT REFERENCES dim_transaction_type,  -- 정크 차원
+
+    net_amount DECIMAL(12,2)
+);
+
+-- 사용 예시
+SELECT
+    tt.is_weekend_sale,
+    tt.is_promotion,
+    COUNT(*) as transaction_count,
+    SUM(f.net_amount) as total_sales
+FROM fact_sales_good f
+JOIN dim_transaction_type tt ON f.transaction_type_key = tt.transaction_type_key
+GROUP BY tt.is_weekend_sale, tt.is_promotion;</code></pre>
+      </div>
+
+      <h3>4. 아웃리거 차원 (Outrigger Dimension)</h3>
+      <p>차원 테이블이 다른 차원 테이블을 참조하는 패턴입니다 (제한적 사용 권장).</p>
+
+      <div class="code-block">
+        <pre><code>-- 아웃리거 차원: 고객 차원이 지역 차원을 참조
+CREATE TABLE dim_geography (
+    geography_key INT PRIMARY KEY,
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50),
+    region VARCHAR(50),
+    population BIGINT
+);
+
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    customer_name VARCHAR(200),
+
+    -- 아웃리거 차원 참조
+    geography_key INT REFERENCES dim_geography(geography_key),
+
+    customer_segment VARCHAR(50)
+);
+
+-- 사용 시 추가 조인 필요
+SELECT
+    g.region,
+    c.customer_segment,
+    SUM(f.net_amount) as total_sales
+FROM fact_sales f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_geography g ON c.geography_key = g.geography_key  -- 추가 조인
+GROUP BY g.region, c.customer_segment;
+
+-- 대안: 비정규화 (권장)
+CREATE TABLE dim_customer_denormalized (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    customer_name VARCHAR(200),
+
+    -- 지역 정보 비정규화
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50),
+    region VARCHAR(50),
+
+    customer_segment VARCHAR(50)
+);</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>5.7 차원 테이블 설계 모범 사례</h2>
+
+      <h3>모범 사례 체크리스트</h3>
+      <ul>
+        <li>✅ 대리 키를 기본 키로 사용</li>
+        <li>✅ 자연 키를 별도 컬럼으로 보존</li>
+        <li>✅ 계층 구조를 비정규화</li>
+        <li>✅ 풍부한 설명적 속성 포함</li>
+        <li>✅ NULL 대신 "Unknown" 또는 "N/A" 사용</li>
+        <li>✅ SCD 전략 수립 (6장 참조)</li>
+        <li>✅ 비즈니스 용어 사용</li>
+        <li>✅ 감사 컬럼 포함 (생성/수정 일시, 사용자)</li>
+      </ul>
+
+      <h3>일반적인 차원 테이블 예시</h3>
+      <div class="code-block">
+        <pre><code>-- 날짜 차원 (가장 중요한 차원)
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,  -- YYYYMMDD 형식
+    full_date DATE UNIQUE NOT NULL,
+
+    -- 일 속성
+    day_of_week INT,
+    day_of_week_name VARCHAR(10),
+    day_of_month INT,
+    day_of_year INT,
+    day_suffix VARCHAR(4),  -- st, nd, rd, th
+
+    -- 주 속성
+    week_of_year INT,
+    week_of_month INT,
+    iso_week INT,
+
+    -- 월 속성
+    month INT,
+    month_name VARCHAR(10),
+    month_abbr VARCHAR(3),
+
+    -- 분기 속성
+    quarter INT,
+    quarter_name VARCHAR(10),  -- Q1, Q2, etc.
+
+    -- 년 속성
+    year INT,
+    year_month INT,  -- YYYYMM
+
+    -- 회계 기간
+    fiscal_year INT,
+    fiscal_quarter INT,
+    fiscal_month INT,
+
+    -- 플래그
+    is_weekend BOOLEAN,
+    is_holiday BOOLEAN,
+    is_working_day BOOLEAN,
+    holiday_name VARCHAR(100),
+
+    -- 상대적 기간
+    is_current_day BOOLEAN,
+    is_current_month BOOLEAN,
+    is_current_quarter BOOLEAN,
+    is_current_year BOOLEAN
+);
+
+-- 고객 차원
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20) UNIQUE NOT NULL,
+
+    -- 기본 정보
+    customer_name VARCHAR(200),
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    title VARCHAR(20),
+
+    -- 연락처
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    mobile VARCHAR(20),
+
+    -- 주소 (비정규화)
+    address_line1 VARCHAR(200),
+    address_line2 VARCHAR(200),
+    city VARCHAR(100),
+    state VARCHAR(50),
+    postal_code VARCHAR(20),
+    country VARCHAR(50),
+
+    -- 인구통계
+    gender VARCHAR(10),
+    birth_date DATE,
+    age_range VARCHAR(20),
+    marital_status VARCHAR(20),
+    education_level VARCHAR(50),
+
+    -- 비즈니스 분류
+    customer_segment VARCHAR(50),
+    customer_type VARCHAR(50),
+    industry VARCHAR(100),
+
+    -- 고객 가치
+    lifetime_value DECIMAL(12,2),
+    risk_score INT,
+    credit_rating VARCHAR(20),
+
+    -- 상태
+    customer_status VARCHAR(20),
+    registration_date DATE,
+    last_purchase_date DATE,
+
+    -- SCD
+    effective_date DATE,
+    expiration_date DATE,
+    is_current BOOLEAN
+);</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>5.8 요약</h2>
+      <p>이 장에서는 데이터 웨어하우스의 핵심 구성 요소인 팩트 테이블과 차원 테이블에 대해 깊이 있게 살펴보았습니다:</p>
+
+      <ul>
+        <li><strong>팩트 테이블</strong>은 비즈니스 이벤트의 측정값을 저장하며, 세분화 수준을 명확히 정의해야 합니다.</li>
+        <li><strong>가산성, 반가산성, 비가산성 팩트</strong>를 구분하여 올바른 집계 방법을 사용해야 합니다.</li>
+        <li><strong>팩트 테이블 패턴</strong>으로는 트랜잭션, 주기적 스냅샷, 누적 스냅샷, 팩트 없는 팩트 테이블이 있습니다.</li>
+        <li><strong>차원 테이블</strong>은 팩트에 대한 설명적 컨텍스트를 제공하며, 비정규화되어야 합니다.</li>
+        <li><strong>대리 키</strong>는 자연 키보다 성능, SCD 지원, 통합 측면에서 우수하며 모든 차원에 사용을 권장합니다.</li>
+        <li><strong>특수 차원 패턴</strong>으로는 퇴화 차원, 역할 수행 차원, 정크 차원, 아웃리거 차원이 있습니다.</li>
+      </ul>
+
+      <p>효과적인 팩트 및 차원 설계는 데이터 웨어하우스의 성능, 유지보수성, 비즈니스 가치를 결정합니다. 비즈니스 요구사항을 철저히 분석하고, 적절한 패턴을 선택하며, 모범 사례를 따르는 것이 중요합니다.</p>
+    </section>
+
+    <section>
+      <h2>복습 문제</h2>
+      <ol>
+        <li><strong>가산성 팩트, 반가산성 팩트, 비가산성 팩트의 차이를 설명하고, 각각의 예시와 올바른 집계 방법을 제시하시오.</strong></li>
+        <li><strong>트랜잭션 팩트 테이블, 주기적 스냅샷 팩트 테이블, 누적 스냅샷 팩트 테이블의 차이점을 설명하고, 각각 어떤 비즈니스 시나리오에 적합한지 논하시오.</strong></li>
+        <li><strong>대리 키를 사용해야 하는 이유를 최소 5가지 이상 제시하고, 대리 키 할당 전략을 설명하시오.</strong></li>
+        <li><strong>퇴화 차원, 역할 수행 차원, 정크 차원의 개념을 설명하고, 각각의 사용 사례를 구체적인 SQL 예제와 함께 제시하시오.</strong></li>
+        <li><strong>차원 테이블에서 계층 구조를 어떻게 표현하는 것이 좋은지, 정규화와 비정규화 접근법을 비교하여 논하시오.</strong></li>
+        <li><strong>팩트 없는 팩트 테이블(Factless Fact Table)이 무엇이며, 어떤 상황에서 사용하는지 구체적인 예를 들어 설명하시오.</strong></li>
+      </ol>
+    </section>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-04.html" class="nav-button prev">이전 장</a>
+    <a href="chapter-06.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

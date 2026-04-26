@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Key Management - WIA-SEC-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .book-container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .chapter-header { text-align: center; padding: 3rem 0; border-bottom: 3px solid #EF4444; margin-bottom: 3rem; }
+        .chapter-number { font-size: 1.2rem; color: #94a3b8; margin-bottom: 0.5rem; }
+        .chapter-title { font-size: 2.5rem; color: #EF4444; margin-bottom: 1rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        h2 { color: #EF4444; font-size: 1.8rem; margin: 2.5rem 0 1.5rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        h3 { color: #f87171; font-size: 1.4rem; margin: 2rem 0 1rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        h4 { color: #fca5a5; font-size: 1.2rem; margin: 1.5rem 0 1rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        p { margin-bottom: 1.5rem; text-align: justify; color: #cbd5e1; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #EF4444; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        .code-block code { font-family: 'Courier New', monospace; color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
+        .feature-list { list-style: none; padding-left: 0; }
+        .feature-list li { padding: 0.75rem 0 0.75rem 2.5rem; position: relative; color: #cbd5e1; }
+        .feature-list li:before { content: "✓"; position: absolute; left: 0; color: #22c55e; font-weight: bold; font-size: 1.2rem; }
+        .table-container { overflow-x: auto; margin: 1.5rem 0; }
+        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #EF4444; color: white; padding: 1rem; text-align: left; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid #334155; color: #cbd5e1; }
+        tr:last-child td { border-bottom: none; }
+        .navigation { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 2px solid #334155; }
+        .nav-link { display: inline-block; padding: 0.75rem 1.5rem; background: #1e293b; border: 2px solid #EF4444; border-radius: 8px; color: #EF4444; text-decoration: none; transition: all 0.3s; }
+        .nav-link:hover { background: #EF4444; color: white; }
+        .summary-box { background: #1e293b; border: 2px solid #EF4444; border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .summary-box h2 { margin-top: 0; }
+        .review-questions { background: #1e293b; border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .review-questions ol { margin-left: 1.5rem; color: #cbd5e1; }
+        .review-questions li { margin-bottom: 1rem; }
+        .footer { text-align: center; padding: 2rem 0; border-top: 3px solid #EF4444; margin-top: 3rem; }
+        .philosophy { font-size: 1.5rem; color: #EF4444; margin-bottom: 1rem; }
+        @media print { body { background: white; color: black; } .nav-link { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="book-container">
+        <div class="chapter-header">
+            <div class="chapter-number">CHAPTER 4</div>
+            <h1 class="chapter-title">Key Management</h1>
+            <p style="color: #94a3b8; margin-top: 1rem;">Comprehensive Key Lifecycle Management and Best Practices</p>
+        </div>
+
+        <h2>The Importance of Key Management</h2>
+        <p>
+            Key management is arguably the most critical aspect of cryptographic security. Even the strongest algorithms become worthless if keys are improperly generated, stored, distributed, or destroyed. Hardware Security Modules provide a comprehensive framework for managing cryptographic keys throughout their entire lifecycle—from generation through secure destruction—ensuring keys remain protected at every stage.
+        </p>
+
+        <p>
+            Poor key management has been the root cause of numerous security breaches. Keys stored in configuration files, transmitted via email, or left on decommissioned systems have led to data breaches affecting millions. HSMs address these vulnerabilities by enforcing rigorous key management policies and providing secure mechanisms for every key lifecycle operation.
+        </p>
+
+        <h2>Key Lifecycle States</h2>
+        <p>
+            The WIA-SEC-014 standard defines a comprehensive key lifecycle with distinct states and allowed transitions. Understanding these states is essential for implementing proper key management policies.
+        </p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>State</th>
+                        <th>Description</th>
+                        <th>Allowed Operations</th>
+                        <th>Typical Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Pre-Active</strong></td>
+                        <td>Key generated but not yet authorized for use</td>
+                        <td>Export, destroy, activate</td>
+                        <td>Hours to days</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Active</strong></td>
+                        <td>Key approved and available for cryptographic operations</td>
+                        <td>All cryptographic operations per key policy</td>
+                        <td>Months to years</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Suspended</strong></td>
+                        <td>Temporarily disabled, can be reactivated</td>
+                        <td>Reactivate, revoke</td>
+                        <td>Days to weeks</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deactivated</strong></td>
+                        <td>No longer used for new operations, verification only</td>
+                        <td>Verify signatures, decrypt legacy data</td>
+                        <td>Years (archival)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Compromised</strong></td>
+                        <td>Known or suspected compromise</td>
+                        <td>None (immediate revocation required)</td>
+                        <td>None</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Destroyed</strong></td>
+                        <td>Securely erased, permanently unrecoverable</td>
+                        <td>None</td>
+                        <td>Permanent</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Key Generation</h2>
+        <p>
+            Secure key generation is the foundation of cryptographic security. Keys must be generated with sufficient entropy, proper parameters, and within a secure environment. HSMs provide the ideal environment for key generation, ensuring keys are born secure and never exist outside the protected boundary.
+        </p>
+
+        <h3>On-Device Key Generation (Recommended)</h3>
+        <p>
+            The gold standard for key generation is creating keys directly within the HSM:
+        </p>
+
+        <ul class="feature-list">
+            <li>Private keys never exist outside the HSM's secure boundary</li>
+            <li>Hardware TRNG provides high-quality entropy</li>
+            <li>Proper algorithm parameters enforced by HSM firmware</li>
+            <li>Immediate protection under HSM's master encryption key</li>
+            <li>Audit trail created automatically</li>
+        </ul>
+
+        <div class="code-block">
+            <code>// RSA Key Pair Generation Request
+{
+  "operation": "generateKeyPair",
+  "algorithm": "RSA",
+  "parameters": {
+    "modulusSize": 3072,
+    "publicExponent": 65537
+  },
+  "privateKeyAttributes": {
+    "label": "signing-key-2025-01",
+    "token": true,
+    "private": true,
+    "sensitive": true,
+    "extractable": false,
+    "sign": true,
+    "decrypt": false
+  },
+  "publicKeyAttributes": {
+    "label": "signing-key-2025-01-pub",
+    "token": true,
+    "verify": true,
+    "encrypt": false
+  },
+  "metadata": {
+    "owner": "security-team",
+    "purpose": "document-signing",
+    "expirationDate": "2027-01-15"
+  }
+}
+
+// Response
+{
+  "status": "success",
+  "privateKeyHandle": "0x8F7E6D5C",
+  "publicKeyHandle": "0x8F7E6D5D",
+  "publicKey": {
+    "n": "C4A2F8E9D7...",  // modulus
+    "e": "010001"         // public exponent (65537)
+  },
+  "keyId": "signing-key-2025-01",
+  "generationTimestamp": "2025-01-15T14:30:22Z"
+}</code>
+        </div>
+
+        <h3>Key Import (When Necessary)</h3>
+        <p>
+            Sometimes keys must be generated elsewhere and imported into the HSM. This should be minimized and carefully controlled:
+        </p>
+
+        <div class="highlight-box">
+            <p><strong>Import Security Requirements:</strong></p>
+            <ul class="feature-list" style="margin: 1rem 0;">
+                <li>Keys must be wrapped (encrypted) during import using secure key wrapping</li>
+                <li>Use temporary secure channels (e.g., TLS 1.3 with mutual authentication)</li>
+                <li>Verify key integrity using checksums or MACs</li>
+                <li>Log all import operations with full audit trail</li>
+                <li>Destroy wrapped key material after successful import</li>
+                <li>Consider marking imported keys as "imported" for tracking</li>
+            </ul>
+        </div>
+
+        <h2>Key Storage and Protection</h2>
+        <p>
+            Once generated, keys must be protected at rest. HSMs implement multiple layers of protection to ensure keys remain confidential and integrity-protected throughout their storage lifetime.
+        </p>
+
+        <h3>Key Attributes and Policies</h3>
+        <p>
+            Each key has attributes that control its usage and protection:
+        </p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Attribute</th>
+                        <th>Purpose</th>
+                        <th>Example Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>CKA_TOKEN</strong></td>
+                        <td>Persistent vs. session key</td>
+                        <td>true (persistent), false (session)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CKA_PRIVATE</strong></td>
+                        <td>Requires authentication to use</td>
+                        <td>true (protected), false (public)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CKA_SENSITIVE</strong></td>
+                        <td>Cannot be revealed in plaintext</td>
+                        <td>true (for private/secret keys)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CKA_EXTRACTABLE</strong></td>
+                        <td>Can be exported from HSM</td>
+                        <td>false (recommended for critical keys)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CKA_SIGN</strong></td>
+                        <td>Can be used for signing</td>
+                        <td>true/false</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CKA_DECRYPT</strong></td>
+                        <td>Can be used for decryption</td>
+                        <td>true/false</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CKA_UNWRAP</strong></td>
+                        <td>Can unwrap other keys</td>
+                        <td>true/false</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Key Hierarchy</h3>
+        <p>
+            HSMs use a hierarchical key structure to protect all keys:
+        </p>
+
+        <div class="highlight-box">
+            <p><strong>Level 0 - Device Master Key (DMK):</strong> Embedded in hardware during manufacturing, never changes, protects all other keys. If DMK is compromised, the entire device is compromised.</p>
+        </div>
+
+        <div class="highlight-box">
+            <p><strong>Level 1 - Master KEKs (Key Encryption Keys):</strong> Generated during HSM initialization, encrypted under DMK, used to protect different classes of keys (user keys, admin keys, etc.).</p>
+        </div>
+
+        <div class="highlight-box">
+            <p><strong>Level 2 - Domain KEKs:</strong> Per-partition or per-tenant keys that isolate different users/applications, encrypted under Master KEKs.</p>
+        </div>
+
+        <div class="highlight-box">
+            <p><strong>Level 3 - Operational Keys:</strong> User keys for signing, encryption, etc., encrypted under Domain KEKs. These are the keys applications actually use.</p>
+        </div>
+
+        <h2>Key Backup and Recovery</h2>
+        <p>
+            While keys should ideally never leave the HSM, backup is essential for business continuity and disaster recovery. The WIA-SEC-014 standard provides secure mechanisms for key backup that maintain security while enabling recovery.
+        </p>
+
+        <h3>Backup Methods</h3>
+
+        <h4>1. Encrypted Key Export (Key Wrapping)</h4>
+        <p>
+            Keys can be exported in wrapped (encrypted) form for backup:
+        </p>
+
+        <div class="code-block">
+            <code>// Export key wrapped under backup KEK
+{
+  "operation": "exportKey",
+  "keyToExport": "critical-signing-key",
+  "wrappingKey": "backup-kek-2025",
+  "wrappingMechanism": "AES_KEY_WRAP_PAD",
+  "includePublicKey": true,
+  "includeMetadata": true
+}
+
+// Response - can be stored securely offline
+{
+  "status": "success",
+  "wrappedKey": "A6A6A6A6A6A6A6A6...",
+  "wrappingKeyId": "backup-kek-2025",
+  "algorithm": "RSA",
+  "keySize": 3072,
+  "metadata": {
+    "label": "critical-signing-key",
+    "creationDate": "2025-01-15",
+    "attributes": {...}
+  },
+  "publicKey": "MIIBIjANBgkq..."
+}</code>
+        </div>
+
+        <h4>2. M-of-N Secret Sharing</h4>
+        <p>
+            Critical keys (especially master keys) can be split into N shares, requiring M shares to reconstruct:
+        </p>
+
+        <ul class="feature-list">
+            <li>Common configurations: 3-of-5, 2-of-3, 5-of-7</li>
+            <li>Each share is cryptographically useless alone</li>
+            <li>Shares distributed to different key custodians</li>
+            <li>Reconstruction requires physical presence of M custodians</li>
+            <li>Based on Shamir's Secret Sharing algorithm</li>
+        </ul>
+
+        <div class="highlight-box">
+            <p><strong>Key Ceremony Example:</strong> When initializing a new root CA, the master key might be generated within the HSM, then backed up using 5-of-7 secret sharing. The seven shares are distributed to seven senior security officers in sealed envelopes. To restore the key (e.g., after HSM failure), any five of the seven officers must gather in a secure facility to provide their shares.</p>
+        </div>
+
+        <h4>3. HSM Clustering and Replication</h4>
+        <p>
+            Modern HSMs support clustering where keys are automatically replicated across multiple devices:
+        </p>
+
+        <ul class="feature-list">
+            <li>Synchronous or asynchronous replication</li>
+            <li>Geographic distribution for disaster recovery</li>
+            <li>Automatic failover when primary HSM fails</li>
+            <li>Load balancing across cluster members</li>
+            <li>Cryptographically protected replication channels</li>
+        </ul>
+
+        <h2>Key Rotation</h2>
+        <p>
+            Regular key rotation is a fundamental security practice that limits the impact of key compromise and meets compliance requirements. The WIA-SEC-014 standard supports both manual and automated key rotation.
+        </p>
+
+        <h3>Why Rotate Keys?</h3>
+        <ul class="feature-list">
+            <li><strong>Limit Exposure:</strong> If a key is compromised, rotation limits the amount of data encrypted under that key</li>
+            <li><strong>Compliance:</strong> Many regulations mandate periodic key rotation (e.g., PCI-DSS)</li>
+            <li><strong>Cryptoperiod Limits:</strong> Cryptographic best practices recommend maximum usage periods</li>
+            <li><strong>Algorithm Migration:</strong> Facilitates transition to stronger algorithms or larger key sizes</li>
+            <li><strong>Personnel Changes:</strong> When key custodians leave the organization</li>
+        </ul>
+
+        <h3>Rotation Strategies</h3>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>How It Works</th>
+                        <th>Use Cases</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Scheduled Rotation</strong></td>
+                        <td>Keys rotated on fixed schedule (monthly, yearly)</td>
+                        <td>Data encryption keys, session keys</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Usage-Based Rotation</strong></td>
+                        <td>Rotate after N operations or bytes encrypted</td>
+                        <td>High-throughput encryption systems</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Event-Driven Rotation</strong></td>
+                        <td>Rotate on specific events (employee departure, breach)</td>
+                        <td>Access control, authentication keys</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Versioned Keys</strong></td>
+                        <td>Multiple key versions active simultaneously</td>
+                        <td>Allows gradual migration, backward compatibility</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Automated Rotation Example</h3>
+        <div class="code-block">
+            <code>// Configure automatic key rotation policy
+{
+  "operation": "setRotationPolicy",
+  "keyLabel": "database-encryption-key",
+  "policy": {
+    "rotationSchedule": "monthly",
+    "retainOldVersions": 3,
+    "automaticRotation": true,
+    "notifyBefore": "7days",
+    "newKeyAttributes": {
+      "algorithm": "AES",
+      "keySize": 256,
+      "extractable": false
+    }
+  }
+}
+
+// HSM automatically:
+// 1. Generates new key version on schedule
+// 2. Marks old key as "deactivated" but keeps for decryption
+// 3. New encryptions use new key version
+// 4. Old data gradually re-encrypted (optional)
+// 5. Notifies administrators of rotation events</code>
+        </div>
+
+        <h2>Key Distribution</h2>
+        <p>
+            Distributing keys securely to their intended recipients is a complex challenge. HSMs provide several mechanisms for secure key distribution.
+        </p>
+
+        <h3>Public Key Distribution</h3>
+        <p>
+            Public keys can be distributed freely, but their authenticity must be verified:
+        </p>
+
+        <ul class="feature-list">
+            <li><strong>Certificates:</strong> Public keys wrapped in X.509 certificates signed by trusted CA</li>
+            <li><strong>Key Servers:</strong> Centralized repositories with integrity protection</li>
+            <li><strong>Direct Exchange:</strong> Out-of-band verification (fingerprints, QR codes)</li>
+            <li><strong>Blockchain:</strong> Distributed ledger for public key publication</li>
+        </ul>
+
+        <h3>Symmetric Key Distribution</h3>
+        <p>
+            Symmetric keys require secure distribution mechanisms:
+        </p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Mechanism</th>
+                        <th>Security Level</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Key Wrapping</strong></td>
+                        <td>Encrypt under recipient's KEK</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RSA Key Transport</strong></td>
+                        <td>Encrypt under recipient's RSA public key</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Diffie-Hellman</strong></td>
+                        <td>Derive shared secret from DH exchange</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Physical Transport</strong></td>
+                        <td>USB HSM or smart card</td>
+                        <td>Very High (for initialization)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Key Destruction</h2>
+        <p>
+            Proper key destruction is as important as secure key generation. Keys must be destroyed when they're no longer needed, when compromised, or when required by policy or regulation.
+        </p>
+
+        <h3>Secure Deletion Process</h3>
+        <div class="code-block">
+            <code>HSM Key Destruction Procedure:
+
+1. Verify authorization (may require multiple approvals)
+2. Check no dependencies (no keys wrapped under this key)
+3. Create audit log entry BEFORE destruction
+4. Overwrite key storage with random data (3+ passes)
+5. Overwrite with zeros
+6. Overwrite with ones
+7. Final random overwrite
+8. Mark storage location as available
+9. Create destruction confirmation audit entry
+10. Notify key stakeholders
+
+Total time: < 100ms
+Result: Key is cryptographically unrecoverable</code>
+        </div>
+
+        <h3>Destruction Considerations</h3>
+        <ul class="feature-list">
+            <li>Ensure all copies destroyed (backups, replicas, wrapped versions)</li>
+            <li>Consider data recovery requirements before destroying decryption keys</li>
+            <li>Regulatory retention periods may require keeping keys for years</li>
+            <li>Certificate revocation before destroying signing keys</li>
+            <li>Document destruction in compliance records</li>
+        </ul>
+
+        <h2>Key Escrow and Recovery</h2>
+        <p>
+            Some scenarios require designated parties to recover keys in emergencies. This must be balanced carefully against security requirements.
+        </p>
+
+        <h3>Escrow Use Cases</h3>
+        <ul class="feature-list">
+            <li>Law enforcement access to encrypted data (controversial)</li>
+            <li>Corporate data recovery when employee unavailable</li>
+            <li>Regulatory compliance in certain industries</li>
+            <li>Succession planning for critical cryptographic operations</li>
+        </ul>
+
+        <div class="highlight-box">
+            <p><strong>Security Considerations:</strong> Key escrow introduces significant risks. Escrowed keys become high-value targets for attackers. If implemented, use M-of-N recovery with split knowledge and dual control. Strictly limit who can access escrowed keys and maintain detailed audit logs of all access.</p>
+        </div>
+
+        <div class="summary-box">
+            <h2>Chapter Summary</h2>
+            <p>
+                Effective key management is the foundation of cryptographic security. The key lifecycle encompasses generation, storage, distribution, rotation, backup, and destruction—each phase requiring careful controls and procedures. HSMs provide the secure environment and tools necessary to implement proper key management throughout this lifecycle.
+            </p>
+            <p>
+                Key generation should occur within the HSM using hardware random number generation to ensure keys are born secure. Storage protection uses hierarchical encryption, with hardware-protected master keys safeguarding all operational keys. Key attributes control usage and extractability, implementing the principle of least privilege.
+            </p>
+            <p>
+                Backup and recovery mechanisms including key wrapping, secret sharing, and HSM clustering enable business continuity while maintaining security. Regular key rotation limits exposure and meets compliance requirements. Secure destruction ensures keys are cryptographically unrecoverable when no longer needed.
+            </p>
+            <p>
+                Organizations must develop comprehensive key management policies addressing all lifecycle phases, assign clear responsibilities, implement technical controls, and maintain detailed audit trails. The WIA-SEC-014 standard provides a framework for these practices, ensuring keys remain protected from generation through destruction.
+            </p>
+        </div>
+
+        <div class="review-questions">
+            <h2>Review Questions</h2>
+            <ol>
+                <li>Describe the six key lifecycle states defined in WIA-SEC-014. What operations are allowed in each state?</li>
+                <li>Why is on-device key generation preferred over importing externally generated keys? What are the security benefits?</li>
+                <li>Explain the key hierarchy used in HSMs (DMK, Master KEKs, Domain KEKs, Operational Keys). How does this hierarchy provide security?</li>
+                <li>What is the purpose of the CKA_EXTRACTABLE attribute? When should it be set to false?</li>
+                <li>Describe three different key backup methods. What are the advantages and disadvantages of each?</li>
+                <li>How does M-of-N secret sharing work? Provide an example use case and explain why it's more secure than a single backup.</li>
+                <li>Why is key rotation important? List at least four reasons organizations rotate keys.</li>
+                <li>Compare scheduled rotation, usage-based rotation, and event-driven rotation. When would you use each strategy?</li>
+                <li>Describe the secure key destruction process. Why are multiple overwrite passes necessary?</li>
+                <li>What are the security risks of key escrow? How can these risks be mitigated if escrow is required?</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-03.html" class="nav-link">← Previous Chapter</a>
+            <a href="chapter-05.html" class="nav-link">Next Chapter →</a>
+        </div>
+
+        <p>Benefit All Humanity</p>
+            <p>&copy; 2025 WIA (World Certification Industry Association)</p>
+        </div>
+    </div>
+</body>
+</html>

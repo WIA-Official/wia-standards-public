@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Graph Data Modeling | WIA-DATA-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        .summary-box { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 0.5rem; margin: 3rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 2</div>
+            <h1>Graph Data Modeling</h1>
+        </header>
+
+        <p>Effective graph data modeling is the foundation of a successful graph database implementation. Unlike relational modeling, which focuses on normalizing data into tables, graph modeling emphasizes the natural relationships in your domain. This chapter explores principles, patterns, and best practices for designing graph schemas that are both performant and maintainable.</p>
+
+        <h2>Understanding Graph Data Models</h2>
+
+        <p>Graph data modeling starts with identifying entities (nodes) and their relationships (edges). The key is to think in terms of connections rather than tables. What matters most are the questions you need to answer and the patterns you need to traverse.</p>
+
+        <h3>The Whiteboard Model</h3>
+
+        <p>One of the most powerful aspects of graph databases is that your initial whiteboard sketch can directly translate into your database schema. When stakeholders draw diagrams with circles and arrows to explain their domain, that diagram IS your data model.</p>
+
+        <div class="highlight-box">
+            <strong>Modeling Principle:</strong> In graph databases, you model what you whiteboard. There's no impedance mismatch between your conceptual model and your implementation.
+        </div>
+
+        <h3>Nodes: Representing Entities</h3>
+
+        <p>Nodes represent the entities in your domain. Each node can have:</p>
+
+        <ul>
+            <li><strong>Labels:</strong> Categories or types (e.g., Person, Product, Company). A node can have multiple labels.</li>
+            <li><strong>Properties:</strong> Key-value pairs storing attributes (e.g., name, email, createdDate)</li>
+            <li><strong>ID:</strong> A unique identifier (often auto-generated)</li>
+        </ul>
+
+        <h3>Edges: Modeling Relationships</h3>
+
+        <p>Edges connect nodes and represent relationships. Each edge has:</p>
+
+        <ul>
+            <li><strong>Type:</strong> A single relationship type (e.g., KNOWS, PURCHASED, WORKS_FOR)</li>
+            <li><strong>Direction:</strong> From one node to another (though you can traverse in both directions)</li>
+            <li><strong>Properties:</strong> Metadata about the relationship (e.g., since, weight, score)</li>
+        </ul>
+
+        <h2>Modeling Principles</h2>
+
+        <p>Several key principles guide effective graph modeling:</p>
+
+        <h3>1. Model Based on Use Cases</h3>
+
+        <p>Start with the questions you need to answer. Your data model should optimize for your most important queries. List your top 10 queries and ensure your model supports them efficiently.</p>
+
+        <p><strong>Example Questions:</strong></p>
+        <ul>
+            <li>Who are Alice's friends?</li>
+            <li>What products did users who bought X also purchase?</li>
+            <li>What's the shortest path between two people?</li>
+            <li>Which accounts are involved in suspicious transaction patterns?</li>
+        </ul>
+
+        <h3>2. Nodes for Entities, Edges for Relationships</h3>
+
+        <p>The fundamental rule: if something is a discrete entity that you might want to query independently, make it a node. If it only exists to connect two entities, make it a relationship.</p>
+
+        <div class="highlight-box">
+            <strong>Decision Rule:</strong>
+            <ul style="margin-top: 1rem; margin-bottom: 0;">
+                <li>Has independent meaning? → Node</li>
+                <li>Connects other things? → Relationship</li>
+                <li>Has many attributes of its own? → Probably a node</li>
+                <li>Might have relationships to other things? → Definitely a node</li>
+            </ul>
+        </div>
+
+        <h3>3. Fine-Grained vs. Aggregated Models</h3>
+
+        <p>Choose the appropriate granularity for your use case:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Fine-Grained</th>
+                    <th>Aggregated</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Level of Detail</td>
+                    <td>Every interaction is a node</td>
+                    <td>Summarized interactions</td>
+                </tr>
+                <tr>
+                    <td>Example</td>
+                    <td>Every email is a node</td>
+                    <td>Email count as edge property</td>
+                </tr>
+                <tr>
+                    <td>Best For</td>
+                    <td>Detailed analysis, audit trails</td>
+                    <td>Performance, analytics</td>
+                </tr>
+                <tr>
+                    <td>Trade-off</td>
+                    <td>More nodes, detailed queries</td>
+                    <td>Fewer nodes, faster traversals</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4. Relationship Direction Matters</h3>
+
+        <p>Always give relationships a meaningful direction, even if you plan to traverse in both directions. This adds semantic clarity and often improves query performance.</p>
+
+        <pre><code>// Good: Clear semantic meaning
+(person:Person)-[:PURCHASED]->(product:Product)
+(employee:Person)-[:WORKS_FOR]->(company:Company)
+
+// Avoid: Bidirectional relationship names
+(person)-[:CONNECTED_TO]-(person) // Which direction?
+</code></pre>
+
+        <h3>5. Use Specific Relationship Types</h3>
+
+        <p>Specific relationship types make queries more efficient and expressive:</p>
+
+        <pre><code>// Good: Specific types
+(user)-[:FRIEND_REQUEST_SENT]->(other)
+(user)-[:FRIEND_REQUEST_RECEIVED]-(other)
+(user)-[:FRIENDS_WITH]-(other)
+
+// Less Good: Generic types with properties
+(user)-[:RELATIONSHIP {type: 'friend_request', direction: 'sent'}]->(other)
+</code></pre>
+
+        <h2>Common Modeling Patterns</h2>
+
+        <p>Several patterns appear frequently in graph modeling:</p>
+
+        <h3>Pattern 1: Intermediate Nodes</h3>
+
+        <p>When a relationship has many properties or connects to other entities, consider making it a node:</p>
+
+        <pre><code>// Before: Relationship with many properties
+(user)-[:EMPLOYED {title: 'Engineer', salary: 100000, startDate: '2020-01-01',
+                   department: 'Engineering', manager: 'Bob'}]->(company)
+
+// Better: Employment as a node
+(user)-[:HAS_EMPLOYMENT]->(employment:Employment)
+(employment)-[:AT_COMPANY]->(company)
+(employment)-[:IN_DEPARTMENT]->(dept:Department)
+(employment)-[:MANAGED_BY]->(manager:Person)
+</code></pre>
+
+        <p>This pattern is especially useful for:</p>
+        <ul>
+            <li>Many-to-many relationships with attributes (e.g., enrollments, assignments)</li>
+            <li>Temporal relationships (e.g., employment history, project assignments)</li>
+            <li>Relationships that themselves have relationships (e.g., a transaction that involves a merchant)</li>
+        </ul>
+
+        <h3>Pattern 2: Linked Lists for Ordering</h3>
+
+        <p>To maintain ordered sequences, use linked list patterns:</p>
+
+        <pre><code>// Maintain order of events
+(event1:Event)-[:NEXT]->(event2:Event)-[:NEXT]->(event3:Event)
+
+// Or bidirectional for easy traversal
+(event1)-[:NEXT]->(event2)<-[:PREV]-(event1)
+</code></pre>
+
+        <h3>Pattern 3: Time Trees</h3>
+
+        <p>For time-based queries, organize temporal data in tree structures:</p>
+
+        <pre><code>// Year -> Month -> Day -> Event
+(root:Root)
+  -[:YEAR]->(y2024:Year {year: 2024})
+    -[:MONTH]->(m01:Month {month: 1})
+      -[:DAY]->(d15:Day {day: 15})
+        -[:EVENT]->(event:Event)
+</code></pre>
+
+        <p>This enables efficient queries like "all events in January 2024" without scanning all events.</p>
+
+        <h3>Pattern 4: Category Hierarchies</h3>
+
+        <p>Model taxonomies and hierarchies naturally:</p>
+
+        <pre><code>(electronics:Category {name: 'Electronics'})
+  -[:SUBCATEGORY]->(computers:Category {name: 'Computers'})
+    -[:SUBCATEGORY]->(laptops:Category {name: 'Laptops'})
+
+(product)-[:IN_CATEGORY]->(laptops)
+</code></pre>
+
+        <h3>Pattern 5: Hyperedges with Intermediate Nodes</h3>
+
+        <p>When a relationship involves more than two entities:</p>
+
+        <pre><code>// A transaction involves a buyer, seller, and product
+(buyer:User)-[:BUYER]->(transaction:Transaction)
+(seller:User)-[:SELLER]->(transaction)
+(product:Product)-[:ITEM]->(transaction)
+(transaction {date: '2024-01-15', amount: 99.99})
+</code></pre>
+
+        <h2>Schema Design Considerations</h2>
+
+        <h3>Labeling Strategy</h3>
+
+        <p>Choose a consistent labeling strategy for your nodes:</p>
+
+        <ul>
+            <li><strong>Single Label:</strong> Each node has one primary label (simple, but less flexible)</li>
+            <li><strong>Multiple Labels:</strong> Nodes can have multiple labels (Person:Employee, Person:Manager)</li>
+            <li><strong>Label Hierarchy:</strong> Use labels to represent type hierarchies</li>
+        </ul>
+
+        <p><strong>Best Practice:</strong> Use singular nouns for labels (Person, not People) and UPPER_SNAKE_CASE for relationship types (WORKS_FOR, not worksFor).</p>
+
+        <h3>Property Design</h3>
+
+        <p>Guidelines for properties:</p>
+
+        <ul>
+            <li><strong>Atomic Values:</strong> Keep properties simple (strings, numbers, booleans, dates)</li>
+            <li><strong>Arrays:</strong> Supported for lists of values, but consider if these should be separate nodes</li>
+            <li><strong>Denormalization:</strong> Unlike relational databases, some denormalization is acceptable for performance</li>
+            <li><strong>NULL Values:</strong> Properties that don't exist are cheaper than properties set to null</li>
+        </ul>
+
+        <h3>Indexing Strategy</h3>
+
+        <p>Plan your indexes based on access patterns:</p>
+
+        <pre><code>// Create index on frequently queried properties
+CREATE INDEX person_email FOR (p:Person) ON (p.email);
+CREATE INDEX product_sku FOR (p:Product) ON (p.sku);
+
+// Composite indexes for multiple properties
+CREATE INDEX person_name_city FOR (p:Person) ON (p.lastName, p.city);
+
+// Full-text indexes for text search
+CREATE FULLTEXT INDEX person_search FOR (p:Person) ON EACH [p.name, p.bio];
+</code></pre>
+
+        <h2>Anti-Patterns to Avoid</h2>
+
+        <p>Common mistakes in graph modeling:</p>
+
+        <h3>1. Property Overload</h3>
+
+        <p><strong>Problem:</strong> Storing too much data as properties instead of relationships</p>
+
+        <pre><code>// Bad: Address as properties
+(person {street: '123 Main St', city: 'NYC', state: 'NY', zip: '10001'})
+
+// Better: Address as related node
+(person)-[:LIVES_AT]->(address:Address {street: '123 Main St', ...})
+</code></pre>
+
+        <h3>2. Dense Nodes</h3>
+
+        <p><strong>Problem:</strong> Nodes with thousands or millions of relationships can cause performance issues</p>
+
+        <p><strong>Solution:</strong> Use intermediate nodes or categorization:</p>
+
+        <pre><code>// Bad: Every user connected to one category node
+(user)-[:INTERESTED_IN]->(sports:Category)
+// This creates a "supernode" with millions of connections
+
+// Better: Use subcategories or intermediate groupings
+(user)-[:INTERESTED_IN]->(football:Subcategory)-[:PARENT]->(sports:Category)
+</code></pre>
+
+        <h3>3. Using Relationships as Attributes</h3>
+
+        <p><strong>Problem:</strong> Creating relationships to represent simple attributes</p>
+
+        <pre><code>// Bad: Color as a node for every product
+(product)-[:HAS_COLOR]->(red:Color)
+
+// Better: Color as a property (unless colors have relationships)
+(product {color: 'red'})
+</code></pre>
+
+        <h3>4. Ignoring Query Patterns</h3>
+
+        <p><strong>Problem:</strong> Modeling "correctly" without considering actual queries</p>
+
+        <p><strong>Solution:</strong> Design for your queries first, theoretical purity second. If you always traverse A→B→C together, optimize that path.</p>
+
+        <h2>Modeling for Different Domains</h2>
+
+        <h3>Social Networks</h3>
+
+        <pre><code>// Core model
+(person:Person {name, email, joinedDate})
+(person)-[:KNOWS {since}]->(friend:Person)
+(person)-[:POSTED]->(post:Post {content, timestamp})
+(person)-[:LIKES]->(post)
+(person)-[:COMMENTED {text, timestamp}]->(post)
+(post)-[:TAGGED]->(topic:Topic)
+</code></pre>
+
+        <h3>E-Commerce</h3>
+
+        <pre><code>// Customer and products
+(customer:User {name, email})
+(product:Product {name, price, sku})
+(category:Category {name})
+
+// Purchase history
+(customer)-[:PURCHASED {date, quantity}]->(product)
+(product)-[:IN_CATEGORY]->(category)
+(category)-[:SUBCATEGORY]->(parent:Category)
+
+// Recommendations
+(customer)-[:VIEWED]->(product)
+(customer)-[:ADDED_TO_CART]->(product)
+(customer)-[:REVIEWED {rating, text, date}]->(product)
+</code></pre>
+
+        <h3>Fraud Detection</h3>
+
+        <pre><code>// Accounts and transactions
+(account:Account {accountNumber, balance})
+(transaction:Transaction {amount, timestamp, type})
+(device:Device {deviceId, ipAddress})
+
+// Relationships
+(account)-[:INITIATED]->(transaction)
+(transaction)-[:TO_ACCOUNT]->(recipient:Account)
+(device)-[:USED_FOR]->(transaction)
+(person:Person)-[:OWNS]->(account)
+
+// Risk indicators
+(account)-[:SHARES_PHONE]->(account2)
+(account)-[:SHARES_ADDRESS]->(account2)
+</code></pre>
+
+        <h2>Migrating from Relational Models</h2>
+
+        <p>When migrating from a relational database:</p>
+
+        <h3>Tables → Nodes</h3>
+
+        <p>Most tables become node labels. Each row becomes a node.</p>
+
+        <pre><code>-- SQL Table
+CREATE TABLE persons (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100)
+);
+
+// Graph Equivalent
+CREATE (p:Person {id: 1, name: 'Alice', email: 'alice@example.com'})
+</code></pre>
+
+        <h3>Foreign Keys → Relationships</h3>
+
+        <p>Foreign key relationships become edges:</p>
+
+        <pre><code>-- SQL
+CREATE TABLE employees (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    company_id INT REFERENCES companies(id)
+);
+
+// Graph
+(employee:Employee)-[:WORKS_FOR]->(company:Company)
+</code></pre>
+
+        <h3>Join Tables → Relationships or Intermediate Nodes</h3>
+
+        <p>Many-to-many join tables can become either relationships (if simple) or intermediate nodes (if they have attributes):</p>
+
+        <pre><code>-- SQL Join Table
+CREATE TABLE enrollments (
+    student_id INT REFERENCES students(id),
+    course_id INT REFERENCES courses(id),
+    grade VARCHAR(2),
+    semester VARCHAR(20)
+);
+
+// Graph Option 1: Relationship with properties
+(student)-[:ENROLLED {grade: 'A', semester: 'Fall 2024'}]->(course)
+
+// Graph Option 2: Intermediate node (better for complex cases)
+(student)-[:HAS_ENROLLMENT]->(enrollment:Enrollment)
+(enrollment)-[:IN_COURSE]->(course)
+(enrollment {grade: 'A', semester: 'Fall 2024'})
+</code></pre>
+
+        <h2>Testing Your Model</h2>
+
+        <p>Before finalizing your schema:</p>
+
+        <ol>
+            <li><strong>Write Sample Queries:</strong> Express your top 10 queries in Cypher to verify the model supports them efficiently</li>
+            <li><strong>Check Traversal Depth:</strong> Ensure common queries don't require excessive hops (>4-5 is often too many)</li>
+            <li><strong>Load Test Data:</strong> Import a representative dataset and measure query performance</li>
+            <li><strong>Review with Stakeholders:</strong> Draw your graph model and verify it matches domain understanding</li>
+            <li><strong>Plan for Evolution:</strong> Ensure you can add new node types and relationships without breaking existing queries</li>
+        </ol>
+
+        <h2>Model Evolution and Versioning</h2>
+
+        <p>Graph schemas are flexible, but plan for evolution:</p>
+
+        <h3>Adding New Elements</h3>
+
+        <p>Adding new node labels, relationship types, or properties is straightforward and non-breaking:</p>
+
+        <pre><code>// Add a new relationship type
+MATCH (p:Person), (c:Company)
+WHERE p.companyName = c.name
+CREATE (p)-[:WORKS_FOR]->(c);
+
+// Add properties to existing nodes
+MATCH (p:Person)
+SET p.status = 'active';
+</code></pre>
+
+        <h3>Refactoring Existing Structure</h3>
+
+        <p>When you need to change existing structure:</p>
+
+        <pre><code>// Split a property into separate nodes
+MATCH (p:Product)
+WHERE p.category IS NOT NULL
+MERGE (c:Category {name: p.category})
+CREATE (p)-[:IN_CATEGORY]->(c)
+REMOVE p.category;
+</code></pre>
+
+        <h3>Versioning Strategies</h3>
+
+        <ul>
+            <li><strong>Parallel Structures:</strong> Run old and new models simultaneously during migration</li>
+            <li><strong>Property Versioning:</strong> Use property prefixes (v1_name, v2_name) during transition</li>
+            <li><strong>Label Versioning:</strong> Use version-specific labels (PersonV1, PersonV2) for major changes</li>
+        </ul>
+
+        <div class="summary-box">
+            <h3 style="margin-bottom: 1rem;">Chapter Summary</h3>
+            <p>Graph data modeling is an iterative process that starts with understanding your domain and the questions you need to answer. By modeling entities as nodes and relationships as edges, and following established patterns, you can create schemas that are both intuitive and performant. Remember that graph databases are schema-flexible, allowing your model to evolve as your understanding deepens.</p>
+            <p style="margin-top: 1rem;">In the next chapter, we'll explore Neo4j in depth, learning how to implement these modeling principles in the world's most popular graph database.</p>
+        </div>
+
+        </div>
+</body>
+</html>

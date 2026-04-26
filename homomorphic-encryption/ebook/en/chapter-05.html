@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Performance Optimization | WIA-SEC-012</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .ebook-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .back-link { display: inline-block; color: #EF4444; text-decoration: none; margin-bottom: 30px; font-size: 16px; transition: color 0.3s; }
+        .back-link:hover { color: #f87171; }
+        .chapter-header { text-align: center; padding: 60px 40px; background: linear-gradient(135deg, #EF4444 0%, #dc2626 100%); border-radius: 20px; margin-bottom: 60px; box-shadow: 0 20px 60px rgba(239, 68, 68, 0.4); }
+        .chapter-number { color: #fecaca; font-size: 16px; font-weight: 600; letter-spacing: 3px; margin-bottom: 15px; }
+        .chapter-header h1 { font-size: 42px; color: white; margin-bottom: 20px; font-weight: 700; }
+        .chapter h2 { font-size: 32px; color: #EF4444; margin: 50px 0 25px; font-weight: 700; border-bottom: 3px solid #EF4444; padding-bottom: 10px; }
+        .chapter h3 { font-size: 26px; color: #f87171; margin: 35px 0 20px; font-weight: 600; }
+        .chapter h4 { font-size: 22px; color: #fca5a5; margin: 25px 0 15px; font-weight: 600; }
+        .chapter p { margin-bottom: 20px; font-size: 18px; color: #cbd5e1; text-align: justify; }
+        .chapter ul, .chapter ol { margin: 20px 0 20px 40px; color: #cbd5e1; }
+        .chapter li { margin-bottom: 12px; font-size: 18px; }
+        .highlight-box { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #EF4444; padding: 25px; margin: 30px 0; border-radius: 8px; }
+        .highlight-box h4 { color: #EF4444; margin-top: 0; margin-bottom: 15px; }
+        .info-box { background: #1e293b; border: 2px solid #334155; padding: 25px; margin: 30px 0; border-radius: 12px; }
+        .info-box h4 { color: #EF4444; margin-top: 0; margin-bottom: 15px; }
+        code { background: #1e293b; padding: 3px 8px; border-radius: 4px; font-family: 'Courier New', monospace; color: #94f3b0; font-size: 16px; }
+        pre { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 25px; overflow-x: auto; margin: 25px 0; }
+        pre code { background: none; padding: 0; display: block; line-height: 1.6; }
+        .formula { text-align: center; font-style: italic; font-size: 20px; margin: 30px 0; color: #fca5a5; background: #1e293b; padding: 20px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 30px 0; background: #1e293b; border-radius: 12px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #EF4444; color: white; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+        .summary-box { background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%); border: 2px solid #EF4444; padding: 30px; margin: 40px 0; border-radius: 12px; }
+        .summary-box h3 { color: #EF4444; margin-top: 0; }
+        .review-questions { background: #1e293b; padding: 30px; margin: 40px 0; border-radius: 12px; border: 2px solid #334155; }
+        .review-questions h3 { color: #EF4444; margin-top: 0; }
+        .review-questions ol { margin-left: 20px; }
+        footer { text-align: center; padding: 60px 20px; margin-top: 100px; border-top: 2px solid #334155; }
+        .philosophy { font-size: 24px; color: #EF4444; margin-bottom: 15px; font-weight: 600; }
+        @media (max-width: 768px) { .chapter-header h1 { font-size: 32px; } .chapter h2 { font-size: 26px; } }
+    </style>
+</head>
+<body>
+    <div class="ebook-container">
+        <a href="index.html" class="back-link">← Back to Table of Contents</a>
+
+        <div class="chapter-header">
+            <div class="chapter-number">CHAPTER 5</div>
+            <h1>Performance Optimization</h1>
+        </div>
+
+        <div class="chapter">
+            <h2>The Performance Challenge</h2>
+
+            <p>Homomorphic encryption's primary barrier to adoption has always been performance. HE operations can be 100-10,000x slower than plaintext equivalents. However, through careful optimization, proper parameter selection, and hardware acceleration, HE can achieve practical performance for many real-world applications. This chapter explores proven techniques to maximize HE performance.</p>
+
+            <h2>Understanding Performance Bottlenecks</h2>
+
+            <h3>Operation Cost Analysis</h3>
+
+            <table>
+                <tr><th>Operation</th><th>Complexity</th><th>Typical Time (BFV, n=8192)</th><th>Bottleneck</th></tr>
+                <tr><td>Key Generation</td><td>O(n log n)</td><td>~100ms</td><td>RNG, NTT</td></tr>
+                <tr><td>Encryption</td><td>O(n log n)</td><td>~5ms</td><td>Polynomial mult, RNG</td></tr>
+                <tr><td>Decryption</td><td>O(n log n)</td><td>~3ms</td><td>Polynomial mult</td></tr>
+                <tr><td>Addition</td><td>O(n)</td><td>~0.1ms</td><td>Memory bandwidth</td></tr>
+                <tr><td>Multiplication</td><td>O(n log n)</td><td>~10ms</td><td>NTT, relinearization</td></tr>
+                <tr><td>Rotation</td><td>O(n log n)</td><td>~8ms</td><td>Galois automorphism</td></tr>
+                <tr><td>Bootstrapping</td><td>O(n² log n)</td><td>~10s</td><td>Homomorphic decryption</td></tr>
+            </table>
+
+            <h3>Memory Requirements</h3>
+
+            <p>HE is memory-intensive. Understanding memory patterns enables optimization:</p>
+
+            <pre><code>BFV Ciphertext Size (n=8192, log q=218):
+- 2 polynomials × 8192 coefficients × 27 bytes ≈ 440 KB
+
+Relinearization Keys:
+- ~10-20 MB per key set
+
+Total Memory for Typical Application:
+- 100 ciphertexts: ~45 MB
+- Evaluation keys: ~50 MB
+- Working memory: ~100 MB
+- Total: ~200 MB (fits in CPU cache hierarchy)</code></pre>
+
+            <h2>Batching and SIMD</h2>
+
+            <h3>CRT Batching in BFV/BGV</h3>
+
+            <p>Process multiple values simultaneously using the Chinese Remainder Theorem:</p>
+
+            <pre><code>// Without batching: encrypt 1000 values → 1000 ciphertexts
+// With batching: encrypt 1000 values → 1 ciphertext (if n/2 ≥ 1000)
+
+// SEAL batching example
+BatchEncoder encoder(context);
+vector<int64_t> values(poly_modulus_degree / 2, 0);
+values[0] = 1;
+values[1] = 2;
+// ... fill all slots ...
+values[4095] = 4096;
+
+Plaintext plain;
+encoder.encode(values, plain);
+Ciphertext cipher;
+encryptor.encrypt(plain, cipher);
+
+// One operation affects ALL values
+evaluator.square(cipher, cipher);  // Squares all 4096 values!</code></pre>
+
+            <h3>SIMD Operations</h3>
+
+            <p>Design algorithms to exploit batching:</p>
+
+            <div class="highlight-box">
+                <h4>Example: Encrypted Database Sum</h4>
+                <pre><code>// Naive: n ciphertexts, n-1 additions
+total = ct[0]
+for i in 1..n:
+    total = add(total, ct[i])
+
+// Optimized: batch into fewer ciphertexts, tree reduction
+// If n=4096 values, batch into 1 ciphertext
+// Use rotations and additions to sum
+result = ct[0]
+for shift in [1, 2, 4, 8, ..., 2048]:
+    rotated = rotate(ct[0], shift)
+    result = add(result, rotated)
+// Now result[0] contains sum of all values!
+// Reduction: log₂(4096) = 12 operations vs 4095</code></pre>
+            </div>
+
+            <h3>Batching Strategies</h3>
+
+            <ul>
+                <li><strong>Horizontal batching:</strong> Same operation on multiple data points (e.g., matrix row)</li>
+                <li><strong>Vertical batching:</strong> Different operations packed together</li>
+                <li><strong>Hybrid batching:</strong> Combine both for maximum efficiency</li>
+                <li><strong>Padding:</strong> Fill unused slots with zeros (minimal overhead)</li>
+            </ul>
+
+            <h2>Number Theoretic Transform (NTT)</h2>
+
+            <h3>Why NTT Matters</h3>
+
+            <p>Polynomial multiplication is the heart of HE. NTT reduces complexity from O(n²) to O(n log n):</p>
+
+            <div class="formula">
+                c(x) = a(x) × b(x) mod (x<sup>n</sup> + 1)
+            </div>
+
+            <pre><code>// Naive multiplication: O(n²)
+for i in 0..n:
+    for j in 0..n:
+        result[(i+j) mod n] += a[i] * b[j]
+
+// NTT multiplication: O(n log n)
+A = NTT(a)
+B = NTT(b)
+C = A ⊙ B  // Point-wise multiplication O(n)
+c = INTT(C)</code></pre>
+
+            <h3>NTT Optimization Techniques</h3>
+
+            <ul>
+                <li><strong>Precomputation:</strong> Cache twiddle factors (roots of unity)</li>
+                <li><strong>Lazy reduction:</strong> Delay modular reduction until necessary</li>
+                <li><strong>Specialized primes:</strong> Choose q for fast modular arithmetic</li>
+                <li><strong>SIMD instructions:</strong> Vectorize NTT butterfly operations</li>
+            </ul>
+
+            <pre><code>// Optimized NTT with AVX2
+__m256i ntt_butterfly_avx2(__m256i a, __m256i b, __m256i w, __m256i q) {
+    __m256i t = _mm256_mul_epu32(b, w);
+    t = _mm256_rem_epu32(t, q);  // Montgomery reduction
+    __m256i u = _mm256_add_epi64(a, t);
+    __m256i v = _mm256_sub_epi64(a, t);
+    return _mm256_blend_epi32(u, v, 0xAA);
+}</code></pre>
+
+            <h2>Parameter Optimization</h2>
+
+            <h3>Choosing Optimal Parameters</h3>
+
+            <table>
+                <tr><th>Goal</th><th>Parameter Choices</th><th>Trade-offs</th></tr>
+                <tr><td>Maximum speed</td><td>Small n (4096), minimal q</td><td>Low security, shallow depth</td></tr>
+                <tr><td>Deep computation</td><td>Large q chain, many primes</td><td>Slower, larger ciphertexts</td></tr>
+                <tr><td>Large batching</td><td>Large n (16384+)</td><td>Slower operations</td></tr>
+                <tr><td>Small ciphertexts</td><td>Small n, small q</td><td>Limited functionality</td></tr>
+                <tr><td>High security</td><td>Large n (32768), conservative q</td><td>Very slow</td></tr>
+            </table>
+
+            <h3>Dynamic Parameter Selection</h3>
+
+            <p>Adjust parameters based on circuit depth:</p>
+
+            <pre><code>// Analyze computation before execution
+circuit_depth = analyze_depth(my_function)
+
+if circuit_depth <= 5:
+    params = small_params()  // Fast, n=4096
+elif circuit_depth <= 10:
+    params = medium_params()  // Balanced, n=8192
+else:
+    params = large_params_with_bootstrap()  // n=16384</code></pre>
+
+            <h2>Algorithmic Optimizations</h2>
+
+            <h3>Minimize Multiplicative Depth</h3>
+
+            <p>Multiplications are expensive. Restructure algorithms to reduce depth:</p>
+
+            <div class="info-box">
+                <h4>Example: Polynomial Evaluation</h4>
+                <pre><code>// Naive: f(x) = a₀ + a₁x + a₂x² + a₃x³ + a₄x⁴
+// Depth: 4 (need x, x², x³, x⁴)
+result = a₀ + a₁*x + a₂*(x*x) + a₃*(x*x*x) + a₄*(x*x*x*x)
+
+// Horner's method: f(x) = a₀ + x(a₁ + x(a₂ + x(a₃ + x·a₄)))
+// Depth: 4 but sequential (can't parallelize)
+result = a₀
+for i in [1, 2, 3, 4]:
+    result = a_i + x * result
+
+// Paterson-Stockmeyer: balanced tree
+// Depth: 2 (optimal!)
+y = x²
+result = (a₀ + a₁*x) + y*(a₂ + a₃*x) + y²*a₄</code></pre>
+            </div>
+
+            <h3>Plaintext-Ciphertext Operations</h3>
+
+            <p>When possible, keep one operand as plaintext:</p>
+
+            <pre><code>// Slow: encrypt constants, multiply ciphertexts
+ct_5 = encrypt(5)
+result = multiply(ct_x, ct_5)  // Full multiplication
+
+// Fast: multiply ciphertext by plaintext constant
+result = multiply_plain(ct_x, 5)  // 10x faster!</code></pre>
+
+            <h3>Approximation Techniques</h3>
+
+            <p>For CKKS and approximate computation:</p>
+
+            <ul>
+                <li><strong>Low-degree polynomials:</strong> Approximate activation functions</li>
+                <li><strong>Iterative refinement:</strong> Start with low precision, refine if needed</li>
+                <li><strong>Truncation:</strong> Drop least significant bits early</li>
+                <li><strong>Quantization:</strong> Reduce bit width of values</li>
+            </ul>
+
+            <h2>Hardware Acceleration</h2>
+
+            <h3>CPU Optimization</h3>
+
+            <div class="highlight-box">
+                <h4>SIMD Instructions</h4>
+                <ul>
+                    <li><strong>AVX2:</strong> 256-bit vectors, process 4 64-bit integers simultaneously</li>
+                    <li><strong>AVX-512:</strong> 512-bit vectors, 8 integers simultaneously</li>
+                    <li><strong>ARM NEON:</strong> SIMD for ARM processors</li>
+                </ul>
+                <p>Typical speedup: 2-4x for NTT operations</p>
+            </div>
+
+            <h3>GPU Acceleration</h3>
+
+            <p>GPUs excel at parallel polynomial operations:</p>
+
+            <table>
+                <tr><th>Operation</th><th>CPU Time</th><th>GPU Time</th><th>Speedup</th></tr>
+                <tr><td>NTT (n=16384)</td><td>2ms</td><td>0.1ms</td><td>20x</td></tr>
+                <tr><td>Multiplication</td><td>15ms</td><td>0.8ms</td><td>19x</td></tr>
+                <tr><td>Bootstrapping</td><td>12s</td><td>400ms</td><td>30x</td></tr>
+            </table>
+
+            <pre><code>// CUDA kernel for NTT butterfly
+__global__ void ntt_layer_kernel(uint64_t* data, uint64_t* twiddles,
+                                  uint64_t q, int layer) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int m = 1 << layer;
+    int k = idx / m;
+    int j = idx % m;
+
+    uint64_t w = twiddles[m + j];
+    uint64_t u = data[2*k*m + j];
+    uint64_t v = mulmod(data[2*k*m + j + m], w, q);
+
+    data[2*k*m + j] = addmod(u, v, q);
+    data[2*k*m + j + m] = submod(u, v, q);
+}</code></pre>
+
+            <h3>FPGAs and ASICs</h3>
+
+            <p>Custom hardware for maximum performance:</p>
+
+            <ul>
+                <li><strong>FPGA implementations:</strong> 5-10x over GPU for specific operations</li>
+                <li><strong>ASIC designs:</strong> 100x potential speedup (under development)</li>
+                <li><strong>Specialized NTT units:</strong> Dedicated polynomial multiplication engines</li>
+            </ul>
+
+            <h2>Memory Optimization</h2>
+
+            <h3>Ciphertext Compression</h3>
+
+            <pre><code>// Standard ciphertext: 2 polynomials × n × log q bits
+// Compressed: 1 polynomial + seed
+// Size reduction: ~50%
+
+// Seed-based randomness (for public key)
+Ciphertext compress(Ciphertext ct, PublicKey pk) {
+    // Keep c₀, compress c₁ using seed
+    seed = extract_seed(ct.c1, pk);
+    return CompressedCiphertext(ct.c0, seed);
+}
+
+Ciphertext decompress(CompressedCiphertext cct, PublicKey pk) {
+    c1 = regenerate_from_seed(cct.seed, pk);
+    return Ciphertext(cct.c0, c1);
+}</code></pre>
+
+            <h3>Lazy Evaluation</h3>
+
+            <p>Defer expensive operations until results are needed:</p>
+
+            <pre><code>// Build computation graph, optimize before executing
+graph = ComputationGraph()
+x = graph.encrypt(data)
+y = graph.add(x, x)
+z = graph.multiply(y, y)
+result = graph.add(z, x)
+
+// Optimize graph
+optimized = graph.optimize()  // Combine operations, reorder
+output = optimized.execute()  // Execute efficiently</code></pre>
+
+            <h3>Cache Optimization</h3>
+
+            <ul>
+                <li><strong>Data layout:</strong> Arrange polynomials for cache-friendly access</li>
+                <li><strong>Blocking:</strong> Process data in cache-sized chunks</li>
+                <li><strong>Prefetching:</strong> Load data before needed</li>
+                <li><strong>Key reuse:</strong> Keep frequently-used keys in cache</li>
+            </ul>
+
+            <h2>Parallel Execution</h2>
+
+            <h3>Multi-threading</h3>
+
+            <pre><code>// Process multiple ciphertexts in parallel
+#pragma omp parallel for
+for (int i = 0; i < num_ciphertexts; i++) {
+    results[i] = evaluate_circuit(ciphertexts[i]);
+}
+
+// Pipeline stages
+Thread 1: Encrypt batch 1
+Thread 2: Compute batch 0 (while Thread 1 encrypts)
+Thread 3: Decrypt batch -1 (while others work)</code></pre>
+
+            <h3>Distributed Computing</h3>
+
+            <p>Scale across multiple machines:</p>
+
+            <div class="info-box">
+                <h4>Map-Reduce Pattern for HE</h4>
+                <pre><code>// Map: Distribute ciphertexts to workers
+workers = [Worker1, Worker2, ..., WorkerN]
+for i, worker in enumerate(workers):
+    worker.send(ciphertexts[i::N])  // Every Nth ciphertext
+
+// Compute: Each worker processes its share
+results = parallel_map(lambda ct: compute(ct), ciphertexts)
+
+// Reduce: Aggregate results homomorphically
+final = tree_reduce(lambda a, b: add(a, b), results)</code></pre>
+            </div>
+
+            <h2>Real-World Performance Examples</h2>
+
+            <h3>Case Study: Neural Network Inference</h3>
+
+            <table>
+                <tr><th>Optimization</th><th>Before</th><th>After</th><th>Technique</th></tr>
+                <tr><td>Baseline (naive)</td><td>2 hours</td><td>-</td><td>-</td></tr>
+                <tr><td>+ SIMD batching</td><td>2 hours</td><td>8 minutes</td><td>Batch 128 inputs</td></tr>
+                <tr><td>+ Low-degree approx</td><td>8 minutes</td><td>2 minutes</td><td>Polynomial activation</td></tr>
+                <tr><td>+ GPU acceleration</td><td>2 minutes</td><td>6 seconds</td><td>CUDA backend</td></tr>
+                <tr><td>+ Algorithm tuning</td><td>6 seconds</td><td>3 seconds</td><td>Reduce depth</td></tr>
+            </table>
+
+            <p>Total speedup: 2400x (2 hours → 3 seconds)</p>
+
+            <h3>Case Study: Database Query</h3>
+
+            <pre><code>// Query: SELECT AVG(salary) FROM employees WHERE age > 30
+
+// Naive approach: 10,000 employees, 1 ciphertext each
+// Time: ~50 seconds
+
+// Optimized approach:
+// 1. Batch 4096 employees per ciphertext (3 ciphertexts total)
+// 2. Use comparison circuit for age > 30
+// 3. Parallel execution on 3 ciphertexts
+// 4. Tree reduction for average
+// Time: ~800ms
+
+// Speedup: 62x</code></pre>
+
+            <div class="summary-box">
+                <h3>Chapter Summary</h3>
+                <ul>
+                    <li>HE performance bottlenecks: polynomial multiplication (NTT), relinearization, bootstrapping</li>
+                    <li>Batching via CRT enables SIMD-style operations on n/2 values simultaneously</li>
+                    <li>NTT reduces polynomial multiplication from O(n²) to O(n log n)</li>
+                    <li>Parameter optimization crucial: balance security, depth, and performance</li>
+                    <li>Algorithmic optimization: minimize multiplicative depth, use Horner's method, exploit plaintext-ciphertext operations</li>
+                    <li>Hardware acceleration: SIMD (2-4x), GPU (10-30x), FPGA (5-10x), ASIC (100x potential)</li>
+                    <li>Memory optimization: ciphertext compression, lazy evaluation, cache-friendly layouts</li>
+                    <li>Parallelism: multi-threading for multiple ciphertexts, distributed computing for massive scale</li>
+                    <li>Real-world speedups: 100-1000x achievable through combined optimizations</li>
+                    <li>Modern HE is practical for many applications with proper optimization</li>
+                </ul>
+            </div>
+
+            <div class="review-questions">
+                <h3>Review Questions</h3>
+                <ol>
+                    <li>Explain why polynomial multiplication is the main performance bottleneck in HE.</li>
+                    <li>How does batching with CRT provide SIMD-style parallelism?</li>
+                    <li>Describe the NTT algorithm and why it's faster than naive polynomial multiplication.</li>
+                    <li>What is the trade-off between polynomial degree n and operation speed?</li>
+                    <li>Compare Horner's method and Paterson-Stockmeyer for polynomial evaluation depth.</li>
+                    <li>Why are plaintext-ciphertext multiplications faster than ciphertext-ciphertext?</li>
+                    <li>How do GPUs accelerate HE operations and what speedups are typical?</li>
+                    <li>Explain ciphertext compression using seed-based randomness.</li>
+                    <li>Design a parallel execution strategy for processing 10,000 encrypted records.</li>
+                    <li>What optimization techniques achieved 2400x speedup in the neural network case study?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

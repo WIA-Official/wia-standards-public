@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6장: 천천히 변하는 차원 - WIA-DATA-003</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-003 v1.0</div>
+    <h1>6장</h1>
+    <p class="subtitle">천천히 변하는 차원 (SCD - Slowly Changing Dimensions)</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>6.1 SCD의 개념과 도전 과제</h2>
+      <p>데이터 웨어하우스의 차원 테이블은 시간이 지남에 따라 변경됩니다. 고객이 이사를 가면 주소가 바뀌고, 제품의 카테고리가 재분류될 수 있으며, 직원이 부서를 이동할 수 있습니다. 이러한 변화를 어떻게 처리할 것인가? 이것이 바로 Slowly Changing Dimensions(SCD)가 해결하고자 하는 핵심 문제입니다.</p>
+
+      <p>SCD는 Ralph Kimball이 정의한 데이터 웨어하우스 설계 패턴으로, 차원 속성의 변화를 추적하고 관리하는 여러 전략을 제공합니다. "천천히(Slowly)"라는 용어는 차원 데이터가 팩트 데이터에 비해 상대적으로 느리게 변한다는 의미입니다.</p>
+
+      <h3>SCD가 중요한 이유</h3>
+      <ul>
+        <li><strong>역사적 정확성</strong>: 과거 시점의 데이터를 올바른 컨텍스트로 분석</li>
+        <li><strong>비즈니스 인텔리전스</strong>: "고객이 이사한 후 구매 패턴이 어떻게 변했는가?" 같은 질문에 답변</li>
+        <li><strong>규제 준수</strong>: 금융, 의료 등 규제 산업에서 감사 추적 제공</li>
+        <li><strong>데이터 일관성</strong>: 시간에 따른 데이터 무결성 유지</li>
+        <li><strong>분석 유연성</strong>: 현재 관점과 과거 관점 모두에서 데이터 분석 가능</li>
+      </ul>
+
+      <h3>SCD 유형 개요</h3>
+      <table>
+        <caption>SCD 유형별 특성 비교</caption>
+        <thead>
+          <tr>
+            <th>SCD 유형</th>
+            <th>이력 보존</th>
+            <th>저장 공간</th>
+            <th>복잡도</th>
+            <th>주요 사용 사례</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Type 0</td>
+            <td>변경 불가</td>
+            <td>최소</td>
+            <td>매우 낮음</td>
+            <td>원본 값, 참조 데이터</td>
+          </tr>
+          <tr>
+            <td>Type 1</td>
+            <td>없음</td>
+            <td>최소</td>
+            <td>낮음</td>
+            <td>오류 수정, 중요하지 않은 변경</td>
+          </tr>
+          <tr>
+            <td>Type 2</td>
+            <td>전체 이력</td>
+            <td>높음</td>
+            <td>중간</td>
+            <td>중요한 비즈니스 속성</td>
+          </tr>
+          <tr>
+            <td>Type 3</td>
+            <td>제한적 (이전 값)</td>
+            <td>낮음</td>
+            <td>낮음</td>
+            <td>예측 가능한 변경</td>
+          </tr>
+          <tr>
+            <td>Type 4</td>
+            <td>전체 이력 (별도 테이블)</td>
+            <td>높음</td>
+            <td>높음</td>
+            <td>대규모 차원, 빈번한 변경</td>
+          </tr>
+          <tr>
+            <td>Type 6</td>
+            <td>하이브리드 (1+2+3)</td>
+            <td>높음</td>
+            <td>높음</td>
+            <td>현재/이전/역사적 뷰 모두 필요</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>SCD 전략 선택 시 고려사항</h3>
+      <div class="code-block">
+        <pre><code>-- SCD 유형 선택 의사결정 트리
+
+비즈니스 요구사항 분석:
+  |
+  ├─ 변경을 허용하지 않아야 하는가?
+  |  └─ 예 → Type 0 (Retain Original)
+  |
+  ├─ 이력 추적이 필요한가?
+  |  └─ 아니오 → Type 1 (Overwrite)
+  |
+  ├─ 전체 이력이 필요한가?
+  |  ├─ 예, 현재 차원과 함께 → Type 2 (Add New Row)
+  |  ├─ 예, 별도 테이블로 → Type 4 (History Table)
+  |  └─ 아니오, 이전 값만 → Type 3 (Add New Column)
+  |
+  └─ 현재/이전/역사적 뷰 모두 필요한가?
+     └─ 예 → Type 6 (Hybrid)</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>6.2 SCD Type 0: 원본 유지 (Retain Original)</h2>
+      <p>Type 0은 가장 단순한 전략으로, 한 번 저장된 값은 절대 변경되지 않습니다. "원본 유지" 전략이라고도 하며, 변경 시도는 거부됩니다.</p>
+
+      <h3>적용 시나리오</h3>
+      <ul>
+        <li><strong>원본 값</strong>: 고객의 최초 가입 날짜, 제품의 최초 출시일</li>
+        <li><strong>참조 데이터</strong>: 국가 코드, 통화 코드</li>
+        <li><strong>감사 필드</strong>: 레코드 생성 일시, 생성 사용자</li>
+        <li><strong>불변 식별자</strong>: 주민등록번호, 시리얼 번호</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Type 0 구현: 고객 차원
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20) UNIQUE NOT NULL,
+    customer_name VARCHAR(200),
+
+    -- Type 0 필드: 절대 변경되지 않음
+    original_signup_date DATE NOT NULL,
+    original_country VARCHAR(50) NOT NULL,
+    first_purchase_date DATE,
+
+    -- Type 1 또는 Type 2로 관리되는 다른 필드들
+    current_email VARCHAR(100),
+    current_address VARCHAR(500),
+
+    created_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_timestamp TIMESTAMP
+);
+
+-- ETL 프로세스: Type 0 필드는 업데이트에서 제외
+UPDATE dim_customer
+SET
+    current_email = src.email,
+    current_address = src.address,
+    updated_timestamp = CURRENT_TIMESTAMP
+    -- original_signup_date는 업데이트하지 않음!
+FROM staging.customer_updates src
+WHERE dim_customer.customer_id = src.customer_id;
+
+-- Type 0 필드 변경 시도 방지 (트리거)
+CREATE OR REPLACE FUNCTION prevent_type0_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- 원본 값 변경 시도 감지
+    IF OLD.original_signup_date <> NEW.original_signup_date THEN
+        RAISE EXCEPTION 'Cannot modify Type 0 field: original_signup_date';
+    END IF;
+
+    IF OLD.original_country <> NEW.original_country THEN
+        RAISE EXCEPTION 'Cannot modify Type 0 field: original_country';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_type0_fields
+BEFORE UPDATE ON dim_customer
+FOR EACH ROW
+EXECUTE FUNCTION prevent_type0_changes();
+
+-- 사용 예시: 원본 가입 국가별 고객 생애 가치
+SELECT
+    original_country,
+    COUNT(*) as customer_count,
+    AVG(lifetime_value) as avg_ltv,
+    SUM(lifetime_value) as total_ltv
+FROM dim_customer
+WHERE is_current = TRUE
+GROUP BY original_country
+ORDER BY total_ltv DESC;</code></pre>
+      </div>
+
+      <h3>Type 0의 장단점</h3>
+      <table>
+        <caption>SCD Type 0 장단점</caption>
+        <thead>
+          <tr>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>구현이 매우 간단</td>
+            <td>유연성 부족</td>
+          </tr>
+          <tr>
+            <td>저장 공간 최소화</td>
+            <td>오류 수정 불가능</td>
+          </tr>
+          <tr>
+            <td>데이터 무결성 보장</td>
+            <td>비즈니스 변화에 대응 어려움</td>
+          </tr>
+          <tr>
+            <td>감사 추적에 유용</td>
+            <td>제한적 사용 사례</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6.3 SCD Type 1: 덮어쓰기 (Overwrite)</h2>
+      <p>Type 1은 새로운 값으로 기존 값을 단순히 덮어씁니다. 이력은 보존되지 않으며, 항상 최신 상태만 유지합니다.</p>
+
+      <h3>적용 시나리오</h3>
+      <ul>
+        <li><strong>오류 수정</strong>: 철자 오류, 데이터 입력 실수</li>
+        <li><strong>표준화</strong>: 주소 형식 통일, 이름 대소문자 정리</li>
+        <li><strong>중요하지 않은 속성</strong>: 이메일 형식 변경, 전화번호 형식</li>
+        <li><strong>최신 값만 필요</strong>: 현재 재고 위치, 현재 가격</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Type 1 구현: 제품 차원
+CREATE TABLE dim_product (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20) UNIQUE NOT NULL,
+    product_name VARCHAR(200),
+
+    -- Type 1 필드: 덮어쓰기
+    description TEXT,
+    color VARCHAR(50),
+    size VARCHAR(20),
+    weight_kg DECIMAL(10,3),
+
+    -- Type 2 필드: 이력 추적
+    category VARCHAR(100),
+    list_price DECIMAL(10,2),
+    effective_date DATE,
+    expiration_date DATE,
+    is_current BOOLEAN,
+
+    updated_timestamp TIMESTAMP
+);
+
+-- Type 1 업데이트 프로세스
+UPDATE dim_product
+SET
+    description = src.description,
+    color = src.color,
+    size = src.size,
+    weight_kg = src.weight_kg,
+    updated_timestamp = CURRENT_TIMESTAMP
+FROM staging.product_updates src
+WHERE dim_product.product_id = src.product_id
+  AND dim_product.is_current = TRUE;
+
+-- 예시: 오류 수정
+-- 수정 전: product_name = 'Smatrphone X'
+UPDATE dim_product
+SET product_name = 'Smartphone X',
+    updated_timestamp = CURRENT_TIMESTAMP
+WHERE product_id = 'PROD-12345';
+-- 수정 후: 이력 없이 즉시 덮어쓰기됨
+
+-- Type 1 일괄 업데이트 (MERGE 사용)
+MERGE INTO dim_product AS target
+USING staging.product_updates AS source
+ON target.product_id = source.product_id
+  AND target.is_current = TRUE
+WHEN MATCHED THEN
+  UPDATE SET
+    description = source.description,
+    color = source.color,
+    size = source.size,
+    weight_kg = source.weight_kg,
+    updated_timestamp = CURRENT_TIMESTAMP
+WHEN NOT MATCHED THEN
+  INSERT (product_key, product_id, product_name, description,
+          color, size, weight_kg, is_current, effective_date)
+  VALUES (NEXTVAL('product_key_seq'), source.product_id,
+          source.product_name, source.description, source.color,
+          source.size, source.weight_kg, TRUE, CURRENT_DATE);
+
+-- 변경 감지 및 로깅
+CREATE TABLE dim_product_changes_log (
+    log_id BIGSERIAL PRIMARY KEY,
+    product_key INT,
+    product_id VARCHAR(20),
+    field_name VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT,
+    change_type VARCHAR(20), -- Type1, Type2, etc.
+    changed_by VARCHAR(100),
+    changed_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Type 1 변경 로깅 트리거
+CREATE OR REPLACE FUNCTION log_type1_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.description <> NEW.description THEN
+        INSERT INTO dim_product_changes_log
+            (product_key, product_id, field_name, old_value,
+             new_value, change_type)
+        VALUES (NEW.product_key, NEW.product_id, 'description',
+                OLD.description, NEW.description, 'Type1');
+    END IF;
+
+    IF OLD.color <> NEW.color THEN
+        INSERT INTO dim_product_changes_log
+            (product_key, product_id, field_name, old_value,
+             new_value, change_type)
+        VALUES (NEW.product_key, NEW.product_id, 'color',
+                OLD.color, NEW.color, 'Type1');
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;</code></pre>
+      </div>
+
+      <h3>Type 1의 장단점</h3>
+      <table>
+        <caption>SCD Type 1 장단점</caption>
+        <thead>
+          <tr>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>구현이 매우 간단</td>
+            <td>이력 데이터 손실</td>
+          </tr>
+          <tr>
+            <td>저장 공간 최소화</td>
+            <td>과거 분석 불가능</td>
+          </tr>
+          <tr>
+            <td>항상 최신 데이터</td>
+            <td>감사 추적 불가</td>
+          </tr>
+          <tr>
+            <td>쿼리가 단순함</td>
+            <td>변경 전 팩트 데이터와 불일치</td>
+          </tr>
+          <tr>
+            <td>성능 우수</td>
+            <td>규제 준수 어려움</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Type 1 사용 시 주의사항</h3>
+      <ul>
+        <li>과거 팩트 데이터가 새로운 차원 값으로 조인됨 (역사적 부정확성)</li>
+        <li>중요한 비즈니스 속성에는 사용 금지</li>
+        <li>가능하면 변경 로그 별도 유지</li>
+        <li>비즈니스 사용자에게 이력 미보존 명확히 전달</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6.4 SCD Type 2: 새 행 추가 (Add New Row)</h2>
+      <p>Type 2는 가장 널리 사용되는 SCD 전략으로, 속성이 변경될 때마다 새로운 행을 추가하여 전체 이력을 보존합니다. 각 버전은 유효 기간으로 구분됩니다.</p>
+
+      <h3>적용 시나리오</h3>
+      <ul>
+        <li><strong>중요한 비즈니스 속성</strong>: 고객 세그먼트, 제품 카테고리, 가격</li>
+        <li><strong>규제 요구사항</strong>: 금융, 의료 산업의 감사 추적</li>
+        <li><strong>트렌드 분석</strong>: "고객이 프리미엄으로 승급한 후 구매 증가했는가?"</li>
+        <li><strong>시계열 분석</strong>: 시간에 따른 속성 변화 추적</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Type 2 구현: 고객 차원
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,           -- 대리 키 (행마다 고유)
+    customer_id VARCHAR(20) NOT NULL,       -- 자연 키 (비즈니스 키)
+
+    -- 고객 속성
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    address VARCHAR(500),
+    city VARCHAR(100),
+    state VARCHAR(50),
+    postal_code VARCHAR(20),
+    country VARCHAR(50),
+
+    -- 비즈니스 분류 (변경 추적 중요)
+    customer_segment VARCHAR(50),           -- Bronze, Silver, Gold, Platinum
+    customer_status VARCHAR(20),            -- Active, Inactive, Suspended
+
+    -- Type 2 메타데이터
+    effective_date DATE NOT NULL,           -- 이 버전이 유효해진 날짜
+    expiration_date DATE,                   -- 이 버전이 만료된 날짜 (NULL = 현재)
+    is_current BOOLEAN DEFAULT TRUE,        -- 현재 버전 플래그
+    version_number INT DEFAULT 1,           -- 버전 번호 (선택적)
+
+    -- 감사 컬럼
+    created_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_timestamp TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100)
+);
+
+-- 인덱스
+CREATE INDEX idx_customer_id ON dim_customer(customer_id);
+CREATE INDEX idx_customer_current ON dim_customer(is_current)
+    WHERE is_current = TRUE;
+CREATE INDEX idx_customer_dates ON dim_customer(effective_date, expiration_date);
+
+-- 대리 키 시퀀스
+CREATE SEQUENCE customer_key_seq START WITH 1;
+
+-- Type 2 INSERT 예시: 초기 로드
+INSERT INTO dim_customer (
+    customer_key, customer_id, customer_name, email,
+    customer_segment, effective_date, expiration_date, is_current
+) VALUES (
+    NEXTVAL('customer_key_seq'),
+    'CUST001',
+    'John Doe',
+    'john@email.com',
+    'Bronze',
+    '2024-01-01',
+    NULL,
+    TRUE
+);
+
+-- Type 2 UPDATE 프로세스: 세그먼트 변경 (Bronze → Gold)
+-- 단계 1: 기존 행 만료
+UPDATE dim_customer
+SET
+    expiration_date = CURRENT_DATE - INTERVAL '1 day',
+    is_current = FALSE,
+    updated_timestamp = CURRENT_TIMESTAMP
+WHERE customer_id = 'CUST001'
+  AND is_current = TRUE;
+
+-- 단계 2: 새 행 추가
+INSERT INTO dim_customer (
+    customer_key, customer_id, customer_name, email,
+    customer_segment, effective_date, expiration_date,
+    is_current, version_number
+)
+SELECT
+    NEXTVAL('customer_key_seq'),
+    customer_id,
+    customer_name,
+    email,
+    'Gold',                                 -- 새 세그먼트
+    CURRENT_DATE,                           -- 새 유효일
+    NULL,
+    TRUE,
+    COALESCE(MAX(version_number), 0) + 1
+FROM dim_customer
+WHERE customer_id = 'CUST001'
+GROUP BY customer_id, customer_name, email;
+
+-- Type 2 자동 처리 프로시저
+CREATE OR REPLACE PROCEDURE upsert_customer_type2(
+    p_customer_id VARCHAR,
+    p_customer_name VARCHAR,
+    p_email VARCHAR,
+    p_customer_segment VARCHAR,
+    p_updated_by VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_existing_segment VARCHAR(50);
+    v_change_detected BOOLEAN := FALSE;
+BEGIN
+    -- 현재 레코드 조회
+    SELECT customer_segment INTO v_existing_segment
+    FROM dim_customer
+    WHERE customer_id = p_customer_id
+      AND is_current = TRUE;
+
+    -- 신규 고객 처리
+    IF v_existing_segment IS NULL THEN
+        INSERT INTO dim_customer (
+            customer_key, customer_id, customer_name, email,
+            customer_segment, effective_date, is_current, created_by
+        ) VALUES (
+            NEXTVAL('customer_key_seq'),
+            p_customer_id,
+            p_customer_name,
+            p_email,
+            p_customer_segment,
+            CURRENT_DATE,
+            TRUE,
+            p_updated_by
+        );
+        RETURN;
+    END IF;
+
+    -- 변경 감지
+    IF v_existing_segment <> p_customer_segment THEN
+        v_change_detected := TRUE;
+    END IF;
+
+    -- Type 2 변경 처리
+    IF v_change_detected THEN
+        -- 기존 행 만료
+        UPDATE dim_customer
+        SET expiration_date = CURRENT_DATE - INTERVAL '1 day',
+            is_current = FALSE,
+            updated_timestamp = CURRENT_TIMESTAMP,
+            updated_by = p_updated_by
+        WHERE customer_id = p_customer_id
+          AND is_current = TRUE;
+
+        -- 새 행 추가
+        INSERT INTO dim_customer (
+            customer_key, customer_id, customer_name, email,
+            customer_segment, effective_date, is_current,
+            version_number, created_by
+        )
+        SELECT
+            NEXTVAL('customer_key_seq'),
+            p_customer_id,
+            p_customer_name,
+            p_email,
+            p_customer_segment,
+            CURRENT_DATE,
+            TRUE,
+            COALESCE(MAX(version_number), 0) + 1,
+            p_updated_by
+        FROM dim_customer
+        WHERE customer_id = p_customer_id
+        GROUP BY customer_id;
+    ELSE
+        -- Type 1 업데이트 (이름, 이메일 등)
+        UPDATE dim_customer
+        SET customer_name = p_customer_name,
+            email = p_email,
+            updated_timestamp = CURRENT_TIMESTAMP,
+            updated_by = p_updated_by
+        WHERE customer_id = p_customer_id
+          AND is_current = TRUE;
+    END IF;
+END;
+$$;
+
+-- 사용 예시: Type 2 변경 적용
+CALL upsert_customer_type2(
+    'CUST001',
+    'John Doe',
+    'john.doe@email.com',
+    'Platinum',
+    'ETL_PROCESS'
+);
+
+-- Type 2 이력 조회
+SELECT
+    customer_key,
+    customer_id,
+    customer_name,
+    customer_segment,
+    effective_date,
+    expiration_date,
+    is_current,
+    version_number,
+    CASE
+        WHEN is_current THEN 'CURRENT'
+        ELSE 'HISTORICAL'
+    END as status
+FROM dim_customer
+WHERE customer_id = 'CUST001'
+ORDER BY effective_date;
+
+-- 결과:
+-- customer_key | customer_id | segment  | effective_date | expiration_date | is_current | version
+-- 1            | CUST001     | Bronze   | 2024-01-01     | 2024-06-30      | FALSE      | 1
+-- 2            | CUST001     | Silver   | 2024-07-01     | 2024-12-31      | FALSE      | 2
+-- 3            | CUST001     | Gold     | 2025-01-01     | NULL            | TRUE       | 3</code></pre>
+      </div>
+
+      <h3>Type 2 팩트 테이블 조인</h3>
+      <div class="code-block">
+        <pre><code>-- 팩트 테이블은 customer_key (대리 키)를 저장
+CREATE TABLE fact_sales (
+    sale_id BIGINT PRIMARY KEY,
+    sale_date DATE,
+    customer_key INT,              -- Type 2 차원의 대리 키
+    product_key INT,
+    quantity INT,
+    amount DECIMAL(12,2)
+);
+
+-- 과거 판매 데이터는 당시의 고객 세그먼트와 연결됨
+-- 2024년 6월 판매 (Bronze 세그먼트)
+INSERT INTO fact_sales VALUES
+    (1, '2024-06-15', 1, 100, 5, 500.00);  -- customer_key=1 (Bronze)
+
+-- 2024년 8월 판매 (Silver 세그먼트)
+INSERT INTO fact_sales VALUES
+    (2, '2024-08-20', 2, 101, 10, 1500.00); -- customer_key=2 (Silver)
+
+-- 2025년 1월 판매 (Gold 세그먼트)
+INSERT INTO fact_sales VALUES
+    (3, '2025-01-10', 3, 102, 20, 3000.00); -- customer_key=3 (Gold)
+
+-- 역사적으로 정확한 분석: 각 시점의 실제 세그먼트로 분석
+SELECT
+    c.customer_segment,
+    COUNT(*) as sale_count,
+    SUM(f.amount) as total_sales
+FROM fact_sales f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+GROUP BY c.customer_segment;
+
+-- 결과:
+-- customer_segment | sale_count | total_sales
+-- Bronze           | 1          | 500.00
+-- Silver           | 1          | 1500.00
+-- Gold             | 1          | 3000.00
+
+-- 현재 관점 분석: 모든 판매를 현재 세그먼트로 분석
+SELECT
+    c.customer_segment,
+    COUNT(*) as sale_count,
+    SUM(f.amount) as total_sales
+FROM fact_sales f
+JOIN dim_customer c_hist ON f.customer_key = c_hist.customer_key
+JOIN dim_customer c ON c_hist.customer_id = c.customer_id AND c.is_current = TRUE
+GROUP BY c.customer_segment;
+
+-- 결과:
+-- customer_segment | sale_count | total_sales
+-- Gold             | 3          | 5000.00  (모든 판매가 현재 세그먼트로 집계)</code></pre>
+      </div>
+
+      <h3>Type 2의 장단점</h3>
+      <table>
+        <caption>SCD Type 2 장단점</caption>
+        <thead>
+          <tr>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>완전한 이력 보존</td>
+            <td>저장 공간 증가</td>
+          </tr>
+          <tr>
+            <td>역사적 정확성</td>
+            <td>차원 테이블 크기 증가</td>
+          </tr>
+          <tr>
+            <td>감사 추적 완벽</td>
+            <td>ETL 복잡도 증가</td>
+          </tr>
+          <tr>
+            <td>과거/현재 분석 모두 가능</td>
+            <td>쿼리 복잡도 증가</td>
+          </tr>
+          <tr>
+            <td>규제 준수 용이</td>
+            <td>중복 고객 혼란 가능</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6.5 SCD Type 3: 새 열 추가 (Add New Column)</h2>
+      <p>Type 3는 제한된 이력을 추적하기 위해 새로운 컬럼을 추가합니다. 일반적으로 "현재 값"과 "이전 값" 두 가지만 유지합니다.</p>
+
+      <h3>적용 시나리오</h3>
+      <ul>
+        <li><strong>예측 가능한 변경</strong>: 조직 재편, 지역 통합</li>
+        <li><strong>소프트 변경</strong>: 일시적 변경, 파일럿 프로그램</li>
+        <li><strong>현재/이전 비교</strong>: "이전 부서 vs 현재 부서 성과 비교"</li>
+        <li><strong>제한된 저장 공간</strong>: Type 2를 사용할 수 없을 때</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Type 3 구현: 직원 차원
+CREATE TABLE dim_employee (
+    employee_key INT PRIMARY KEY,
+    employee_id VARCHAR(20) UNIQUE NOT NULL,
+    employee_name VARCHAR(200),
+
+    -- Type 3: 현재 및 이전 부서
+    current_department VARCHAR(100),
+    previous_department VARCHAR(100),
+    department_change_date DATE,
+
+    -- Type 3: 현재 및 이전 직급
+    current_job_title VARCHAR(100),
+    previous_job_title VARCHAR(100),
+    title_change_date DATE,
+
+    -- Type 3: 현재 및 이전 관리자
+    current_manager_key INT,
+    previous_manager_key INT,
+    manager_change_date DATE,
+
+    hire_date DATE,
+    is_active BOOLEAN,
+
+    updated_timestamp TIMESTAMP
+);
+
+-- Type 3 업데이트: 부서 변경
+UPDATE dim_employee
+SET
+    previous_department = current_department,      -- 현재를 이전으로 이동
+    current_department = 'Engineering',            -- 새 값 설정
+    department_change_date = CURRENT_DATE,
+    updated_timestamp = CURRENT_TIMESTAMP
+WHERE employee_id = 'EMP001';
+
+-- 변경 전후:
+-- 변경 전: current_department='Sales',    previous_department=NULL
+-- 변경 후: current_department='Engineering', previous_department='Sales'
+
+-- Type 3 업데이트 프로시저
+CREATE OR REPLACE PROCEDURE update_employee_department_type3(
+    p_employee_id VARCHAR,
+    p_new_department VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_current_dept VARCHAR(100);
+BEGIN
+    -- 현재 부서 조회
+    SELECT current_department INTO v_current_dept
+    FROM dim_employee
+    WHERE employee_id = p_employee_id;
+
+    -- 부서가 실제로 변경된 경우만 처리
+    IF v_current_dept <> p_new_department THEN
+        UPDATE dim_employee
+        SET previous_department = current_department,
+            current_department = p_new_department,
+            department_change_date = CURRENT_DATE,
+            updated_timestamp = CURRENT_TIMESTAMP
+        WHERE employee_id = p_employee_id;
+    END IF;
+END;
+$$;
+
+-- 사용 예시
+CALL update_employee_department_type3('EMP001', 'Product Management');
+
+-- Type 3 분석: 부서 이동 전후 성과 비교
+SELECT
+    e.employee_name,
+    e.previous_department,
+    e.current_department,
+    e.department_change_date,
+
+    -- 이전 부서에서의 판매 (변경 전)
+    SUM(CASE
+        WHEN f.sale_date < e.department_change_date
+        THEN f.amount ELSE 0
+    END) as sales_in_previous_dept,
+
+    -- 현재 부서에서의 판매 (변경 후)
+    SUM(CASE
+        WHEN f.sale_date >= e.department_change_date
+        THEN f.amount ELSE 0
+    END) as sales_in_current_dept
+FROM dim_employee e
+LEFT JOIN fact_sales f ON e.employee_key = f.employee_key
+WHERE e.previous_department IS NOT NULL
+GROUP BY e.employee_name, e.previous_department,
+         e.current_department, e.department_change_date;
+
+-- Type 3 다중 버전 (3개 이상 이력 - 권장하지 않음)
+CREATE TABLE dim_customer_type3_extended (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+
+    -- 과도한 Type 3 사용 (안 좋은 예)
+    current_address VARCHAR(500),
+    previous_address_1 VARCHAR(500),
+    previous_address_2 VARCHAR(500),
+    previous_address_3 VARCHAR(500),
+
+    -- 이렇게 하지 마세요! 대신 Type 2 사용
+    current_segment VARCHAR(50),
+    previous_segment_1 VARCHAR(50),
+    previous_segment_2 VARCHAR(50)
+);
+-- 위 설계는 복잡하고 확장성이 없음. Type 2가 더 적합!</code></pre>
+      </div>
+
+      <h3>Type 3의 장단점</h3>
+      <table>
+        <caption>SCD Type 3 장단점</caption>
+        <thead>
+          <tr>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>구현 간단</td>
+            <td>제한적 이력 (보통 1-2개)</td>
+          </tr>
+          <tr>
+            <td>저장 공간 적음</td>
+            <td>확장성 부족</td>
+          </tr>
+          <tr>
+            <td>쿼리 간단 (조인 불필요)</td>
+            <td>변경 빈도 높으면 부적합</td>
+          </tr>
+          <tr>
+            <td>현재/이전 비교 용이</td>
+            <td>전체 이력 분석 불가</td>
+          </tr>
+          <tr>
+            <td>차원 크기 일정</td>
+            <td>스키마 변경 필요 (새 컬럼)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6.6 SCD Type 4: 이력 테이블 분리 (History Table)</h2>
+      <p>Type 4는 현재 데이터와 이력 데이터를 별도 테이블로 분리합니다. 대규모 차원이나 변경이 빈번한 경우 Type 2의 대안으로 사용됩니다.</p>
+
+      <h3>적용 시나리오</h3>
+      <ul>
+        <li><strong>대규모 차원</strong>: 수백만 개의 행이 있는 고객 차원</li>
+        <li><strong>빈번한 변경</strong>: 매일 수천 건의 업데이트</li>
+        <li><strong>성능 최적화</strong>: 현재 데이터 조회 성능 중요</li>
+        <li><strong>이력 접근 드묾</strong>: 현재 데이터가 주로 사용됨</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Type 4 구현: 현재 차원 테이블
+CREATE TABLE dim_product_current (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20) UNIQUE NOT NULL,
+    product_name VARCHAR(200),
+    category VARCHAR(100),
+    brand VARCHAR(100),
+    list_price DECIMAL(10,2),
+    cost DECIMAL(10,2),
+    supplier_id VARCHAR(20),
+
+    -- 메타데이터
+    effective_date DATE,
+    updated_timestamp TIMESTAMP,
+
+    -- 현재 테이블에는 항상 각 product_id의 최신 버전만 존재
+    CONSTRAINT unique_current_product UNIQUE (product_id)
+);
+
+-- Type 4 이력 테이블
+CREATE TABLE dim_product_history (
+    product_history_key BIGSERIAL PRIMARY KEY,
+    product_key INT,                        -- 현재 테이블의 키 참조
+    product_id VARCHAR(20) NOT NULL,
+    product_name VARCHAR(200),
+    category VARCHAR(100),
+    brand VARCHAR(100),
+    list_price DECIMAL(10,2),
+    cost DECIMAL(10,2),
+    supplier_id VARCHAR(20),
+
+    -- Type 4 이력 메타데이터
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    version_number INT,
+    change_type VARCHAR(20),                -- INSERT, UPDATE, DELETE
+
+    created_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 인덱스
+CREATE INDEX idx_product_history_id ON dim_product_history(product_id);
+CREATE INDEX idx_product_history_dates
+    ON dim_product_history(effective_date, expiration_date);
+CREATE INDEX idx_product_history_key ON dim_product_history(product_key);
+
+-- Type 4 INSERT: 신규 제품
+INSERT INTO dim_product_current (
+    product_key, product_id, product_name, category,
+    list_price, effective_date
+) VALUES (
+    NEXTVAL('product_key_seq'),
+    'PROD-001',
+    'Widget A',
+    'Widgets',
+    99.99,
+    CURRENT_DATE
+);
+
+-- 이력 테이블에도 기록
+INSERT INTO dim_product_history (
+    product_key, product_id, product_name, category,
+    list_price, effective_date, version_number, change_type
+)
+SELECT
+    product_key, product_id, product_name, category,
+    list_price, effective_date, 1, 'INSERT'
+FROM dim_product_current
+WHERE product_id = 'PROD-001';
+
+-- Type 4 UPDATE 프로시저
+CREATE OR REPLACE PROCEDURE update_product_type4(
+    p_product_id VARCHAR,
+    p_new_category VARCHAR,
+    p_new_price DECIMAL
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_product_key INT;
+    v_old_category VARCHAR(100);
+    v_old_price DECIMAL(10,2);
+    v_max_version INT;
+BEGIN
+    -- 현재 값 조회
+    SELECT product_key, category, list_price
+    INTO v_product_key, v_old_category, v_old_price
+    FROM dim_product_current
+    WHERE product_id = p_product_id;
+
+    -- 변경 감지
+    IF v_old_category <> p_new_category OR v_old_price <> p_new_price THEN
+        -- 현재 버전을 이력으로 이동
+        SELECT COALESCE(MAX(version_number), 0) INTO v_max_version
+        FROM dim_product_history
+        WHERE product_id = p_product_id;
+
+        -- 기존 이력의 만료일 설정
+        UPDATE dim_product_history
+        SET expiration_date = CURRENT_DATE - INTERVAL '1 day'
+        WHERE product_id = p_product_id
+          AND expiration_date IS NULL;
+
+        -- 현재 상태를 이력에 저장
+        INSERT INTO dim_product_history (
+            product_key, product_id, product_name, category,
+            list_price, effective_date, expiration_date,
+            version_number, change_type
+        )
+        SELECT
+            product_key, product_id, product_name, category,
+            list_price, effective_date, CURRENT_DATE - INTERVAL '1 day',
+            v_max_version + 1, 'UPDATE'
+        FROM dim_product_current
+        WHERE product_id = p_product_id;
+
+        -- 현재 테이블 업데이트
+        UPDATE dim_product_current
+        SET category = p_new_category,
+            list_price = p_new_price,
+            effective_date = CURRENT_DATE,
+            updated_timestamp = CURRENT_TIMESTAMP
+        WHERE product_id = p_product_id;
+
+        -- 새 현재 상태를 이력에도 추가
+        INSERT INTO dim_product_history (
+            product_key, product_id, product_name, category,
+            list_price, effective_date, version_number, change_type
+        )
+        SELECT
+            product_key, product_id, product_name, category,
+            list_price, effective_date, v_max_version + 2, 'UPDATE'
+        FROM dim_product_current
+        WHERE product_id = p_product_id;
+    END IF;
+END;
+$$;
+
+-- 사용 예시
+CALL update_product_type4('PROD-001', 'Premium Widgets', 149.99);
+
+-- 현재 데이터 조회 (빠름)
+SELECT * FROM dim_product_current WHERE product_id = 'PROD-001';
+
+-- 전체 이력 조회
+SELECT
+    product_id,
+    category,
+    list_price,
+    effective_date,
+    expiration_date,
+    version_number,
+    change_type,
+    CASE
+        WHEN expiration_date IS NULL THEN 'CURRENT'
+        ELSE 'HISTORICAL'
+    END as status
+FROM dim_product_history
+WHERE product_id = 'PROD-001'
+ORDER BY effective_date;
+
+-- 팩트 테이블 조인 (현재 데이터)
+SELECT
+    f.sale_date,
+    p.product_name,
+    p.category,
+    f.quantity,
+    f.amount
+FROM fact_sales f
+JOIN dim_product_current p ON f.product_key = p.product_key
+WHERE f.sale_date >= CURRENT_DATE - INTERVAL '30 days';
+
+-- 팩트 테이블 조인 (이력 데이터 - 시점 정확)
+SELECT
+    f.sale_date,
+    ph.product_name,
+    ph.category,
+    ph.list_price,
+    f.quantity,
+    f.amount
+FROM fact_sales f
+JOIN dim_product_history ph
+    ON f.product_key = ph.product_key
+    AND f.sale_date BETWEEN ph.effective_date
+        AND COALESCE(ph.expiration_date, '9999-12-31')
+WHERE f.sale_date BETWEEN '2024-01-01' AND '2024-12-31';</code></pre>
+      </div>
+
+      <h3>Type 4의 장단점</h3>
+      <table>
+        <caption>SCD Type 4 장단점</caption>
+        <thead>
+          <tr>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>현재 데이터 조회 매우 빠름</td>
+            <td>구현 복잡도 높음</td>
+          </tr>
+          <tr>
+            <td>현재 차원 크기 최소화</td>
+            <td>두 테이블 관리 필요</td>
+          </tr>
+          <tr>
+            <td>전체 이력 보존</td>
+            <td>이력 조회 시 조인 복잡</td>
+          </tr>
+          <tr>
+            <td>대규모 차원에 적합</td>
+            <td>ETL 복잡도 증가</td>
+          </tr>
+          <tr>
+            <td>인덱스 효율적</td>
+            <td>저장 공간 중복</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6.7 SCD Type 6: 하이브리드 (1+2+3 결합)</h2>
+      <p>Type 6는 Type 1, 2, 3의 장점을 결합한 하이브리드 접근법입니다. "1+2+3=6"이라는 의미로 Type 6라고 불립니다. 현재 속성, 이력 속성, 이전 속성을 모두 추적합니다.</p>
+
+      <h3>적용 시나리오</h3>
+      <ul>
+        <li><strong>복잡한 분석 요구</strong>: 현재/과거/이전 관점 모두 필요</li>
+        <li><strong>유연한 리포팅</strong>: 다양한 시점의 분석</li>
+        <li><strong>비즈니스 인텔리전스</strong>: 트렌드 및 변화 분석</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- Type 6 구현: 고객 차원
+CREATE TABLE dim_customer_type6 (
+    customer_key INT PRIMARY KEY,              -- Type 2: 각 버전마다 고유 키
+    customer_id VARCHAR(20) NOT NULL,          -- 자연 키
+    customer_name VARCHAR(200),
+
+    -- Type 2: 이력 속성 (시점별로 다름)
+    historical_segment VARCHAR(50),             -- 해당 시점의 실제 세그먼트
+    historical_city VARCHAR(100),
+    historical_state VARCHAR(50),
+
+    -- Type 3: 이전 값 저장
+    previous_segment VARCHAR(50),
+    segment_change_date DATE,
+
+    -- Type 1: 현재 값 (모든 행에 동일하게 업데이트)
+    current_segment VARCHAR(50),               -- 최신 세그먼트
+    current_city VARCHAR(100),                 -- 최신 도시
+    current_state VARCHAR(50),                 -- 최신 주
+
+    -- Type 2 메타데이터
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    is_current BOOLEAN DEFAULT TRUE,
+    version_number INT,
+
+    updated_timestamp TIMESTAMP
+);
+
+-- 인덱스
+CREATE INDEX idx_customer_type6_id ON dim_customer_type6(customer_id);
+CREATE INDEX idx_customer_type6_current
+    ON dim_customer_type6(is_current) WHERE is_current = TRUE;
+
+-- Type 6 초기 INSERT
+INSERT INTO dim_customer_type6 (
+    customer_key, customer_id, customer_name,
+    historical_segment, current_segment,
+    effective_date, is_current, version_number
+) VALUES (
+    NEXTVAL('customer_key_seq'),
+    'CUST001',
+    'Alice Johnson',
+    'Bronze',           -- historical_segment
+    'Bronze',           -- current_segment (처음에는 동일)
+    '2024-01-01',
+    TRUE,
+    1
+);
+
+-- Type 6 UPDATE 프로시저
+CREATE OR REPLACE PROCEDURE update_customer_type6(
+    p_customer_id VARCHAR,
+    p_new_segment VARCHAR,
+    p_new_city VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_current_segment VARCHAR(50);
+    v_previous_segment VARCHAR(50);
+    v_max_version INT;
+BEGIN
+    -- 현재 정보 조회
+    SELECT current_segment, version_number
+    INTO v_current_segment, v_max_version
+    FROM dim_customer_type6
+    WHERE customer_id = p_customer_id
+      AND is_current = TRUE;
+
+    v_previous_segment := v_current_segment;
+
+    -- Type 2: 기존 행 만료
+    UPDATE dim_customer_type6
+    SET expiration_date = CURRENT_DATE - INTERVAL '1 day',
+        is_current = FALSE
+    WHERE customer_id = p_customer_id
+      AND is_current = TRUE;
+
+    -- Type 2: 새 행 추가
+    INSERT INTO dim_customer_type6 (
+        customer_key, customer_id, customer_name,
+        historical_segment, historical_city,
+        previous_segment, segment_change_date,
+        current_segment, current_city,
+        effective_date, is_current, version_number
+    )
+    SELECT
+        NEXTVAL('customer_key_seq'),
+        customer_id,
+        customer_name,
+        p_new_segment,                    -- Type 2: 새 이력 값
+        p_new_city,
+        v_previous_segment,               -- Type 3: 이전 값
+        CURRENT_DATE,
+        p_new_segment,                    -- Type 1: 현재 값
+        p_new_city,
+        CURRENT_DATE,
+        TRUE,
+        v_max_version + 1
+    FROM dim_customer_type6
+    WHERE customer_id = p_customer_id
+      AND version_number = v_max_version;
+
+    -- Type 1: 모든 이력 행의 current_* 컬럼 업데이트
+    UPDATE dim_customer_type6
+    SET current_segment = p_new_segment,
+        current_city = p_new_city,
+        updated_timestamp = CURRENT_TIMESTAMP
+    WHERE customer_id = p_customer_id;
+
+END;
+$$;
+
+-- 사용 예시: 세그먼트 변경
+CALL update_customer_type6('CUST001', 'Gold', 'San Francisco');
+
+-- Type 6 데이터 조회
+SELECT
+    customer_id,
+    version_number,
+    historical_segment,      -- 그 시점의 실제 값
+    previous_segment,        -- 직전 값
+    current_segment,         -- 현재 최신 값
+    effective_date,
+    expiration_date,
+    is_current
+FROM dim_customer_type6
+WHERE customer_id = 'CUST001'
+ORDER BY version_number;
+
+-- 결과:
+-- customer_id | version | historical | previous | current | effective   | expiration  | is_current
+-- CUST001     | 1       | Bronze     | NULL     | Gold    | 2024-01-01  | 2024-06-30  | FALSE
+-- CUST001     | 2       | Silver     | Bronze   | Gold    | 2024-07-01  | 2024-12-31  | FALSE
+-- CUST001     | 3       | Gold       | Silver   | Gold    | 2025-01-01  | NULL        | TRUE
+
+-- Type 6 분석 1: 역사적 관점 (각 시점의 실제 세그먼트)
+SELECT
+    c.historical_segment,
+    SUM(f.amount) as sales
+FROM fact_sales f
+JOIN dim_customer_type6 c ON f.customer_key = c.customer_key
+GROUP BY c.historical_segment;
+
+-- Type 6 분석 2: 현재 관점 (모든 판매를 현재 세그먼트로)
+SELECT
+    c.current_segment,
+    SUM(f.amount) as sales
+FROM fact_sales f
+JOIN dim_customer_type6 c ON f.customer_key = c.customer_key
+GROUP BY c.current_segment;
+
+-- Type 6 분석 3: 승급 분석 (이전 vs 현재)
+SELECT
+    customer_id,
+    customer_name,
+    previous_segment,
+    current_segment,
+    segment_change_date,
+    DATEDIFF('day', segment_change_date, CURRENT_DATE) as days_in_current_segment
+FROM dim_customer_type6
+WHERE is_current = TRUE
+  AND previous_segment IS NOT NULL
+  AND previous_segment <> current_segment;</code></pre>
+      </div>
+
+      <h3>Type 6의 장단점</h3>
+      <table>
+        <caption>SCD Type 6 장단점</caption>
+        <thead>
+          <tr>
+            <th>장점</th>
+            <th>단점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>최대 유연성 (3가지 관점)</td>
+            <td>구현 매우 복잡</td>
+          </tr>
+          <tr>
+            <td>완전한 이력 보존</td>
+            <td>저장 공간 많이 사용</td>
+          </tr>
+          <tr>
+            <td>현재/과거 분석 모두 간편</td>
+            <td>ETL 복잡도 최고</td>
+          </tr>
+          <tr>
+            <td>변화 추적 용이</td>
+            <td>유지보수 어려움</td>
+          </tr>
+          <tr>
+            <td>BI 사용자 친화적</td>
+            <td>성능 오버헤드</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6.8 SCD 성능 최적화 및 모범 사례</h2>
+
+      <h3>인덱싱 전략</h3>
+      <div class="code-block">
+        <pre><code>-- SCD Type 2 최적 인덱스
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20) NOT NULL,
+    customer_segment VARCHAR(50),
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    is_current BOOLEAN
+);
+
+-- 필수 인덱스
+CREATE INDEX idx_customer_id ON dim_customer(customer_id);
+
+-- 현재 행만 조회하는 부분 인덱스 (성능 향상)
+CREATE INDEX idx_customer_current
+ON dim_customer(customer_id, is_current)
+WHERE is_current = TRUE;
+
+-- 날짜 범위 조회용 인덱스
+CREATE INDEX idx_customer_dates
+ON dim_customer(effective_date, expiration_date);
+
+-- 복합 인덱스 (자주 함께 사용되는 컬럼)
+CREATE INDEX idx_customer_segment_current
+ON dim_customer(customer_segment, is_current)
+WHERE is_current = TRUE;
+
+-- 파티셔닝 (대규모 Type 2 차원)
+CREATE TABLE dim_customer_partitioned (
+    customer_key BIGINT,
+    customer_id VARCHAR(20),
+    customer_segment VARCHAR(50),
+    effective_date DATE NOT NULL,
+    expiration_date DATE,
+    is_current BOOLEAN
+) PARTITION BY RANGE (effective_date);
+
+-- 연도별 파티션
+CREATE TABLE dim_customer_2023 PARTITION OF dim_customer_partitioned
+    FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
+
+CREATE TABLE dim_customer_2024 PARTITION OF dim_customer_partitioned
+    FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+
+CREATE TABLE dim_customer_2025 PARTITION OF dim_customer_partitioned
+    FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');</code></pre>
+      </div>
+
+      <h3>SCD 선택 가이드</h3>
+      <table>
+        <caption>속성 특성에 따른 SCD 유형 선택</caption>
+        <thead>
+          <tr>
+            <th>속성 예시</th>
+            <th>권장 SCD</th>
+            <th>이유</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>고객 세그먼트, 제품 카테고리</td>
+            <td>Type 2</td>
+            <td>비즈니스 분석에 중요한 이력</td>
+          </tr>
+          <tr>
+            <td>철자 오류, 대소문자</td>
+            <td>Type 1</td>
+            <td>데이터 품질 개선, 이력 불필요</td>
+          </tr>
+          <tr>
+            <td>조직 구조, 지역 통합</td>
+            <td>Type 3</td>
+            <td>일회성 변경, 이전/현재만 필요</td>
+          </tr>
+          <tr>
+            <td>고객 주소 (수백만 고객)</td>
+            <td>Type 4</td>
+            <td>대규모, 현재 조회 성능 중요</td>
+          </tr>
+          <tr>
+            <td>생년월일, 최초 가입일</td>
+            <td>Type 0</td>
+            <td>불변 속성</td>
+          </tr>
+          <tr>
+            <td>VIP 고객 상태 (복잡한 분석)</td>
+            <td>Type 6</td>
+            <td>현재/과거/이전 모두 필요</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>ETL 모범 사례</h3>
+      <ul>
+        <li><strong>변경 감지 최적화</strong>: 해시 값 비교로 변경 여부 빠르게 판단</li>
+        <li><strong>일괄 처리</strong>: 개별 업데이트보다 MERGE 문 사용</li>
+        <li><strong>델타 로드</strong>: 전체 테이블이 아닌 변경분만 처리</li>
+        <li><strong>병렬 처리</strong>: 차원별로 독립적으로 처리</li>
+        <li><strong>감사 로그</strong>: 모든 SCD 변경 기록</li>
+        <li><strong>데이터 품질 검증</strong>: SCD 적용 전 데이터 검증</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 해시 기반 변경 감지
+ALTER TABLE dim_customer ADD COLUMN row_hash VARCHAR(64);
+
+-- 해시 계산
+UPDATE dim_customer
+SET row_hash = MD5(
+    CONCAT(
+        COALESCE(customer_name, ''),
+        COALESCE(customer_segment, ''),
+        COALESCE(city, ''),
+        COALESCE(state, '')
+    )
+);
+
+-- 변경 감지 (해시 비교)
+SELECT src.customer_id
+FROM staging.customer_updates src
+JOIN dim_customer dim
+    ON src.customer_id = dim.customer_id
+    AND dim.is_current = TRUE
+WHERE MD5(CONCAT(
+    COALESCE(src.customer_name, ''),
+    COALESCE(src.customer_segment, ''),
+    COALESCE(src.city, ''),
+    COALESCE(src.state, '')
+)) <> dim.row_hash;</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>6.9 요약</h2>
+      <p>Slowly Changing Dimensions(SCD)는 데이터 웨어하우스에서 차원 속성의 변화를 관리하는 핵심 설계 패턴입니다:</p>
+
+      <ul>
+        <li><strong>SCD Type 0 (원본 유지)</strong>는 불변 속성에 사용하며, 한 번 저장된 값은 절대 변경되지 않습니다.</li>
+        <li><strong>SCD Type 1 (덮어쓰기)</strong>는 오류 수정이나 중요하지 않은 속성에 사용하며, 이력을 보존하지 않습니다.</li>
+        <li><strong>SCD Type 2 (새 행 추가)</strong>는 가장 널리 사용되는 방식으로, 전체 이력을 보존하여 역사적으로 정확한 분석을 가능하게 합니다.</li>
+        <li><strong>SCD Type 3 (새 열 추가)</strong>는 제한된 이력(이전/현재)만 추적하며, 예측 가능한 일회성 변경에 적합합니다.</li>
+        <li><strong>SCD Type 4 (이력 테이블 분리)</strong>는 대규모 차원에서 현재 데이터 조회 성능을 최적화하기 위해 사용됩니다.</li>
+        <li><strong>SCD Type 6 (하이브리드)</strong>는 Type 1, 2, 3을 결합하여 현재, 과거, 이전 관점을 모두 제공하지만 구현이 가장 복잡합니다.</li>
+      </ul>
+
+      <p>SCD 유형 선택은 비즈니스 요구사항, 데이터 볼륨, 성능 요구사항, 규제 준수를 종합적으로 고려해야 합니다. 하나의 차원 테이블에서 여러 SCD 유형을 혼합하여 사용하는 것도 가능하며, 실제로 권장되는 방식입니다.</p>
+    </section>
+
+    <section>
+      <h2>복습 문제</h2>
+      <ol>
+        <li><strong>SCD Type 1과 Type 2의 주요 차이점을 설명하고, 각각 어떤 상황에서 사용해야 하는지 구체적인 예를 들어 논하시오.</strong></li>
+        <li><strong>SCD Type 2 구현 시 대리 키가 왜 필수적인지 설명하고, 자연 키만 사용할 경우 발생할 수 있는 문제점을 제시하시오.</strong></li>
+        <li><strong>SCD Type 4가 Type 2와 어떻게 다른지 설명하고, Type 4를 선택해야 하는 시나리오를 제시하시오. 성능 측면에서 어떤 이점이 있는가?</strong></li>
+        <li><strong>SCD Type 6(하이브리드)의 구조를 설명하고, historical_*, previous_*, current_* 컬럼이 각각 어떤 목적으로 사용되는지 SQL 예제와 함께 논하시오.</strong></li>
+        <li><strong>대규모 Type 2 차원 테이블(수억 개 행)의 성능을 최적화하기 위한 전략을 5가지 이상 제시하시오. 인덱싱, 파티셔닝, ETL 최적화를 모두 포함하시오.</strong></li>
+        <li><strong>하나의 차원 테이블에서 여러 SCD 유형을 혼합하여 사용하는 것이 왜 유용한지 설명하고, 고객 차원 테이블 예시를 들어 각 속성에 적절한 SCD 유형을 할당하시오.</strong></li>
+      </ol>
+    </section>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-05.html" class="nav-button prev">이전 장</a>
+    <a href="chapter-07.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

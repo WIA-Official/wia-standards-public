@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제5장: 조직 분류 및 암 검출 - WIA-MED-008</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-008] WIA 디지털 병리학 표준 전자책</a> | 제5장 (총 8장)</p>
+
+<hr>
+
+<h1>🎯 제5장: 조직 분류 및 암 검출</h1>
+
+<blockquote>
+<p><strong>정밀 진단</strong></p>
+<p>조직 유형의 정확한 분류와 암의 조기 검출은 환자의 생존율과 삶의 질에 직접적인 영향을 미칩니다. AI 기반 분석은 이러한 정밀 진단을 가능하게 합니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>5.1 조직 유형 분류</h2>
+
+<h3>5.1.1 주요 조직 유형</h3>
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>조직 유형</th>
+            <th>특징</th>
+            <th>AI 검출 포인트</th>
+            <th>정확도</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>상피 조직</strong></td>
+            <td>밀집된 세포, 기저막</td>
+            <td>세포 핵 밀도, 극성</td>
+            <td>96%</td>
+        </tr>
+        <tr>
+            <td><strong>결합 조직</strong></td>
+            <td>섬유, 간질, 세포외 기질</td>
+            <td>콜라겐 패턴, 섬유아세포</td>
+            <td>94%</td>
+        </tr>
+        <tr>
+            <td><strong>근육 조직</strong></td>
+            <td>세포 배열, 줄무늬</td>
+            <td>근섬유 방향성</td>
+            <td>95%</td>
+        </tr>
+        <tr>
+            <td><strong>신경 조직</strong></td>
+            <td>뉴런, 신경교세포</td>
+            <td>세포체, 돌기</td>
+            <td>93%</td>
+        </tr>
+        <tr>
+            <td><strong>지방 조직</strong></td>
+            <td>큰 지방 세포, 빈 공간</td>
+            <td>원형 공포, 얇은 격막</td>
+            <td>98%</td>
+        </tr>
+        <tr>
+            <td><strong>혈관 조직</strong></td>
+            <td>내피세포, 관강</td>
+            <td>관 구조, 적혈구</td>
+            <td>91%</td>
+        </tr>
+        <tr>
+            <td><strong>림프 조직</strong></td>
+            <td>림프구, 여포</td>
+            <td>소림프구 밀도</td>
+            <td>92%</td>
+        </tr>
+        <tr>
+            <td><strong>괴사 조직</strong></td>
+            <td>세포 붕괴, 핵 용해</td>
+            <td>무정형 구조, 호산성</td>
+            <td>97%</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>5.1.2 다중 클래스 분류 모델</h3>
+
+<pre>
+유방 조직 9-클래스 분류기:
+
+클래스:
+  0: 정상 유관 상피 (Normal ductal epithelium)
+  1: 정상 소엽 상피 (Normal lobular epithelium)
+  2: 섬유선종 (Fibroadenoma)
+  3: 관상피내암 (DCIS - Ductal Carcinoma In Situ)
+  4: 침윤성 관암종 (IDC - Invasive Ductal Carcinoma)
+  5: 침윤성 소엽암종 (ILC - Invasive Lobular Carcinoma)
+  6: 지방 조직 (Adipose tissue)
+  7: 간질 조직 (Stroma)
+  8: 괴사 (Necrosis)
+
+모델 아키텍처: Inception-v3
+
+성능 (검증 세트, 5,000 패치):
+
+클래스별 정확도:
+  0: 정상 유관 - 96.2%
+  1: 정상 소엽 - 94.8%
+  2: 섬유선종 - 92.5%
+  3: DCIS - 91.3%
+  4: IDC - 95.7%
+  5: ILC - 89.2%
+  6: 지방 - 98.5%
+  7: 간질 - 95.1%
+  8: 괴사 - 97.3%
+
+전체 정확도: 94.5%
+
+혼동 행렬 (주요):
+  DCIS ↔ IDC: 3.2% (가장 빈번한 오분류)
+  ILC ↔ Stroma: 2.8%
+  Normal ↔ Fibroadenoma: 1.5%
+
+임상적 영향:
+  - 암 vs 비암: 98.9% 정확도
+  - 침윤성 vs 비침윤성: 97.2%
+  - 치료 결정에 중요한 구분 정확
+</pre>
+
+<hr>
+
+<h2>5.2 암 진단 알고리즘</h2>
+
+<h3>5.2.1 유방암 검출</h3>
+
+<pre>
+유방암 검출 파이프라인:
+
+1단계: 전처리
+   입력: WSI (40배율)
+   작업:
+     - 조직 영역 감지
+     - 배경 제거
+     - 색상 정규화 (Macenko 방법)
+   출력: 정규화된 조직 이미지
+
+2단계: 패치 추출
+   패치 크기: 256×256 픽셀
+   겹침: 50%
+   조직 비율 임계값: >70%
+   총 패치: ~30,000개/슬라이드
+
+3단계: 종양 확률 예측
+   모델: ResNet101 앙상블 (5개 모델)
+   각 패치 출력: [P(정상), P(종양)]
+
+   예시 패치 결과:
+     패치 #15234: [0.98, 0.02] → 정상
+     패치 #15235: [0.12, 0.88] → 종양
+     패치 #15236: [0.05, 0.95] → 종양
+     패치 #15237: [0.85, 0.15] → 정상
+
+4단계: 히트맵 생성
+   각 패치의 종양 확률을 공간적으로 매핑
+   색상 스케일:
+     파란색 (0.0) → 녹색 (0.5) → 빨간색 (1.0)
+
+5단계: 종양 영역 세그멘테이션
+   임계값: 종양 확률 > 0.5
+   후처리:
+     - 모폴로지 연산 (opening, closing)
+     - 작은 영역 제거 (< 0.05mm²)
+     - 영역 라벨링
+
+6단계: 특징 추출
+   각 종양 영역:
+     - 면적 (mm²)
+     - 둘레 (mm)
+     - 원형도
+     - 평균 종양 확률
+     - 텍스처 특징
+
+7단계: 최종 분류
+   슬라이드 레벨 예측:
+     - 종양 존재 여부
+     - 종양 부담 (Tumor burden): 종양 면적 / 조직 면적
+     - 위험도 점수 (0-100)
+
+결과 보고서:
+  환자 ID: P123456
+  슬라이드 ID: S25-00123-A1
+
+  진단: 침윤성 관암종 (IDC) 검출
+  신뢰도: 96.3%
+
+  종양 정보:
+    - 검출 영역: 3개
+    - 총 종양 면적: 15.2 mm²
+    - 종양 부담: 6.8%
+    - 최대 종양 크기: 8.3 mm
+
+  종양 영역 #1:
+    - 위치: (5200, 8100)
+    - 크기: 8.3 mm²
+    - 평균 확률: 0.92
+    - 분류: IDC
+
+  종양 영역 #2:
+    - 위치: (12000, 3500)
+    - 크기: 4.7 mm²
+    - 평균 확률: 0.88
+    - 분류: IDC
+
+  종양 영역 #3:
+    - 위치: (8500, 15200)
+    - 크기: 2.2 mm²
+    - 평균 확률: 0.85
+    - 분류: DCIS 의심
+
+  권장 사항:
+    - 병리학자 검토 필수
+    - 추가 IHC 염색 권장 (ER, PR, HER2)
+    - 림프절 검사 권장
+
+성능 (검증 데이터셋, 1,000 슬라이드):
+  - 감도: 97.2%
+  - 특이도: 95.8%
+  - AUC: 0.991
+  - 처리 시간: 3.2분/슬라이드
+</pre>
+
+<h3>5.2.2 전립선암 검출</h3>
+
+<pre>
+Gleason 등급 평가:
+
+Gleason 시스템:
+  등급 1-5 (1: 가장 분화, 5: 가장 미분화)
+  Gleason 점수 = 1차 패턴 + 2차 패턴
+  예: 3+4 = 7 (주로 등급 3, 일부 등급 4)
+
+AI 기반 Gleason 등급:
+
+입력: 전립선 생검 슬라이드 (H&E, 40배율)
+
+1. 선암 영역 검출
+   모델: U-Net
+   출력: 암 vs 양성 세그멘테이션 맵
+
+2. Gleason 패턴 분류
+   모델: ResNet50 (5-클래스)
+   클래스: 등급 1, 2, 3, 4, 5
+
+   각 패턴 특징:
+     등급 3: 작고 분리된 선 구조
+     등급 4: 융합된 선, 불규칙 모양
+     등급 5: 고형 시트, 선 구조 없음
+
+3. 1차 및 2차 패턴 결정
+   1차 패턴: 가장 많은 면적 차지
+   2차 패턴: 두 번째로 많은 면적 (≥5%)
+
+4. Gleason 점수 계산
+   예시:
+     등급 3: 70% 면적 → 1차 패턴
+     등급 4: 25% 면적 → 2차 패턴
+     등급 5: 5% 면적
+
+   Gleason 점수 = 3 + 4 = 7
+
+5. WHO/ISUP Grade Group
+   점수 6: Grade Group 1 (저위험)
+   점수 7 (3+4): Grade Group 2 (중간위험)
+   점수 7 (4+3): Grade Group 3 (중간위험)
+   점수 8: Grade Group 4 (고위험)
+   점수 9-10: Grade Group 5 (고위험)
+
+성능:
+  병리학자 간 일치도 (Kappa): 0.65-0.75
+  AI 모델 (Kappa): 0.71 (병리학자 수준)
+
+  정확도 (Grade Group):
+    GG1: 88%
+    GG2: 82%
+    GG3: 79%
+    GG4: 85%
+    GG5: 91%
+
+  전체 정확도: 84.2%
+
+  임상적 가치:
+    - 일관성 향상
+    - 재현성 증가
+    - 치료 결정 지원
+</pre>
+
+<h3>5.2.3 폐암 검출</h3>
+
+<pre>
+폐암 조직학적 분류:
+
+주요 유형:
+  1. 선암종 (Adenocarcinoma) - 40%
+  2. 편평세포암종 (Squamous Cell Carcinoma) - 25%
+  3. 소세포폐암 (Small Cell Lung Cancer) - 15%
+  4. 대세포암종 (Large Cell Carcinoma) - 10%
+  5. 기타 - 10%
+
+다중 클래스 분류 모델:
+
+아키텍처: Inception-ResNet-v2
+
+특징 학습:
+  선암종:
+    - 선 구조 (Glandular structure)
+    - 점액 생성
+    - TTF-1 양성 (IHC)
+
+  편평세포암종:
+    - 각화 (Keratinization)
+    - 세포간 교
+    - p63 양성 (IHC)
+
+  소세포폐암:
+    - 작은 세포
+    - 높은 핵/세포질 비율
+    - 몰딩 (Molding)
+    - 빠른 증식
+
+성능 (5,000 슬라이드 테스트):
+  전체 정확도: 93.8%
+
+  클래스별:
+    선암종: 95.2% (Recall)
+    편평세포: 92.5%
+    소세포: 94.8%
+    대세포: 89.3%
+
+  혼동:
+    선암 ↔ 대세포: 4.1%
+    편평세포 ↔ 미분화암: 3.2%
+
+보조 도구:
+  - 선 구조 검출
+  - 각화 영역 표시
+  - 유사분열 계수
+  - Ki-67 지수 추정
+</pre>
+
+<hr>
+
+<h2>5.3 등급 평가 시스템</h2>
+
+<h3>5.3.1 조직학적 등급 (Histological Grade)</h3>
+
+<pre>
+Nottingham 유방암 등급 시스템:
+
+3가지 평가 항목 (각 1-3점):
+
+1. 관 형성 (Tubule Formation)
+   점수 1: >75% 관 구조
+   점수 2: 10-75% 관 구조
+   점수 3: <10% 관 구조
+
+   AI 측정:
+     관 구조 세그멘테이션
+     관 면적 / 종양 면적 계산
+
+2. 핵 다형성 (Nuclear Pleomorphism)
+   점수 1: 균일한 핵, 경도 다형성
+   점수 2: 중등도 다형성
+   점수 3: 현저한 다형성
+
+   AI 측정:
+     핵 크기 표준편차
+     핵 모양 변이
+     염색질 패턴 분석
+
+3. 유사분열 지수 (Mitotic Count)
+   10 HPF (High Power Field)당 유사분열 수
+
+   점수 1: 0-5개
+   점수 2: 6-10개
+   점수 3: >10개
+
+   AI 측정:
+     유사분열 세포 자동 검출
+     Mask R-CNN 기반
+     10 HPF 정규화 (1.59 mm²)
+
+총점 및 등급:
+  점수 3-5: Grade I (저등급, 예후 좋음)
+  점수 6-7: Grade II (중등급)
+  점수 8-9: Grade III (고등급, 예후 나쁨)
+
+예시 케이스:
+  관 형성: 15% → 점수 2
+  핵 다형성: 중등도 → 점수 2
+  유사분열: 18개/10HPF → 점수 3
+
+  총점: 2 + 2 + 3 = 7
+  등급: Grade II
+
+AI 성능:
+  관 형성 일치도: 92% (Kappa 0.85)
+  핵 다형성 일치도: 87% (Kappa 0.79)
+  유사분열 일치도: 94% (Kappa 0.89)
+
+  전체 등급 일치도: 89% (Kappa 0.82)
+  병리학자 간: 85% (Kappa 0.76)
+
+  → AI가 병리학자보다 일관성 높음
+</pre>
+
+<h3>5.3.2 TNM 병기 지원</h3>
+
+<pre>
+TNM 시스템:
+
+T (Tumor): 원발 종양 크기
+  T1: ≤20mm
+  T2: 20-50mm
+  T3: >50mm
+  T4: 흉벽/피부 침범
+
+N (Nodes): 림프절 전이
+  N0: 전이 없음
+  N1: 1-3개 겨드랑이 림프절
+  N2: 4-9개
+  N3: ≥10개 또는 쇄골상
+
+M (Metastasis): 원격 전이
+  M0: 없음
+  M1: 있음
+
+AI 지원:
+
+T 평가:
+  1. 종양 크기 자동 측정
+     - 종양 세그멘테이션
+     - 장축 길이 계산
+     - 다중 종양 시 합산
+
+  2. 침윤 깊이
+     - 기저막 검출
+     - 침윤 경계 측정
+
+N 평가:
+  1. 림프절 전이 검출
+     - CAMELYON 방법 (4.3.3 참조)
+     - 마이크로전이 (0.2-2mm) 감지
+     - 고립 종양 세포 (<0.2mm) 감지
+
+  2. 전이 정량화
+     - 전이 림프절 개수
+     - 피막 외 침범 검출
+     - 림프관 침습 평가
+
+M 평가:
+  - 주로 영상 검사 (CT, PET)
+  - 생검 슬라이드로 확진
+  - AI로 전이 조직 vs 원발 조직 구분
+
+종합 보고:
+  원발 종양:
+    크기: 23mm (자동 측정)
+    등급: Grade II
+    → T2
+
+  림프절 (8개 검사):
+    전이 양성: 2개
+    마이크로전이: 1개
+    음성: 5개
+    → N1
+
+  원격 전이:
+    없음
+    → M0
+
+  병기: T2N1M0 (Stage IIA)
+
+  예후:
+    5년 생존율: ~85%
+    치료: 수술 + 화학요법 + 방사선
+</pre>
+
+<hr>
+
+<h2>5.4 바이오마커 분석</h2>
+
+<h3>5.4.1 면역조직화학 (IHC) 정량화</h3>
+
+<pre>
+유방암 바이오마커:
+
+ER (Estrogen Receptor):
+  염색: 핵 염색
+  판독: H-score 또는 Allred score
+
+  AI 정량화:
+    1. 핵 세그멘테이션
+    2. 염색 강도 측정 (0-3+)
+       0: 염색 없음
+       1+: 약한 염색
+       2+: 중등도 염색
+       3+: 강한 염색
+
+    3. 양성 비율 계산
+       강도별 세포 비율:
+         0: 20%
+         1+: 15%
+         2+: 35%
+         3+: 30%
+
+    4. H-score 계산
+       H-score = (1×15) + (2×35) + (3×30)
+               = 15 + 70 + 90
+               = 175 (범위: 0-300)
+
+    판정: ER 양성 (H-score ≥1)
+
+PR (Progesterone Receptor):
+  동일한 방법
+  H-score = 140
+  판정: PR 양성
+
+HER2 (Human Epidermal Growth Factor Receptor 2):
+  염색: 막 염색
+  판독: 0, 1+, 2+, 3+
+
+  AI 평가:
+    1. 세포막 검출
+    2. 염색 강도 및 완전성
+
+    기준:
+      0: 염색 없음 또는 <10% 세포
+      1+: 불완전한 막 염색, >10% 세포
+      2+: 약~중등도 완전한 막 염색, >10%
+      3+: 강한 완전한 막 염색, >10%
+
+    결과: 2+ (모호함)
+    → FISH/ISH 추가 검사 권장
+
+Ki-67 (증식 지수):
+  염색: 핵 염색
+  측정: 양성 핵 비율
+
+  AI 정량화:
+    1. 모든 핵 감지: 2,134개
+    2. 양성 핵 감지: 428개
+    3. Ki-67 지수 = 428/2134 × 100%
+                   = 20.1%
+
+  해석:
+    <15%: 저증식
+    15-30%: 중등도 증식
+    >30%: 고증식
+
+  결과: 중등도 증식 (20.1%)
+
+종합 바이오마커 프로파일:
+  ER: 양성 (H-score 175)
+  PR: 양성 (H-score 140)
+  HER2: 2+ (FISH 필요)
+  Ki-67: 20.1%
+
+  임상적 의미:
+    - 호르몬 수용체 양성 (ER+/PR+)
+    - 내분비 치료 반응 예상
+    - HER2 상태 확인 필요
+    - 중등도 증식 → 화학요법 고려
+</pre>
+
+<h3>5.4.2 PD-L1 발현 평가</h3>
+
+<pre>
+면역항암제 반응 예측:
+
+PD-L1 (Programmed Death-Ligand 1):
+  종양 세포 및 면역 세포 발현
+
+측정 방법:
+  TPS (Tumor Proportion Score):
+    PD-L1 양성 종양 세포 / 전체 종양 세포
+
+  CPS (Combined Positive Score):
+    PD-L1 양성 세포 (종양 + 면역) / 전체 종양 세포
+
+AI 워크플로우:
+
+1. 세포 유형 분류
+   - 종양 세포
+   - 림프구
+   - 대식세포
+   - 간질 세포
+
+2. PD-L1 염색 감지
+   막 염색 강도 및 비율
+
+3. TPS 계산
+   종양 세포: 5,000개
+   PD-L1+ 종양 세포: 1,200개
+   TPS = 1200/5000 × 100% = 24%
+
+4. CPS 계산
+   PD-L1+ 종양 세포: 1,200개
+   PD-L1+ 면역 세포: 800개
+   전체 종양 세포: 5,000개
+
+   CPS = (1200+800)/5000 × 100 = 40
+
+판정 (비소세포폐암 기준):
+  TPS <1%: 음성
+  TPS 1-49%: 저발현
+  TPS ≥50%: 고발현
+
+  결과: TPS 24% (저발현)
+        CPS 40
+
+치료 결정:
+  - TPS ≥50%: 면역항암제 단독 치료
+  - TPS 1-49%: 면역항암제 + 화학요법
+  - TPS <1%: 화학요법 우선
+
+  본 케이스: 병용 요법 권장
+</pre>
+
+<hr>
+
+<h2>5.5 WIA-MED-008 암 검출 표준</h2>
+
+<h3>5.5.1 표준 출력 형식</h3>
+
+<pre>
+{
+  "wia_cancer_detection": {
+    "version": "1.0.0",
+    "slide_id": "S25-00123",
+    "detection_date": "2025-01-15T10:30:00Z",
+    "model": "BreastCancerDetector-v2.1",
+
+    "findings": {
+      "cancer_detected": true,
+      "confidence": 0.963,
+      "cancer_type": "invasive_ductal_carcinoma",
+      "tumor_burden_percent": 6.8,
+
+      "regions": [
+        {
+          "region_id": 1,
+          "coordinates": {
+            "x": 5200,
+            "y": 8100,
+            "width": 2100,
+            "height": 2200
+          },
+          "area_mm2": 8.3,
+          "classification": "IDC",
+          "confidence": 0.92,
+          "grade": "II",
+          "features": {
+            "tubule_formation_score": 2,
+            "nuclear_pleomorphism_score": 2,
+            "mitotic_count_per_10hpf": 18,
+            "total_grade_score": 7
+          }
+        }
+      ],
+
+      "biomarkers": {
+        "ER": {
+          "status": "positive",
+          "h_score": 175,
+          "method": "IHC"
+        },
+        "PR": {
+          "status": "positive",
+          "h_score": 140,
+          "method": "IHC"
+        },
+        "HER2": {
+          "status": "equivocal",
+          "score": "2+",
+          "recommendation": "FISH_test_required"
+        },
+        "Ki67": {
+          "index_percent": 20.1,
+          "interpretation": "moderate_proliferation"
+        }
+      },
+
+      "staging": {
+        "t_stage": "T2",
+        "estimated_size_mm": 23,
+        "invasion_depth_mm": 15
+      },
+
+      "recommendations": [
+        "Pathologist review required",
+        "HER2 FISH testing recommended",
+        "Lymph node evaluation recommended",
+        "Consider molecular profiling"
+      ]
+    },
+
+    "quality_metrics": {
+      "focus_quality": 94.5,
+      "tissue_coverage_percent": 85,
+      "artifact_score": 0.02
+    }
+  }
+}
+</pre>
+
+<hr>
+
+<h2>5.6 장 요약</h2>
+
+<ol>
+    <li><strong>조직 분류:</strong> 8가지 주요 조직 유형, 94-98% 정확도</li>
+    <li><strong>암 검출:</strong> 유방암, 전립선암, 폐암 알고리즘</li>
+    <li><strong>등급 평가:</strong> Nottingham, Gleason 자동 평가</li>
+    <li><strong>바이오마커:</strong> IHC 정량화, PD-L1 평가</li>
+    <li><strong>표준 출력:</strong> WIA-MED-008 JSON 형식</li>
+</ol>
+
+<hr>
+
+<h2>5.7 복습 문제</h2>
+
+<ol>
+    <li>주요 8가지 조직 유형과 특징은?</li>
+    <li>Nottingham 등급 시스템의 3가지 평가 항목은?</li>
+    <li>Gleason 점수 3+4와 4+3의 차이는?</li>
+    <li>H-score 계산 방법은?</li>
+    <li>PD-L1 TPS와 CPS의 차이는?</li>
+</ol>
+
+<hr>
+
+<p><a href="chapter-06.html">다음: 제6장 - 검사실 정보 시스템 (LIS) 통합 →</a></p>
+</body>
+</html>

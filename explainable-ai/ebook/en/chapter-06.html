@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6: Trust Metrics and Validation | WIA-AI-009</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #10B981, #34d399); color: white; padding: 3rem 2rem; margin: -2rem -2rem 3rem -2rem; }
+        h1 { font-size: 2.5rem; margin-top: 0.5rem; }
+        .content { background: white; padding: 3rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        h2 { color: #10B981; margin: 2.5rem 0 1rem 0; font-size: 1.8rem; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
+        h3 { color: #059669; margin: 1.5rem 0 0.75rem 0; font-size: 1.3rem; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight { background: #f0fdf4; border-left: 4px solid #10B981; padding: 1rem; margin: 1.5rem 0; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 3px; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 1rem 0; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        .summary { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 3rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        .questions { background: #fefce8; border: 2px solid #eab308; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .questions h2 { color: #ca8a04; border-bottom: 2px solid #eab308; }
+        .nav { display: flex; justify-content: space-between; margin-top: 3rem; }
+        .nav a { background: #10B981; color: white; padding: 1rem 2rem; text-decoration: none; border-radius: 6px; }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #e2e8f0; color: #64748b; }
+        .philosophy { color: #10B981; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
+        th { background: #10B981; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>WIA-AI-009 | Chapter 6</div>
+            <h1>Trust Metrics and Validation</h1>
+        </header>
+        <div class="content">
+            <h2>Measuring Explanation Quality</h2>
+            <p>An explanation is only valuable if it's trustworthy. But how do we measure the quality of an explanation? The WIA-AI-009 standard defines comprehensive trust metrics that quantify explanation reliability, consistency, and usefulness.</p>
+
+            <div class="highlight">
+                <strong>弘益人間:</strong> Trust metrics ensure AI serves humanity responsibly by providing objective measures of explanation quality, preventing misleading or low-quality explanations from eroding trust in AI systems.
+            </div>
+
+            <h2>Core Trust Metrics</h2>
+
+            <h3>1. Fidelity</h3>
+            <p>Fidelity measures how accurately the explanation represents the model's true behavior. A high-fidelity explanation means the explanation method correctly captures what the model is doing.</p>
+
+            <pre><code>// Fidelity computation
+function computeFidelity(explanation, model, testInstances) {
+  let totalError = 0;
+
+  for (const instance of testInstances) {
+    const modelPrediction = model.predict(instance);
+    const explanationPrediction = explanation.predictFromExplanation(instance);
+    totalError += Math.abs(modelPrediction - explanationPrediction);
+  }
+
+  return 1 - (totalError / testInstances.length);
+}
+
+// Fidelity > 0.85 is considered good
+// Fidelity > 0.95 is excellent</code></pre>
+
+            <h3>2. Consistency</h3>
+            <p>Similar inputs should produce similar explanations. Consistency measures whether the explanation method behaves predictably across the input space.</p>
+
+            <p>WIA-AI-009 defines two consistency variants:</p>
+            <ul>
+                <li><strong>Lipschitz consistency:</strong> Small input changes → small explanation changes</li>
+                <li><strong>Semantic consistency:</strong> Semantically similar inputs → similar explanations</li>
+            </ul>
+
+            <h3>3. Stability</h3>
+            <p>For stochastic explanation methods (LIME, KernelSHAP), stability measures how much explanations vary across multiple runs with the same input. High stability means the randomness is well-controlled.</p>
+
+            <pre><code>function computeStability(explainer, instance, numRuns = 50) {
+  const explanations = [];
+
+  for (let i = 0; i < numRuns; i++) {
+    explanations.push(explainer.explain(instance));
+  }
+
+  // Compute variance across explanations
+  return 1 - computeVariance(explanations);
+}
+
+// Stability > 0.80 recommended for production</code></pre>
+
+            <h3>4. Comprehensibility</h3>
+            <p>Can humans actually understand the explanation? Comprehensibility is harder to quantify but crucial for practical utility.</p>
+
+            <p>Proxy metrics include:</p>
+            <ul>
+                <li><strong>Explanation complexity:</strong> Number of features/rules presented (fewer is often better)</li>
+                <li><strong>Cognitive load:</strong> Estimated mental effort required (measured through user studies)</li>
+                <li><strong>Actionability:</strong> Can users act on the explanation to change outcomes?</li>
+            </ul>
+
+            <h3>5. Completeness</h3>
+            <p>Do explanations account for the entire prediction? For additive methods like SHAP, this is exact: sum of attributions = prediction - baseline. For other methods, completeness is approximate.</p>
+
+            <h2>Validating Explanations</h2>
+
+            <h3>Ablation Testing</h3>
+            <p>Remove the features the explanation identifies as important. The prediction should change significantly. If it doesn't, the explanation is suspect.</p>
+
+            <div class="highlight">
+                <strong>Example:</strong> If SHAP says credit_score is the most important feature (SHAP value = -0.35), removing it should substantially increase the default risk prediction. If the prediction barely changes, the explanation is questionable.
+            </div>
+
+            <h3>Perturbation Analysis</h3>
+            <p>Modify features in the direction the explanation suggests. If the explanation says "increasing X would decrease risk," actually increase X and verify the prediction changes as expected.</p>
+
+            <h3>Cross-Method Validation</h3>
+            <p>Compare explanations from multiple methods. If SHAP, LIME, and feature permutation all identify different "most important" features, investigate further—at least one is likely wrong.</p>
+
+            <h3>Domain Expert Review</h3>
+            <p>Have experts evaluate whether explanations align with domain knowledge. An explanation that violates known causal relationships is problematic, even if it has good metrics.</p>
+
+            <h2>Fairness Metrics</h2>
+            <p>Explanations should treat different demographic groups fairly.</p>
+
+            <h3>Explanation Parity</h3>
+            <p>Do explanations have similar quality (fidelity, stability) across demographic groups? Lower quality for protected groups could signal bias.</p>
+
+            <h3>Feature Importance Parity</h3>
+            <p>Do the same features drive predictions across groups? If the model relies heavily on feature X for Group A but feature Y for Group B, this might indicate disparate treatment.</p>
+
+            <h3>Counterfactual Fairness</h3>
+            <p>Do counterfactual explanations require changing protected attributes? If the counterfactual for a denied loan is "change your race," the model is clearly discriminating unfairly.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fairness Metric</th>
+                        <th>What It Measures</th>
+                        <th>WIA-AI-009 Threshold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fidelity Parity</td>
+                        <td>Fidelity difference across groups</td>
+                        <td>&lt; 0.05</td>
+                    </tr>
+                    <tr>
+                        <td>Stability Parity</td>
+                        <td>Stability difference across groups</td>
+                        <td>&lt; 0.05</td>
+                    </tr>
+                    <tr>
+                        <td>Feature Distribution</td>
+                        <td>Top features similarity across groups</td>
+                        <td>&gt; 0.70</td>
+                    </tr>
+                    <tr>
+                        <td>Protected Attribute Weight</td>
+                        <td>Importance of protected attributes</td>
+                        <td>&lt; 0.05 (ideally 0)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Automated Validation Pipelines</h2>
+            <p>The WIA-AI-009 standard recommends automated validation as part of the ML pipeline:</p>
+
+            <pre><code>// Automated explanation validation
+class ExplanationValidator {
+  constructor(model, explainer) {
+    this.model = model;
+    this.explainer = explainer;
+  }
+
+  async validateExplanation(instance, explanation) {
+    const results = {
+      fidelity: await this.testFidelity(instance, explanation),
+      stability: await this.testStability(instance),
+      ablation: await this.testAblation(instance, explanation),
+      consistency: await this.testConsistency(instance, explanation),
+      passed: false
+    };
+
+    // All metrics must meet thresholds
+    results.passed = (
+      results.fidelity > 0.85 &&
+      results.stability > 0.80 &&
+      results.ablation.correlation > 0.70 &&
+      results.consistency > 0.75
+    );
+
+    return results;
+  }
+
+  async testAblation(instance, explanation) {
+    const topFeatures = explanation.getTopFeatures(5);
+    const originalPrediction = this.model.predict(instance);
+
+    let correlationSum = 0;
+
+    for (const feature of topFeatures) {
+      const ablatedInstance = {...instance};
+      delete ablatedInstance[feature.name];
+
+      const ablatedPrediction = this.model.predict(ablatedInstance);
+      const predictionChange = Math.abs(originalPrediction - ablatedPrediction);
+      const expectedChange = Math.abs(feature.importance);
+
+      correlationSum += (predictionChange / expectedChange);
+    }
+
+    return { correlation: correlationSum / topFeatures.length };
+  }
+}</code></pre>
+
+            <h2>Human Evaluation Protocols</h2>
+            <p>Automated metrics don't capture everything. Human evaluation remains essential.</p>
+
+            <h3>Simulatability Testing</h3>
+            <p>Can users predict the model's output given the explanation? Show users explanations without predictions, ask them to guess the prediction, measure accuracy.</p>
+
+            <h3>Trust Calibration</h3>
+            <p>Do explanations lead to appropriate trust? Users should trust the model more when it's correct and less when it's wrong. Explanations should help users distinguish these cases.</p>
+
+            <h3>Decision Support Evaluation</h3>
+            <p>Do explanations improve human decision-making? In human-AI collaborative tasks, measure whether explanations help humans catch model errors and make better choices.</p>
+
+            <h2>Detecting Adversarial Explanations</h2>
+            <p>Models can be designed to produce plausible but misleading explanations. Detection strategies:</p>
+
+            <h3>Explanation-Prediction Decoupling Test</h3>
+            <p>If you can change the explanation without changing the prediction (or vice versa), the explanation may be decoupled from actual reasoning.</p>
+
+            <h3>Counterfactual Verification</h3>
+            <p>Generate counterfactuals suggested by the explanation. If they don't actually flip the prediction, the explanation is suspect.</p>
+
+            <h3>Cross-Architecture Comparison</h3>
+            <p>Compare explanations from models with different architectures but similar performance. Drastically different explanations for the same input warrant investigation.</p>
+
+            <h2>Explanation Quality Dashboards</h2>
+            <p>The WIA-AI-009 standard includes specifications for monitoring explanation quality in production:</p>
+
+            <pre><code>{
+  "explanation_quality_report": {
+    "model_id": "loan_classifier_v3",
+    "reporting_period": "2025-01-01 to 2025-01-31",
+    "metrics": {
+      "average_fidelity": 0.92,
+      "average_stability": 0.87,
+      "average_consistency": 0.84,
+      "completeness_score": 0.98
+    },
+    "fairness_metrics": {
+      "fidelity_parity": 0.03,
+      "stability_parity": 0.04,
+      "protected_attribute_importance": 0.02
+    },
+    "validation_tests": {
+      "ablation_correlation": 0.79,
+      "perturbation_alignment": 0.81,
+      "cross_method_agreement": 0.76
+    },
+    "alerts": [
+      {
+        "type": "consistency_drop",
+        "severity": "medium",
+        "description": "Consistency for age > 65 dropped to 0.68",
+        "recommendation": "Investigate data distribution changes"
+      }
+    ],
+    "human_evaluation": {
+      "simulatability": 0.72,
+      "trust_calibration": 0.81,
+      "decision_support_improvement": 0.15
+    }
+  }
+}</code></pre>
+
+            <h2>Continuous Monitoring</h2>
+            <p>Explanation quality can degrade over time due to concept drift, data distribution changes, or model updates. Continuous monitoring ensures sustained quality:</p>
+
+            <ul>
+                <li><strong>Weekly automated tests:</strong> Run validation suite on sample of production instances</li>
+                <li><strong>Monthly human evaluation:</strong> Have domain experts review sample explanations</li>
+                <li><strong>Quarterly comprehensive audit:</strong> Full validation across all metrics and subpopulations</li>
+                <li><strong>Alert on degradation:</strong> Automatic notifications when metrics drop below thresholds</li>
+            </ul>
+
+            <h2>Best Practices for Trust</h2>
+            <ol>
+                <li><strong>Multi-metric evaluation:</strong> Never rely on a single metric; use a comprehensive suite</li>
+                <li><strong>Subpopulation analysis:</strong> Check metrics for different demographic and feature-based subgroups</li>
+                <li><strong>Longitudinal tracking:</strong> Monitor how metrics evolve over time</li>
+                <li><strong>Cross-method validation:</strong> Verify important findings with multiple explanation methods</li>
+                <li><strong>Domain expert involvement:</strong> Combine automated metrics with expert review</li>
+                <li><strong>Transparency about limitations:</strong> Document known weaknesses and edge cases</li>
+                <li><strong>User feedback loops:</strong> Collect feedback on explanation usefulness and adjust accordingly</li>
+            </ol>
+
+            <div class="summary">
+                <h2>Chapter Summary</h2>
+                <p>Trust metrics provide objective measures of explanation quality, ensuring that explanations are reliable, consistent, and useful. The WIA-AI-009 standard defines five core metrics: fidelity (accuracy), consistency (similarity for similar inputs), stability (reproducibility), comprehensibility (human understandability), and completeness (accounting for the full prediction).</p>
+
+                <p>Validation techniques including ablation testing, perturbation analysis, cross-method comparison, and domain expert review help verify that explanations accurately reflect model behavior. Fairness metrics ensure explanations don't discriminate across demographic groups, with metrics for explanation parity, feature importance parity, and counterfactual fairness.</p>
+
+                <p>Automated validation pipelines integrate explanation quality checks into the ML workflow, catching degradation early. Human evaluation protocols measure simulatability, trust calibration, and decision support effectiveness—aspects that automated metrics can't fully capture.</p>
+
+                <p>Continuous monitoring with weekly automated tests, monthly human evaluation, and quarterly comprehensive audits ensures sustained explanation quality in production systems. The standard emphasizes multi-metric evaluation, subpopulation analysis, and transparency about limitations.</p>
+            </div>
+
+            <div class="questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Define fidelity in the context of XAI. How is it computed?</li>
+                    <li>What is the difference between consistency and stability?</li>
+                    <li>Describe how ablation testing validates explanations. What does it test?</li>
+                    <li>Why is comprehensibility harder to quantify than fidelity or stability?</li>
+                    <li>What are three fairness metrics for explanations? Why does each matter?</li>
+                    <li>How can cross-method validation help detect unreliable explanations?</li>
+                    <li>Describe the concept of "adversarial explanations." How can they be detected?</li>
+                    <li>What is simulatability testing, and what does it measure?</li>
+                    <li>Why is continuous monitoring of explanation quality important?</li>
+                    <li>Design a validation protocol for a high-stakes application like medical diagnosis. What metrics and tests would you include?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

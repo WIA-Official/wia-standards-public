@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Data Cleansing and Remediation | WIA-DATA-005</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8;}
+        .header {background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-bottom: 3px solid #10B981; padding: 2rem; text-align: center;}
+        .chapter-number {color: #10B981; font-size: 1.2rem; font-weight: bold;}
+        .header h1 {color: #10B981; font-size: 2rem; margin: 0.5rem 0;}
+        .container {max-width: 800px; margin: 0 auto; padding: 3rem 2rem;}
+        .nav-links {display: flex; justify-content: space-between; margin-bottom: 2rem;}
+        .nav-link {color: #10B981; text-decoration: none; padding: 0.5rem 1rem; border: 2px solid #10B981; border-radius: 0.5rem; transition: all 0.3s;}
+        .nav-link:hover {background: #10B981; color: #0f172a;}
+        .content {background: #1e293b; padding: 3rem; border-radius: 1rem; margin-bottom: 2rem;}
+        h2 {color: #10B981; margin: 2rem 0 1rem 0; font-size: 1.8rem;}
+        h3 {color: #10B981; margin: 1.5rem 0 0.5rem 0; font-size: 1.3rem;}
+        p {margin-bottom: 1rem; color: #cbd5e1;}
+        ul, ol {margin: 1rem 0 1rem 2rem; color: #cbd5e1;}
+        li {margin-bottom: 0.5rem;}
+        .highlight {background: #0f172a; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #10B981; margin: 1.5rem 0;}
+        code {background: #0f172a; padding: 0.2rem 0.5rem; border-radius: 0.3rem; color: #10B981; font-family: 'Courier New', monospace;}
+        pre {background: #0f172a; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1rem 0;}
+        pre code {background: transparent; padding: 0;}
+        table {width: 100%; border-collapse: collapse; margin: 1.5rem 0;}
+        th, td {padding: 1rem; text-align: left; border-bottom: 1px solid #334155;}
+        th {background: #0f172a; color: #10B981; font-weight: bold;}
+        tr:hover {background: #0f172a;}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="chapter-number">CHAPTER 05</div>
+        <h1>Data Cleansing and Remediation</h1>
+    </div>
+    <div class="container">
+        <div class="nav-links">
+            <a href="./chapter-04.html" class="nav-link">← Previous Chapter</a>
+            <a href="./index.html" class="nav-link">Table of Contents</a>
+            <a href="./chapter-06.html" class="nav-link">Next Chapter →</a>
+        </div>
+        <div class="content">
+            <h2>What is Data Cleansing?</h2>
+            <p>Data cleansing (also called data cleaning or scrubbing) is the process of detecting and correcting inaccurate, incomplete, or irrelevant data. While validation prevents bad data from entering, cleansing fixes data that's already problematic.</p>
+
+            <h2>Common Data Quality Issues</h2>
+            <h3>1. Missing Values</h3>
+            <p>Handling nulls and empty fields:</p>
+            <ul>
+                <li><strong>Remove:</strong> Delete records with critical missing data</li>
+                <li><strong>Impute:</strong> Fill with mean, median, mode, or predicted values</li>
+                <li><strong>Flag:</strong> Keep record but mark field as incomplete</li>
+                <li><strong>Default:</strong> Use default value (e.g., "Unknown", 0)</li>
+            </ul>
+
+            <pre><code># Python example - Missing value handling
+import pandas as pd
+
+df = pd.read_csv('customers.csv')
+
+# Remove rows with missing critical fields
+df_clean = df.dropna(subset=['customer_id', 'email'])
+
+# Impute missing age with median
+df['age'].fillna(df['age'].median(), inplace=True)
+
+# Fill missing category with 'Unknown'
+df['category'].fillna('Unknown', inplace=True)</code></pre>
+
+            <h3>2. Duplicate Records</h3>
+            <p>Strategies for deduplication:</p>
+            <pre><code># Exact duplicates
+df_deduped = df.drop_duplicates(subset=['email'], keep='first')
+
+# Fuzzy matching for near duplicates
+from fuzzywuzzy import fuzz
+
+def find_similar_names(name1, name2, threshold=85):
+    return fuzz.ratio(name1, name2) >= threshold</code></pre>
+
+            <h3>3. Formatting Issues</h3>
+            <p>Standardizing data formats:</p>
+            <pre><code># Standardize case
+df['email'] = df['email'].str.lower()
+df['name'] = df['name'].str.title()
+
+# Remove whitespace
+df['phone'] = df['phone'].str.strip().str.replace(' ', '')
+
+# Standardize dates
+df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d')</code></pre>
+
+            <h3>4. Outliers and Anomalies</h3>
+            <p>Detecting and handling outliers:</p>
+            <pre><code># Z-score method
+from scipy import stats
+import numpy as np
+
+z_scores = np.abs(stats.zscore(df['price']))
+df_no_outliers = df[z_scores < 3]
+
+# IQR method
+Q1 = df['price'].quantile(0.25)
+Q3 = df['price'].quantile(0.75)
+IQR = Q3 - Q1
+df_filtered = df[(df['price'] >= Q1 - 1.5*IQR) & (df['price'] <= Q3 + 1.5*IQR)]</code></pre>
+
+            <h2>Data Cleansing Techniques</h2>
+
+            <h3>Parsing and Standardization</h3>
+            <p>Extract and standardize components:</p>
+            <pre><code># Parse address into components
+import usaddress
+
+address = "123 Main Street, Apt 4B, New York, NY 10001"
+parsed = usaddress.tag(address)
+
+# Standardize phone numbers
+import phonenumbers
+
+phone = phonenumbers.parse("+1-415-555-1234", "US")
+formatted = phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
+# Result: "+14155551234"</code></pre>
+
+            <h3>Data Transformation</h3>
+            <pre><code># Type conversions
+df['age'] = df['age'].astype(int)
+df['active'] = df['active'].map({'yes': True, 'no': False})
+
+# Derived fields
+df['full_name'] = df['first_name'] + ' ' + df['last_name']
+df['age'] = (pd.Timestamp.now() - pd.to_datetime(df['birth_date'])).dt.days // 365</code></pre>
+
+            <h2>Automated vs Manual Cleansing</h2>
+
+            <table>
+                <thead>
+                    <tr><th>Aspect</th><th>Automated</th><th>Manual</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Speed</td><td>Fast, scales well</td><td>Slow, labor-intensive</td></tr>
+                    <tr><td>Cost</td><td>Low per record</td><td>High per record</td></tr>
+                    <tr><td>Accuracy</td><td>Consistent rules</td><td>Context-aware</td></tr>
+                    <tr><td>Best For</td><td>Common patterns, large volumes</td><td>Complex cases, edge cases</td></tr>
+                </tbody>
+            </table>
+
+            <h2>Data Cleansing Workflow</h2>
+            <div class="highlight">
+                <ol>
+                    <li><strong>Audit:</strong> Profile data to identify issues</li>
+                    <li><strong>Define Rules:</strong> Establish cleansing standards</li>
+                    <li><strong>Backup:</strong> Create snapshot before cleansing</li>
+                    <li><strong>Execute:</strong> Run automated cleansing scripts</li>
+                    <li><strong>Review:</strong> Sample and verify results</li>
+                    <li><strong>Validate:</strong> Run quality checks</li>
+                    <li><strong>Document:</strong> Record changes made</li>
+                    <li><strong>Monitor:</strong> Track ongoing quality</li>
+                </ol>
+            </div>
+
+            <h2>Tools for Data Cleansing</h2>
+
+            <h3>Open Source</h3>
+            <ul>
+                <li><strong>OpenRefine:</strong> Interactive data cleaning tool</li>
+                <li><strong>Python pandas:</strong> Data manipulation library</li>
+                <li><strong>Apache Spark:</strong> Big data processing</li>
+                <li><strong>dbt:</strong> SQL-based transformations</li>
+            </ul>
+
+            <h3>Commercial</h3>
+            <ul>
+                <li><strong>Informatica Data Quality:</strong> Enterprise cleansing suite</li>
+                <li><strong>Talend Data Quality:</strong> Integrated with ETL</li>
+                <li><strong>Trifacta:</strong> Visual data wrangling</li>
+            </ul>
+
+            <h2>Best Practices</h2>
+            <ul>
+                <li>Always backup before cleansing</li>
+                <li>Document all transformations</li>
+                <li>Test on sample before full dataset</li>
+                <li>Track cleansing metrics and results</li>
+                <li>Implement cleansing in pipelines, not ad-hoc</li>
+                <li>Prefer prevention over correction</li>
+            </ul>
+
+            <h2>Key Takeaways</h2>
+            <ul>
+                <li>Cleansing fixes existing data quality issues</li>
+                <li>Common issues: missing values, duplicates, format inconsistencies, outliers</li>
+                <li>Balance automated cleansing with manual review</li>
+                <li>Follow systematic workflow: audit, define, execute, validate, monitor</li>
+                <li>Prevention is better than cleansing—fix root causes</li>
+            </ul>
+
+            <h2>What's Next</h2>
+            <p>In the next chapter, we'll explore Master Data Management—establishing single sources of truth for critical business entities and maintaining consistency across your organization.</p>
+        </div>
+        <div class="nav-links">
+            <a href="./chapter-04.html" class="nav-link">← Previous Chapter</a>
+            <a href="./index.html" class="nav-link">Table of Contents</a>
+            <a href="./chapter-06.html" class="nav-link">Next Chapter →</a>
+        </div>
+    </div>
+</body>
+</html>

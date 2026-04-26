@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Neo4j Deep Dive | WIA-DATA-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        .summary-box { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 0.5rem; margin: 3rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 3</div>
+            <h1>Neo4j Deep Dive</h1>
+        </header>
+
+        <p>Neo4j is the world's leading graph database platform, pioneering the property graph model and the Cypher query language. With over a decade of development and millions of deployments worldwide, Neo4j has become synonymous with graph databases. This chapter explores Neo4j's architecture, features, and best practices for building production-grade applications.</p>
+
+        <h2>Introduction to Neo4j</h2>
+
+        <p>Founded in 2007, Neo4j was built from the ground up as a native graph database. Unlike databases that added graph capabilities later, Neo4j's entire architecture is optimized for graph storage and traversal. This native approach delivers unmatched performance for connected data queries.</p>
+
+        <h3>Key Features</h3>
+
+        <ul>
+            <li><strong>ACID Transactions:</strong> Full transactional support with rollback capabilities</li>
+            <li><strong>Cypher Query Language:</strong> Intuitive, SQL-like declarative language for graphs</li>
+            <li><strong>Index-Free Adjacency:</strong> Native graph storage for O(1) traversals</li>
+            <li><strong>High Availability:</strong> Clustering and replication for mission-critical applications</li>
+            <li><strong>Graph Algorithms:</strong> Built-in library of 50+ production-quality algorithms</li>
+            <li><strong>APOC Procedures:</strong> Extensive library of utility functions and procedures</li>
+            <li><strong>Visualization Tools:</strong> Browser-based interface for exploration and development</li>
+            <li><strong>Multi-Language Support:</strong> Drivers for Java, Python, JavaScript, .NET, Go, and more</li>
+        </ul>
+
+        <h2>Neo4j Architecture</h2>
+
+        <p>Understanding Neo4j's architecture helps you build better applications:</p>
+
+        <h3>Storage Layer</h3>
+
+        <p>Neo4j uses a custom storage format optimized for graphs:</p>
+
+        <ul>
+            <li><strong>Fixed-Size Records:</strong> Nodes and relationships stored in fixed-size records for fast random access</li>
+            <li><strong>Property Stores:</strong> Separate stores for different property types (strings, arrays, etc.)</li>
+            <li><strong>Index-Free Adjacency:</strong> Each node physically stores references to its relationships</li>
+            <li><strong>Memory Mapping:</strong> Leverages OS page cache for hot data</li>
+        </ul>
+
+        <h3>Transaction Layer</h3>
+
+        <p>Neo4j provides full ACID guarantees:</p>
+
+        <pre><code>// Begin transaction
+BEGIN
+MATCH (p:Person {name: 'Alice'})
+SET p.balance = p.balance - 100
+
+MATCH (q:Person {name: 'Bob'})
+SET q.balance = q.balance + 100
+COMMIT
+
+// Or rollback on error
+ROLLBACK
+</code></pre>
+
+        <h3>Query Execution Engine</h3>
+
+        <p>Cypher queries are compiled into execution plans:</p>
+
+        <pre><code>// View execution plan
+EXPLAIN
+MATCH (p:Person)-[:KNOWS*2]->(friend)
+WHERE p.name = 'Alice'
+RETURN friend.name
+
+// Profile with actual statistics
+PROFILE
+MATCH (p:Person)-[:KNOWS*2]->(friend)
+WHERE p.name = 'Alice'
+RETURN friend.name
+</code></pre>
+
+        <h2>Neo4j Editions</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Edition</th>
+                    <th>Use Case</th>
+                    <th>Key Features</th>
+                    <th>License</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Community</td>
+                    <td>Development, Small Projects</td>
+                    <td>Single instance, Core features</td>
+                    <td>GPLv3</td>
+                </tr>
+                <tr>
+                    <td>Enterprise</td>
+                    <td>Production, Enterprise</td>
+                    <td>Clustering, Hot backups, Advanced monitoring</td>
+                    <td>Commercial</td>
+                </tr>
+                <tr>
+                    <td>AuraDB</td>
+                    <td>Cloud, Managed Service</td>
+                    <td>Fully managed, Auto-scaling, Built-in security</td>
+                    <td>Commercial</td>
+                </tr>
+                <tr>
+                    <td>Desktop</td>
+                    <td>Local Development</td>
+                    <td>GUI management, Plugin ecosystem</td>
+                    <td>Free</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Installation and Setup</h2>
+
+        <h3>Neo4j Desktop (Recommended for Learning)</h3>
+
+        <ol>
+            <li>Download from neo4j.com/download</li>
+            <li>Install and launch Neo4j Desktop</li>
+            <li>Create a new project and database</li>
+            <li>Start the database and open Neo4j Browser</li>
+        </ol>
+
+        <h3>Docker Installation</h3>
+
+        <pre><code># Pull Neo4j image
+docker pull neo4j:latest
+
+# Run Neo4j container
+docker run \
+    --name neo4j \
+    -p 7474:7474 -p 7687:7687 \
+    -e NEO4J_AUTH=neo4j/password \
+    -v $HOME/neo4j/data:/data \
+    neo4j:latest
+
+# Access at http://localhost:7474
+</code></pre>
+
+        <h3>Server Installation (Ubuntu/Debian)</h3>
+
+        <pre><code># Add Neo4j repository
+wget -O - https://debian.neo4j.com/neotechnology.gpg.key | sudo apt-key add -
+echo 'deb https://debian.neo4j.com stable latest' | sudo tee /etc/apt/sources.list.d/neo4j.list
+
+# Install Neo4j
+sudo apt-get update
+sudo apt-get install neo4j
+
+# Start service
+sudo systemctl start neo4j
+sudo systemctl enable neo4j
+</code></pre>
+
+        <h2>Neo4j Browser</h2>
+
+        <p>Neo4j Browser is a web-based interface for querying and visualizing your graph:</p>
+
+        <h3>Key Features</h3>
+
+        <ul>
+            <li><strong>Query Editor:</strong> Write and execute Cypher queries with syntax highlighting</li>
+            <li><strong>Graph Visualization:</strong> Interactive visualization of query results</li>
+            <li><strong>Database Inspection:</strong> Browse node labels, relationship types, and properties</li>
+            <li><strong>Built-in Guides:</strong> Interactive tutorials and documentation</li>
+            <li><strong>Query History:</strong> Review and re-run previous queries</li>
+        </ul>
+
+        <h3>Useful Browser Commands</h3>
+
+        <pre><code>// Show database schema
+:schema
+
+// Show database statistics
+:sysinfo
+
+// List available procedures
+CALL dbms.procedures()
+
+// Show all indexes
+:schema indexes
+
+// Clear the graph visualization
+:clear
+</code></pre>
+
+        <h2>Configuration and Tuning</h2>
+
+        <p>Neo4j's configuration file (neo4j.conf) controls database behavior:</p>
+
+        <h3>Memory Settings</h3>
+
+        <pre><code># Page cache (OS-level file system cache)
+dbms.memory.pagecache.size=4G
+
+# Heap memory for query execution
+dbms.memory.heap.initial_size=2G
+dbms.memory.heap.max_size=4G
+
+# Transaction log size
+dbms.tx_log.rotation.retention_policy=2G size
+</code></pre>
+
+        <h3>Network Configuration</h3>
+
+        <pre><code># HTTP connector
+dbms.connector.http.enabled=true
+dbms.connector.http.listen_address=0.0.0.0:7474
+
+# Bolt connector (native protocol)
+dbms.connector.bolt.enabled=true
+dbms.connector.bolt.listen_address=0.0.0.0:7687
+</code></pre>
+
+        <h3>Security Settings</h3>
+
+        <pre><code># Authentication and authorization
+dbms.security.auth_enabled=true
+
+# Encryption
+dbms.ssl.policy.bolt.enabled=true
+dbms.ssl.policy.bolt.base_directory=certificates/bolt
+
+# Password policy
+dbms.security.auth_minimum_password_length=8
+</code></pre>
+
+        <h2>Indexes and Constraints</h2>
+
+        <p>Proper indexing is crucial for query performance:</p>
+
+        <h3>Creating Indexes</h3>
+
+        <pre><code>// Single-property index
+CREATE INDEX person_email FOR (p:Person) ON (p.email)
+
+// Composite index
+CREATE INDEX person_name_city FOR (p:Person) ON (p.lastName, p.city)
+
+// Full-text index
+CREATE FULLTEXT INDEX person_search FOR (p:Person) ON EACH [p.name, p.bio]
+
+// Using full-text search
+CALL db.index.fulltext.queryNodes("person_search", "Alice engineer") 
+YIELD node, score
+RETURN node.name, score
+</code></pre>
+
+        <h3>Constraints</h3>
+
+        <pre><code>// Unique constraint (automatically creates index)
+CREATE CONSTRAINT person_email_unique FOR (p:Person) REQUIRE p.email IS UNIQUE
+
+// Node property existence
+CREATE CONSTRAINT person_name_exists FOR (p:Person) REQUIRE p.name IS NOT NULL
+
+// Relationship property existence
+CREATE CONSTRAINT knows_since_exists FOR ()-[k:KNOWS]-() REQUIRE k.since IS NOT NULL
+
+// Node key (multiple properties must be unique together)
+CREATE CONSTRAINT person_key FOR (p:Person) REQUIRE (p.firstName, p.lastName, p.birthDate) IS NODE KEY
+</code></pre>
+
+        <h2>Data Import Strategies</h2>
+
+        <h3>LOAD CSV for Small to Medium Datasets</h3>
+
+        <pre><code>// Import from CSV file
+LOAD CSV WITH HEADERS FROM 'file:///people.csv' AS row
+CREATE (p:Person {
+    id: toInteger(row.id),
+    name: row.name,
+    email: row.email,
+    age: toInteger(row.age)
+})
+
+// Using periodic commit for large files
+:auto USING PERIODIC COMMIT 500
+LOAD CSV WITH HEADERS FROM 'file:///large_dataset.csv' AS row
+CREATE (p:Person {id: toInteger(row.id), name: row.name})
+</code></pre>
+
+        <h3>neo4j-admin import for Large Datasets</h3>
+
+        <pre><code># Bulk import from CSV (database must be stopped)
+neo4j-admin database import full \
+  --nodes=Person=people.csv \
+  --nodes=Company=companies.csv \
+  --relationships=WORKS_FOR=employment.csv \
+  --delimiter="," \
+  neo4j
+</code></pre>
+
+        <h3>APOC for Complex Imports</h3>
+
+        <pre><code>// Import from JSON
+CALL apoc.load.json('https://api.example.com/users') YIELD value
+CREATE (p:Person {
+    id: value.id,
+    name: value.name,
+    email: value.email
+})
+
+// Import from database
+CALL apoc.load.jdbc('jdbc:mysql://localhost/mydb', 'SELECT * FROM users') YIELD row
+CREATE (p:Person {id: row.id, name: row.name})
+</code></pre>
+
+        <h2>Backup and Recovery</h2>
+
+        <h3>Online Backup (Enterprise)</h3>
+
+        <pre><code># Perform online backup
+neo4j-admin database backup --to-path=/backups neo4j
+
+# Restore from backup
+neo4j-admin database restore --from-path=/backups/neo4j neo4j
+</code></pre>
+
+        <h3>Dump and Load (All Editions)</h3>
+
+        <pre><code># Dump database
+neo4j-admin database dump --to-path=/dumps neo4j
+
+# Load dump
+neo4j-admin database load --from-path=/dumps/neo4j.dump neo4j --overwrite-destination=true
+</code></pre>
+
+        <h2>Monitoring and Observability</h2>
+
+        <h3>Query Logging</h3>
+
+        <pre><code># Enable query logging in neo4j.conf
+dbms.logs.query.enabled=true
+dbms.logs.query.threshold=1s
+dbms.logs.query.parameter_logging_enabled=true
+</code></pre>
+
+        <h3>Metrics and Monitoring</h3>
+
+        <pre><code>// Database statistics
+CALL dbms.queryJmx("org.neo4j:*") YIELD name, attributes
+
+// List running queries
+CALL dbms.listQueries()
+
+// Kill a long-running query
+CALL dbms.killQuery("query-123")
+
+// Transaction statistics
+CALL dbms.listTransactions()
+</code></pre>
+
+        <h3>Integration with Monitoring Tools</h3>
+
+        <p>Neo4j exposes metrics via JMX and can integrate with:</p>
+        <ul>
+            <li><strong>Prometheus:</strong> For metrics collection and alerting</li>
+            <li><strong>Grafana:</strong> For visualization and dashboards</li>
+            <li><strong>Elasticsearch:</strong> For log aggregation and analysis</li>
+        </ul>
+
+        <h2>Neo4j Drivers and Client Applications</h2>
+
+        <h3>Official Drivers</h3>
+
+        <p>Neo4j provides official drivers for major languages:</p>
+
+        <h4>Python Driver</h4>
+
+        <pre><code>from neo4j import GraphDatabase
+
+class Neo4jConnection:
+    def __init__(self, uri, user, password):
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+    
+    def close(self):
+        self.driver.close()
+    
+    def query(self, query, parameters=None):
+        with self.driver.session() as session:
+            result = session.run(query, parameters)
+            return [record for record in result]
+
+# Usage
+conn = Neo4jConnection("bolt://localhost:7687", "neo4j", "password")
+results = conn.query("""
+    MATCH (p:Person)-[:KNOWS]->(friend)
+    WHERE p.name = $name
+    RETURN friend.name as friendName
+""", {"name": "Alice"})
+
+for record in results:
+    print(record["friendName"])
+
+conn.close()
+</code></pre>
+
+        <h4>JavaScript Driver</h4>
+
+        <pre><code>const neo4j = require('neo4j-driver');
+
+const driver = neo4j.driver(
+    'bolt://localhost:7687',
+    neo4j.auth.basic('neo4j', 'password')
+);
+
+async function findFriends(name) {
+    const session = driver.session();
+    try {
+        const result = await session.run(
+            'MATCH (p:Person {name: $name})-[:KNOWS]->(friend) RETURN friend.name as friendName',
+            { name }
+        );
+        return result.records.map(r => r.get('friendName'));
+    } finally {
+        await session.close();
+    }
+}
+
+// Usage
+findFriends('Alice').then(friends => {
+    console.log(friends);
+    driver.close();
+});
+</code></pre>
+
+        <h2>High Availability and Clustering</h2>
+
+        <p>Neo4j Enterprise supports clustering for production environments:</p>
+
+        <h3>Causal Clustering</h3>
+
+        <p>Neo4j's clustering architecture uses a Raft-based consensus protocol:</p>
+
+        <ul>
+            <li><strong>Core Servers:</strong> Participate in consensus, handle writes</li>
+            <li><strong>Read Replicas:</strong> Serve read-only queries, scale horizontally</li>
+            <li><strong>Automatic Failover:</strong> Leader election on failure</li>
+        </ul>
+
+        <pre><code># Core server configuration
+dbms.mode=CORE
+causal_clustering.initial_discovery_members=server1:5000,server2:5000,server3:5000
+causal_clustering.minimum_core_cluster_size_at_formation=3
+
+# Read replica configuration
+dbms.mode=READ_REPLICA
+causal_clustering.initial_discovery_members=server1:5000,server2:5000,server3:5000
+</code></pre>
+
+        <h2>Performance Best Practices</h2>
+
+        <ol>
+            <li><strong>Use Indexes:</strong> Create indexes on frequently queried properties</li>
+            <li><strong>Parameterize Queries:</strong> Use parameters to enable query plan caching</li>
+            <li><strong>Limit Result Sets:</strong> Use LIMIT to avoid returning excessive data</li>
+            <li><strong>Avoid Cartesian Products:</strong> Ensure patterns are properly connected</li>
+            <li><strong>Use PROFILE:</strong> Analyze query execution plans to identify bottlenecks</li>
+            <li><strong>Batch Operations:</strong> Group multiple operations in single transactions</li>
+            <li><strong>Monitor Memory:</strong> Ensure adequate page cache and heap size</li>
+            <li><strong>Use Appropriate Data Types:</strong> Store dates as temporal types, not strings</li>
+        </ol>
+
+        <div class="summary-box">
+            <h3 style="margin-bottom: 1rem;">Chapter Summary</h3>
+            <p>Neo4j is a mature, production-ready graph database platform with extensive tooling, drivers, and ecosystem support. From simple local development with Neo4j Desktop to highly available clustered deployments in the enterprise, Neo4j provides the foundation for building graph-powered applications. Understanding its architecture, configuration options, and best practices enables you to build performant, scalable solutions.</p>
+            <p style="margin-top: 1rem;">In the next chapter, we'll explore graph query languages in depth, mastering Cypher and comparing it with alternatives like Gremlin.</p>
+        </div>
+
+        </div>
+</body>
+</html>

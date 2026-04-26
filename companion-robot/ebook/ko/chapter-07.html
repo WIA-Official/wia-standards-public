@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: 4단계 - 시스템 통합 | WIA-ROB-013 반려 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--companion-color:#A855F7;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--companion-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--companion-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--companion-color);margin:40px 0 20px;border-bottom:2px solid var(--companion-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--companion-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--companion-color);text-decoration:none;padding:10px 20px;border:2px solid var(--companion-color);border-radius:5px}
+        .nav a:hover{background:var(--companion-color);color:var(--bg)}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--companion-color)}
+        tr:hover{background:rgba(168,85,247,0.1)}
+        strong{color:var(--companion-color)}
+        .summary{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0;border-left:4px solid var(--companion-color)}
+        .summary h3{margin-top:0}
+        .questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .questions h3{margin-top:0}
+        .questions ol{margin-left:20px;margin-top:15px}
+        .questions li{margin:10px 0}
+        ul{margin-left:20px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border:1px solid var(--border)}
+        code{font-family:'Courier New',monospace;color:#e879f9}
+        .highlight{background:rgba(168,85,247,0.2);padding:15px;border-radius:5px;margin:20px 0;border-left:4px solid var(--companion-color)}
+        .warning{background:rgba(239,68,68,0.2);padding:15px;border-radius:5px;margin:20px 0;border-left:4px solid #ef4444}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제7장: 4단계 - 시스템 통합</h1>
+
+        <p>4단계는 반려 로봇을 <strong>외부 시스템과 연결</strong>하여 포괄적인 생태계를 구축합니다. 헬스케어, 스마트 홈, 캘린더, 웨어러블 등과의 통합을 다룹니다.</p>
+
+        <h2>7.1 통합 원칙</h2>
+
+        <h3>7.1.1 핵심 원칙</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>원칙</th>
+                    <th>설명</th>
+                    <th>구현 요구사항</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>사용자 동의</td>
+                    <td>모든 통합에 명시적 동의 필요</td>
+                    <td>통합별 개별 동의 받기</td>
+                </tr>
+                <tr>
+                    <td>프라이버시 설계</td>
+                    <td>최소 권한, 최소 데이터</td>
+                    <td>필요한 데이터만 요청</td>
+                </tr>
+                <tr>
+                    <td>데이터 최소화</td>
+                    <td>필요한 것만 공유</td>
+                    <td>세밀한 권한 관리</td>
+                </tr>
+                <tr>
+                    <td>보안 통신</td>
+                    <td>모든 연결 암호화</td>
+                    <td>TLS 1.3+, OAuth 2.0</td>
+                </tr>
+                <tr>
+                    <td>우아한 저하</td>
+                    <td>통합 실패 시에도 작동</td>
+                    <td>폴백 메커니즘</td>
+                </tr>
+                <tr>
+                    <td>상호운용성</td>
+                    <td>표준 프로토콜 사용</td>
+                    <td>개방형 표준 준수</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>7.2 헬스케어 통합</h2>
+
+        <h3>7.2.1 HL7 FHIR 통합</h3>
+        <pre><code>interface HealthcareIntegration {
+  protocol: "HL7 FHIR R4";
+
+  dataTypes: [
+    "mood_tracking",           // 기분 추적
+    "medication_adherence",    // 약물 복용 순응도
+    "therapy_sessions",        // 치료 세션
+    "vital_signs"             // 생체 신호
+  ];
+
+  consent: "explicit_opt_in";
+  dataSharing: "user_controlled";
+}</code></pre>
+
+        <h3>7.2.2 정신 건강 데이터</h3>
+        <pre><code>interface MentalHealthData {
+  moodLogs: MoodLog[];
+  therapyProgress: TherapyProgress[];
+  medicationAdherence: MedicationLog[];
+  crisisEvents: CrisisEvent[];
+}
+
+interface MoodLog {
+  timestamp: ISO8601;
+  mood: {
+    primaryEmotion: string;
+    valence: number;          // -1.0 ~ +1.0
+    arousal: number;          // 0.0 ~ 1.0
+  };
+  triggers: string[];
+  activities: string[];
+  notes?: string;
+}
+
+interface TherapyProgress {
+  sessionDate: ISO8601;
+  therapistId: string;
+  goals: {
+    goal: string;
+    progress: number;         // 0-100
+  }[];
+  homework: {
+    assigned: string;
+    completed: boolean;
+  }[];
+}</code></pre>
+
+        <h3>7.2.3 헬스케어 통합 사용 사례</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>사용 사례</th>
+                    <th>데이터 흐름</th>
+                    <th>혜택</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>기분 추적</td>
+                    <td>반려 로봇 → EMR 시스템</td>
+                    <td>치료사가 환자 기분 추세 확인</td>
+                </tr>
+                <tr>
+                    <td>약물 알림</td>
+                    <td>EMR → 반려 로봇</td>
+                    <td>복약 시간 알림, 순응도 향상</td>
+                </tr>
+                <tr>
+                    <td>치료 목표</td>
+                    <td>양방향</td>
+                    <td>치료 계획 통합 지원</td>
+                </tr>
+                <tr>
+                    <td>위기 알림</td>
+                    <td>반려 로봇 → 의료진</td>
+                    <td>즉각적 개입 가능</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warning">
+            <p><strong>HIPAA/GDPR 준수:</strong> 건강 데이터는 특별한 보호가 필요합니다. 반드시 해당 지역의 의료 데이터 규정을 준수해야 합니다.</p>
+        </div>
+
+        <h2>7.3 스마트 홈 통합</h2>
+
+        <h3>7.3.1 지원 프로토콜</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜</th>
+                    <th>설명</th>
+                    <th>기기 예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Matter</td>
+                    <td>범용 스마트 홈 표준</td>
+                    <td>조명, 온도조절기, 잠금장치</td>
+                </tr>
+                <tr>
+                    <td>Home Assistant</td>
+                    <td>오픈소스 홈 자동화</td>
+                    <td>다양한 기기 통합</td>
+                </tr>
+                <tr>
+                    <td>Apple HomeKit</td>
+                    <td>Apple 생태계</td>
+                    <td>HomeKit 호환 기기</td>
+                </tr>
+                <tr>
+                    <td>Google Home</td>
+                    <td>Google 생태계</td>
+                    <td>Nest, Google 기기</td>
+                </tr>
+                <tr>
+                    <td>Amazon Alexa</td>
+                    <td>Amazon 생태계</td>
+                    <td>Echo, Alexa 호환 기기</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.3.2 환경 인식</h3>
+        <pre><code>interface SmartHomeIntegration {
+  // 환경 센서
+  temperature: number;           // 섭씨
+  lighting: number;              // 룩스
+  noise_level: number;           // 데시벨
+
+  // 활동 감지
+  presence: boolean;
+  activity: string;              // "sleeping", "cooking", "working"
+
+  // 루틴 지원
+  routines: Routine[];
+}
+
+interface Routine {
+  id: string;
+  name: string;
+  trigger: {
+    type: "time" | "event" | "mood";
+    value: any;
+  };
+  actions: {
+    device: string;
+    action: string;
+    parameters: any;
+  }[];
+}
+
+// 예시: 기분에 따른 조명 조절
+{
+  name: "기분 좋을 때 밝은 조명",
+  trigger: {
+    type: "mood",
+    value: { primaryEmotion: "joy", valence: "> 0.5" }
+  },
+  actions: [
+    { device: "living_room_light", action: "setBrightness", parameters: { brightness: 100 } },
+    { device: "living_room_light", action: "setColor", parameters: { color: "warm_white" } }
+  ]
+}</code></pre>
+
+        <h3>7.3.3 스마트 홈 사용 사례</h3>
+        <ul>
+            <li><strong>기분 기반 조명:</strong> 슬플 때 따뜻한 조명, 집중할 때 밝은 조명</li>
+            <li><strong>수면 루틴:</strong> 잠자리 시간에 조명 어둡게, 온도 낮춤</li>
+            <li><strong>활동 지원:</strong> 운동 시간에 활기찬 음악, 명상 시 조용한 환경</li>
+            <li><strong>안전 모니터링:</strong> 노인 활동 패턴 추적, 이상 감지 시 알림</li>
+        </ul>
+
+        <h2>7.4 캘린더 통합</h2>
+
+        <h3>7.4.1 지원 프로토콜</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>프로토콜/API</th>
+                    <th>제공자</th>
+                    <th>기능</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>CalDAV</td>
+                    <td>표준 프로토콜</td>
+                    <td>캘린더 읽기/쓰기</td>
+                </tr>
+                <tr>
+                    <td>Google Calendar API</td>
+                    <td>Google</td>
+                    <td>Gmail 캘린더</td>
+                </tr>
+                <tr>
+                    <td>Microsoft Graph API</td>
+                    <td>Microsoft</td>
+                    <td>Outlook 캘린더</td>
+                </tr>
+                <tr>
+                    <td>Apple Calendar</td>
+                    <td>Apple</td>
+                    <td>iCloud 캘린더</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.4.2 일정 인식</h3>
+        <pre><code>interface CalendarIntegration {
+  // 일정 관리
+  upcomingEvents: Event[];
+  conflicts: Conflict[];
+
+  // 알림
+  reminders: Reminder[];
+
+  // 시간 관리
+  freeTime: TimeSlot[];
+  suggestions: ScheduleSuggestion[];
+}
+
+interface Event {
+  id: string;
+  title: string;
+  start: ISO8601;
+  end: ISO8601;
+  location?: string;
+  participants?: string[];
+  importance: "low" | "medium" | "high";
+}
+
+interface Reminder {
+  eventId: string;
+  reminderTime: ISO8601;
+  message: string;
+  notificationSent: boolean;
+}</code></pre>
+
+        <h3>7.4.3 캘린더 사용 사례</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>사용 사례</th>
+                    <th>기능</th>
+                    <th>예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>일정 알림</td>
+                    <td>회의 전 준비 시간 알림</td>
+                    <td>"30분 후 회의가 있어요. 준비하셨나요?"</td>
+                </tr>
+                <tr>
+                    <td>시간 관리</td>
+                    <td>여유 시간 파악</td>
+                    <td>"오늘 오후 3시에 1시간 여유가 있어요."</td>
+                </tr>
+                <tr>
+                    <td>스트레스 예측</td>
+                    <td>바쁜 날 미리 알림</td>
+                    <td>"내일은 회의가 많아요. 오늘 충분히 쉬세요."</td>
+                </tr>
+                <tr>
+                    <td>워라밸</td>
+                    <td>과도한 일정 경고</td>
+                    <td>"이번 주 일정이 너무 많아요. 휴식도 필요해요."</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>7.5 응급 서비스 통합</h2>
+
+        <h3>7.5.1 위기 자원 데이터베이스</h3>
+        <pre><code>interface EmergencyIntegration {
+  // 국가별 위기 핫라인
+  crisisHotlines: Map<string, HotlineInfo>;
+
+  // 응급 서비스
+  emergencyNumbers: Map<string, string>;
+
+  // 전문가 추천
+  mentalHealthProviders: Provider[];
+}
+
+interface HotlineInfo {
+  country: string;
+  number: string;
+  name: string;
+  type: "suicide" | "mental_health" | "abuse" | "substance";
+  availability: string;
+  languages: string[];
+  isTextSupported: boolean;
+}
+
+// 한국 예시
+const koreaHotlines = [
+  {
+    country: "KR",
+    number: "1393",
+    name: "자살예방상담전화",
+    type: "suicide",
+    availability: "24/7",
+    languages: ["ko"],
+    isTextSupported: false
+  },
+  {
+    country: "KR",
+    number: "1577-0199",
+    name: "정신건강위기상담전화",
+    type: "mental_health",
+    availability: "24/7",
+    languages: ["ko"],
+    isTextSupported: false
+  },
+  {
+    country: "KR",
+    number: "1366",
+    name: "여성긴급전화",
+    type: "abuse",
+    availability: "24/7",
+    languages: ["ko", "en", "zh", "vi"],
+    isTextSupported: true
+  }
+];</code></pre>
+
+        <h3>7.5.2 위기 대응 워크플로우</h3>
+        <div class="highlight">
+            <p><strong>위기 감지 시 단계:</strong></p>
+            <ol style="margin-left:20px;margin-top:10px">
+                <li><strong>즉각 안정화:</strong> 진정 기법, 공감적 언어</li>
+                <li><strong>자원 제공:</strong> 해당 지역/언어의 핫라인 정보</li>
+                <li><strong>행동 촉구:</strong> 지금 전화하도록 권장</li>
+                <li><strong>후속 조치:</strong> 30분-1시간 후 확인</li>
+                <li><strong>지속 지원:</strong> 전문가 치료와 병행</li>
+            </ol>
+        </div>
+
+        <h2>7.6 웨어러블 기기 통합</h2>
+
+        <h3>7.6.1 건강 추적 기기</h3>
+        <pre><code>interface WearableIntegration {
+  deviceType: "smartwatch" | "fitness_band" | "health_monitor";
+
+  metrics: {
+    heartRate: number;              // bpm
+    steps: number;
+    sleep: SleepData;
+    stress: number;                 // 0-100
+    activity: ActivityData;
+  };
+
+  syncFrequency: "realtime" | "hourly" | "daily";
+}
+
+interface SleepData {
+  totalSleep: number;               // 분
+  deepSleep: number;                // 분
+  remSleep: number;                 // 분
+  lightSleep: number;               // 분
+  sleepScore: number;               // 0-100
+}
+
+interface BiometricData {
+  heartRateVariability: number;     // ms
+  skinConductance: number;          // μS
+  bodyTemperature: number;          // 섭씨
+  oxygenSaturation: number;         // %
+
+  // 프라이버시 제어
+  sharingConsent: boolean;
+  retentionPeriod: number;          // 일
+}</code></pre>
+
+        <h3>7.6.2 웨어러블 데이터 활용</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>데이터</th>
+                    <th>활용</th>
+                    <th>개입 예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>심박수</td>
+                    <td>스트레스/불안 감지</td>
+                    <td>높은 심박수 시 호흡 운동 제안</td>
+                </tr>
+                <tr>
+                    <td>수면 품질</td>
+                    <td>웰빙 모니터링</td>
+                    <td>수면 부족 시 휴식 권장</td>
+                </tr>
+                <tr>
+                    <td>활동량</td>
+                    <td>에너지 수준 추정</td>
+                    <td>장시간 비활동 시 움직임 권장</td>
+                </tr>
+                <tr>
+                    <td>스트레스 점수</td>
+                    <td>정서 지원 필요성</td>
+                    <td>높은 스트레스 시 대화 시작</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>7.7 소셜 미디어 통합</h2>
+
+        <h3>7.7.1 지원 플랫폼</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>플랫폼</th>
+                    <th>통합 기능</th>
+                    <th>프라이버시 수준</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Facebook</td>
+                    <td>성과 공유, 커뮤니티</td>
+                    <td>사용자 제어</td>
+                </tr>
+                <tr>
+                    <td>Twitter/X</td>
+                    <td>마일스톤 공유</td>
+                    <td>공개/비공개 선택</td>
+                </tr>
+                <tr>
+                    <td>Instagram</td>
+                    <td>시각적 진행 상황</td>
+                    <td>선택적 공유</td>
+                </tr>
+                <tr>
+                    <td>WhatsApp</td>
+                    <td>지지 그룹 연결</td>
+                    <td>암호화 메시징</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.7.2 소셜 기능</h3>
+        <pre><code>interface SocialIntegration {
+  // 공유
+  shareAchievements: boolean;
+  shareProgress: boolean;
+
+  // 프라이버시
+  publicSharing: boolean;
+  selectedFriends: string[];
+
+  // 커뮤니티
+  supportGroups: Group[];
+  events: Event[];
+}
+
+interface Group {
+  id: string;
+  name: string;
+  type: "support" | "therapy" | "hobby" | "educational";
+  members: number;
+  privacy: "public" | "private" | "secret";
+}</code></pre>
+
+        <div class="warning">
+            <p><strong>소셜 미디어 통합 주의사항:</strong></p>
+            <ul>
+                <li>정신 건강 정보는 절대 자동 공유하지 않음</li>
+                <li>모든 공유는 명시적 사용자 동의 필요</li>
+                <li>공유 전 미리보기 제공</li>
+                <li>언제든지 공유 취소 가능</li>
+            </ul>
+        </div>
+
+        <h2>7.8 교육 플랫폼 통합</h2>
+
+        <h3>7.8.1 학습 관리 시스템 (LMS)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>플랫폼</th>
+                    <th>API</th>
+                    <th>지원 기능</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Canvas LMS</td>
+                    <td>Canvas API</td>
+                    <td>과제, 성적, 일정</td>
+                </tr>
+                <tr>
+                    <td>Moodle</td>
+                    <td>Moodle Web Services</td>
+                    <td>코스, 퀴즈, 포럼</td>
+                </tr>
+                <tr>
+                    <td>Google Classroom</td>
+                    <td>Classroom API</td>
+                    <td>과제, 공지, 제출</td>
+                </tr>
+                <tr>
+                    <td>Microsoft Teams for Education</td>
+                    <td>Graph API</td>
+                    <td>팀, 과제, 회의</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.8.2 교육 지원 기능</h3>
+        <pre><code>interface EducationIntegration {
+  courses: Course[];
+  assignments: Assignment[];
+  progress: LearningProgress[];
+
+  // 지원
+  studyReminders: boolean;
+  homeworkHelp: boolean;
+  examPreparation: boolean;
+}
+
+interface Assignment {
+  id: string;
+  course: string;
+  title: string;
+  dueDate: ISO8601;
+  status: "not_started" | "in_progress" | "submitted" | "graded";
+  grade?: number;
+}</code></pre>
+
+        <h2>7.9 생산성 도구 통합</h2>
+
+        <h3>7.9.1 프로젝트 관리</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>도구</th>
+                    <th>통합</th>
+                    <th>사용 사례</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Asana</td>
+                    <td>Asana API</td>
+                    <td>작업 추적, 마감일 알림</td>
+                </tr>
+                <tr>
+                    <td>Trello</td>
+                    <td>Trello API</td>
+                    <td>보드 관리, 진행 상황</td>
+                </tr>
+                <tr>
+                    <td>Jira</td>
+                    <td>Jira REST API</td>
+                    <td>이슈 추적, 스프린트</td>
+                </tr>
+                <tr>
+                    <td>Monday.com</td>
+                    <td>Monday API</td>
+                    <td>워크플로우 자동화</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>7.9.2 워라밸 지원</h3>
+        <pre><code>interface ProductivityIntegration {
+  tasks: Task[];
+  projects: Project[];
+  deadlines: Deadline[];
+
+  // 워라밸
+  breakReminders: boolean;
+  workHourTracking: boolean;
+  stressManagement: boolean;
+}
+
+// 워라밸 규칙
+const workLifeBalance = {
+  maxContinuousWorkHours: 4,
+  breakFrequency: 60,              // 분
+  breakDuration: 10,               // 분
+  dailyWorkLimit: 8,               // 시간
+  weekendProtection: true
+};</code></pre>
+
+        <h2>7.10 데이터 이동성 및 이전</h2>
+
+        <h3>7.10.1 내보내기 형식</h3>
+        <pre><code>interface DataExport {
+  version: "1.0.0";
+  exportDate: ISO8601;
+  standard: "WIA-ROB-013";
+
+  companionProfile: CompanionProfile;
+  conversations: Conversation[];
+  memories: Memory[];
+  integrations: {
+    healthcare: HealthData[];
+    smartHome: HomeData[];
+    calendar: EventData[];
+    wearable: BiometricData[];
+  };
+  analytics: Analytics;
+}</code></pre>
+
+        <h3>7.10.2 가져오기 지원</h3>
+        <div class="highlight">
+            <p><strong>사용자 마이그레이션 지원:</strong></p>
+            <ul>
+                <li>다른 WIA-ROB-013 준수 플랫폼에서 데이터 가져오기</li>
+                <li>대화 기록, 메모리, 선호도 보존</li>
+                <li>통합 설정 재구성</li>
+                <li>점진적 마이그레이션 옵션</li>
+            </ul>
+        </div>
+
+        <div class="summary">
+            <h3>핵심 내용 요약</h3>
+            <ul>
+                <li>통합 원칙: 사용자 동의, 프라이버시 설계, 데이터 최소화, 보안 통신, 우아한 저하, 상호운용성</li>
+                <li>헬스케어: HL7 FHIR R4, 기분 추적, 약물 순응도, 치료 진행, HIPAA/GDPR 준수</li>
+                <li>스마트 홈: Matter, Home Assistant, HomeKit, Google Home, Alexa 지원</li>
+                <li>캘린더: CalDAV, Google/Microsoft/Apple API, 일정 알림, 시간 관리, 워라밸</li>
+                <li>응급 서비스: 국가별 위기 핫라인 DB, 24/7 자원, 다국어 지원</li>
+                <li>웨어러블: 심박수, 수면, 활동, 스트레스 추적, 실시간/시간별/일별 동기화</li>
+                <li>소셜 미디어: 성과 공유, 지지 그룹, 프라이버시 제어, 정신 건강 정보 자동 공유 금지</li>
+                <li>교육: Canvas, Moodle, Google Classroom, Teams 통합, 과제 알림, 학습 지원</li>
+                <li>생산성: Asana, Trello, Jira, Monday.com, 워라밸 규칙 (4시간 연속 작업 제한, 60분마다 휴식)</li>
+                <li>데이터 이동성: WIA-ROB-013 준수 플랫폼 간 완전한 데이터 이전 지원</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>시스템 통합의 여섯 가지 핵심 원칙을 나열하세요.</li>
+                <li>헬스케어 통합에서 사용하는 표준 프로토콜은? 버전은?</li>
+                <li>스마트 홈 통합에서 지원해야 하는 다섯 가지 프로토콜은?</li>
+                <li>캘린더 통합의 네 가지 주요 사용 사례를 설명하세요.</li>
+                <li>한국의 세 가지 주요 위기 핫라인 번호는?</li>
+                <li>웨어러블 기기에서 추적하는 네 가지 주요 메트릭은?</li>
+                <li>소셜 미디어 통합 시 절대 자동 공유하지 말아야 할 정보는?</li>
+                <li>교육 플랫폼 통합에서 지원하는 네 가지 LMS는?</li>
+                <li>워라밸 규칙에서 최대 연속 작업 시간과 휴식 빈도는?</li>
+                <li>데이터 내보내기에 포함되는 다섯 가지 주요 카테고리는?</li>
+            </ol>
+        </div>
+
+        <div style="margin-top:40px;padding-top:30px;border-top:2px solid var(--border);text-align:center;color:#64748b">
+            <p><strong>WIA-ROB-013 반려 로봇 표준</strong></p>
+            <p>© 2025 World Certification Industry Association</p>
+            <p style="margin-top:10px">弘益人間 · Benefit All Humanity</p>
+        </div>
+    </div>
+</body>
+</html>

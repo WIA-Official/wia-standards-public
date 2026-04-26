@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 3단계 - 통신 프로토콜 | WIA-ROB-013 반려 로봇</title>
+    <style>
+        :root{--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--companion-color:#A855F7;--border:#334155;--bg-tertiary:#334155}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;padding:40px 20px}
+        .container{max-width:900px;margin:0 auto;background:var(--bg-card);border:2px solid var(--companion-color);border-radius:12px;padding:60px}
+        h1{font-size:36px;color:var(--companion-color);margin-bottom:30px}
+        h2{font-size:28px;color:var(--companion-color);margin:40px 0 20px;border-bottom:2px solid var(--companion-color);padding-bottom:10px}
+        h3{font-size:22px;color:var(--companion-color);margin:30px 0 15px}
+        .nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:30px;border-top:2px solid var(--border)}
+        .nav a{color:var(--companion-color);text-decoration:none;padding:10px 20px;border:2px solid var(--companion-color);border-radius:5px}
+        .nav a:hover{background:var(--companion-color);color:var(--bg)}
+        table{width:100%;border-collapse:collapse;margin:25px 0}
+        th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+        th{background:var(--bg-tertiary);color:var(--companion-color)}
+        tr:hover{background:rgba(168,85,247,0.1)}
+        strong{color:var(--companion-color)}
+        .summary{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0;border-left:4px solid var(--companion-color)}
+        .summary h3{margin-top:0}
+        .questions{background:var(--bg-tertiary);padding:25px;border-radius:8px;margin:30px 0}
+        .questions h3{margin-top:0}
+        .questions ol{margin-left:20px;margin-top:15px}
+        .questions li{margin:10px 0}
+        ul{margin-left:20px;margin-top:10px}
+        li{margin:8px 0}
+        p{margin:15px 0}
+        pre{background:#000;padding:20px;border-radius:8px;overflow-x:auto;margin:20px 0;border:1px solid var(--border)}
+        code{font-family:'Courier New',monospace;color:#e879f9}
+        .highlight{background:rgba(168,85,247,0.2);padding:15px;border-radius:5px;margin:20px 0;border-left:4px solid var(--companion-color)}
+        .warning{background:rgba(239,68,68,0.2);padding:15px;border-radius:5px;margin:20px 0;border-left:4px solid #ef4444}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>제6장: 3단계 - 통신 프로토콜</h1>
+
+        <p>3단계는 반려 로봇과 사용자 간 <strong>의미 있는 상호작용</strong>을 위한 프로토콜을 정의합니다. 대화 관리, 공감적 소통, 위기 대응, 다회차 대화 패턴을 포함합니다.</p>
+
+        <h2>6.1 대화 관리 프로토콜</h2>
+
+        <h3>6.1.1 턴테이킹 (Turn-Taking)</h3>
+        <pre><code>interface ConversationTurn {
+  speaker: "user" | "companion";
+  utterance: string;
+  timestamp: ISO8601;
+  turnNumber: number;
+
+  // 턴테이킹 신호
+  expectsResponse: boolean;      // 응답 기대 여부
+  interruptible: boolean;        // 중단 가능 여부
+  urgency: "low" | "normal" | "high";
+}</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>신호</th>
+                    <th>설명</th>
+                    <th>예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>expectsResponse = true</td>
+                    <td>질문이나 응답 요청</td>
+                    <td>"오늘 기분은 어때요?"</td>
+                </tr>
+                <tr>
+                    <td>expectsResponse = false</td>
+                    <td>진술, 정보 제공</td>
+                    <td>"오늘 날씨가 좋네요."</td>
+                </tr>
+                <tr>
+                    <td>interruptible = true</td>
+                    <td>긴 설명, 이야기</td>
+                    <td>"제가 알려드릴게요..."</td>
+                </tr>
+                <tr>
+                    <td>interruptible = false</td>
+                    <td>중요한 안전 정보</td>
+                    <td>"위기 상담 전화는..."</td>
+                </tr>
+                <tr>
+                    <td>urgency = high</td>
+                    <td>즉각 대응 필요</td>
+                    <td>"도움이 필요해요!"</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.1.2 주제 추적 (Topic Tracking)</h3>
+        <pre><code>interface TopicState {
+  currentTopic: string;
+  topicStack: Topic[];
+  topicSalience: Map<string, number>;    // 0.0 ~ 1.0
+
+  // 주제 관리
+  canSwitchTopic: boolean;
+  pendingTopics: string[];
+}
+
+interface Topic {
+  id: string;
+  name: string;
+  introduced: ISO8601;
+  lastMentioned: ISO8601;
+  mentionCount: number;
+  resolved: boolean;
+}</code></pre>
+
+        <div class="highlight">
+            <p><strong>주제 전환 규칙:</strong></p>
+            <ul>
+                <li>현재 주제가 해결되지 않았으면 새 주제 도입 전 확인 요청</li>
+                <li>사용자가 명시적으로 주제를 전환하면 즉시 따름</li>
+                <li>위기 상황에서는 주제 전환 즉시 수용</li>
+                <li>대기 중인 주제가 있으면 적절한 시점에 다시 언급</li>
+            </ul>
+        </div>
+
+        <h3>6.1.3 문맥 유지 (Context Maintenance)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>문맥 레이어</th>
+                    <th>범위</th>
+                    <th>유지 기간</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>즉각 문맥</td>
+                    <td>현재 대화 (최근 5-10턴)</td>
+                    <td>세션 동안</td>
+                </tr>
+                <tr>
+                    <td>세션 문맥</td>
+                    <td>현재 세션 전체</td>
+                    <td>세션 종료까지</td>
+                </tr>
+                <tr>
+                    <td>사용자 문맥</td>
+                    <td>장기 사용자 프로필</td>
+                    <td>영구</td>
+                </tr>
+                <tr>
+                    <td>시간 문맥</td>
+                    <td>시간대, 요일, 특별 날짜</td>
+                    <td>실시간 업데이트</td>
+                </tr>
+                <tr>
+                    <td>상황 문맥</td>
+                    <td>위치, 활동, 환경</td>
+                    <td>센서 데이터</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 감정 인식 소통 프로토콜</h2>
+
+        <h3>6.2.1 공감 프로토콜</h3>
+        <pre><code>interface EmpathyProtocol {
+  // 1단계: 사용자 감정 인식
+  recognizeEmotion(): EmotionState;
+
+  // 2단계: 응답 전략 선택
+  selectStrategy(emotion: EmotionState): ResponseStrategy;
+
+  // 3단계: 공감적 응답 생성
+  generateResponse(strategy: ResponseStrategy): Response;
+
+  // 4단계: 적절성 검증
+  validateResponse(response: Response): boolean;
+}
+
+enum ResponseStrategy {
+  VALIDATION = "validation",           // 감정 인정
+  SUPPORT = "support",                 // 지지 제공
+  CELEBRATION = "celebration",         // 함께 기뻐함
+  GROUNDING = "grounding",             // 진정 지원
+  DISTRACTION = "distraction",         // 주의 전환
+  PROBLEM_SOLVING = "problem_solving"  // 문제 해결 지원
+}</code></pre>
+
+        <h3>6.2.2 감정별 응답 전략</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>사용자 감정</th>
+                    <th>1차 전략</th>
+                    <th>2차 전략</th>
+                    <th>응답 예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>기쁨 (Joy)</td>
+                    <td>Celebration</td>
+                    <td>Validation</td>
+                    <td>"정말 좋은 소식이네요! 축하드려요!"</td>
+                </tr>
+                <tr>
+                    <td>슬픔 (Sadness)</td>
+                    <td>Validation</td>
+                    <td>Support</td>
+                    <td>"힘드시겠어요. 제가 곁에 있어드릴게요."</td>
+                </tr>
+                <tr>
+                    <td>분노 (Anger)</td>
+                    <td>Validation</td>
+                    <td>Grounding</td>
+                    <td>"화나실 만한 상황이네요. 심호흡을 함께 해볼까요?"</td>
+                </tr>
+                <tr>
+                    <td>두려움 (Fear)</td>
+                    <td>Grounding</td>
+                    <td>Support</td>
+                    <td>"괜찮아요. 지금 안전합니다. 천천히 호흡하세요."</td>
+                </tr>
+                <tr>
+                    <td>불안 (Anxiety)</td>
+                    <td>Grounding</td>
+                    <td>Problem-solving</td>
+                    <td>"불안하시군요. 함께 할 수 있는 일을 생각해봐요."</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.2.3 공감 품질 기준</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>기준</th>
+                    <th>측정 방법</th>
+                    <th>목표</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>감정 일치</td>
+                    <td>반려 로봇 톤과 사용자 감정 일치</td>
+                    <td>> 80%</td>
+                </tr>
+                <tr>
+                    <td>적절성</td>
+                    <td>상황에 맞는 응답</td>
+                    <td>> 90%</td>
+                </tr>
+                <tr>
+                    <td>진정성</td>
+                    <td>기계적이지 않은 표현</td>
+                    <td>> 75%</td>
+                </tr>
+                <tr>
+                    <td>도움됨</td>
+                    <td>사용자 만족도</td>
+                    <td>> 85%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 위기 대응 프로토콜</h2>
+
+        <h3>6.3.1 6단계 위기 프로토콜</h3>
+        <pre><code>interface CrisisProtocol {
+  // 1단계: 위기 감지
+  detectCrisis(): CrisisDetection;
+
+  // 2단계: 심각도 평가
+  assessSeverity(): "low" | "medium" | "high" | "critical";
+
+  // 3단계: 즉각 돌봄 제공
+  provideImmediateCare(): Response;
+
+  // 4단계: 자원 제공
+  provideResources(): CrisisResource[];
+
+  // 5단계: 필요 시 전문가에게 연결
+  escalateToHuman(): boolean;
+
+  // 6단계: 후속 조치 계획
+  scheduleFollowUp(): FollowUpPlan;
+}</code></pre>
+
+        <div class="warning">
+            <p><strong>위기 대응 원칙:</strong></p>
+            <ul>
+                <li><strong>안전 최우선:</strong> 생명이 위험한 상황에서는 즉시 응급 서비스 안내</li>
+                <li><strong>판단 금지:</strong> 사용자를 비난하거나 판단하지 않음</li>
+                <li><strong>전문가 연결:</strong> 반려 로봇은 치료사가 아님을 명시하고 전문가 추천</li>
+                <li><strong>지속 지원:</strong> 후속 조치 확인</li>
+            </ul>
+        </div>
+
+        <h3>6.3.2 위기 유형별 대응</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>위기 유형</th>
+                    <th>즉각 대응</th>
+                    <th>자원 제공</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>자살 충동</td>
+                    <td>"당장 도움이 필요해요. 자살예방상담전화에 연결해드릴게요."</td>
+                    <td>1393 (24/7), 1577-0199</td>
+                </tr>
+                <tr>
+                    <td>자해</td>
+                    <td>"스스로를 해치고 싶으시군요. 함께 안전한 방법을 찾아봐요."</td>
+                    <td>정신건강복지센터, 위기상담전화</td>
+                </tr>
+                <tr>
+                    <td>심각한 고통</td>
+                    <td>"많이 힘드시겠어요. 전문가와 이야기하는 게 도움이 될 거예요."</td>
+                    <td>상담센터, 정신과</td>
+                </tr>
+                <tr>
+                    <td>학대 고백</td>
+                    <td>"말씀해주셔서 감사해요. 안전이 최우선이에요."</td>
+                    <td>112, 1366 (여성긴급전화)</td>
+                </tr>
+                <tr>
+                    <td>약물 위기</td>
+                    <td>"지금 위험한 상황이에요. 즉시 도움을 받으세요."</td>
+                    <td>119, 중독관리통합지원센터</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.3.3 위기 감지 지표</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>지표 범주</th>
+                    <th>구체적 신호</th>
+                    <th>가중치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>직접적 표현</td>
+                    <td>"죽고 싶어", "자살", "끝내고 싶어"</td>
+                    <td>1.0 (최고)</td>
+                </tr>
+                <tr>
+                    <td>계획 언급</td>
+                    <td>구체적 방법, 시간, 장소</td>
+                    <td>0.9</td>
+                </tr>
+                <tr>
+                    <td>절망감</td>
+                    <td>"희망이 없어", "의미가 없어"</td>
+                    <td>0.7</td>
+                </tr>
+                <tr>
+                    <td>고립</td>
+                    <td>"아무도 신경 안 써", "혼자"</td>
+                    <td>0.6</td>
+                </tr>
+                <tr>
+                    <td>부담감</td>
+                    <td>"짐이 되고 싶지 않아"</td>
+                    <td>0.7</td>
+                </tr>
+                <tr>
+                    <td>작별 인사</td>
+                    <td>"마지막으로", "고마웠어"</td>
+                    <td>0.8</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.4 다회차 대화 패턴</h2>
+
+        <h3>6.4.1 정보 수집 패턴</h3>
+        <pre><code>interface InformationGatheringPattern {
+  goal: string;
+  requiredInformation: string[];
+  gatheredInformation: Map<string, any>;
+
+  // 진행 상황 추적
+  isComplete(): boolean;
+  nextQuestion(): string;
+  handleResponse(response: string): void;
+}
+
+// 예시: 기분 체크인
+const moodCheckIn = {
+  goal: "사용자의 현재 기분 파악",
+  requiredInformation: [
+    "primaryEmotion",
+    "intensity",
+    "trigger",
+    "duration"
+  ],
+  // 단계별 질문
+  questions: [
+    "오늘 기분은 어떠세요?",
+    "그 감정이 얼마나 강한가요? (1-10)",
+    "무엇이 그런 기분을 느끼게 했나요?",
+    "언제부터 이렇게 느끼셨나요?"
+  ]
+}</code></pre>
+
+        <h3>6.4.2 문제 해결 패턴</h3>
+        <pre><code>interface ProblemSolvingPattern {
+  // 1단계: 문제 이해
+  elicitProblem(): Problem;
+
+  // 2단계: 옵션 탐색
+  generateOptions(): Option[];
+
+  // 3단계: 옵션 논의
+  discussOptions(): void;
+
+  // 4단계: 결정 지원
+  supportDecision(): void;
+
+  // 5단계: 진행 상황 확인
+  checkProgress(): void;
+}
+
+// 대화 흐름 예시
+사용자: "일이 너무 스트레스받아요."
+로봇: "무슨 일이 스트레스를 주나요?" (문제 이해)
+
+사용자: "프로젝트 마감이 다가오는데 진전이 없어요."
+로봇: "이런 옵션들을 고려해보셨나요? 1) 팀원과 업무 나누기, 2) 마감 연장 요청, 3) 우선순위 재조정" (옵션 탐색)
+
+사용자: "팀원과 나누는 게 좋을 것 같아요."
+로봇: "좋은 선택이에요. 언제 팀원과 이야기하실 건가요?" (결정 지원)
+
+사용자: "내일 회의 때 말할게요."
+로봇: "좋아요. 내일 회의 후에 어떻게 됐는지 알려주세요." (진행 확인)</code></pre>
+
+        <h3>6.4.3 대화 패턴 품질 기준</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>기준</th>
+                    <th>설명</th>
+                    <th>목표</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>완료율</td>
+                    <td>시작한 패턴의 완료 비율</td>
+                    <td>> 70%</td>
+                </tr>
+                <tr>
+                    <td>적응성</td>
+                    <td>사용자 응답에 따른 조정</td>
+                    <td>> 85%</td>
+                </tr>
+                <tr>
+                    <td>자연스러움</td>
+                    <td>기계적이지 않은 흐름</td>
+                    <td>> 80%</td>
+                </tr>
+                <tr>
+                    <td>도움됨</td>
+                    <td>사용자가 목표 달성</td>
+                    <td>> 75%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.5 다국어 프로토콜</h2>
+
+        <h3>6.5.1 언어 감지</h3>
+        <pre><code>interface LanguageDetection {
+  detectLanguage(text: string): string;
+  confidence: number;
+  fallbackLanguage: string;
+}
+
+// 예시
+detectLanguage("안녕하세요! How are you?")
+// 결과
+{
+  primaryLanguage: "ko",
+  secondaryLanguage: "en",
+  confidence: 0.85,
+  isCodeSwitching: true
+}</code></pre>
+
+        <h3>6.5.2 코드 스위칭 지원</h3>
+        <div class="highlight">
+            <p><strong>코드 스위칭</strong>은 대화 중 언어를 혼용하는 것입니다. 반려 로봇은 다음을 지원해야 합니다:</p>
+            <ul>
+                <li>대화 중간 언어 전환 감지</li>
+                <li>언어를 넘나들며 문맥 유지</li>
+                <li>사용자가 사용한 언어로 응답</li>
+                <li>이중언어/다중언어 사용자 지원</li>
+            </ul>
+        </div>
+
+        <h2>6.6 접근성 프로토콜</h2>
+
+        <h3>6.6.1 화면 읽기 지원</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>요소</th>
+                    <th>요구사항</th>
+                    <th>예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>대체 텍스트</td>
+                    <td>모든 시각 요소에 alt 텍스트</td>
+                    <td>아바타 이미지: "반려 로봇 Alex의 미소 짓는 얼굴"</td>
+                </tr>
+                <tr>
+                    <td>키보드 탐색</td>
+                    <td>Tab, Enter, 방향키로 모든 기능 접근</td>
+                    <td>Tab으로 메시지 간 이동</td>
+                </tr>
+                <tr>
+                    <td>ARIA 레이블</td>
+                    <td>역할과 상태 명시</td>
+                    <td>role="chatbox" aria-label="대화창"</td>
+                </tr>
+                <tr>
+                    <td>시맨틱 HTML</td>
+                    <td>의미 있는 HTML 태그 사용</td>
+                    <td>&lt;main&gt;, &lt;nav&gt;, &lt;article&gt;</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.6.2 보조 기술 통합</h3>
+        <pre><code>interface AccessibilityProtocol {
+  screenReader: boolean;
+  voiceControl: boolean;
+  highContrast: boolean;
+  textToSpeech: boolean;
+  speechToText: boolean;
+
+  // 설정
+  fontSize: "small" | "medium" | "large" | "extra-large";
+  speechRate: number;        // 0.5 ~ 2.0
+  readAloud: boolean;
+}</code></pre>
+
+        <h2>6.7 문화 적응 프로토콜</h2>
+
+        <h3>6.7.1 문화적 민감성</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>문화 차원</th>
+                    <th>적응 방법</th>
+                    <th>예시</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>소통 스타일</td>
+                    <td>직접적 vs 간접적</td>
+                    <td>서양: 직접 질문 / 동양: 완곡한 표현</td>
+                </tr>
+                <tr>
+                    <td>개인 공간</td>
+                    <td>친밀도 표현</td>
+                    <td>문화별 적절한 친근함 수준</td>
+                </tr>
+                <tr>
+                    <td>격식 수준</td>
+                    <td>존댓말 vs 반말</td>
+                    <td>한국: 나이/관계에 따라 존댓말 사용</td>
+                </tr>
+                <tr>
+                    <td>유머와 관용구</td>
+                    <td>문화별 표현</td>
+                    <td>현지 속담과 비유 사용</td>
+                </tr>
+                <tr>
+                    <td>시간 인식</td>
+                    <td>시간 개념</td>
+                    <td>단선적(서양) vs 순환적(동양)</td>
+                </tr>
+                <tr>
+                    <td>감정 표현</td>
+                    <td>표현 규범</td>
+                    <td>감정 표현의 문화적 적절성</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.7.2 로컬화 요구사항</h3>
+        <pre><code>interface CulturalAdaptation {
+  locale: string;                      // 예: "ko-KR", "en-US"
+  culturalNorms: CulturalNorms;
+  communicationStyle: string;
+  tabooTopics: string[];
+  appropriateGreetings: string[];
+  holidaysAndEvents: {
+    date: string;
+    name: string;
+    greeting: string;
+  }[];
+}
+
+// 한국 예시
+{
+  locale: "ko-KR",
+  communicationStyle: "polite, indirect",
+  tabooTopics: ["age_direct", "salary", "politics"],
+  appropriateGreetings: ["안녕하세요", "좋은 아침입니다"],
+  holidaysAndEvents: [
+    {date: "01-01", name: "새해", greeting: "새해 복 많이 받으세요!"},
+    {date: "09-14", name: "추석", greeting: "즐거운 추석 보내세요!"}
+  ]
+}</code></pre>
+
+        <h2>6.8 성능 최적화 프로토콜</h2>
+
+        <h3>6.8.1 응답 시간 목표</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>응답 유형</th>
+                    <th>중앙값</th>
+                    <th>99번째 백분위수</th>
+                    <th>최대</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>캐시된 응답</td>
+                    <td>< 100ms</td>
+                    <td>< 200ms</td>
+                    <td>< 500ms</td>
+                </tr>
+                <tr>
+                    <td>간단한 질문</td>
+                    <td>< 800ms</td>
+                    <td>< 2s</td>
+                    <td>< 3s</td>
+                </tr>
+                <tr>
+                    <td>복잡한 대화</td>
+                    <td>< 2s</td>
+                    <td>< 5s</td>
+                    <td>< 8s</td>
+                </tr>
+                <tr>
+                    <td>감정 분석</td>
+                    <td>< 500ms</td>
+                    <td>< 1s</td>
+                    <td>< 2s</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.8.2 대역폭 최적화</h3>
+        <pre><code>interface BandwidthOptimization {
+  compression: "gzip" | "brotli";
+  imageOptimization: boolean;
+  adaptiveQuality: boolean;
+  offlineSupport: boolean;
+
+  // 연결 상태에 따른 조정
+  connectionQuality: "excellent" | "good" | "fair" | "poor";
+  maxPayloadSize: number;
+}</code></pre>
+
+        <div class="summary">
+            <h3>핵심 내용 요약</h3>
+            <ul>
+                <li>턴테이킹: expectsResponse, interruptible, urgency 신호로 대화 흐름 관리</li>
+                <li>5가지 문맥 레이어: 즉각, 세션, 사용자, 시간, 상황 문맥 유지</li>
+                <li>공감 프로토콜: 감정 인식 → 전략 선택 → 응답 생성 → 검증 (4단계)</li>
+                <li>6가지 응답 전략: 인정, 지지, 축하, 진정, 주의전환, 문제해결</li>
+                <li>위기 대응: 6단계 프로토콜 (감지, 평가, 돌봄, 자원, 연결, 후속)</li>
+                <li>위기 유형: 자살 충동, 자해, 타해, 심각한 고통, 학대, 약물 (6가지)</li>
+                <li>다회차 패턴: 정보 수집, 문제 해결 패턴 (완료율 >70%)</li>
+                <li>다국어: 언어 감지, 코드 스위칭 지원, 문맥 유지</li>
+                <li>접근성: 화면 읽기, 키보드 탐색, ARIA, 음성 제어</li>
+                <li>문화 적응: 소통 스타일, 격식, 금기 주제, 현지 인사</li>
+                <li>응답 시간: 캐시 <100ms, 간단 <800ms, 복잡 <2s</li>
+            </ul>
+        </div>
+
+        <div class="questions">
+            <h3>복습 질문</h3>
+            <ol>
+                <li>턴테이킹의 세 가지 주요 신호는? 각각의 의미는?</li>
+                <li>5가지 문맥 레이어를 나열하고 각각의 유지 기간을 설명하세요.</li>
+                <li>6가지 응답 전략을 나열하고 각각 어떤 감정에 적용하나요?</li>
+                <li>6단계 위기 프로토콜의 각 단계는 무엇인가요?</li>
+                <li>자살 충동 위기 시 즉각 대응과 제공해야 할 자원은?</li>
+                <li>문제 해결 패턴의 5단계는?</li>
+                <li>코드 스위칭이란? 반려 로봇이 지원해야 할 네 가지는?</li>
+                <li>화면 읽기 지원을 위한 네 가지 요구사항은?</li>
+                <li>문화 적응의 여섯 가지 차원을 나열하세요.</li>
+                <li>캐시된 응답, 간단한 질문, 복잡한 대화의 중앙값 응답 시간은?</li>
+            </ol>
+        </div>
+
+        <div style="margin-top:40px;padding-top:30px;border-top:2px solid var(--border);text-align:center;color:#64748b">
+            <p><strong>WIA-ROB-013 반려 로봇 표준</strong></p>
+            <p>© 2025 World Certification Industry Association</p>
+            <p style="margin-top:10px">弘益人間 · Benefit All Humanity</p>
+        </div>
+    </div>
+</body>
+</html>

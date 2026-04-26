@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제6장: 예약 시스템 - WIA-HOME</title>
+</head>
+<body>
+<h1>제6장: 예약 시스템</h1>
+
+<blockquote>
+"홍익인간: 모든 서비스업은 전문적인 일정 관리를 받을 자격이 있습니다."
+</blockquote>
+
+<hr>
+
+<h2>6.1 예약 설정</h2>
+
+<pre>
+예약 활성화
+===========
+
+const home = new WIAHome({
+  name: '스타일 살롱',
+  features: {
+    booking: true
+  }
+});
+
+
+가용 시간 설정
+==============
+
+home.booking.setup({
+  availability: {
+    days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+    hours: { start: '10:00', end: '20:00' },
+    slotDuration: 30, // 분
+    maxAdvance: 30    // 일 후까지
+  }
+});
+
+
+휴식 및 차단 날짜
+=================
+
+home.booking.setup({
+  availability: {
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+    hours: { start: '09:00', end: '18:00' },
+    breaks: [
+      { start: '12:00', end: '13:00' }  // 점심
+    ],
+    blockedDates: [
+      '2025-12-25',  // 크리스마스
+      '2025-01-01'   // 새해
+    ]
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.2 서비스</h2>
+
+<pre>
+서비스 정의
+===========
+
+home.booking.addServices([
+  {
+    id: 'haircut',
+    name: '커트',
+    duration: 30,
+    price: 15000,
+    description: '전문 커트'
+  },
+  {
+    id: 'perm',
+    name: '펌',
+    duration: 120,
+    price: 80000,
+    description: '풀 펌 서비스'
+  },
+  {
+    id: 'color',
+    name: '염색',
+    duration: 90,
+    price: 60000,
+    description: '헤어 염색'
+  }
+]);
+
+
+여러 직원
+=========
+
+여러 직원이 있는 사업:
+
+home.booking.addStaff([
+  {
+    id: 'staff_1',
+    name: '김 디자이너',
+    services: ['haircut', 'perm', 'color'],
+    availability: {
+      days: ['mon', 'tue', 'wed', 'thu', 'fri']
+    }
+  },
+  {
+    id: 'staff_2',
+    name: '박 디자이너',
+    services: ['haircut', 'color'],
+    availability: {
+      days: ['wed', 'thu', 'fri', 'sat']
+    }
+  }
+]);
+</pre>
+
+<hr>
+
+<h2>6.3 캘린더 관리</h2>
+
+<pre>
+캘린더 보기
+===========
+
+// 가능한 시간대 가져오기
+const slots = await home.booking.getAvailableSlots({
+  date: '2025-12-20',
+  serviceId: 'haircut'
+});
+
+// 반환:
+[
+  { time: '10:00', available: true },
+  { time: '10:30', available: true },
+  { time: '11:00', available: false },  // 이미 예약됨
+  { time: '11:30', available: true },
+  ...
+]
+
+
+월간 개요
+=========
+
+const calendar = await home.booking.getCalendar({
+  month: 12,
+  year: 2025
+});
+
+// 일별 예약 수 반환:
+{
+  '2025-12-01': 3,
+  '2025-12-02': 5,
+  '2025-12-03': 2,
+  ...
+}
+
+
+시간 차단
+=========
+
+// 특정 시간 차단 (휴가, 미팅 등)
+await home.booking.blockTime({
+  start: '2025-12-24 09:00',
+  end: '2025-12-26 18:00',
+  reason: '연휴 휴무'
+});
+</pre>
+
+<hr>
+
+<h2>6.4 예약 흐름</h2>
+
+<pre>
+고객 예약 흐름
+==============
+
+1. 서비스 선택
+   고객이 원하는 서비스 선택
+
+2. 날짜 선택
+   캘린더에서 가능한 날짜 표시
+
+3. 시간 선택
+   선택한 날짜의 가능한 시간대
+
+4. 정보 입력
+   이름, 전화, 이메일, 메모
+
+5. 확정
+   예약 생성, 알림 전송
+
+
+예약 이벤트
+===========
+
+home.on('booking_received', async (event) => {
+  const booking = event.data;
+
+  console.log('새 예약!');
+  console.log('서비스:', booking.service);
+  console.log('날짜:', booking.date);
+  console.log('시간:', booking.time);
+  console.log('고객:', booking.customerName);
+});
+
+
+예약 작업
+=========
+
+// 예약 목록
+const bookings = await home.booking.list({
+  date: '2025-12-20',
+  status: 'confirmed'
+});
+
+// 예약 확정
+await home.booking.confirm(bookingId);
+
+// 예약 취소
+await home.booking.cancel(bookingId, {
+  reason: '고객 요청',
+  notifyCustomer: true
+});
+
+// 예약 변경
+await home.booking.reschedule(bookingId, {
+  newDate: '2025-12-21',
+  newTime: '14:00'
+});
+</pre>
+
+<hr>
+
+<h2>6.5 알림</h2>
+
+<pre>
+알림 설정
+=========
+
+home.booking.setNotifications({
+  // 새 예약 알림
+  newBooking: {
+    channels: ['kakao', 'sms'],
+    toOwner: true,
+    toCustomer: true
+  },
+
+  // 예약 전 리마인더
+  reminder: {
+    channels: ['kakao'],
+    beforeHours: 24,
+    toCustomer: true
+  },
+
+  // 취소 알림
+  cancellation: {
+    channels: ['kakao', 'sms'],
+    toOwner: true,
+    toCustomer: true
+  }
+});
+
+
+알림 채널
+=========
+
+사용 가능한 채널:
+  - kakao (카카오톡)
+  - sms (문자 메시지)
+  - email
+  - push (브라우저 알림)
+
+
+알림 템플릿
+===========
+
+메시지 커스터마이징:
+
+home.booking.setNotificationTemplates({
+  newBooking: {
+    customer: `
+      [스타일 살롱] 예약 확정!
+
+      서비스: {service}
+      날짜: {date}
+      시간: {time}
+
+      곧 뵙겠습니다!
+    `,
+    owner: `
+      [새 예약]
+      고객: {customerName}
+      서비스: {service}
+      날짜: {date} {time}
+      전화: {customerPhone}
+    `
+  }
+});
+
+
+자동 리마인더
+=============
+
+시스템이 자동으로 전송:
+  - 24시간 전: 리마인더
+  - 2시간 전: 최종 리마인더
+  - 예약 후: 감사 + 리뷰 요청
+
+모두 커스터마이징 가능.
+</pre>
+
+<hr>
+
+<h2>6.6 연동</h2>
+
+<pre>
+네이버 예약 연동
+================
+
+await home.integrate({
+  naver: {
+    booking: true,
+    bookingId: 'xxxxx'
+  }
+});
+
+// 네이버 예약이 대시보드에 표시
+// 가용성 자동 동기화
+
+
+카카오 헤어샵 연동
+==================
+
+await home.integrate({
+  kakao: {
+    hairshop: true,
+    shopId: 'xxxxx'
+  }
+});
+
+// 미용실에서 인기
+
+
+Google 캘린더 동기화
+====================
+
+await home.integrate({
+  google: {
+    calendar: true,
+    calendarId: 'primary'
+  }
+});
+
+// 예약이 Google 캘린더에 표시
+// 차단 시간 양방향 동기화
+
+
+이점
+====
+
+[OK] 모든 예약을 한 곳에서
+[OK] 이중 예약 없음
+[OK] 자동 동기화
+[OK] 단일 진실의 소스
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 서비스와 가용성이 있는 완전한 예약 시스템</li>
+<li>[OK] 개별 일정이 있는 다중 직원 지원</li>
+<li>[OK] 차단 및 오버라이드가 있는 캘린더 관리</li>
+<li>[OK] 선택부터 확정까지 전체 예약 흐름</li>
+<li>[OK] 템플릿이 있는 다채널 알림</li>
+<li>[OK] 네이버, 카카오, Google 캘린더 연동</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-05.html">이전: 제5장 - 전자상거래</a> | <a href="chapter-07.html">다음: 제7장 - 보안</a></p>
+</body>
+</html>

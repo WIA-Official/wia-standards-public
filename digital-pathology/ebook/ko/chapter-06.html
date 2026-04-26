@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: 검사실 정보 시스템 (LIS) 통합 - WIA-MED-008</title>
+</head>
+<body>
+
+<p><a href="index.html">[MED-008] WIA 디지털 병리학 표준 전자책</a> | 제6장 (총 8장)</p>
+
+<hr>
+
+<h1>🏥 제6장: 검사실 정보 시스템 (LIS) 통합</h1>
+
+<blockquote>
+<p><strong>통합된 워크플로우</strong></p>
+<p>디지털 병리학의 성공은 검사실 정보 시스템과의 원활한 통합에 달려 있습니다. 데이터가 자동으로 흐르고, 오류가 최소화되며, 효율성이 극대화됩니다.</p>
+</blockquote>
+
+<hr>
+
+<h2>6.1 LIS 아키텍처</h2>
+
+<h3>6.1.1 LIS 구성요소</h3>
+
+<pre>
+검사실 정보 시스템 (Laboratory Information System):
+
+핵심 모듈:
+
+1. 접수 모듈 (Accessioning)
+   - 검체 등록
+   - 바코드 생성
+   - 환자 정보 연동
+
+2. 워크플로우 관리
+   - 작업 큐 관리
+   - 우선순위 설정
+   - 상태 추적
+
+3. 결과 입력
+   - 수기 입력
+   - 장비 인터페이스
+   - 음성 인식
+
+4. 검증 및 승인
+   - 결과 검토
+   - 전문의 승인
+   - 품질 관리
+
+5. 보고서 생성
+   - 표준 템플릿
+   - 맞춤형 보고서
+   - 전자 서명
+
+6. 통신 인터페이스
+   - HL7 메시징
+   - FHIR API
+   - DICOM
+
+전체 아키텍처:
+
+[접수 데스크]
+    ↓
+[LIS 접수 모듈]
+  - 환자 정보 입력
+  - 검체 라벨 출력
+    ↓
+[검체 처리]
+  - 조직 처리기
+  - 포매, 절편, 염색
+    ↓
+[디지털 병리학 시스템]
+  - WSI 스캐너
+  - 이미지 관리 (PACS)
+  - AI 분석
+    ↓
+[LIS 결과 모듈]
+  - AI 결과 통합
+  - 병리학자 검토
+    ↓
+[LIS 보고 모듈]
+  - 보고서 생성
+  - 전자 서명
+    ↓
+[EMR (전자의무기록)]
+  - 임상의 조회
+  - 치료 계획
+</pre>
+
+<h3>6.1.2 데이터 흐름</h3>
+
+<pre>
+생검 검체 데이터 흐름:
+
+Day 0 - 검체 채취:
+  09:00 - 외래에서 생검 시행
+  09:15 - 검체 → 병리과 접수
+  09:30 - LIS 등록
+          {
+            "accession_number": "S25-00123",
+            "patient_id": "P123456",
+            "clinical_info": "Right breast mass",
+            "specimen_type": "Core needle biopsy",
+            "blocks": ["A1", "A2"]
+          }
+
+Day 1 - 조직 처리:
+  08:00 - 자동 조직 처리기 시작 (24시간)
+
+Day 2 - 슬라이드 제작:
+  10:00 - 파라핀 포매
+  11:00 - 절편 (4μm)
+  12:00 - H&E 염색
+  13:00 - 커버글라스
+  13:30 - 바코드 라벨 부착
+          LIS 상태 업데이트: "Ready for scanning"
+
+Day 2 - 디지털화:
+  14:00 - WSI 스캐너 로딩
+  14:05 - 바코드 스캔 → LIS 조회
+          슬라이드 정보 자동 가져오기
+  14:10 - 스캔 시작
+  14:12 - 스캔 완료 (2분)
+  14:15 - 이미지 → PACS 전송
+          LIS 업데이트: "Scanned, awaiting review"
+          메타데이터:
+          {
+            "scan_date": "2025-01-17T14:12:00Z",
+            "scanner": "Aperio GT450",
+            "magnification": 40,
+            "file_size_mb": 2340
+          }
+
+Day 2 - AI 분석:
+  14:16 - AI 파이프라인 자동 시작
+  14:20 - AI 분석 완료 (4분)
+  14:21 - 결과 → LIS 전송
+          {
+            "ai_result": {
+              "cancer_detected": true,
+              "confidence": 0.96,
+              "type": "invasive_ductal_carcinoma"
+            }
+          }
+          LIS 업데이트: "AI reviewed, pathologist review pending"
+          병리학자에게 알림
+
+Day 2 - 병리학자 검토:
+  15:00 - 병리학자 로그인
+          작업 목록:
+            [!] S25-00123 (AI: Cancer detected 96%)
+  15:05 - 디지털 슬라이드 열기
+  15:20 - 진단 완료
+          LIS에 결과 입력:
+          {
+            "diagnosis": "Invasive ductal carcinoma, Grade II",
+            "comment": "ER/PR/HER2 testing recommended",
+            "pathologist": "Dr. Kim",
+            "reviewed_date": "2025-01-17T15:20:00Z"
+          }
+  15:25 - 전자 서명
+          LIS 상태: "Signed, report ready"
+
+Day 2 - 보고서 배포:
+  15:26 - LIS → EMR 자동 전송 (HL7)
+  15:27 - 임상의에게 알림
+  15:30 - 환자 포털 업데이트 (FHIR)
+
+소요 시간:
+  검체 채취 → 보고서: 54시간 30분
+  vs 전통적 방식: 72-96시간
+  시간 단축: ~30%
+</pre>
+
+<hr>
+
+<h2>6.2 HL7 및 FHIR 표준</h2>
+
+<h3>6.2.1 HL7 v2 메시징</h3>
+
+<pre>
+HL7 v2.x: 의료 정보 교환 표준
+
+주요 메시지 유형:
+
+ORM (Order Message) - 검사 오더:
+  MSH|^~\&|EMR|HOSPITAL|LIS|PATHLAB|20250117090000||ORM^O01|12345|P|2.5
+  PID|1||P123456||DOE^JANE||19800515|F
+  ORC|NW|ORDER123||||||20250117090000
+  OBR|1|ORDER123||88305^SURGICAL PATHOLOGY^CPT|||20250117085500||||||||^KIM^ATTENDING
+  OBX|1|TX|CLINICAL^CLINICAL INFO||Right breast mass, r/o cancer
+
+  해석:
+    MSH: 메시지 헤더
+    PID: 환자 정보 (ID: P123456, 여성, 1980-05-15)
+    ORC: 오더 제어 (신규 오더)
+    OBR: 검사 요청 (88305: 수술 병리)
+    OBX: 임상 정보
+
+ORU (Observation Result) - 결과 보고:
+  MSH|^~\&|LIS|PATHLAB|EMR|HOSPITAL|20250117152600||ORU^R01|67890|P|2.5
+  PID|1||P123456||DOE^JANE||19800515|F
+  OBR|1|ORDER123|S25-00123|88305^SURGICAL PATHOLOGY|||20250117152000||||||^KIM^PATHOLOGIST||||||F
+  OBX|1|TX|DIAGNOSIS||Invasive ductal carcinoma, Grade II
+  OBX|2|TX|COMMENT||ER/PR/HER2 testing recommended
+  OBX|3|TX|AI_RESULT||Cancer detected (Confidence: 96%)
+
+구현 예시 (Python):
+
+  from hl7apy.core import Message
+  from datetime import datetime
+
+  # 결과 메시지 생성
+  msg = Message("ORU_R01", version="2.5")
+
+  msg.msh.sending_application = "LIS"
+  msg.msh.receiving_application = "EMR"
+  msg.msh.message_datetime = datetime.now()
+
+  # 환자 정보
+  pid = msg.add_segment("PID")
+  pid.pid_3 = "P123456"
+  pid.pid_5 = "DOE^JANE"
+
+  # 결과
+  obx = msg.add_segment("OBX")
+  obx.obx_3 = "DIAGNOSIS"
+  obx.obx_5 = "Invasive ductal carcinoma, Grade II"
+
+  # HL7 문자열 출력
+  hl7_string = msg.to_er7()
+  send_to_emr(hl7_string)
+</pre>
+
+<h3>6.2.2 FHIR (Fast Healthcare Interoperability Resources)</h3>
+
+<pre>
+FHIR: 차세대 의료 정보 교환 표준
+
+주요 리소스:
+
+Patient (환자):
+  {
+    "resourceType": "Patient",
+    "id": "P123456",
+    "identifier": [{
+      "system": "hospital-mrn",
+      "value": "MRN-123456"
+    }],
+    "name": [{
+      "family": "Doe",
+      "given": ["Jane"]
+    }],
+    "gender": "female",
+    "birthDate": "1980-05-15"
+  }
+
+ServiceRequest (검사 요청):
+  {
+    "resourceType": "ServiceRequest",
+    "id": "ORDER123",
+    "status": "active",
+    "intent": "order",
+    "code": {
+      "coding": [{
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "88305",
+        "display": "Surgical pathology"
+      }]
+    },
+    "subject": {
+      "reference": "Patient/P123456"
+    },
+    "authoredOn": "2025-01-17T09:00:00Z",
+    "requester": {
+      "reference": "Practitioner/DR-KIM"
+    },
+    "reasonCode": [{
+      "text": "Right breast mass, rule out cancer"
+    }]
+  }
+
+Specimen (검체):
+  {
+    "resourceType": "Specimen",
+    "id": "S25-00123",
+    "identifier": [{
+      "system": "pathlab-accession",
+      "value": "S25-00123"
+    }],
+    "status": "available",
+    "type": {
+      "coding": [{
+        "system": "http://snomed.info/sct",
+        "code": "309068002",
+        "display": "Core needle biopsy"
+      }]
+    },
+    "subject": {
+      "reference": "Patient/P123456"
+    },
+    "receivedTime": "2025-01-17T09:15:00Z",
+    "collection": {
+      "collectedDateTime": "2025-01-17T09:00:00Z",
+      "bodySite": {
+        "coding": [{
+          "system": "http://snomed.info/sct",
+          "code": "80248007",
+          "display": "Right breast"
+        }]
+      }
+    }
+  }
+
+DiagnosticReport (진단 보고서):
+  {
+    "resourceType": "DiagnosticReport",
+    "id": "REPORT-S25-00123",
+    "status": "final",
+    "category": [{
+      "coding": [{
+        "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+        "code": "PAT",
+        "display": "Pathology"
+      }]
+    }],
+    "code": {
+      "coding": [{
+        "system": "http://loinc.org",
+        "code": "60568-3",
+        "display": "Pathology Synoptic report"
+      }]
+    },
+    "subject": {
+      "reference": "Patient/P123456"
+    },
+    "effectiveDateTime": "2025-01-17T15:20:00Z",
+    "issued": "2025-01-17T15:26:00Z",
+    "performer": [{
+      "reference": "Practitioner/DR-KIM-PATH"
+    }],
+    "specimen": [{
+      "reference": "Specimen/S25-00123"
+    }],
+    "result": [{
+      "reference": "Observation/DIAGNOSIS-001"
+    }],
+    "conclusion": "Invasive ductal carcinoma, Grade II",
+    "conclusionCode": [{
+      "coding": [{
+        "system": "http://snomed.info/sct",
+        "code": "408643008",
+        "display": "Infiltrating duct carcinoma"
+      }]
+    }]
+  }
+
+Observation (AI 분석 결과):
+  {
+    "resourceType": "Observation",
+    "id": "AI-RESULT-001",
+    "status": "final",
+    "category": [{
+      "coding": [{
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory"
+      }]
+    }],
+    "code": {
+      "coding": [{
+        "system": "http://loinc.org",
+        "code": "LA6576-8",
+        "display": "Positive"
+      }],
+      "text": "AI Cancer Detection"
+    },
+    "subject": {
+      "reference": "Patient/P123456"
+    },
+    "effectiveDateTime": "2025-01-17T14:20:00Z",
+    "valueCodeableConcept": {
+      "coding": [{
+        "system": "http://snomed.info/sct",
+        "code": "408643008",
+        "display": "Infiltrating duct carcinoma"
+      }]
+    },
+    "interpretation": [{
+      "coding": [{
+        "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+        "code": "POS",
+        "display": "Positive"
+      }]
+    }],
+    "note": [{
+      "text": "AI Model: BreastCancerDetector v2.1, Confidence: 96%"
+    }],
+    "method": {
+      "text": "AI deep learning analysis"
+    },
+    "device": {
+      "display": "WIA AI Platform"
+    }
+  }
+
+FHIR API 사용 (RESTful):
+
+  # 환자 조회
+  GET /Patient/P123456
+
+  # 검체 정보 조회
+  GET /Specimen?identifier=S25-00123
+
+  # 진단 보고서 조회
+  GET /DiagnosticReport?patient=P123456&date=2025-01-17
+
+  # AI 결과 생성
+  POST /Observation
+  Body: { ... AI 결과 JSON ... }
+
+  # 보고서 업데이트
+  PUT /DiagnosticReport/REPORT-S25-00123
+  Body: { ... 업데이트된 보고서 ... }
+</pre>
+
+<hr>
+
+<h2>6.3 워크플로우 관리</h2>
+
+<h3>6.3.1 자동화된 워크플로우</h3>
+
+<pre>
+디지털 병리학 워크플로우 자동화:
+
+1. 검체 등록 자동화
+   Trigger: 바코드 스캔
+   Action:
+     - LIS에서 환자 정보 자동 조회
+     - 슬라이드 라벨 자동 생성
+     - 스캔 큐에 추가
+
+2. 스캔 스케줄링
+   Rule:
+     IF specimen_type == "frozen_section"
+       THEN priority = "STAT"
+     ELSE IF clinical_urgency == "high"
+       THEN priority = "URGENT"
+     ELSE
+       priority = "ROUTINE"
+
+   큐 관리:
+     STAT: 즉시 스캔 (5분 이내)
+     URGENT: 2시간 이내
+     ROUTINE: 일괄 처리 (야간)
+
+3. AI 분석 트리거
+   Trigger: 스캔 완료
+   Condition: slide.stain == "H&E" AND slide.organ IN ["breast", "lung", "prostate"]
+   Action:
+     - 적절한 AI 모델 선택
+     - 분석 작업 큐에 추가
+     - GPU 리소스 할당
+
+4. 결과 라우팅
+   AI Result:
+     IF confidence > 0.95 AND cancer_detected
+       THEN alert_pathologist("high_priority")
+     ELSE IF confidence < 0.70
+       THEN flag_for_review("uncertain")
+
+   Pathologist Review:
+     - AI 결과 미리 로드
+     - 히트맵 오버레이 표시
+     - 원클릭 확인/수정
+
+5. 보고서 생성
+   Trigger: 병리학자 승인
+   Action:
+     - 템플릿 기반 보고서 자동 생성
+     - AI 결과 통합
+     - IHC 결과 자동 포함
+     - 전자 서명
+     - EMR 전송
+
+6. 품질 관리
+   Daily QC:
+     - 스캔 실패율 모니터링
+     - AI 성능 추적
+     - 처리 시간 분석
+     - 병목 지점 식별
+
+워크플로우 메트릭 (대시보드):
+
+  오늘의 통계 (2025-01-17):
+    총 검체: 145
+    스캔 완료: 132 (91%)
+    스캔 대기: 13 (9%)
+
+    AI 분석:
+      완료: 118
+      진행 중: 8
+      대기: 6
+
+    병리학자 검토:
+      완료: 95
+      진행 중: 23
+      대기: 27
+
+    보고서:
+      발행: 89
+      보류: 43
+
+  평균 처리 시간:
+    스캔: 2.3분/슬라이드
+    AI 분석: 4.1분
+    병리학자 검토: 8.5분
+    총: 15.1분 (디지털화 후)
+
+  병목 지점:
+    ⚠️ 병리학자 검토 (27 대기)
+      → 추가 병리학자 투입 권장
+</pre>
+
+<h3>6.3.2 예외 처리</h3>
+
+<pre>
+일반적인 문제 및 해결:
+
+문제 1: 스캔 실패
+  원인: 초점 불량 (FQ < 70%)
+  자동 처리:
+    1. 재스캔 (최대 2회)
+    2. 여전히 실패 시:
+       - 기술자에게 알림
+       - LIS 상태: "Scan failed - manual intervention"
+       - 슬라이드 품질 검토 요청
+
+문제 2: 바코드 인식 실패
+  원인: 바코드 손상 또는 누락
+  자동 처리:
+    1. OCR로 텍스트 라벨 읽기
+    2. 실패 시:
+       - 수동 입력 UI 표시
+       - 기술자가 accession number 입력
+       - LIS 조회 후 진행
+
+문제 3: AI 분석 오류
+  원인: 모델 에러 또는 부적절한 입력
+  자동 처리:
+    1. 에러 로그 기록
+    2. 대체 모델 시도
+    3. 여전히 실패 시:
+       - AI 결과 없이 진행
+       - 병리학자에게 알림
+       - 기술팀에 티켓 생성
+
+문제 4: LIS 통신 장애
+  원인: 네트워크 또는 LIS 다운타임
+  자동 처리:
+    1. 로컬 큐에 메시지 저장
+    2. 5분마다 재시도
+    3. 30분 후에도 실패:
+       - 관리자에게 긴급 알림
+       - 수동 프로세스로 전환
+    4. 복구 시:
+       - 저장된 메시지 순차 전송
+       - 데이터 동기화 확인
+
+예외 처리 코드 예시:
+
+  def process_slide(slide_id):
+      try:
+          # 1. 스캔
+          image = scan_slide(slide_id)
+          if image.quality_score < 0.7:
+              raise ScanQualityError("Focus quality insufficient")
+
+          # 2. LIS 업데이트
+          try:
+              lis.update_status(slide_id, "scanned")
+          except LISConnectionError:
+              logger.error("LIS connection failed, queuing update")
+              message_queue.add(slide_id, "scanned")
+
+          # 3. AI 분석
+          try:
+              ai_result = ai_pipeline.analyze(image)
+          except AIModelError as e:
+              logger.error(f"AI analysis failed: {e}")
+              ai_result = None  # 계속 진행
+
+          # 4. 병리학자에게 전달
+          worklist.add(slide_id, ai_result)
+
+      except ScanQualityError:
+          retry_count = get_retry_count(slide_id)
+          if retry_count < 2:
+              reschedule_scan(slide_id)
+          else:
+              notify_technologist(slide_id, "Manual review required")
+
+      except Exception as e:
+          logger.critical(f"Unexpected error: {e}")
+          alert_admin(slide_id, str(e))
+</pre>
+
+<hr>
+
+<h2>6.4 데이터 보안 및 개인정보 보호</h2>
+
+<h3>6.4.1 보안 요구사항</h3>
+
+<pre>
+HIPAA 준수 (미국):
+
+1. 접근 제어
+   - 역할 기반 접근 제어 (RBAC)
+   - 최소 권한 원칙
+   - 다단계 인증 (MFA)
+
+   역할 예시:
+     병리학자:
+       - 모든 슬라이드 조회
+       - 진단 입력
+       - 보고서 서명
+
+     기술자:
+       - 슬라이드 스캔
+       - QC 수행
+       - 진단 조회 불가
+
+     연구자:
+       - 익명화된 데이터만
+       - 환자 식별 정보 접근 불가
+
+2. 암호화
+   전송 중:
+     - TLS 1.3
+     - 최소 2048-bit RSA 또는 256-bit ECC
+
+   저장 시:
+     - AES-256 암호화
+     - 암호화 키 별도 관리 (KMS)
+
+   백업:
+     - 암호화된 백업
+     - 오프사이트 저장
+
+3. 감사 로그
+   모든 접근 기록:
+     {
+       "timestamp": "2025-01-17T15:30:22Z",
+       "user": "dr.kim@hospital.com",
+       "action": "VIEW_SLIDE",
+       "resource": "S25-00123",
+       "ip_address": "192.168.1.100",
+       "success": true
+     }
+
+   보관 기간: 최소 6년
+
+4. 데이터 무결성
+   - SHA-256 체크섬
+   - 디지털 서명
+   - 변조 감지
+
+5. 재해 복구
+   - 3-2-1 백업 규칙
+   - 복구 시간 목표 (RTO): < 4시간
+   - 복구 지점 목표 (RPO): < 1시간
+</pre>
+
+<h3>6.4.2 익명화 및 비식별화</h3>
+
+<pre>
+연구용 데이터 익명화:
+
+방법 1: 식별자 제거
+  원본:
+    {
+      "patient_name": "Jane Doe",
+      "patient_id": "P123456",
+      "mrn": "MRN-123456",
+      "dob": "1980-05-15",
+      "ssn": "123-45-6789"
+    }
+
+  익명화:
+    {
+      "study_id": "STUDY-001-0042",
+      "age_at_diagnosis": 44,
+      "birth_year": 1980  // 생년월일 대신 출생년도만
+    }
+
+방법 2: 이미지 내 정보 제거
+  슬라이드 라벨:
+    - OCR로 텍스트 감지
+    - 환자 정보 영역 마스킹
+    - 새 익명 ID로 교체
+
+방법 3: 메타데이터 정제
+  보존:
+    - 조직 유형
+    - 염색 방법
+    - 스캔 파라미터
+    - 진단 정보
+
+  제거:
+    - 환자 이름
+    - 의료기록번호
+    - 날짜 (연도만 보존)
+    - 의료진 이름
+
+방법 4: k-익명성
+  k=5 (같은 특성 조합 최소 5명):
+    {
+      "age_group": "40-45",  // 정확한 나이 대신
+      "diagnosis_year": "2025",
+      "organ": "breast",
+      "stage": "II"
+    }
+
+검증:
+  - 재식별 위험 평가
+  - 전문가 검토
+  - IRB 승인
+
+사용 동의:
+  - 환자 동의서
+  - 연구 목적 명시
+  - 데이터 사용 기간
+  - 철회 권리
+</pre>
+
+<hr>
+
+<h2>6.5 WIA-MED-008 LIS 통합 표준</h2>
+
+<h3>6.5.1 표준 인터페이스</h3>
+
+<pre>
+WIA-LIS 인터페이스 사양:
+
+1. 접수 정보 조회
+   Endpoint: GET /api/v1/accession/{accession_number}
+
+   Response:
+   {
+     "accession_number": "S25-00123",
+     "patient": {
+       "id": "P123456",
+       "age": 44,
+       "gender": "F"
+     },
+     "specimen": {
+       "type": "core_needle_biopsy",
+       "site": "right_breast",
+       "collected_date": "2025-01-17"
+     },
+     "clinical_info": "Right breast mass, r/o cancer",
+     "ordering_physician": "Dr. Smith",
+     "priority": "ROUTINE",
+     "requested_stains": ["H&E", "ER", "PR", "HER2"]
+   }
+
+2. 스캔 상태 업데이트
+   Endpoint: POST /api/v1/scan/status
+
+   Body:
+   {
+     "accession_number": "S25-00123",
+     "slide_id": "S25-00123-A1",
+     "status": "scanned",
+     "scan_info": {
+       "scanner": "Aperio GT450",
+       "magnification": 40,
+       "scan_date": "2025-01-17T14:12:00Z",
+       "quality_score": 0.945,
+       "image_url": "pacs://images/S25-00123-A1.wdps"
+     }
+   }
+
+3. AI 결과 전송
+   Endpoint: POST /api/v1/ai/result
+
+   Body:
+   {
+     "slide_id": "S25-00123-A1",
+     "model": "BreastCancerDetector-v2.1",
+     "analysis_date": "2025-01-17T14:20:00Z",
+     "result": {
+       "cancer_detected": true,
+       "confidence": 0.96,
+       "cancer_type": "IDC",
+       "grade": "II",
+       "regions": [...]
+     }
+   }
+
+4. 진단 결과 입력
+   Endpoint: POST /api/v1/diagnosis
+
+   Body:
+   {
+     "accession_number": "S25-00123",
+     "pathologist": "dr.kim@hospital.com",
+     "diagnosis_date": "2025-01-17T15:20:00Z",
+     "diagnosis": "Invasive ductal carcinoma, Grade II",
+     "synoptic": {
+       "histologic_type": "Invasive ductal carcinoma",
+       "grade": "II",
+       "size_mm": 23,
+       "margins": "Negative"
+     },
+     "comment": "ER/PR/HER2 testing recommended",
+     "signature": "..."
+   }
+
+5. 보고서 조회
+   Endpoint: GET /api/v1/report/{accession_number}
+
+   Response:
+   {
+     "accession_number": "S25-00123",
+     "status": "final",
+     "report_date": "2025-01-17T15:26:00Z",
+     "pathologist": "Dr. Kim, Surgical Pathology",
+     "diagnosis": "...",
+     "microscopic": "...",
+     "comment": "...",
+     "pdf_url": "reports/S25-00123.pdf"
+   }
+</pre>
+
+<hr>
+
+<h2>6.6 장 요약</h2>
+
+<ol>
+    <li><strong>LIS 아키텍처:</strong> 접수, 워크플로우, 결과, 보고</li>
+    <li><strong>HL7/FHIR:</strong> 의료 정보 교환 표준</li>
+    <li><strong>워크플로우:</strong> 자동화, 예외 처리</li>
+    <li><strong>보안:</strong> HIPAA 준수, 암호화, 감사</li>
+    <li><strong>익명화:</strong> 연구용 데이터 비식별화</li>
+    <li><strong>WIA 표준:</strong> LIS 통합 API</li>
+</ol>
+
+<hr>
+
+<p><a href="chapter-07.html">다음: 제7장 - 원격 병리학 상담 →</a></p>
+</body>
+</html>

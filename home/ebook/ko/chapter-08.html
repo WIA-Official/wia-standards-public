@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제8장: 구현 - WIA-HOME</title>
+</head>
+<body>
+<h1>제8장: 구현</h1>
+
+<blockquote>
+"홍익인간: 명확한 API는 누구나 WIA 기반 위에 구축할 수 있게 합니다."
+</blockquote>
+
+<hr>
+
+<h2>8.1 설치</h2>
+
+<pre>
+NPM 설치
+========
+
+npm install @anthropic/wia-home
+
+또는 yarn:
+yarn add @anthropic/wia-home
+
+또는 pnpm:
+pnpm add @anthropic/wia-home
+
+
+기본 설정
+=========
+
+import { WIAHome } from '@anthropic/wia-home';
+
+// 홈 생성
+const home = new WIAHome({
+  name: '내 가게',
+  domain: 'myshop.wia.shop'
+});
+
+// 서버 시작
+await home.start();
+
+console.log('라이브:', home.domain);
+
+
+설정 옵션
+=========
+
+const home = new WIAHome({
+  // 기본
+  name: '내 가게',
+  domain: 'myshop.wia.shop',
+
+  // 서버
+  server: {
+    port: 'auto',
+    maxConnections: 100,
+    sleepMode: true,
+    sleepAfter: 5  // 분
+  },
+
+  // 기능
+  features: {
+    shop: true,
+    blog: true,
+    booking: true
+  },
+
+  // 보안
+  security: {
+    ddos: { rateLimit: 100 },
+    waf: { sqlInjection: true, xss: true }
+  },
+
+  // 저사양 모드
+  lowSpecMode: {
+    limits: {
+      maxMemory: 256,
+      maxCpu: 20
+    }
+  }
+});
+</pre>
+
+<hr>
+
+<h2>8.2 코어 API</h2>
+
+<pre>
+WIAHome 클래스
+==============
+
+// 정적 메서드
+WIAHome.analyze(url)      // 사이트 분석
+WIAHome.clone(url, opts)  // 사이트 클론
+WIAHome.quickStart(opts)  // 퀵 스타트
+WIAHome.fromIntent(text)  // 의도 기반
+WIAHome.fromTemplate(id)  // 템플릿에서
+WIAHome.migrate(config)   // 마이그레이션
+
+
+인스턴스 메서드
+===============
+
+// 서버 제어
+home.start()              // 서버 시작
+home.stop()               // 서버 정지
+home.restart()            // 재시작
+
+// 상태
+home.status               // 'running' | 'stopped'
+home.domain               // 'myshop.wia.shop'
+home.uptime               // 초
+
+
+속성
+====
+
+// 통계
+home.stats.visitors       // 방문자 수
+home.stats.pageViews      // 페이지뷰 수
+home.stats.orders         // 주문 수
+
+// 자원
+home.resources.cpu        // CPU 사용량 %
+home.resources.memory     // 메모리 사용량 bytes
+home.resources.bandwidth  // 대역폭 통계
+
+
+이벤트
+======
+
+home.on('server_started', callback)
+home.on('server_stopped', callback)
+home.on('visitor_connected', callback)
+home.on('page_viewed', callback)
+home.on('order_received', callback)
+home.on('booking_received', callback)
+home.on('security_alert', callback)
+home.on('error', callback)
+</pre>
+
+<hr>
+
+<h2>8.3 콘텐츠 API</h2>
+
+<pre>
+페이지
+======
+
+// 생성
+await home.pages.create({
+  title: '소개',
+  slug: 'about',
+  content: '# 회사 소개\n\n우리는...'
+});
+
+// 읽기
+const page = await home.pages.get('about');
+
+// 수정
+await home.pages.update('about', {
+  content: '# 회사 소개\n\n업데이트된 콘텐츠...'
+});
+
+// 삭제
+await home.pages.delete('about');
+
+// 목록
+const pages = await home.pages.list();
+
+
+블로그
+======
+
+// 포스트 생성
+await home.blog.createPost({
+  title: '첫 번째 포스트',
+  content: '안녕하세요...',
+  tags: ['뉴스']
+});
+
+// 포스트 목록
+const posts = await home.blog.listPosts({
+  tag: 'news',
+  limit: 10
+});
+
+// 포스트 수정
+await home.blog.updatePost(postId, {
+  content: '업데이트됨...'
+});
+
+
+미디어
+======
+
+// 업로드
+const media = await home.media.upload(file);
+
+// 목록
+const mediaList = await home.media.list();
+
+// 삭제
+await home.media.delete(mediaId);
+
+// 최적화
+await home.media.optimize(mediaId);
+</pre>
+
+<hr>
+
+<h2>8.4 쇼핑몰 API</h2>
+
+<pre>
+상품
+====
+
+// 상품 추가
+await home.shop.addProduct({
+  name: '초콜릿 케이크',
+  price: 35000,
+  description: '풍부한 초콜릿...',
+  images: [imageRef],
+  inventory: 10
+});
+
+// 상품 목록
+const products = await home.shop.listProducts();
+
+// 상품 수정
+await home.shop.updateProduct(productId, {
+  price: 38000
+});
+
+// 상품 삭제
+await home.shop.removeProduct(productId);
+
+
+결제
+====
+
+// 결제 설정
+home.shop.setPayment({
+  korean: {
+    kakaoPay: true,
+    naverPay: true
+  },
+  bankTransfer: {
+    enabled: true,
+    accounts: [...]
+  }
+});
+
+
+주문
+====
+
+// 주문 목록
+const orders = await home.shop.orders.list({
+  status: 'pending'
+});
+
+// 상태 업데이트
+await home.shop.orders.updateStatus(
+  orderId, 'shipped'
+);
+
+// 환불 처리
+await home.shop.orders.refund(orderId, {
+  amount: 35000,
+  reason: '고객 요청'
+});
+</pre>
+
+<hr>
+
+<h2>8.5 예약 API</h2>
+
+<pre>
+설정
+====
+
+home.booking.setup({
+  availability: {
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+    hours: { start: '09:00', end: '18:00' },
+    slotDuration: 30
+  },
+  services: [
+    { name: '상담', duration: 30, price: 0 },
+    { name: '풀 서비스', duration: 60, price: 50000 }
+  ]
+});
+
+
+예약
+====
+
+// 가능한 시간대 가져오기
+const slots = await home.booking.getAvailableSlots({
+  date: '2025-12-20',
+  serviceId: 'consultation'
+});
+
+// 예약 목록
+const bookings = await home.booking.list({
+  date: '2025-12-20'
+});
+
+// 예약 확정
+await home.booking.confirm(bookingId);
+
+// 예약 취소
+await home.booking.cancel(bookingId, {
+  reason: '고객 요청',
+  notifyCustomer: true
+});
+
+
+알림
+====
+
+home.booking.setNotifications({
+  newBooking: {
+    channels: ['kakao', 'sms'],
+    toOwner: true,
+    toCustomer: true
+  },
+  reminder: {
+    channels: ['kakao'],
+    beforeHours: 24
+  }
+});
+</pre>
+
+<hr>
+
+<h2>8.6 TypeScript 지원</h2>
+
+<pre>
+완전한 타입 정의
+================
+
+import {
+  WIAHome,
+  WIAHomeConfig,
+  Product,
+  Order,
+  Booking,
+  Page,
+  BlogPost,
+  MediaRef,
+  Theme
+} from '@anthropic/wia-home';
+
+// 모든 메서드가 완전히 타입됨
+const home = new WIAHome({
+  name: '내 가게'
+});
+
+// 타입 안전한 작업
+const product: Product = await home.shop.addProduct({
+  name: '아이템',
+  price: 10000,
+  // TypeScript가 모든 필드 확인
+});
+</pre>
+
+<hr>
+
+<h2>8.7 모바일 지원</h2>
+
+<pre>
+모바일 호스팅
+=============
+
+스마트폰도 서버가 될 수 있습니다!
+
+import { WIAHomeMobile } from '@anthropic/wia-home/mobile';
+
+const home = new WIAHomeMobile({
+  batteryAware: true,
+  wifiOnly: true,
+  backgroundMode: true
+});
+
+await home.start();
+
+
+배터리 최적화
+=============
+
+모바일 전용 기능:
+  [OK] WiFi에서만 실행
+  [OK] 배터리 낮으면 일시정지
+  [OK] 백그라운드 실행
+  [OK] 요청 시 깨어남
+</pre>
+
+<hr>
+
+<h2>결론</h2>
+
+<p>WIA-HOME은 호스팅 비용 없이 자신만의 웹사이트를 만들기 위한 완전한 플랫폼을 제공합니다. P2P 네트워킹부터 전자상거래, 보안까지 모든 것이 내장되어 있고 사용하기 쉽습니다.</p>
+
+<p>홍익인간 철학에 따라, WIA-HOME은 소상공인부터 프리랜서, 학생까지 모든 사람이 플랫폼 종속 없이 영원히 무료로 자신만의 디지털 집을 가질 수 있도록 보장합니다.</p>
+
+<pre>
+WIA-HOME의 약속:
+
+1. 건물주가 없어요 - 내 PC가 서버
+2. 영원히 내 것이에요 - 플랫폼 독립
+3. 돈 안 들어요 - 영원히 무료 호스팅
+4. 쉬워요 - 5분 만에 런칭
+5. 안전해요 - 가족이 집을 지켜요
+
+WIA 대가족의 든든한 울타리,
+비바람이 와도 흔들리지 않는 집.
+
+- WIA-HOME -
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 간단한 NPM 설치 및 설정</li>
+<li>[OK] 서버 제어를 위한 포괄적인 Core API</li>
+<li>[OK] 페이지, 블로그, 미디어용 Content API</li>
+<li>[OK] 전자상거래 작업용 Shop API</li>
+<li>[OK] 예약 관리용 Booking API</li>
+<li>[OK] 타입 정의가 있는 완전한 TypeScript 지원</li>
+<li>[OK] 스마트폰 호스팅을 위한 모바일 지원</li>
+</ul>
+</body>
+</html>

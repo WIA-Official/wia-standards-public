@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Implementation Guide | WIA-FIN-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .header { background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(34, 197, 94, 0.2); padding: 2rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 800px; margin: 0 auto; }
+        .logo { font-size: 2rem; margin-bottom: 0.5rem; }
+        h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #22c55e 0%, #10b981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+        h2 { color: #22c55e; font-size: 1.75rem; margin: 2rem 0 1rem; }
+        h3 { color: #10b981; font-size: 1.5rem; margin: 1.5rem 0 1rem; }
+        p { color: #cbd5e1; margin-bottom: 1rem; }
+        .highlight { background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 1rem; margin: 1.5rem 0; border-radius: 4px; }
+        ul, ol { color: #cbd5e1; margin-left: 2rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.5rem; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(34, 197, 94, 0.2); }
+        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #22c55e; color: #0f172a; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .btn:hover { background: #16a34a; }
+        .btn-secondary { background: transparent; border: 2px solid #22c55e; color: #22c55e; }
+        .code-block { background: #0f172a; border: 1px solid rgba(34, 197, 94, 0.3); padding: 1.5rem; margin: 1rem 0; border-radius: 8px; overflow-x: auto; }
+        .code-block pre { color: #22c55e; font-family: monospace; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">👛 Chapter 4</div>
+            <h1>Implementation Guide</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Getting Started</h2>
+        <p>This chapter provides practical guidance for implementing digital wallets using the WIA-FIN-015 standard. We'll cover SDK integration, API usage, and real-world code examples.</p>
+
+        <h2>Installation</h2>
+
+        <h3>NPM/Yarn</h3>
+        <div class="code-block">
+<pre>npm install @wia/digital-wallet-sdk
+# or
+yarn add @wia/digital-wallet-sdk</pre>
+        </div>
+
+        <h3>CDN (Browser)</h3>
+        <div class="code-block">
+<pre>&lt;script src="https://cdn.wia.org/digital-wallet/v1.0.0/wallet.min.js"&gt;&lt;/script&gt;</pre>
+        </div>
+
+        <h2>Basic Wallet Creation</h2>
+        <div class="code-block">
+<pre>import { DigitalWallet, WalletType } from '@wia/digital-wallet-sdk';
+
+// Create a new HD wallet
+const wallet = await DigitalWallet.create({
+  type: WalletType.HD,
+  currencies: ['USD', 'EUR', 'BTC', 'ETH'],
+  security: {
+    encryption: '256-bit',
+    biometric: true,
+    twoFactor: true
+  }
+});
+
+console.log('Wallet created:', wallet.address);
+console.log('Recovery phrase:', wallet.recoveryPhrase);
+// IMPORTANT: Store recovery phrase securely!</pre>
+        </div>
+
+        <h2>Loading Existing Wallet</h2>
+        <div class="code-block">
+<pre>// From recovery phrase
+const wallet = await DigitalWallet.fromRecoveryPhrase(
+  'word1 word2 word3 ... word12',
+  {
+    currencies: ['USD', 'BTC', 'ETH']
+  }
+);
+
+// From private key
+const wallet = await DigitalWallet.fromPrivateKey(
+  '0x1234567890abcdef...',
+  {
+    type: WalletType.SIMPLE
+  }
+);</pre>
+        </div>
+
+        <h2>Checking Balance</h2>
+        <div class="code-block">
+<pre>// Single currency balance
+const usdBalance = await wallet.getBalance('USD');
+console.log(`USD Balance: $${usdBalance.available}`);
+
+// All balances
+const allBalances = await wallet.getAllBalances();
+allBalances.forEach(balance => {
+  console.log(`${balance.currency}: ${balance.total}`);
+});</pre>
+        </div>
+
+        <h2>Sending Payments</h2>
+
+        <h3>Basic Transfer</h3>
+        <div class="code-block">
+<pre>const transaction = await wallet.send({
+  to: '0x742d35Cc6634C0532925a3b844E76735f18D8E9C',
+  amount: 100,
+  currency: 'USD',
+  method: 'instant'
+});
+
+console.log('Transaction ID:', transaction.id);
+console.log('Status:', transaction.status);</pre>
+        </div>
+
+        <h3>With Authentication</h3>
+        <div class="code-block">
+<pre>// Require biometric authentication
+const transaction = await wallet.send({
+  to: recipient,
+  amount: 500,
+  currency: 'USD'
+}, {
+  authenticate: 'biometric'
+});
+
+// Require PIN + 2FA for high-value
+const transaction = await wallet.send({
+  to: recipient,
+  amount: 5000,
+  currency: 'USD'
+}, {
+  authenticate: ['pin', '2fa']
+});</pre>
+        </div>
+
+        <h2>Receiving Payments</h2>
+
+        <h3>Generate Payment Request</h3>
+        <div class="code-block">
+<pre>const paymentRequest = await wallet.createPaymentRequest({
+  amount: 25.99,
+  currency: 'USD',
+  merchant: 'Coffee Shop',
+  expires: 300 // 5 minutes
+});
+
+// Get QR code data
+const qrCode = paymentRequest.qrCode;
+// Display QR code to customer
+
+// Get payment link
+const paymentLink = paymentRequest.link;
+// https://wallet.example.com/pay/abc123...</pre>
+        </div>
+
+        <h3>Monitor Incoming Payments</h3>
+        <div class="code-block">
+<pre>wallet.on('payment_received', (payment) => {
+  console.log('Received:', payment.amount, payment.currency);
+  console.log('From:', payment.from);
+  console.log('Transaction:', payment.transactionId);
+
+  // Send confirmation to customer
+  sendConfirmationEmail(payment);
+});</pre>
+        </div>
+
+        <h2>NFC Payment Integration</h2>
+
+        <h3>Enable NFC</h3>
+        <div class="code-block">
+<pre>// Check NFC availability
+if (await wallet.nfc.isAvailable()) {
+  // Enable NFC payments
+  const nfc = await wallet.nfc.enable({
+    merchantId: 'merchant_123',
+    defaultCurrency: 'USD'
+  });
+
+  // Handle tap events
+  nfc.on('tap', async (terminal) => {
+    console.log('NFC tap detected');
+
+    const payment = await wallet.processNFCPayment({
+      terminal,
+      amount: terminal.amount,
+      currency: terminal.currency,
+      authenticate: 'biometric'
+    });
+
+    if (payment.success) {
+      console.log('Payment completed!');
+      terminal.showSuccess();
+    }
+  });
+}</pre>
+        </div>
+
+        <h2>QR Code Payments</h2>
+
+        <h3>Generate QR Code</h3>
+        <div class="code-block">
+<pre>const qr = await wallet.qr.generate({
+  type: 'payment_request',
+  amount: 50.00,
+  currency: 'USD',
+  merchant: 'Online Store',
+  orderId: 'ORD-12345'
+});
+
+// Get QR code as image
+const qrImage = await qr.toImage({
+  format: 'png',
+  size: 300
+});
+
+// Display in HTML
+document.getElementById('qr-code').src = qrImage;</pre>
+        </div>
+
+        <h3>Scan QR Code</h3>
+        <div class="code-block">
+<pre>// Start QR scanner
+const scanner = await wallet.qr.startScanner({
+  camera: 'back',
+  continuous: false
+});
+
+scanner.on('detected', async (qrData) => {
+  // Parse QR code data
+  const payment = await wallet.qr.parsePaymentRequest(qrData);
+
+  // Show confirmation to user
+  const confirmed = await showPaymentConfirmation(payment);
+
+  if (confirmed) {
+    const result = await wallet.send(payment);
+    console.log('Payment sent:', result.id);
+  }
+
+  scanner.stop();
+});</pre>
+        </div>
+
+        <h2>Multi-Currency Exchange</h2>
+        <div class="code-block">
+<pre>// Get exchange rate
+const rate = await wallet.getExchangeRate('USD', 'EUR');
+console.log(`1 USD = ${rate} EUR`);
+
+// Convert currency
+const exchanged = await wallet.exchange({
+  from: 'USD',
+  to: 'EUR',
+  amount: 100
+});
+
+console.log(`Exchanged 100 USD to ${exchanged.received} EUR`);
+console.log(`Fee: ${exchanged.fee} USD`);</pre>
+        </div>
+
+        <h2>Transaction History</h2>
+        <div class="code-block">
+<pre>// Get recent transactions
+const transactions = await wallet.getTransactions({
+  limit: 10,
+  currency: 'USD',
+  type: 'all' // 'sent' | 'received' | 'all'
+});
+
+transactions.forEach(tx => {
+  console.log(`${tx.type}: ${tx.amount} ${tx.currency}`);
+  console.log(`Date: ${tx.timestamp}`);
+  console.log(`Status: ${tx.status}`);
+});</pre>
+        </div>
+
+        <h2>Security Features</h2>
+
+        <h3>Enable Biometric Authentication</h3>
+        <div class="code-block">
+<pre>// Check biometric availability
+const biometric = await wallet.security.biometric;
+
+if (biometric.isAvailable()) {
+  await biometric.enable({
+    type: 'face', // or 'fingerprint'
+    fallback: 'pin'
+  });
+
+  console.log('Biometric auth enabled');
+}</pre>
+        </div>
+
+        <h3>Setup Two-Factor Authentication</h3>
+        <div class="code-block">
+<pre>// Generate TOTP secret
+const totp = await wallet.security.enable2FA({
+  method: 'totp',
+  phoneNumber: '+1234567890'
+});
+
+// Display QR code for authenticator app
+console.log('Scan this QR code:', totp.qrCode);
+
+// Verify setup
+const verified = await totp.verify(userCode);
+if (verified) {
+  console.log('2FA enabled successfully');
+}</pre>
+        </div>
+
+        <h2>DeFi Integration</h2>
+
+        <h3>Connect to dApp</h3>
+        <div class="code-block">
+<pre>import { WalletConnect } from '@wia/digital-wallet-sdk';
+
+// Initialize WalletConnect
+const wc = new WalletConnect({
+  bridge: 'https://bridge.walletconnect.org',
+  qrcodeModal: QRCodeModal
+});
+
+// Create connection
+await wc.createSession();
+
+// Handle connection
+wc.on('connect', (error, payload) => {
+  if (!error) {
+    const { accounts, chainId } = payload.params[0];
+    console.log('Connected to dApp');
+  }
+});</pre>
+        </div>
+
+        <h3>Stake Tokens</h3>
+        <div class="code-block">
+<pre>// Stake ETH
+const staking = await wallet.defi.stake({
+  currency: 'ETH',
+  amount: 1.5,
+  protocol: 'ethereum-pos',
+  duration: 90 // days
+});
+
+console.log('Staking APY:', staking.apy);
+console.log('Estimated rewards:', staking.estimatedRewards);</pre>
+        </div>
+
+        <h2>Error Handling</h2>
+        <div class="code-block">
+<pre>try {
+  const tx = await wallet.send({
+    to: recipient,
+    amount: 1000,
+    currency: 'USD'
+  });
+} catch (error) {
+  if (error.code === 'INSUFFICIENT_BALANCE') {
+    console.error('Not enough funds');
+  } else if (error.code === 'INVALID_ADDRESS') {
+    console.error('Invalid recipient address');
+  } else if (error.code === 'AUTHENTICATION_FAILED') {
+    console.error('Authentication required');
+  } else {
+    console.error('Transaction failed:', error.message);
+  }
+}</pre>
+        </div>
+
+        <h2>Testing</h2>
+
+        <h3>Test Mode</h3>
+        <div class="code-block">
+<pre>// Enable test mode (testnet/sandbox)
+const wallet = await DigitalWallet.create({
+  type: WalletType.HD,
+  currencies: ['USD', 'BTC'],
+  testMode: true // Use testnet
+});
+
+// All transactions are on testnet
+const tx = await wallet.send({
+  to: testAddress,
+  amount: 10,
+  currency: 'BTC'
+});
+// Uses Bitcoin Testnet</pre>
+        </div>
+
+        <div class="highlight">
+            <strong>Best Practice:</strong> Always test your integration thoroughly in test mode
+            before deploying to production. Use testnet currencies and sandbox environments
+            to avoid risking real funds during development.
+        </div>
+
+        </div>
+</body>
+</html>

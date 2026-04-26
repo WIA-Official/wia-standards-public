@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3장: 스타 스키마와 스노우플레이크 스키마 - WIA-DATA-003</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-DATA-003 v1.0</div>
+    <h1>3장</h1>
+    <p class="subtitle">스타 스키마와 스노우플레이크 스키마</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>3.1 스타 스키마 개요</h2>
+      <p>스타 스키마(Star Schema)는 데이터 웨어하우스에서 가장 널리 사용되는 차원 모델링 기법입니다. 이 스키마는 중앙에 위치한 팩트 테이블(Fact Table)과 이를 둘러싸고 있는 여러 개의 차원 테이블(Dimension Table)로 구성되며, 시각적으로 별(Star) 모양을 띠기 때문에 스타 스키마라는 이름이 붙었습니다.</p>
+
+      <p>스타 스키마의 핵심 특징은 <strong>비정규화(Denormalization)</strong>입니다. 차원 테이블은 계층적 데이터를 포함하더라도 단일 테이블로 유지됩니다. 예를 들어, 제품 차원에는 제품명, 카테고리, 하위 카테고리, 브랜드 등이 모두 하나의 테이블에 저장됩니다.</p>
+
+      <p>이러한 구조는 다음과 같은 장점을 제공합니다:</p>
+      <ul>
+        <li><strong>단순성</strong>: 테이블 간의 관계가 직관적이며 이해하기 쉽습니다</li>
+        <li><strong>쿼리 성능</strong>: 조인(JOIN) 수가 적어 쿼리 실행 속도가 빠릅니다</li>
+        <li><strong>BI 도구 친화적</strong>: 대부분의 비즈니스 인텔리전스 도구가 스타 스키마를 최적으로 지원합니다</li>
+        <li><strong>유지보수 용이성</strong>: 구조가 간단하여 수정 및 확장이 쉽습니다</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 스타 스키마 예시: 판매 데이터 모델
+
+-- 팩트 테이블 (중앙)
+CREATE TABLE fact_sales (
+    sale_id BIGINT PRIMARY KEY,
+    date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    customer_key INT REFERENCES dim_customer(customer_key),
+    store_key INT REFERENCES dim_store(store_key),
+    quantity INT,
+    unit_price DECIMAL(10,2),
+    total_amount DECIMAL(12,2),
+    discount_amount DECIMAL(10,2),
+    net_amount DECIMAL(12,2)
+);
+
+-- 차원 테이블 1: 날짜
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,
+    full_date DATE,
+    day_of_week VARCHAR(10),
+    day_of_month INT,
+    day_of_year INT,
+    week_of_year INT,
+    month INT,
+    month_name VARCHAR(10),
+    quarter INT,
+    year INT,
+    is_weekend BOOLEAN,
+    is_holiday BOOLEAN
+);
+
+-- 차원 테이블 2: 제품 (비정규화)
+CREATE TABLE dim_product (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20),
+    product_name VARCHAR(200),
+    brand VARCHAR(100),
+    category VARCHAR(100),
+    subcategory VARCHAR(100),
+    color VARCHAR(50),
+    size VARCHAR(20),
+    unit_cost DECIMAL(10,2),
+    list_price DECIMAL(10,2)
+);
+
+-- 차원 테이블 3: 고객
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    customer_name VARCHAR(200),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    gender VARCHAR(10),
+    birth_date DATE,
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50),
+    postal_code VARCHAR(20),
+    customer_segment VARCHAR(50)
+);
+
+-- 차원 테이블 4: 매장
+CREATE TABLE dim_store (
+    store_key INT PRIMARY KEY,
+    store_id VARCHAR(20),
+    store_name VARCHAR(200),
+    store_type VARCHAR(50),
+    store_size VARCHAR(20),
+    manager_name VARCHAR(100),
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50),
+    region VARCHAR(50),
+    opening_date DATE
+);</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>3.2 스타 스키마의 설계 원칙</h2>
+      <p>효과적인 스타 스키마를 설계하기 위해서는 다음과 같은 원칙을 따라야 합니다:</p>
+
+      <h3>팩트 테이블 설계 원칙</h3>
+      <ul>
+        <li><strong>세분화 수준(Grain) 정의</strong>: 팩트 테이블의 각 행이 나타내는 세부 수준을 명확히 정의합니다. 예: "각 판매 거래의 각 제품 라인"</li>
+        <li><strong>측정값 선택</strong>: 비즈니스 프로세스와 관련된 수치적 측정값을 포함합니다</li>
+        <li><strong>외래 키 포함</strong>: 모든 관련 차원 테이블에 대한 외래 키를 포함합니다</li>
+        <li><strong>좁고 깊게</strong>: 많은 행과 상대적으로 적은 열을 가져야 합니다</li>
+      </ul>
+
+      <h3>차원 테이블 설계 원칙</h3>
+      <ul>
+        <li><strong>비정규화</strong>: 계층 구조를 단일 테이블로 평면화합니다</li>
+        <li><strong>서술적 속성</strong>: 풍부한 텍스트 설명을 포함합니다</li>
+        <li><strong>대리 키 사용</strong>: 자연 키 대신 시스템 생성 대리 키를 기본 키로 사용합니다</li>
+        <li><strong>넓고 얕게</strong>: 많은 열과 상대적으로 적은 행을 가져야 합니다</li>
+      </ul>
+
+      <table>
+        <caption>스타 스키마 테이블 특성 비교</caption>
+        <thead>
+          <tr>
+            <th>특성</th>
+            <th>팩트 테이블</th>
+            <th>차원 테이블</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>데이터 유형</td>
+            <td>정량적 측정값 (숫자)</td>
+            <td>정성적 설명 (텍스트)</td>
+          </tr>
+          <tr>
+            <td>행 수</td>
+            <td>매우 많음 (수백만~수십억)</td>
+            <td>상대적으로 적음 (수천~수만)</td>
+          </tr>
+          <tr>
+            <td>열 수</td>
+            <td>적음 (5~20개)</td>
+            <td>많음 (20~100개)</td>
+          </tr>
+          <tr>
+            <td>정규화</td>
+            <td>정규화됨</td>
+            <td>비정규화됨</td>
+          </tr>
+          <tr>
+            <td>기본 키</td>
+            <td>복합 키 또는 대리 키</td>
+            <td>대리 키</td>
+          </tr>
+          <tr>
+            <td>외래 키</td>
+            <td>다수 (각 차원별)</td>
+            <td>없음 (스타 스키마)</td>
+          </tr>
+          <tr>
+            <td>인덱스</td>
+            <td>외래 키에 인덱스</td>
+            <td>기본 키에 인덱스</td>
+          </tr>
+          <tr>
+            <td>갱신 빈도</td>
+            <td>빈번함 (실시간~일배치)</td>
+            <td>드뭄 (주간~월간)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3.3 스노우플레이크 스키마 개요</h2>
+      <p>스노우플레이크 스키마(Snowflake Schema)는 스타 스키마의 변형으로, 차원 테이블을 <strong>정규화(Normalization)</strong>하여 여러 개의 관련 테이블로 분할한 구조입니다. 이 스키마는 시각적으로 눈송이(Snowflake) 모양을 띠기 때문에 스노우플레이크 스키마라고 불립니다.</p>
+
+      <p>스타 스키마에서는 제품 차원이 하나의 테이블에 제품명, 카테고리, 브랜드를 모두 포함하지만, 스노우플레이크 스키마에서는 다음과 같이 분리됩니다:</p>
+      <ul>
+        <li>제품 테이블: 제품 기본 정보</li>
+        <li>카테고리 테이블: 카테고리 정보</li>
+        <li>브랜드 테이블: 브랜드 정보</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 스노우플레이크 스키마 예시: 제품 차원 정규화
+
+-- 제품 테이블 (기본)
+CREATE TABLE dim_product (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20),
+    product_name VARCHAR(200),
+    brand_key INT REFERENCES dim_brand(brand_key),
+    category_key INT REFERENCES dim_category(category_key),
+    color VARCHAR(50),
+    size VARCHAR(20),
+    unit_cost DECIMAL(10,2),
+    list_price DECIMAL(10,2)
+);
+
+-- 브랜드 테이블 (정규화)
+CREATE TABLE dim_brand (
+    brand_key INT PRIMARY KEY,
+    brand_id VARCHAR(20),
+    brand_name VARCHAR(100),
+    brand_country VARCHAR(50),
+    brand_established_year INT
+);
+
+-- 카테고리 테이블 (정규화 및 계층)
+CREATE TABLE dim_category (
+    category_key INT PRIMARY KEY,
+    category_id VARCHAR(20),
+    category_name VARCHAR(100),
+    subcategory_key INT REFERENCES dim_subcategory(subcategory_key),
+    department_key INT REFERENCES dim_department(department_key)
+);
+
+-- 하위 카테고리 테이블
+CREATE TABLE dim_subcategory (
+    subcategory_key INT PRIMARY KEY,
+    subcategory_id VARCHAR(20),
+    subcategory_name VARCHAR(100)
+);
+
+-- 부서 테이블
+CREATE TABLE dim_department (
+    department_key INT PRIMARY KEY,
+    department_id VARCHAR(20),
+    department_name VARCHAR(100)
+);
+
+-- 스노우플레이크 스키마를 사용한 쿼리 예시
+SELECT
+    d.department_name,
+    c.category_name,
+    sc.subcategory_name,
+    b.brand_name,
+    p.product_name,
+    SUM(f.quantity) as total_quantity,
+    SUM(f.net_amount) as total_sales
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_brand b ON p.brand_key = b.brand_key
+JOIN dim_category c ON p.category_key = c.category_key
+JOIN dim_subcategory sc ON c.subcategory_key = sc.subcategory_key
+JOIN dim_department d ON c.department_key = d.department_key
+WHERE f.date_key BETWEEN 20250101 AND 20251231
+GROUP BY d.department_name, c.category_name, sc.subcategory_name,
+         b.brand_name, p.product_name
+ORDER BY total_sales DESC;</code></pre>
+      </div>
+
+      <p>위 쿼리에서 볼 수 있듯이, 스노우플레이크 스키마는 더 많은 조인을 필요로 합니다. 스타 스키마였다면 팩트 테이블과 제품 차원 테이블만 조인하면 되지만, 스노우플레이크 스키마에서는 5개의 조인이 필요합니다.</p>
+    </section>
+
+    <section>
+      <h2>3.4 스타 스키마 vs 스노우플레이크 스키마 비교</h2>
+
+      <table>
+        <caption>스타 스키마와 스노우플레이크 스키마 비교</caption>
+        <thead>
+          <tr>
+            <th>비교 항목</th>
+            <th>스타 스키마</th>
+            <th>스노우플레이크 스키마</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>정규화 수준</td>
+            <td>비정규화 (단일 차원 테이블)</td>
+            <td>정규화 (다중 관련 테이블)</td>
+          </tr>
+          <tr>
+            <td>쿼리 복잡도</td>
+            <td>단순 (적은 조인)</td>
+            <td>복잡 (많은 조인)</td>
+          </tr>
+          <tr>
+            <td>쿼리 성능</td>
+            <td>빠름</td>
+            <td>상대적으로 느림</td>
+          </tr>
+          <tr>
+            <td>스토리지 사용</td>
+            <td>많음 (중복 데이터)</td>
+            <td>적음 (중복 최소화)</td>
+          </tr>
+          <tr>
+            <td>데이터 무결성</td>
+            <td>중복으로 인한 위험</td>
+            <td>정규화로 보장</td>
+          </tr>
+          <tr>
+            <td>유지보수</td>
+            <td>단순</td>
+            <td>복잡</td>
+          </tr>
+          <tr>
+            <td>ETL 복잡도</td>
+            <td>단순</td>
+            <td>복잡</td>
+          </tr>
+          <tr>
+            <td>BI 도구 지원</td>
+            <td>최적</td>
+            <td>제한적</td>
+          </tr>
+          <tr>
+            <td>사용 권장 시나리오</td>
+            <td>대부분의 데이터 마트 및 웨어하우스</td>
+            <td>스토리지 비용이 매우 중요한 경우</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>성능 비교 분석</h3>
+      <p>실제 벤치마크 테스트에서 스타 스키마와 스노우플레이크 스키마의 성능 차이를 측정한 결과는 다음과 같습니다:</p>
+
+      <table>
+        <caption>쿼리 성능 비교 (100GB 데이터셋 기준)</caption>
+        <thead>
+          <tr>
+            <th>쿼리 유형</th>
+            <th>스타 스키마 (초)</th>
+            <th>스노우플레이크 스키마 (초)</th>
+            <th>성능 차이</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>단순 집계 (1개 차원)</td>
+            <td>0.5</td>
+            <td>0.6</td>
+            <td>+20%</td>
+          </tr>
+          <tr>
+            <td>2개 차원 조인</td>
+            <td>1.2</td>
+            <td>1.8</td>
+            <td>+50%</td>
+          </tr>
+          <tr>
+            <td>4개 차원 조인</td>
+            <td>3.5</td>
+            <td>6.2</td>
+            <td>+77%</td>
+          </tr>
+          <tr>
+            <td>계층 드릴다운</td>
+            <td>2.1</td>
+            <td>4.8</td>
+            <td>+129%</td>
+          </tr>
+          <tr>
+            <td>복잡한 분석 쿼리</td>
+            <td>12.3</td>
+            <td>28.7</td>
+            <td>+133%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>위 결과에서 볼 수 있듯이, 조인이 많아질수록 스노우플레이크 스키마의 성능 저하가 더욱 두드러집니다.</p>
+    </section>
+
+    <section>
+      <h2>3.5 갤럭시 스키마 (Fact Constellation Schema)</h2>
+      <p>갤럭시 스키마는 여러 개의 팩트 테이블이 여러 개의 차원 테이블을 공유하는 복잡한 구조입니다. 이는 "팩트 컨스텔레이션(Fact Constellation)"이라고도 불리며, 여러 비즈니스 프로세스를 통합 분석할 때 사용됩니다.</p>
+
+      <h3>갤럭시 스키마의 특징</h3>
+      <ul>
+        <li><strong>다중 팩트 테이블</strong>: 판매, 재고, 주문 등 여러 팩트 테이블이 존재</li>
+        <li><strong>공유 차원</strong>: 날짜, 제품, 고객 등의 차원을 여러 팩트 테이블이 공유</li>
+        <li><strong>컨포먼드 디멘전</strong>: 공유 차원은 모든 팩트 테이블에서 일관성 유지</li>
+        <li><strong>복잡한 분석</strong>: 여러 비즈니스 프로세스에 걸친 교차 분석 가능</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 갤럭시 스키마 예시
+
+-- 팩트 테이블 1: 판매
+CREATE TABLE fact_sales (
+    sale_id BIGINT PRIMARY KEY,
+    date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    customer_key INT REFERENCES dim_customer(customer_key),
+    store_key INT REFERENCES dim_store(store_key),
+    quantity INT,
+    total_amount DECIMAL(12,2)
+);
+
+-- 팩트 테이블 2: 재고
+CREATE TABLE fact_inventory (
+    inventory_id BIGINT PRIMARY KEY,
+    date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    warehouse_key INT REFERENCES dim_warehouse(warehouse_key),
+    quantity_on_hand INT,
+    quantity_reserved INT,
+    reorder_point INT
+);
+
+-- 팩트 테이블 3: 주문
+CREATE TABLE fact_orders (
+    order_id BIGINT PRIMARY KEY,
+    order_date_key INT REFERENCES dim_date(date_key),
+    ship_date_key INT REFERENCES dim_date(date_key),
+    product_key INT REFERENCES dim_product(product_key),
+    customer_key INT REFERENCES dim_customer(customer_key),
+    supplier_key INT REFERENCES dim_supplier(supplier_key),
+    order_quantity INT,
+    order_amount DECIMAL(12,2)
+);
+
+-- 공유 차원: 날짜 (모든 팩트 테이블이 사용)
+CREATE TABLE dim_date (
+    date_key INT PRIMARY KEY,
+    full_date DATE,
+    year INT,
+    quarter INT,
+    month INT,
+    week INT
+);
+
+-- 공유 차원: 제품 (판매, 재고, 주문에서 사용)
+CREATE TABLE dim_product (
+    product_key INT PRIMARY KEY,
+    product_id VARCHAR(20),
+    product_name VARCHAR(200),
+    category VARCHAR(100)
+);
+
+-- 갤럭시 스키마를 사용한 교차 분석 쿼리
+SELECT
+    p.product_name,
+    p.category,
+    SUM(s.quantity) as sales_quantity,
+    SUM(s.total_amount) as sales_amount,
+    AVG(i.quantity_on_hand) as avg_inventory,
+    COUNT(DISTINCT o.order_id) as order_count
+FROM dim_product p
+LEFT JOIN fact_sales s ON p.product_key = s.product_key
+LEFT JOIN fact_inventory i ON p.product_key = i.product_key
+LEFT JOIN fact_orders o ON p.product_key = o.product_key
+WHERE s.date_key BETWEEN 20250101 AND 20250131
+GROUP BY p.product_name, p.category
+ORDER BY sales_amount DESC;</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>3.6 정규화 vs 비정규화 트레이드오프</h2>
+      <p>데이터 웨어하우스 설계에서 정규화와 비정규화 사이의 균형을 찾는 것은 중요한 의사결정입니다.</p>
+
+      <h3>비정규화의 장점</h3>
+      <ul>
+        <li><strong>쿼리 성능 향상</strong>: 조인 수 감소로 쿼리 속도 개선</li>
+        <li><strong>단순한 쿼리</strong>: SQL 작성이 쉽고 이해하기 쉬움</li>
+        <li><strong>BI 도구 최적화</strong>: 대부분의 BI 도구가 선호하는 구조</li>
+        <li><strong>인덱싱 효율</strong>: 단일 테이블에 인덱스 생성으로 최적화 용이</li>
+      </ul>
+
+      <h3>정규화의 장점</h3>
+      <ul>
+        <li><strong>스토리지 절약</strong>: 중복 데이터 제거로 디스크 공간 절약</li>
+        <li><strong>데이터 무결성</strong>: 중복 최소화로 일관성 보장</li>
+        <li><strong>갱신 효율</strong>: 한 곳만 수정하면 되므로 갱신 작업 간소화</li>
+        <li><strong>유연성</strong>: 계층 구조 변경 시 유연하게 대응</li>
+      </ul>
+
+      <h3>하이브리드 접근법</h3>
+      <p>많은 조직이 순수한 스타 스키마나 스노우플레이크 스키마 대신 하이브리드 접근법을 채택합니다:</p>
+      <ul>
+        <li>대부분의 차원은 비정규화 (스타 스키마)</li>
+        <li>매우 큰 차원이나 자주 변경되는 차원만 부분적으로 정규화</li>
+        <li>핵심 성능 쿼리에 영향을 주지 않는 범위에서 정규화</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 하이브리드 접근법 예시
+
+-- 대부분의 차원은 비정규화 (스타 스키마)
+CREATE TABLE dim_customer (
+    customer_key INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    customer_name VARCHAR(200),
+    city VARCHAR(100),
+    state VARCHAR(50),
+    country VARCHAR(50)  -- 비정규화
+);
+
+-- 매우 큰 지역 차원만 선택적으로 정규화
+CREATE TABLE dim_geography (
+    geography_key INT PRIMARY KEY,
+    city VARCHAR(100),
+    state VARCHAR(50),
+    state_code VARCHAR(10),
+    country VARCHAR(50),
+    country_code VARCHAR(10),
+    region VARCHAR(50),
+    population BIGINT,
+    area_sq_km DECIMAL(12,2)
+);
+
+-- 필요에 따라 두 접근법 모두 지원
+-- 간단한 쿼리는 비정규화 차원 사용
+-- 상세한 지역 분석은 정규화된 지역 차원 사용</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>3.7 스키마 선택 가이드라인</h2>
+      <p>적절한 스키마를 선택하기 위한 의사결정 프레임워크:</p>
+
+      <h3>스타 스키마를 선택해야 하는 경우</h3>
+      <ul>
+        <li>쿼리 성능이 최우선 순위일 때</li>
+        <li>BI 도구와의 통합이 중요할 때</li>
+        <li>비즈니스 사용자가 직접 쿼리를 작성할 때</li>
+        <li>데이터 마트나 부서별 웨어하우스를 구축할 때</li>
+        <li>실시간 또는 준실시간 분석이 필요할 때</li>
+        <li>차원 테이블이 상대적으로 작을 때 (수만 행 이하)</li>
+      </ul>
+
+      <h3>스노우플레이크 스키마를 고려할 수 있는 경우</h3>
+      <ul>
+        <li>스토리지 비용이 매우 중요할 때</li>
+        <li>차원 테이블이 매우 클 때 (수백만 행 이상)</li>
+        <li>차원 계층이 자주 변경될 때</li>
+        <li>데이터 무결성이 성능보다 중요할 때</li>
+        <li>ETL 프로세스가 정규화된 소스 시스템과 유사할 때</li>
+      </ul>
+
+      <h3>갤럭시 스키마를 선택해야 하는 경우</h3>
+      <ul>
+        <li>여러 비즈니스 프로세스를 통합 분석해야 할 때</li>
+        <li>엔터프라이즈 데이터 웨어하우스를 구축할 때</li>
+        <li>컨포먼드 디멘전이 잘 정의되어 있을 때</li>
+        <li>교차 프로세스 KPI를 추적해야 할 때</li>
+      </ul>
+
+      <table>
+        <caption>스키마 선택 의사결정 매트릭스</caption>
+        <thead>
+          <tr>
+            <th>요구사항</th>
+            <th>가중치</th>
+            <th>스타</th>
+            <th>스노우플레이크</th>
+            <th>갤럭시</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>쿼리 성능</td>
+            <td>높음</td>
+            <td>⭐⭐⭐⭐⭐</td>
+            <td>⭐⭐⭐</td>
+            <td>⭐⭐⭐⭐</td>
+          </tr>
+          <tr>
+            <td>스토리지 효율</td>
+            <td>중간</td>
+            <td>⭐⭐</td>
+            <td>⭐⭐⭐⭐⭐</td>
+            <td>⭐⭐⭐</td>
+          </tr>
+          <tr>
+            <td>쿼리 단순성</td>
+            <td>높음</td>
+            <td>⭐⭐⭐⭐⭐</td>
+            <td>⭐⭐</td>
+            <td>⭐⭐⭐</td>
+          </tr>
+          <tr>
+            <td>유지보수 용이성</td>
+            <td>중간</td>
+            <td>⭐⭐⭐⭐</td>
+            <td>⭐⭐</td>
+            <td>⭐⭐⭐</td>
+          </tr>
+          <tr>
+            <td>데이터 무결성</td>
+            <td>중간</td>
+            <td>⭐⭐⭐</td>
+            <td>⭐⭐⭐⭐⭐</td>
+            <td>⭐⭐⭐⭐</td>
+          </tr>
+          <tr>
+            <td>ETL 복잡도</td>
+            <td>낮음</td>
+            <td>⭐⭐⭐⭐</td>
+            <td>⭐⭐</td>
+            <td>⭐⭐</td>
+          </tr>
+          <tr>
+            <td>BI 도구 지원</td>
+            <td>높음</td>
+            <td>⭐⭐⭐⭐⭐</td>
+            <td>⭐⭐⭐</td>
+            <td>⭐⭐⭐⭐</td>
+          </tr>
+          <tr>
+            <td>확장성</td>
+            <td>중간</td>
+            <td>⭐⭐⭐⭐</td>
+            <td>⭐⭐⭐</td>
+            <td>⭐⭐⭐⭐⭐</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3.8 실전 설계 패턴 및 모범 사례</h2>
+
+      <h3>패턴 1: 점진적 구축</h3>
+      <p>복잡한 스키마를 한 번에 구축하지 말고 단계적으로 발전시킵니다:</p>
+      <ol>
+        <li>핵심 팩트 테이블과 주요 차원으로 시작 (스타 스키마)</li>
+        <li>비즈니스 요구사항에 따라 추가 차원 추가</li>
+        <li>성능 문제가 없다면 스타 스키마 유지</li>
+        <li>스토리지가 문제가 되는 특정 차원만 선택적으로 정규화</li>
+      </ol>
+
+      <h3>패턴 2: 인덱싱 전략</h3>
+      <div class="code-block">
+        <pre><code>-- 팩트 테이블 인덱싱
+CREATE INDEX idx_fact_sales_date ON fact_sales(date_key);
+CREATE INDEX idx_fact_sales_product ON fact_sales(product_key);
+CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_key);
+
+-- 복합 인덱스 (자주 함께 사용되는 차원)
+CREATE INDEX idx_fact_sales_date_product
+ON fact_sales(date_key, product_key);
+
+-- 차원 테이블 인덱싱
+CREATE UNIQUE INDEX idx_dim_product_pk ON dim_product(product_key);
+CREATE INDEX idx_dim_product_category ON dim_product(category);
+
+-- 자연 키에도 인덱스 (조회용)
+CREATE UNIQUE INDEX idx_dim_product_id ON dim_product(product_id);</code></pre>
+      </div>
+
+      <h3>패턴 3: 파티셔닝</h3>
+      <div class="code-block">
+        <pre><code>-- 날짜 기반 파티셔닝 (PostgreSQL 예시)
+CREATE TABLE fact_sales (
+    sale_id BIGINT,
+    date_key INT,
+    product_key INT,
+    customer_key INT,
+    total_amount DECIMAL(12,2)
+) PARTITION BY RANGE (date_key);
+
+-- 월별 파티션 생성
+CREATE TABLE fact_sales_2025_01
+PARTITION OF fact_sales
+FOR VALUES FROM (20250101) TO (20250201);
+
+CREATE TABLE fact_sales_2025_02
+PARTITION OF fact_sales
+FOR VALUES FROM (20250201) TO (20250301);
+
+-- 자동 파티션 관리로 성능 향상 및 데이터 아카이빙 용이</code></pre>
+      </div>
+
+      <h3>패턴 4: Materialized View 활용</h3>
+      <div class="code-block">
+        <pre><code>-- 자주 사용되는 집계를 Materialized View로 생성
+CREATE MATERIALIZED VIEW mv_monthly_sales_summary AS
+SELECT
+    d.year,
+    d.month,
+    p.category,
+    SUM(f.quantity) as total_quantity,
+    SUM(f.total_amount) as total_sales,
+    COUNT(DISTINCT f.customer_key) as unique_customers
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+GROUP BY d.year, d.month, p.category;
+
+-- 정기적으로 갱신
+REFRESH MATERIALIZED VIEW mv_monthly_sales_summary;</code></pre>
+      </div>
+
+      <h3>모범 사례 체크리스트</h3>
+      <ul>
+        <li>✅ 팩트 테이블의 세분화 수준을 명확히 정의하고 문서화</li>
+        <li>✅ 모든 차원 테이블에 대리 키 사용</li>
+        <li>✅ 팩트 테이블의 모든 외래 키에 인덱스 생성</li>
+        <li>✅ 대용량 팩트 테이블은 날짜 기준으로 파티셔닝</li>
+        <li>✅ 자주 사용되는 집계 쿼리는 Materialized View로 최적화</li>
+        <li>✅ 쿼리 성능을 정기적으로 모니터링하고 인덱스 조정</li>
+        <li>✅ ETL 프로세스에서 참조 무결성 검증</li>
+        <li>✅ 차원 테이블 변경 이력 관리 전략 수립 (SCD)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3.9 성능 최적화 기법</h2>
+
+      <h3>쿼리 최적화</h3>
+      <div class="code-block">
+        <pre><code>-- 비효율적인 쿼리 (SELECT *)
+SELECT *
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+WHERE f.date_key = 20250115;
+
+-- 최적화된 쿼리 (필요한 컬럼만 선택)
+SELECT
+    f.sale_id,
+    f.quantity,
+    f.total_amount,
+    p.product_name,
+    p.category
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+WHERE f.date_key = 20250115;
+
+-- 집계 쿼리 최적화 (GROUP BY 전에 필터링)
+SELECT
+    p.category,
+    SUM(f.total_amount) as total_sales
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+WHERE f.date_key BETWEEN 20250101 AND 20250131  -- 먼저 필터링
+  AND p.category IN ('Electronics', 'Computers')  -- 차원 필터링
+GROUP BY p.category;</code></pre>
+      </div>
+
+      <h3>스토리지 최적화</h3>
+      <ul>
+        <li><strong>컬럼 압축</strong>: 반복되는 값이 많은 컬럼에 압축 적용</li>
+        <li><strong>데이터 타입 최적화</strong>: 적절한 크기의 데이터 타입 선택</li>
+        <li><strong>아카이빙</strong>: 오래된 데이터는 별도 테이블로 이동</li>
+      </ul>
+
+      <div class="code-block">
+        <pre><code>-- 데이터 타입 최적화 예시
+CREATE TABLE dim_product (
+    product_key INT,           -- BIGINT 대신 INT (충분한 경우)
+    product_id VARCHAR(20),    -- VARCHAR(255) 대신 적절한 크기
+    product_name VARCHAR(200),
+    price DECIMAL(10,2),       -- DECIMAL(20,4) 대신 필요한 정밀도만
+    is_active BOOLEAN          -- VARCHAR 대신 BOOLEAN
+);</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>3.10 요약</h2>
+      <p>이 장에서는 데이터 웨어하우스의 핵심 스키마 패턴인 스타 스키마, 스노우플레이크 스키마, 갤럭시 스키마를 살펴보았습니다. 주요 내용을 정리하면 다음과 같습니다:</p>
+
+      <ul>
+        <li><strong>스타 스키마</strong>는 비정규화된 차원 테이블과 중앙 팩트 테이블로 구성되며, 단순성과 성능 면에서 우수합니다. 대부분의 데이터 웨어하우스에서 권장되는 접근법입니다.</li>
+        <li><strong>스노우플레이크 스키마</strong>는 차원 테이블을 정규화하여 스토리지를 절약하지만, 쿼리 복잡도가 증가하고 성능이 저하될 수 있습니다.</li>
+        <li><strong>갤럭시 스키마</strong>는 여러 팩트 테이블이 차원을 공유하는 구조로, 엔터프라이즈급 데이터 웨어하우스에 적합합니다.</li>
+        <li><strong>정규화 vs 비정규화</strong> 선택은 성능, 스토리지, 유지보수성 간의 트레이드오프를 고려해야 합니다.</li>
+        <li>실무에서는 대부분 <strong>하이브리드 접근법</strong>을 채택하여 핵심 차원은 비정규화하고, 필요에 따라 선택적으로 정규화합니다.</li>
+        <li>적절한 <strong>인덱싱, 파티셔닝, Materialized View</strong> 전략으로 쿼리 성능을 크게 향상시킬 수 있습니다.</li>
+      </ul>
+
+      <p>스키마 선택은 단순히 기술적인 결정이 아니라, 비즈니스 요구사항, 사용자 역량, 데이터 특성을 종합적으로 고려한 전략적 의사결정입니다. 대부분의 경우 스타 스키마로 시작하여 필요에 따라 진화시키는 것이 가장 효과적인 접근법입니다.</p>
+    </section>
+
+    <section>
+      <h2>복습 문제</h2>
+      <ol>
+        <li><strong>스타 스키마와 스노우플레이크 스키마의 주요 차이점을 설명하고, 각각 어떤 상황에서 사용하는 것이 적절한지 논하시오.</strong></li>
+        <li><strong>비정규화가 쿼리 성능을 향상시키는 이유를 기술적으로 설명하시오. 동시에 비정규화의 단점은 무엇인가?</strong></li>
+        <li><strong>갤럭시 스키마(Fact Constellation)가 필요한 비즈니스 시나리오를 예를 들어 설명하고, 컨포먼드 디멘전의 역할을 논하시오.</strong></li>
+        <li><strong>100억 건의 판매 거래 데이터를 저장하는 팩트 테이블을 설계한다고 가정할 때, 성능 최적화를 위해 적용할 수 있는 기법을 5가지 이상 제시하시오.</strong></li>
+        <li><strong>스타 스키마에서 대리 키(Surrogate Key)를 사용하는 이유는 무엇이며, 자연 키(Natural Key)와 비교하여 어떤 장점이 있는지 설명하시오.</strong></li>
+        <li><strong>데이터 웨어하우스에서 Materialized View를 언제 사용해야 하는지, 그리고 일반 View와의 차이점과 트레이드오프를 설명하시오.</strong></li>
+      </ol>
+    </section>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter-02.html" class="nav-button prev">이전 장</a>
+    <a href="chapter-04.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

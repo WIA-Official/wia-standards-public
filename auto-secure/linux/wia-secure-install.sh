@@ -1,28 +1,30 @@
 #!/bin/bash
 #
-# WIA-AUTO-SECURE v2.0
+# WIA-AUTO-SECURE v1.0
 # One-Click HTTPS Installation
-# Multi-Domain & Wildcard Support
 #
 # World Certification Industry Association
 # https://wia.family
 #
 # 홍익인간 (弘益人間) - 널리 인간을 이롭게 하라
 #
-# Usage: curl -sSL https://wia.family/secure | bash
-#    or: ./wia-secure-install.sh [domain]
+# Safe Usage (recommended):
+#   curl -sSL https://wia.family/secure -o wia-secure.sh
+#   less wia-secure.sh          # Review the script
+#   bash wia-secure.sh
 #
-# v2.0 Features:
-#   - Single domain (+ www auto)
-#   - Multiple domains (up to 100)
-#   - Wildcard certificates (*.domain.com)
-#   - Cloudflare DNS API integration
-#   - Route53, DigitalOcean DNS support
+# Quick Usage:
+#   curl -sSL https://wia.family/secure | bash
+#
+# Non-Interactive:
+#   export WIA_DOMAIN="example.com" WIA_EMAIL="admin@example.com"
+#   ./wia-secure-install.sh --non-interactive
+#
+# Offline (certbot already installed):
+#   ./wia-secure-install.sh --offline
 #
 
 set -e
-
-VERSION="2.0"
 
 # ============================================================
 # Colors & Formatting
@@ -32,17 +34,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
-
-# ============================================================
-# Global Variables
-# ============================================================
-DOMAINS=()
-MODE=""
-DNS_PROVIDER=""
-CREDENTIALS_FILE=""
 
 # ============================================================
 # Banner
@@ -58,10 +51,8 @@ print_banner() {
     echo "║   ╚███╔███╔╝██║██║  ██║      ███████║███████╗╚██████╗    ║"
     echo "║    ╚══╝╚══╝ ╚═╝╚═╝  ╚═╝      ╚══════╝╚══════╝ ╚═════╝    ║"
     echo "║                                                           ║"
-    echo "║            WIA-AUTO-SECURE v${VERSION}                          ║"
+    echo "║            WIA-AUTO-SECURE v1.0                          ║"
     echo "║            One-Click HTTPS Installation                   ║"
-    echo "║                                                           ║"
-    echo "║   ${MAGENTA}★ Multi-Domain ★ Wildcard ★ DNS API${CYAN}                  ║"
     echo "║                                                           ║"
     echo "║            홍익인간 - 널리 인간을 이롭게 하라             ║"
     echo "║                                                           ║"
@@ -93,38 +84,6 @@ log_step() {
 }
 
 # ============================================================
-# Show Menu
-# ============================================================
-show_menu() {
-    log_step "Select Installation Mode"
-    echo ""
-    echo -e "  ${GREEN}1)${NC} Single Domain ${YELLOW}(example.com + www)${NC}"
-    echo -e "     └─ 가장 일반적인 옵션"
-    echo ""
-    echo -e "  ${GREEN}2)${NC} Multiple Domains ${YELLOW}(up to 100 domains)${NC}"
-    echo -e "     └─ api.example.com, admin.example.com 등"
-    echo ""
-    echo -e "  ${GREEN}3)${NC} Wildcard Certificate ${YELLOW}(*.example.com)${NC}"
-    echo -e "     └─ 모든 서브도메인 커버 (DNS API 필요)"
-    echo ""
-    echo -e "${YELLOW}"
-    read -p "Select mode [1-3]: " mode_choice
-    echo -e "${NC}"
-
-    case $mode_choice in
-        1) MODE="single" ;;
-        2) MODE="multiple" ;;
-        3) MODE="wildcard" ;;
-        *)
-            log_error "Invalid selection. Please choose 1, 2, or 3."
-            exit 1
-            ;;
-    esac
-
-    log_info "Selected mode: $MODE"
-}
-
-# ============================================================
 # System Detection
 # ============================================================
 detect_os() {
@@ -132,8 +91,8 @@ detect_os() {
 
     if [ -f /etc/os-release ]; then
         . /etc/os-release
-        OS=$ID
-        VERSION=$VERSION_ID
+        OS="$ID"
+        VERSION="$VERSION_ID"
     elif [ -f /etc/redhat-release ]; then
         OS="rhel"
     elif [ -f /etc/debian_version ]; then
@@ -201,7 +160,7 @@ install_certbot() {
     local pkg_mgr=$(detect_package_manager)
     local webserver=$1
 
-    case $pkg_mgr in
+    case "$pkg_mgr" in
         apt)
             log_info "Using apt package manager"
             sudo apt-get update -qq
@@ -223,6 +182,7 @@ install_certbot() {
             ;;
         yum)
             log_info "Using yum package manager"
+            # For Amazon Linux 2023 / RHEL / CentOS
             sudo yum install -y -q certbot
             if [ "$webserver" = "nginx" ]; then
                 sudo yum install -y -q python3-certbot-nginx
@@ -232,11 +192,20 @@ install_certbot() {
             ;;
         pacman)
             log_info "Using pacman package manager"
-            sudo pacman -Sy --noconfirm certbot
+            sudo pacman -Syu --noconfirm certbot
             if [ "$webserver" = "nginx" ]; then
                 sudo pacman -S --noconfirm certbot-nginx
             elif [ "$webserver" = "apache" ]; then
                 sudo pacman -S --noconfirm certbot-apache
+            fi
+            ;;
+        zypper)
+            log_info "Using zypper package manager"
+            sudo zypper install -y certbot
+            if [ "$webserver" = "nginx" ]; then
+                sudo zypper install -y python3-certbot-nginx
+            elif [ "$webserver" = "apache" ]; then
+                sudo zypper install -y python3-certbot-apache
             fi
             ;;
         *)
@@ -249,289 +218,56 @@ install_certbot() {
 }
 
 # ============================================================
-# Install DNS Plugin
+# Get Domain
 # ============================================================
-install_dns_plugin() {
-    local provider=$1
-    local pkg_mgr=$(detect_package_manager)
-
-    log_step "Installing DNS plugin for $provider..."
-
-    case $pkg_mgr in
-        apt)
-            case $provider in
-                cloudflare)
-                    sudo apt-get install -y -qq python3-certbot-dns-cloudflare
-                    ;;
-                route53)
-                    sudo apt-get install -y -qq python3-certbot-dns-route53
-                    ;;
-                digitalocean)
-                    sudo apt-get install -y -qq python3-certbot-dns-digitalocean
-                    ;;
-                google)
-                    sudo apt-get install -y -qq python3-certbot-dns-google
-                    ;;
-            esac
-            ;;
-        dnf|yum)
-            case $provider in
-                cloudflare)
-                    sudo $pkg_mgr install -y -q python3-certbot-dns-cloudflare 2>/dev/null || \
-                    pip3 install certbot-dns-cloudflare
-                    ;;
-                route53)
-                    pip3 install certbot-dns-route53
-                    ;;
-                digitalocean)
-                    pip3 install certbot-dns-digitalocean
-                    ;;
-                google)
-                    pip3 install certbot-dns-google
-                    ;;
-            esac
-            ;;
-        *)
-            log_info "Installing via pip3..."
-            pip3 install certbot-dns-$provider
-            ;;
-    esac
-
-    log_success "DNS plugin installed"
-}
-
-# ============================================================
-# Validate Domain
-# ============================================================
-validate_domain() {
+get_domain() {
     local domain=$1
-    if [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
-        return 0
-    else
-        return 1
+
+    # Check environment variable first (for non-interactive mode)
+    if [ -z "$domain" ] && [ -n "$WIA_DOMAIN" ]; then
+        domain="$WIA_DOMAIN"
+        log_info "Using domain from WIA_DOMAIN environment variable: $domain"
     fi
-}
-
-# ============================================================
-# Get Single Domain
-# ============================================================
-get_single_domain() {
-    local domain=$1
 
     if [ -z "$domain" ]; then
+        if [ "$NON_INTERACTIVE" = "true" ]; then
+            log_error "Non-interactive mode requires WIA_DOMAIN environment variable"
+            exit 1
+        fi
         log_step "Domain Configuration"
         echo -e "${YELLOW}"
         read -p "Enter your domain (e.g., example.com): " domain
         echo -e "${NC}"
     fi
 
-    if ! validate_domain "$domain"; then
+    # Validate domain format
+    if [[ ! "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
         log_error "Invalid domain format: $domain"
         exit 1
     fi
 
-    # Ask about www
-    echo -e "${YELLOW}"
-    read -p "Include www.$domain? [Y/n]: " include_www
-    echo -e "${NC}"
-
-    include_www=${include_www:-Y}
-
-    DOMAINS=("$domain")
-    if [[ "$include_www" =~ ^[Yy]$ ]]; then
-        DOMAINS+=("www.$domain")
-    fi
-
-    log_info "Domains: ${DOMAINS[*]}"
-}
-
-# ============================================================
-# Get Multiple Domains
-# ============================================================
-get_multiple_domains() {
-    log_step "Multiple Domain Configuration"
-
-    echo ""
-    echo -e "${CYAN}Enter domains separated by comma or space${NC}"
-    echo -e "${YELLOW}Example: example.com, api.example.com, admin.example.com${NC}"
-    echo ""
-    echo -e "${YELLOW}"
-    read -p "Domains: " domains_input
-    echo -e "${NC}"
-
-    # Parse input - handle both comma and space separated
-    local input="${domains_input//,/ }"  # Replace commas with spaces
-
-    for domain in $input; do
-        # Trim whitespace
-        domain=$(echo "$domain" | xargs)
-
-        if [ -n "$domain" ]; then
-            if validate_domain "$domain"; then
-                DOMAINS+=("$domain")
-                log_info "Added: $domain"
-            else
-                log_warn "Skipping invalid domain: $domain"
-            fi
-        fi
-    done
-
-    if [ ${#DOMAINS[@]} -eq 0 ]; then
-        log_error "No valid domains provided!"
-        exit 1
-    fi
-
-    # Ask about www for primary domain
-    echo -e "${YELLOW}"
-    read -p "Include www.${DOMAINS[0]}? [Y/n]: " include_www
-    echo -e "${NC}"
-
-    include_www=${include_www:-Y}
-    if [[ "$include_www" =~ ^[Yy]$ ]]; then
-        DOMAINS+=("www.${DOMAINS[0]}")
-    fi
-
-    echo ""
-    log_info "Total domains: ${#DOMAINS[@]}"
-    log_info "Domains: ${DOMAINS[*]}"
-}
-
-# ============================================================
-# Get Wildcard Domain
-# ============================================================
-get_wildcard_domain() {
-    log_step "Wildcard Certificate Configuration"
-
-    echo ""
-    echo -e "${CYAN}Wildcard certificates require DNS API access${NC}"
-    echo -e "${YELLOW}This will issue a certificate for *.domain.com${NC}"
-    echo ""
-    echo -e "${YELLOW}"
-    read -p "Enter your root domain (e.g., example.com): " domain
-    echo -e "${NC}"
-
-    if ! validate_domain "$domain"; then
-        log_error "Invalid domain format: $domain"
-        exit 1
-    fi
-
-    DOMAINS=("*.$domain" "$domain")
-    log_info "Will issue: *.${domain} + ${domain}"
-}
-
-# ============================================================
-# Select DNS Provider
-# ============================================================
-select_dns_provider() {
-    log_step "Select DNS Provider"
-    echo ""
-    echo -e "  ${GREEN}1)${NC} Cloudflare ${YELLOW}(추천 - 가장 쉬움)${NC}"
-    echo -e "  ${GREEN}2)${NC} AWS Route53"
-    echo -e "  ${GREEN}3)${NC} DigitalOcean"
-    echo -e "  ${GREEN}4)${NC} Google Cloud DNS"
-    echo ""
-    echo -e "${YELLOW}"
-    read -p "Select provider [1-4]: " provider_choice
-    echo -e "${NC}"
-
-    case $provider_choice in
-        1) DNS_PROVIDER="cloudflare" ;;
-        2) DNS_PROVIDER="route53" ;;
-        3) DNS_PROVIDER="digitalocean" ;;
-        4) DNS_PROVIDER="google" ;;
-        *)
-            log_error "Invalid selection"
-            exit 1
-            ;;
-    esac
-
-    log_info "Selected DNS provider: $DNS_PROVIDER"
-}
-
-# ============================================================
-# Setup DNS Credentials
-# ============================================================
-setup_dns_credentials() {
-    local provider=$1
-
-    log_step "Setting up $provider credentials..."
-
-    mkdir -p ~/.secrets
-    CREDENTIALS_FILE="$HOME/.secrets/${provider}.ini"
-
-    case $provider in
-        cloudflare)
-            echo ""
-            echo -e "${CYAN}Cloudflare API Token Setup${NC}"
-            echo -e "${YELLOW}Get your token from: https://dash.cloudflare.com/profile/api-tokens${NC}"
-            echo -e "${YELLOW}Required permission: Zone:DNS:Edit${NC}"
-            echo ""
-            echo -e "${YELLOW}"
-            read -p "Enter Cloudflare API Token: " api_token
-            echo -e "${NC}"
-
-            cat > "$CREDENTIALS_FILE" << EOF
-# Cloudflare API Token
-dns_cloudflare_api_token = $api_token
-EOF
-            ;;
-        route53)
-            echo ""
-            echo -e "${CYAN}AWS Route53 Credentials Setup${NC}"
-            echo ""
-            echo -e "${YELLOW}"
-            read -p "Enter AWS Access Key ID: " aws_key
-            read -p "Enter AWS Secret Access Key: " aws_secret
-            echo -e "${NC}"
-
-            mkdir -p ~/.aws
-            cat > ~/.aws/credentials << EOF
-[default]
-aws_access_key_id = $aws_key
-aws_secret_access_key = $aws_secret
-EOF
-            CREDENTIALS_FILE=""  # Route53 uses ~/.aws/credentials
-            ;;
-        digitalocean)
-            echo ""
-            echo -e "${CYAN}DigitalOcean API Token Setup${NC}"
-            echo ""
-            echo -e "${YELLOW}"
-            read -p "Enter DigitalOcean API Token: " api_token
-            echo -e "${NC}"
-
-            cat > "$CREDENTIALS_FILE" << EOF
-dns_digitalocean_token = $api_token
-EOF
-            ;;
-        google)
-            echo ""
-            echo -e "${CYAN}Google Cloud DNS Setup${NC}"
-            echo -e "${YELLOW}Provide path to service account JSON file${NC}"
-            echo ""
-            echo -e "${YELLOW}"
-            read -p "Enter path to JSON key file: " json_path
-            echo -e "${NC}"
-
-            CREDENTIALS_FILE="$json_path"
-            ;;
-    esac
-
-    if [ -n "$CREDENTIALS_FILE" ] && [ -f "$CREDENTIALS_FILE" ]; then
-        chmod 600 "$CREDENTIALS_FILE"
-    fi
-
-    log_success "Credentials configured!"
+    log_info "Domain: $domain"
+    echo "$domain"
 }
 
 # ============================================================
 # Get Email
 # ============================================================
 get_email() {
-    log_step "Email Configuration (for Let's Encrypt notifications)"
-    echo -e "${YELLOW}"
-    read -p "Enter your email: " email
-    echo -e "${NC}"
+    # Check environment variable first (for non-interactive mode)
+    if [ -n "$WIA_EMAIL" ]; then
+        email="$WIA_EMAIL"
+        log_info "Using email from WIA_EMAIL environment variable: $email"
+    else
+        if [ "$NON_INTERACTIVE" = "true" ]; then
+            log_error "Non-interactive mode requires WIA_EMAIL environment variable"
+            exit 1
+        fi
+        log_step "Email Configuration (for Let's Encrypt notifications)"
+        echo -e "${YELLOW}"
+        read -p "Enter your email: " email
+        echo -e "${NC}"
+    fi
 
     if [[ ! "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
         log_error "Invalid email format: $email"
@@ -543,143 +279,91 @@ get_email() {
 }
 
 # ============================================================
-# Issue Certificate - Single/Multiple (HTTP-01)
+# Backup & Restore Web Server Config
 # ============================================================
-issue_certificate_http() {
-    local email=$1
+backup_webserver_config() {
+    local webserver=$1
+    local backup_dir="/tmp/wia-secure-backup-$(date +%Y%m%d%H%M%S)"
+    mkdir -p "$backup_dir"
+
+    if [ "$webserver" = "nginx" ]; then
+        cp -r /etc/nginx/sites-enabled/ "$backup_dir/" 2>/dev/null || true
+        cp -r /etc/nginx/conf.d/ "$backup_dir/" 2>/dev/null || true
+    elif [ "$webserver" = "apache" ]; then
+        cp -r /etc/apache2/sites-enabled/ "$backup_dir/" 2>/dev/null || true
+        cp -r /etc/httpd/conf.d/ "$backup_dir/" 2>/dev/null || true
+    fi
+
+    log_info "Web server config backed up to $backup_dir"
+    echo "$backup_dir"
+}
+
+restore_webserver_config() {
+    local backup_dir=$1
     local webserver=$2
 
-    log_step "Issuing SSL Certificate via HTTP-01..."
+    if [ -z "$backup_dir" ] || [ ! -d "$backup_dir" ]; then
+        log_warn "No backup found to restore"
+        return 1
+    fi
 
-    # Build domain flags
-    local domain_flags=""
-    for domain in "${DOMAINS[@]}"; do
-        domain_flags="$domain_flags -d $domain"
-    done
+    log_warn "Restoring web server config from $backup_dir..."
 
-    log_info "Domains: $domain_flags"
+    if [ "$webserver" = "nginx" ]; then
+        [ -d "$backup_dir/sites-enabled" ] && cp -r "$backup_dir/sites-enabled/"* /etc/nginx/sites-enabled/ 2>/dev/null || true
+        [ -d "$backup_dir/conf.d" ] && cp -r "$backup_dir/conf.d/"* /etc/nginx/conf.d/ 2>/dev/null || true
+        sudo systemctl reload nginx 2>/dev/null || true
+    elif [ "$webserver" = "apache" ]; then
+        [ -d "$backup_dir/sites-enabled" ] && cp -r "$backup_dir/sites-enabled/"* /etc/apache2/sites-enabled/ 2>/dev/null || true
+        [ -d "$backup_dir/conf.d" ] && cp -r "$backup_dir/conf.d/"* /etc/httpd/conf.d/ 2>/dev/null || true
+        sudo systemctl reload apache2 2>/dev/null || sudo systemctl reload httpd 2>/dev/null || true
+    fi
+
+    log_info "Web server config restored from backup"
+}
+
+# ============================================================
+# Issue Certificate
+# ============================================================
+issue_certificate() {
+    local domain=$1
+    local email=$2
+    local webserver=$3
+
+    log_step "Issuing SSL Certificate for $domain..."
 
     case $webserver in
         nginx)
             log_info "Using nginx plugin"
-            sudo certbot --nginx $domain_flags \
+            sudo certbot --nginx -d "$domain" -d "www.$domain" \
                 --non-interactive --agree-tos --email "$email" \
-                --redirect
+                --redirect || {
+                    log_warn "www subdomain failed, trying without..."
+                    sudo certbot --nginx -d "$domain" \
+                        --non-interactive --agree-tos --email "$email" \
+                        --redirect
+                }
             ;;
         apache)
             log_info "Using apache plugin"
-            sudo certbot --apache $domain_flags \
+            sudo certbot --apache -d "$domain" -d "www.$domain" \
                 --non-interactive --agree-tos --email "$email" \
-                --redirect
+                --redirect || {
+                    log_warn "www subdomain failed, trying without..."
+                    sudo certbot --apache -d "$domain" \
+                        --non-interactive --agree-tos --email "$email" \
+                        --redirect
+                }
             ;;
         standalone)
             log_info "Using standalone mode"
             log_warn "Make sure port 80 is not in use!"
-            sudo certbot certonly --standalone $domain_flags \
+            sudo certbot certonly --standalone -d "$domain" \
                 --non-interactive --agree-tos --email "$email"
             ;;
     esac
 
     log_success "SSL Certificate issued successfully!"
-}
-
-# ============================================================
-# Issue Certificate - Wildcard (DNS-01)
-# ============================================================
-issue_certificate_dns() {
-    local email=$1
-    local provider=$2
-
-    log_step "Issuing Wildcard SSL Certificate via DNS-01..."
-
-    # Build domain flags
-    local domain_flags=""
-    for domain in "${DOMAINS[@]}"; do
-        domain_flags="$domain_flags -d $domain"
-    done
-
-    log_info "Domains: $domain_flags"
-    log_info "DNS Provider: $provider"
-    log_warn "DNS propagation may take 60-120 seconds..."
-
-    case $provider in
-        cloudflare)
-            sudo certbot certonly \
-                --dns-cloudflare \
-                --dns-cloudflare-credentials "$CREDENTIALS_FILE" \
-                --dns-cloudflare-propagation-seconds 60 \
-                $domain_flags \
-                --non-interactive --agree-tos --email "$email"
-            ;;
-        route53)
-            sudo certbot certonly \
-                --dns-route53 \
-                --dns-route53-propagation-seconds 60 \
-                $domain_flags \
-                --non-interactive --agree-tos --email "$email"
-            ;;
-        digitalocean)
-            sudo certbot certonly \
-                --dns-digitalocean \
-                --dns-digitalocean-credentials "$CREDENTIALS_FILE" \
-                --dns-digitalocean-propagation-seconds 60 \
-                $domain_flags \
-                --non-interactive --agree-tos --email "$email"
-            ;;
-        google)
-            sudo certbot certonly \
-                --dns-google \
-                --dns-google-credentials "$CREDENTIALS_FILE" \
-                --dns-google-propagation-seconds 60 \
-                $domain_flags \
-                --non-interactive --agree-tos --email "$email"
-            ;;
-    esac
-
-    log_success "Wildcard SSL Certificate issued successfully!"
-
-    # Get the root domain (remove *. prefix)
-    local root_domain="${DOMAINS[1]}"  # Second domain should be the root
-
-    echo ""
-    log_warn "═══════════════════════════════════════════════════════════"
-    log_warn "  IMPORTANT: Configure your web server manually!"
-    log_warn "═══════════════════════════════════════════════════════════"
-    echo ""
-    log_info "Certificate files location:"
-    echo -e "  ${GREEN}Certificate:${NC} /etc/letsencrypt/live/$root_domain/fullchain.pem"
-    echo -e "  ${GREEN}Private Key:${NC} /etc/letsencrypt/live/$root_domain/privkey.pem"
-    echo ""
-    log_info "Example Nginx configuration:"
-    echo -e "${YELLOW}"
-    cat << 'NGINXEOF'
-    server {
-        listen 443 ssl;
-        server_name *.example.com example.com;
-
-        ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
-
-        # ... your config ...
-    }
-NGINXEOF
-    echo -e "${NC}"
-
-    log_info "Example Apache configuration:"
-    echo -e "${YELLOW}"
-    cat << 'APACHEEOF'
-    <VirtualHost *:443>
-        ServerName example.com
-        ServerAlias *.example.com
-
-        SSLEngine on
-        SSLCertificateFile /etc/letsencrypt/live/example.com/fullchain.pem
-        SSLCertificateKeyFile /etc/letsencrypt/live/example.com/privkey.pem
-
-        # ... your config ...
-    </VirtualHost>
-APACHEEOF
-    echo -e "${NC}"
 }
 
 # ============================================================
@@ -695,6 +379,7 @@ setup_auto_renewal() {
         # Setup cron job as fallback
         log_info "Setting up cron job for auto-renewal"
 
+        # Create renewal script
         sudo tee /etc/cron.d/wia-certbot-renew > /dev/null << 'EOF'
 # WIA-AUTO-SECURE: Auto-renew SSL certificates
 # Runs twice daily at random minute to spread load
@@ -715,27 +400,16 @@ EOF
 # Verify Installation
 # ============================================================
 verify_installation() {
+    local domain=$1
+
     log_step "Verifying HTTPS Installation..."
-
-    # Use first non-wildcard domain for verification
-    local test_domain=""
-    for domain in "${DOMAINS[@]}"; do
-        if [[ "$domain" != \** ]]; then
-            test_domain="$domain"
-            break
-        fi
-    done
-
-    if [ -z "$test_domain" ]; then
-        test_domain="${DOMAINS[1]}"  # Use root domain
-    fi
 
     # Wait for changes to propagate
     sleep 2
 
     # Test HTTPS connection
     if command -v curl &> /dev/null; then
-        local http_code=$(curl -s -o /dev/null -w "%{http_code}" "https://$test_domain" --max-time 10 2>/dev/null || echo "000")
+        local http_code=$(curl -s -o /dev/null -w "%{http_code}" "https://$domain" --max-time 10 2>/dev/null || echo "000")
 
         if [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || [ "$http_code" = "302" ]; then
             log_success "HTTPS is working! (HTTP $http_code)"
@@ -745,10 +419,10 @@ verify_installation() {
     fi
 
     # Show certificate info
-    log_info "Certificate location: /etc/letsencrypt/live/$test_domain/"
+    log_info "Certificate location: /etc/letsencrypt/live/$domain/"
 
-    if [ -f "/etc/letsencrypt/live/$test_domain/fullchain.pem" ]; then
-        local expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$test_domain/fullchain.pem" 2>/dev/null | cut -d= -f2)
+    if [ -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]; then
+        local expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$domain/fullchain.pem" 2>/dev/null | cut -d= -f2)
         log_info "Certificate expires: $expiry"
     fi
 }
@@ -757,9 +431,7 @@ verify_installation() {
 # Print Summary
 # ============================================================
 print_summary() {
-    local primary_domain="${DOMAINS[0]}"
-    # Remove wildcard prefix for display
-    primary_domain="${primary_domain#\*.}"
+    local domain=$1
 
     echo -e "\n${GREEN}"
     echo "╔═══════════════════════════════════════════════════════════╗"
@@ -769,44 +441,39 @@ print_summary() {
     echo "╠═══════════════════════════════════════════════════════════╣"
     echo "║                                                           ║"
     echo "║   Your site is now secure:                                ║"
-    printf "║   ${BOLD}https://%-48s${NC}${GREEN}║\n" "$primary_domain"
+    printf "║   ${BOLD}https://%-48s${NC}${GREEN}║\n" "$domain"
     echo "║                                                           ║"
-
-    if [ "$MODE" = "wildcard" ]; then
-        echo "║   ${YELLOW}★ Wildcard: *.${primary_domain}${GREEN}                              ║"
-        echo "║                                                           ║"
-    elif [ ${#DOMAINS[@]} -gt 1 ]; then
-        echo "║   ${YELLOW}★ Domains: ${#DOMAINS[@]} total${GREEN}                                   ║"
-        echo "║                                                           ║"
-    fi
-
     echo "║   Certificate auto-renews every 60-90 days               ║"
     echo "║   No further action needed!                               ║"
     echo "║                                                           ║"
     echo "╠═══════════════════════════════════════════════════════════╣"
     echo "║                                                           ║"
-    echo "║   Powered by WIA-AUTO-SECURE v${VERSION}                        ║"
+    echo "║   Powered by WIA-AUTO-SECURE                             ║"
     echo "║   https://wia.family                                      ║"
     echo "║                                                           ║"
     echo "║   홍익인간 - 널리 인간을 이롭게 하라                      ║"
     echo "║                                                           ║"
     echo "╚═══════════════════════════════════════════════════════════╝"
     echo -e "${NC}\n"
-
-    # List all secured domains
-    if [ ${#DOMAINS[@]} -gt 1 ]; then
-        echo -e "${CYAN}Secured Domains:${NC}"
-        for domain in "${DOMAINS[@]}"; do
-            echo -e "  ${GREEN}✓${NC} https://$domain"
-        done
-        echo ""
-    fi
 }
 
 # ============================================================
 # Main
 # ============================================================
 main() {
+    # Parse flags
+    NON_INTERACTIVE="false"
+    OFFLINE_MODE="false"
+    local positional_args=()
+
+    for arg in "$@"; do
+        case "$arg" in
+            --non-interactive) NON_INTERACTIVE="true" ;;
+            --offline) OFFLINE_MODE="true" ;;
+            *) positional_args+=("$arg") ;;
+        esac
+    done
+
     print_banner
 
     # Check if running as root or with sudo
@@ -815,27 +482,8 @@ main() {
         exit 1
     fi
 
-    # Check if domain provided as argument (legacy single-domain mode)
-    if [ -n "$1" ]; then
-        MODE="single"
-        get_single_domain "$1"
-    else
-        # Show menu for mode selection
-        show_menu
-
-        case $MODE in
-            single)
-                get_single_domain
-                ;;
-            multiple)
-                get_multiple_domains
-                ;;
-            wildcard)
-                get_wildcard_domain
-                select_dns_provider
-                ;;
-        esac
-    fi
+    # Get domain from argument or prompt
+    local domain=$(get_domain "${positional_args[0]:-}")
 
     # Get email
     local email=$(get_email)
@@ -846,32 +494,44 @@ main() {
     # Detect web server
     local webserver=$(detect_webserver)
 
-    # Install certbot if needed
-    if ! command -v certbot &> /dev/null; then
+    # Install certbot
+    if [ "$OFFLINE_MODE" = "true" ]; then
+        log_info "Offline mode: skipping certbot installation"
+        if ! command -v certbot &> /dev/null; then
+            log_error "Offline mode requires certbot to be pre-installed"
+            log_error "Install certbot first: sudo apt install certbot (or equivalent)"
+            exit 1
+        fi
+        log_info "Certbot found: $(certbot --version 2>&1 || echo 'unknown version')"
+    elif ! command -v certbot &> /dev/null; then
         install_certbot "$webserver"
     else
         log_info "Certbot already installed"
     fi
 
-    # Issue certificate based on mode
-    if [ "$MODE" = "wildcard" ]; then
-        # Wildcard requires DNS plugin
-        install_dns_plugin "$DNS_PROVIDER"
-        setup_dns_credentials "$DNS_PROVIDER"
-        issue_certificate_dns "$email" "$DNS_PROVIDER"
-    else
-        # Single or multiple domains use HTTP-01
-        issue_certificate_http "$email" "$webserver"
+    # Backup web server config before issuing certificate
+    local backup_dir=""
+    if [ "$webserver" != "standalone" ]; then
+        backup_dir=$(backup_webserver_config "$webserver")
     fi
+
+    # Issue certificate (with rollback on failure)
+    issue_certificate "$domain" "$email" "$webserver" || {
+        log_error "Certificate issuance failed!"
+        if [ -n "$backup_dir" ]; then
+            restore_webserver_config "$backup_dir" "$webserver"
+        fi
+        exit 1
+    }
 
     # Setup auto-renewal
     setup_auto_renewal
 
     # Verify
-    verify_installation
+    verify_installation "$domain"
 
     # Summary
-    print_summary
+    print_summary "$domain"
 }
 
 # Run main with all arguments

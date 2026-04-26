@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: HSM 아키텍처 및 구성요소 - WIA-SEC-014</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.9; }
+        .book-container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .chapter-header { text-align: center; padding: 3rem 0; border-bottom: 3px solid #EF4444; margin-bottom: 3rem; }
+        .chapter-number { font-size: 1.2rem; color: #94a3b8; margin-bottom: 0.5rem; }
+        .chapter-title { font-size: 2.5rem; color: #EF4444; margin-bottom: 1rem; }
+        h2 { color: #EF4444; font-size: 1.8rem; margin: 2.5rem 0 1.5rem; }
+        h3 { color: #f87171; font-size: 1.4rem; margin: 2rem 0 1rem; }
+        h4 { color: #fca5a5; font-size: 1.2rem; margin: 1.5rem 0 1rem; }
+        p { margin-bottom: 1.5rem; text-align: justify; color: #cbd5e1; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #EF4444; padding: 1.5rem; margin: 2rem 0; border-radius: 4px; }
+        .code-block { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+        .code-block code { font-family: 'Courier New', monospace; color: #94a3b8; font-size: 0.95rem; line-height: 1.6; white-space: pre; }
+        .feature-list { list-style: none; padding-left: 0; }
+        .feature-list li { padding: 0.75rem 0 0.75rem 2.5rem; position: relative; color: #cbd5e1; }
+        .feature-list li:before { content: "✓"; position: absolute; left: 0; color: #22c55e; font-weight: bold; font-size: 1.2rem; }
+        .table-container { overflow-x: auto; margin: 1.5rem 0; }
+        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th { background: #EF4444; color: white; padding: 1rem; text-align: left; }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid #334155; color: #cbd5e1; }
+        tr:last-child td { border-bottom: none; }
+        .navigation { display: flex; justify-content: space-between; margin: 3rem 0; padding-top: 2rem; border-top: 2px solid #334155; }
+        .nav-link { display: inline-block; padding: 0.75rem 1.5rem; background: #1e293b; border: 2px solid #EF4444; border-radius: 8px; color: #EF4444; text-decoration: none; transition: all 0.3s; }
+        .nav-link:hover { background: #EF4444; color: white; }
+        .summary-box { background: #1e293b; border: 2px solid #EF4444; border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .summary-box h2 { margin-top: 0; }
+        .review-questions { background: #1e293b; border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+        .review-questions ol { margin-left: 1.5rem; color: #cbd5e1; }
+        .review-questions li { margin-bottom: 1rem; }
+        .footer { text-align: center; padding: 2rem 0; border-top: 3px solid #EF4444; margin-top: 3rem; }
+        .philosophy { font-size: 1.5rem; color: #EF4444; margin-bottom: 1rem; }
+        @media print { body { background: white; color: black; } .nav-link { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="book-container">
+        <div class="chapter-header">
+            <div class="chapter-number">제2장</div>
+            <h1 class="chapter-title">HSM 아키텍처 및 구성요소</h1>
+            <p style="color: #94a3b8; margin-top: 1rem;">내부 구조와 하드웨어 설계 원리</p>
+        </div>
+
+        <h2>HSM 내부 아키텍처 개요</h2>
+        <p>
+            HSM의 보안성은 하드웨어 아키텍처 설계에서 시작됩니다. 일반 서버와 달리 HSM은 보안을 최우선으로 설계된 전용 하드웨어로, 다층 방어 메커니즘과 격리된 처리 환경을 통해 암호화 키와 연산을 보호합니다. 이 장에서는 HSM의 내부 구조, 주요 구성요소, 그리고 각 요소가 전체 보안 체계에 기여하는 방식을 상세히 살펴봅니다.
+        </p>
+
+        <div class="code-block">
+            <code>HSM 전체 아키텍처:
+
+┌──────────────────────────────────────────────────────┐
+│               변조 방지 외부 케이스                    │
+│  ┌────────────────────────────────────────────────┐  │
+│  │           변조 감지 메시 레이어                │  │
+│  │  ┌──────────────────────────────────────────┐ │  │
+│  │  │      보안 처리 환경 (Trust Anchor)       │ │  │
+│  │  │                                          │ │  │
+│  │  │  ┌────────────┐    ┌─────────────────┐  │ │  │
+│  │  │  │ 암호화     │    │  키 저장소       │  │ │  │
+│  │  │  │ 프로세서   │◄──►│ (비휘발성)      │  │ │  │
+│  │  │  └─────┬──────┘    └─────────────────┘  │ │  │
+│  │  │        │                                 │ │  │
+│  │  │  ┌─────▼──────┐    ┌─────────────────┐  │ │  │
+│  │  │  │ TRNG       │    │  펌웨어 ROM     │  │ │  │
+│  │  │  │ (난수발생기)│    │ (불변)           │  │ │  │
+│  │  │  └────────────┘    └─────────────────┘  │ │  │
+│  │  │                                          │ │  │
+│  │  │  ┌────────────────────────────────────┐ │ │  │
+│  │  │  │  보안 부팅 및 무결성 검증         │ │ │  │
+│  │  │  └────────────────────────────────────┘ │ │  │
+│  │  └──────────────────────────────────────────┘ │  │
+│  │                                                │  │
+│  │  ┌──────────────────────────────────────────┐ │  │
+│  │  │     I/O 컨트롤러 (네트워크/PCIe/USB)     │ │  │
+│  │  └──────────────────────────────────────────┘ │  │
+│  └────────────────────────────────────────────────┘  │
+│                                                       │
+│  변조 감지 센서: 전압, 온도, 주파수, 방사선, 케이스    │
+└──────────────────────────────────────────────────────┘</code>
+        </div>
+
+        <h2>보안 프로세서 (Secure Cryptographic Processor)</h2>
+        <p>
+            HSM의 핵심은 보안 프로세서입니다. 이 전용 칩은 모든 암호화 연산을 수행하며, 키 자료에 대한 직접 접근 권한을 가진 유일한 구성요소입니다. 일반 범용 CPU와 달리 보안 프로세서는 다음과 같은 특화된 기능을 제공합니다.
+        </p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>구성요소</th>
+                        <th>기능</th>
+                        <th>보안 특징</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>암호화 가속기</strong></td>
+                        <td>RSA, ECC, AES 등 하드웨어 가속</td>
+                        <td>사이드채널 공격 방지 설계, 상수 시간 연산</td>
+                    </tr>
+                    <tr>
+                        <td><strong>보안 메모리</strong></td>
+                        <td>키 및 중간 연산 결과 저장</td>
+                        <td>물리적으로 읽기 불가능, 전원 차단 시 자동 삭제</td>
+                    </tr>
+                    <tr>
+                        <td><strong>암호화 코프로세서</strong></td>
+                        <td>전용 수학 연산 (모듈러 지수, 타원곡선)</td>
+                        <td>타이밍 공격 방지, 마스킹 적용</td>
+                    </tr>
+                    <tr>
+                        <td><strong>보안 부팅 ROM</strong></td>
+                        <td>신뢰 루트, 펌웨어 검증</td>
+                        <td>변경 불가능한 코드, 서명 검증</td>
+                    </tr>
+                    <tr>
+                        <td><strong>격리 실행 환경</strong></td>
+                        <td>신뢰 실행 환경 (TEE)</td>
+                        <td>메모리 암호화, 격리된 주소 공간</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>암호화 가속기 상세</h3>
+        <p>
+            현대 HSM은 다양한 암호화 알고리즘에 대한 하드웨어 가속기를 내장하고 있어, 소프트웨어 구현 대비 10~100배 빠른 성능을 제공합니다.
+        </p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>알고리즘</th>
+                        <th>일반 CPU 성능</th>
+                        <th>HSM 가속기 성능</th>
+                        <th>배수</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>RSA-2048 서명</strong></td>
+                        <td>~500 ops/sec</td>
+                        <td>10,000+ ops/sec</td>
+                        <td>20배</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RSA-2048 검증</strong></td>
+                        <td>~15,000 ops/sec</td>
+                        <td>30,000+ ops/sec</td>
+                        <td>2배</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ECDSA P-256 서명</strong></td>
+                        <td>~2,000 ops/sec</td>
+                        <td>20,000+ ops/sec</td>
+                        <td>10배</td>
+                    </tr>
+                    <tr>
+                        <td><strong>AES-256 GCM</strong></td>
+                        <td>~500 MB/sec</td>
+                        <td>5,000+ MB/sec</td>
+                        <td>10배</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SHA-256 해싱</strong></td>
+                        <td>~200 MB/sec</td>
+                        <td>2,000+ MB/sec</td>
+                        <td>10배</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>진정한 난수 생성기 (TRNG)</h2>
+        <p>
+            암호화의 강도는 난수의 품질에 직접적으로 의존합니다. HSM은 소프트웨어 난수 생성기(PRNG) 대신 물리적 현상을 기반으로 한 진정한 난수 생성기(True Random Number Generator, TRNG)를 사용합니다.
+        </p>
+
+        <h3>TRNG 구현 방식</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>방식</th>
+                        <th>물리적 원리</th>
+                        <th>장점</th>
+                        <th>단점</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>열 잡음</strong></td>
+                        <td>저항의 전자 열운동</td>
+                        <td>저렴, 소형화 가능</td>
+                        <td>온도에 영향받음</td>
+                    </tr>
+                    <tr>
+                        <td><strong>링 오실레이터</strong></td>
+                        <td>지터(jitter) 누적</td>
+                        <td>FPGA 구현 용이</td>
+                        <td>예측 가능한 패턴 가능</td>
+                    </tr>
+                    <tr>
+                        <td><strong>방사성 붕괴</strong></td>
+                        <td>알파/베타 입자 방출</td>
+                        <td>완전히 예측 불가능</td>
+                        <td>비싸고 규제 대상</td>
+                    </tr>
+                    <tr>
+                        <td><strong>광자 도착 시간</strong></td>
+                        <td>양자역학적 불확정성</td>
+                        <td>최고 품질의 무작위성</td>
+                        <td>복잡하고 고가</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>TRNG 품질 검증</h3>
+        <p>
+            HSM의 TRNG는 NIST SP 800-90B 표준에 따라 엔트로피를 검증받습니다. 지속적인 건강 테스트를 통해 난수 품질을 모니터링합니다.
+        </p>
+
+        <div class="code-block">
+            <code>TRNG 연속 건강 테스트:
+
+1. 반복 카운트 테스트 (Repetition Count Test)
+   - 연속된 같은 값이 과도하게 나타나는지 검사
+   - 임계값: 일반적으로 5~10회
+
+2. 적응형 비율 테스트 (Adaptive Proportion Test)
+   - 특정 윈도우 내에서 동일 값 출현 빈도 검사
+   - 윈도우 크기: 512~1024 샘플
+
+3. 자가상관 테스트
+   - 이전 값과의 상관관계 검사
+   - 주기성 패턴 감지
+
+실패 시 조치:
+- TRNG 출력 차단
+- 경고 이벤트 생성
+- 시스템 관리자 알림
+- 선택적으로 HSM 작동 중단</code>
+        </div>
+
+        <h2>키 저장소 (Key Storage)</h2>
+        <p>
+            HSM은 암호화 키를 안전하게 저장하기 위해 특수 설계된 비휘발성 메모리를 사용합니다. 이 메모리는 물리적 추출이 불가능하도록 보호됩니다.
+        </p>
+
+        <h3>키 저장 기술</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>저장 방식</th>
+                        <th>기술</th>
+                        <th>특징</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>배터리 백업 RAM</strong></td>
+                        <td>SRAM + 리튬 배터리</td>
+                        <td>빠른 접근, 전원 차단 시 휘발 가능</td>
+                    </tr>
+                    <tr>
+                        <td><strong>플래시 메모리</strong></td>
+                        <td>암호화된 NAND/NOR 플래시</td>
+                        <td>영구 저장, 하드웨어 암호화 필수</td>
+                    </tr>
+                    <tr>
+                        <td><strong>EEPROM</strong></td>
+                        <td>전기적 소거 가능 ROM</td>
+                        <td>소용량, 높은 내구성</td>
+                    </tr>
+                    <tr>
+                        <td><strong>eFuse</strong></td>
+                        <td>일회성 프로그램 가능 퓨즈</td>
+                        <td>루트 키 저장, 변경 불가</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PUF (Physical Unclonable Function)</strong></td>
+                        <td>제조 공정 변이 활용</td>
+                        <td>복제 불가능한 고유 키 파생</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>키 암호화 키 (KEK) 계층</h3>
+        <p>
+            HSM 내부에서도 키는 암호화되어 저장됩니다. 마스터 키 암호화 키(KEK)를 사용한 계층적 키 관리 구조를 적용합니다.
+        </p>
+
+        <div class="code-block">
+            <code>HSM 키 계층 구조:
+
+                  ┌───────────────────────┐
+                  │   Hardware Root Key   │
+                  │   (PUF 또는 eFuse)    │  ← 하드웨어에 내장
+                  └───────────┬───────────┘     변경 불가
+                              │
+                  ┌───────────▼───────────┐
+                  │   Master KEK          │
+                  │   (초기화 시 생성)     │  ← 관리자만 접근
+                  └───────────┬───────────┘
+                              │
+                  ┌───────────▼───────────┐
+                  │   Domain KEK          │
+                  │   (파티션별)          │  ← 멀티테넌트 격리
+                  └───────────┬───────────┘
+                              │
+                  ┌───────────▼───────────┐
+                  │   User Keys           │
+                  │   (애플리케이션 키)    │  ← 실제 사용 키
+                  └───────────────────────┘
+
+키 래핑 프로세스:
+1. 사용자 키를 Domain KEK로 암호화
+2. Domain KEK를 Master KEK로 암호화
+3. Master KEK를 Hardware Root Key로 암호화
+4. 암호화된 키만 비휘발성 메모리에 저장</code>
+        </div>
+
+        <h2>변조 방지 및 감지 메커니즘</h2>
+        <p>
+            HSM의 물리적 보안은 다층 방어 체계로 구성됩니다. 각 계층은 서로 다른 유형의 공격을 방어합니다.
+        </p>
+
+        <h3>외부 케이스 보안</h3>
+        <ul class="feature-list">
+            <li><strong>에폭시 밀봉:</strong> 주요 칩을 불투명 에폭시로 완전 덮어 물리적 프로빙 방지</li>
+            <li><strong>메시 레이어:</strong> PCB 전체를 감싸는 미세 전도성 메시, 드릴링 시도 시 단락</li>
+            <li><strong>케이스 스위치:</strong> 케이스 개봉 시 즉시 감지하는 마이크로 스위치</li>
+            <li><strong>변조 방지 나사:</strong> 특수 형상의 나사로 일반 공구로 열 수 없음</li>
+        </ul>
+
+        <h3>환경 센서</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>센서 유형</th>
+                        <th>감지 대상</th>
+                        <th>정상 범위</th>
+                        <th>공격 예시</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>전압 센서</strong></td>
+                        <td>입력 전압 변동</td>
+                        <td>±5% 이내</td>
+                        <td>전압 글리치 공격</td>
+                    </tr>
+                    <tr>
+                        <td><strong>주파수 센서</strong></td>
+                        <td>클럭 주파수 조작</td>
+                        <td>±1% 이내</td>
+                        <td>클럭 글리치 공격</td>
+                    </tr>
+                    <tr>
+                        <td><strong>온도 센서</strong></td>
+                        <td>작동 온도</td>
+                        <td>0°C ~ 50°C</td>
+                        <td>냉각/가열 공격</td>
+                    </tr>
+                    <tr>
+                        <td><strong>방사선 센서</strong></td>
+                        <td>X-ray, 레이저</td>
+                        <td>백그라운드 수준</td>
+                        <td>칩 분석 시도</td>
+                    </tr>
+                    <tr>
+                        <td><strong>전자기 센서</strong></td>
+                        <td>EM 펄스</td>
+                        <td>정상 EMI 범위</td>
+                        <td>EMP 공격</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>네트워크 및 통신 인터페이스</h2>
+        <p>
+            HSM은 다양한 물리적 인터페이스를 통해 호스트 시스템과 통신합니다. 각 인터페이스는 보안과 성능 요구사항에 따라 선택됩니다.
+        </p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>인터페이스</th>
+                        <th>대역폭</th>
+                        <th>지연시간</th>
+                        <th>사용 사례</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>PCIe 3.0 x8</strong></td>
+                        <td>~6.8 GB/s</td>
+                        <td>< 1 μs</td>
+                        <td>초고성능 암호화, HFT</td>
+                    </tr>
+                    <tr>
+                        <td><strong>10 GbE</strong></td>
+                        <td>~1.2 GB/s</td>
+                        <td>< 100 μs</td>
+                        <td>데이터센터 배포</td>
+                    </tr>
+                    <tr>
+                        <td><strong>1 GbE</strong></td>
+                        <td>~120 MB/s</td>
+                        <td>< 1 ms</td>
+                        <td>일반 엔터프라이즈</td>
+                    </tr>
+                    <tr>
+                        <td><strong>USB 3.0</strong></td>
+                        <td>~400 MB/s</td>
+                        <td>< 10 ms</td>
+                        <td>휴대용 HSM, 개발자 토큰</td>
+                    </tr>
+                    <tr>
+                        <td><strong>시리얼 (RS-232)</strong></td>
+                        <td>~100 KB/s</td>
+                        <td>< 10 ms</td>
+                        <td>레거시 시스템, 관리 콘솔</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>안전한 통신 프로토콜</h3>
+        <p>
+            HSM과 호스트 간 통신은 암호화되고 인증됩니다. 주요 프로토콜은 다음과 같습니다.
+        </p>
+
+        <div class="code-block">
+            <code>HSM 통신 보안 계층:
+
+애플리케이션 계층:
+  - PKCS#11 API (암호화 작업 요청)
+  - REST API (클라우드 HSM)
+
+전송 보안 계층:
+  - TLS 1.3 (상호 인증)
+    * 클라이언트 인증서 검증
+    * Perfect Forward Secrecy
+    * 세션 암호화
+
+네트워크 계층:
+  - IPsec (네트워크 HSM)
+  - VPN 터널
+  - 격리된 관리 VLAN
+
+물리 계층:
+  - 전용 네트워크 세그먼트
+  - 스위치 포트 보안</code>
+        </div>
+
+        <h2>펌웨어 및 소프트웨어 구조</h2>
+        <p>
+            HSM의 펌웨어는 보안과 신뢰성을 위해 특별히 설계됩니다. 일반 OS와 달리 최소화된 신뢰 기반(Trusted Computing Base, TCB)을 유지합니다.
+        </p>
+
+        <h3>펌웨어 계층 구조</h3>
+        <div class="code-block">
+            <code>HSM 펌웨어 스택:
+
+┌─────────────────────────────────────┐
+│  애플리케이션 API 레이어             │
+│  - PKCS#11 구현                     │
+│  - JCE Provider                     │
+│  - REST API 핸들러                   │
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│  암호화 서비스 레이어                │
+│  - 키 관리 (생성, 저장, 폐기)        │
+│  - 암호화 연산 (서명, 암호화 등)     │
+│  - 난수 생성                        │
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│  하드웨어 추상화 레이어 (HAL)        │
+│  - 암호화 가속기 드라이버            │
+│  - TRNG 드라이버                    │
+│  - 메모리 관리                      │
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│  보안 부팅 및 무결성 검증            │
+│  - 서명된 펌웨어 검증                │
+│  - 측정된 부팅 (Measured Boot)      │
+│  - 롤백 방지                        │
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┘
+│  하드웨어 (보안 프로세서, 메모리 등)  │
+└──────────────────────────────────────┘</code>
+        </div>
+
+        <h3>보안 부팅 프로세스</h3>
+        <p>
+            HSM은 전원 투입 시마다 무결성을 검증하는 보안 부팅 프로세스를 수행합니다.
+        </p>
+
+        <div class="code-block">
+            <code>HSM 부팅 시퀀스:
+
+1. 하드웨어 초기화
+   ├─ 보안 프로세서 리셋
+   ├─ TRNG 시작 및 테스트
+   └─ 센서 초기화 (온도, 전압 등)
+
+2. 부팅 ROM 실행 (변경 불가)
+   ├─ 하드웨어 자가진단 (POST)
+   ├─ 펌웨어 서명 검증
+   │  └─ 실패 시 → 부팅 중단
+   └─ 롤백 방지 확인
+
+3. 펌웨어 로드 및 검증
+   ├─ 펌웨어를 보안 메모리로 로드
+   ├─ 해시 계산 및 비교
+   └─ 측정값을 PCR에 저장
+
+4. 암호화 서비스 초기화
+   ├─ KEK 계층 복원
+   ├─ 키 저장소 마운트
+   └─ 암호화 알고리즘 자가진단
+
+5. 보안 상태 검증
+   ├─ 변조 센서 상태 확인
+   ├─ 이전 제로화 이벤트 검사
+   └─ 감사 로그 무결성 검증
+
+6. API 서비스 시작
+   ├─ 네트워크 인터페이스 활성화
+   └─ 클라이언트 연결 수락 시작
+
+부팅 시간: 일반적으로 30초~2분</code>
+        </div>
+
+        <h2>파티셔닝 및 멀티테넌시</h2>
+        <p>
+            현대 HSM은 단일 물리적 장치를 여러 논리적 파티션으로 나누어 여러 애플리케이션이나 조직이 안전하게 공유할 수 있습니다.
+        </p>
+
+        <h3>HSM 파티션 격리</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>격리 메커니즘</th>
+                        <th>구현 방식</th>
+                        <th>보안 수준</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>암호화 격리</strong></td>
+                        <td>각 파티션마다 별도의 KEK 사용</td>
+                        <td>높음 - 키 유출 시에도 다른 파티션 보호</td>
+                    </tr>
+                    <tr>
+                        <td><strong>메모리 격리</strong></td>
+                        <td>하드웨어 메모리 보호 단위(MPU)</td>
+                        <td>높음 - 물리적 주소 공간 분리</td>
+                    </tr>
+                    <tr>
+                        <td><strong>인증 격리</strong></td>
+                        <td>파티션별 독립 사용자 데이터베이스</td>
+                        <td>중간 - 올바른 구성 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>감사 로그 격리</strong></td>
+                        <td>파티션별 독립 로그 파일</td>
+                        <td>중간 - 로그 접근 제어 필요</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="summary-box">
+            <h2>요약</h2>
+            <p>
+                HSM의 아키텍처는 보안을 최우선으로 설계되었습니다. 핵심 구성요소로는 암호화 전용 보안 프로세서, 진정한 난수 생성기(TRNG), 변조 방지 키 저장소, 다층 물리적 보안 메커니즘이 있습니다. 보안 프로세서는 RSA, ECC, AES 등의 암호화 알고리즘에 대한 하드웨어 가속기를 내장하여 일반 CPU 대비 10~100배 빠른 성능을 제공합니다.
+            </p>
+            <p>
+                TRNG는 열 잡음, 링 오실레이터, 광자 도착 시간 등 물리적 무작위성을 활용하여 예측 불가능한 난수를 생성하며, NIST SP 800-90B 표준에 따라 지속적으로 품질을 검증합니다. 키 저장소는 플래시 메모리, EEPROM, PUF 등의 기술을 사용하며, 마스터 KEK를 정점으로 한 계층적 키 래핑 구조로 보호됩니다.
+            </p>
+            <p>
+                물리적 보안은 에폭시 밀봉, 메시 레이어, 케이스 스위치 등 외부 보호와 전압·온도·주파수·방사선 센서를 통한 환경 모니터링으로 구성됩니다. 변조 시도 감지 시 밀리초 내에 모든 키를 제로화합니다. 통신 인터페이스는 PCIe, 이더넷, USB 등 다양하며, TLS 1.3, IPsec 등으로 보안이 유지됩니다.
+            </p>
+            <p>
+                HSM 펌웨어는 최소화된 신뢰 기반(TCB)을 유지하며, 보안 부팅을 통해 매 전원 투입 시 무결성을 검증합니다. 현대 HSM은 파티셔닝을 통해 멀티테넌시를 지원하며, 암호화·메모리·인증·감사 로그를 격리하여 안전한 공유를 가능하게 합니다.
+            </p>
+        </div>
+
+        <div class="review-questions">
+            <h2>복습 문제</h2>
+            <ol>
+                <li>HSM 보안 프로세서의 주요 구성요소 5가지를 나열하고 각각의 역할을 설명하세요.</li>
+                <li>암호화 가속기가 일반 CPU 대비 높은 성능을 제공하는 이유를 설명하세요.</li>
+                <li>진정한 난수 생성기(TRNG)와 소프트웨어 난수 생성기(PRNG)의 차이를 설명하고, HSM이 TRNG를 사용하는 이유를 논하세요.</li>
+                <li>TRNG의 연속 건강 테스트 2가지를 설명하고, 테스트 실패 시 조치를 기술하세요.</li>
+                <li>HSM 키 저장소에 사용되는 5가지 기술을 비교하고 각각의 장단점을 설명하세요.</li>
+                <li>HSM의 키 암호화 키(KEK) 계층 구조를 그림으로 그리고 각 계층의 역할을 설명하세요.</li>
+                <li>HSM의 물리적 변조 방지 메커니즘 5가지를 나열하고 각각이 방어하는 공격 유형을 설명하세요.</li>
+                <li>HSM의 환경 센서 5가지와 각 센서가 감지하는 공격 유형을 설명하세요.</li>
+                <li>HSM의 보안 부팅 프로세스를 단계별로 설명하고, 각 단계의 중요성을 논하세요.</li>
+                <li>HSM 파티셔닝의 격리 메커니즘 4가지를 설명하고 멀티테넌시 환경에서의 중요성을 논하세요.</li>
+            </ol>
+        </div>
+
+        <div class="navigation">
+            <a href="chapter-01.html" class="nav-link">← 이전 장</a>
+            <a href="chapter-03.html" class="nav-link">다음 장 →</a>
+        </div>
+
+        <p>널리 인간을 이롭게 하라</p>
+            <p>&copy; 2025 WIA (World Certification Industry Association)</p>
+        </div>
+    </div>
+
+<section style="margin-top:2rem;padding:1.5rem;background:rgba(139,92,246,0.05);border-left:4px solid #8B5CF6;">
+<h2 style="color:#A78BFA;">참조 표준 및 적용 지침</h2>
+<p style="line-height:1.8;">
+본 표준은 다음 ALLOW 출처를 단일 진실원으로 삼아 데이터 교환·서명·
+감사 증적 인터페이스를 제공합니다. 구현체는 이들 원전을 대체하지
+않고, 데이터 교환·감사 증적·자동 검증을 위한 상호운용 계층을
+정의합니다.
+</p>
+<ul style="line-height:1.8;">
+  <li>OpenAPI Specification 3.1 — REST API 정의</li>
+  <li>JSON Schema 2020-12 — 스키마 검증</li>
+  <li>ISO/IEC 27001:2022 — 정보보안 경영시스템</li>
+  <li>ISO/IEC 27018:2019 — 공용 클라우드의 PII 보호</li>
+  <li>ISO/IEC 17065:2012 — 제품 인증 기관</li>
+  <li>CycloneDX 1.5 / SPDX 2.3 — 소프트웨어 BOM</li>
+  <li>Sigstore (DSSE 봉투, Rekor 투명성 로그) — 서명 앵커링</li>
+  <li>in-toto Attestation Framework 1.0 — 빌드 출처 검증</li>
+  <li>IETF RFC 9700 — OAuth 2.1</li>
+  <li>IETF RFC 9457 — Problem Details for HTTP APIs</li>
+  <li>IETF RFC 8615 — well-known URIs</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">실무 적용 체크리스트</h3>
+<ul style="line-height:1.8;">
+  <li>매니페스트 무결성: 모든 발급은 SHA-256 또는 Sigstore 서명을
+      부착해 변조를 차단합니다. 발급 후 변경은 새 매니페스트로 처리
+      되며 이전 매니페스트는 supersede 마킹과 함께 보존됩니다.</li>
+  <li>보관 기간: ISO/IEC 17065:2012 감사 기대치를 충족하기 위해 7년
+      이상의 보관 정책을 명시합니다. 관할 규정이 더 길면 그것을
+      따릅니다.</li>
+  <li>버전 관리: 정정·확장은 시맨틱 버저닝(SemVer 2.0.0)을 따릅니다.
+      필수 요건의 추가는 마이너, 호환 단절은 메이저 버전 갱신을
+      트리거합니다. 메이저 변경은 최소 90일 병행 호환 기간을 거치며
+      그 기간 동안 신·구 두 버전 모두 WIA 등록부에 Stable로 표기
+      됩니다.</li>
+  <li>부정결과 보고: 누락된 지표는 사유와 함께 매니페스트에 기록
+      되어야 합니다. 사유가 없는 누락은 감사 시 실패로 간주됩니다.</li>
+  <li>키 회전: 매니페스트 서명 키는 배포 정책에 따라 회전됩니다.
+      이전 키는 공개된 키 이력에 보존되어 과거 매니페스트의 사후
+      검증을 보장합니다.</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">참조 토폴로지</h3>
+<p style="line-height:1.8;">
+구현체의 운용 토폴로지는 다음 4가지 중 하나로 매니페스트에 선언됩니다:
+단일 테넌트 엣지(조직당 1개 런타임), 멀티 테넌트 게이트웨이(헤더 기반
+격리로 다중 테넌트 서비스), 연합 메시(다수 런타임이 디렉토리 서비스
+통해 상호 인식), 에어갭 배치(라이브 연결 없이 서명된 패키지를
+out-of-band 채널로 전송). 각 토폴로지는 참조 테스트 벡터를 포함하며
+구현체가 자신의 배포가 표준 패턴과 일치하는지 검증할 수 있도록
+합니다.
+</p>
+
+<h3 style="color:#8B5CF6;">거버넌스 및 변경 관리</h3>
+<p style="line-height:1.8;">
+모든 변경 제안과 정정 요청은 GitHub Issues 트래커에 표준 이름 레이블로
+접수됩니다. WIA 표준 워킹그룹은 매 마이너 릴리스 사이클의 시작 시점에
+열린 이슈를 검토하고, 결정 로그를 릴리스 노트와 함께 공개합니다.
+정정(에라타)은 패치 버전으로 발급되며, 새로운 의무 요건의 추가는
+마이너, 호환 단절은 메이저 버전 갱신을 트리거합니다. 안전·인체·
+프라이버시 관련 이슈는 fast-track 절차로 처리됩니다.
+</p>
+
+<p style="text-align:center;margin-top:2rem;color:#94a3b8;">
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+</p>
+</section>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 07: Social Networks and Recommendation Systems | WIA-DATA-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        h4 { font-size: 1.2rem; color: #10B981; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; color: #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        .summary-box { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 0.5rem; margin: 3rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 7</div>
+            <h1>Social Networks and Recommendation Systems</h1>
+        </header>
+
+        <p>Social networks and recommendation systems are quintessential graph database applications. This chapter explores how to model, query, and analyze social graphs, and build sophisticated recommendation engines using graph algorithms.</p>
+
+        <h2>Social Network Modeling</h2>
+        
+        <h3>Core Social Graph Schema</h3>
+        <pre><code>// Users and profiles
+CREATE (alice:User:Person {
+  id: 'user_001',
+  username: 'alice',
+  name: 'Alice Johnson',
+  email: 'alice@example.com',
+  joinedDate: date('2020-01-15'),
+  bio: 'Software engineer and coffee enthusiast'
+})
+
+// Social relationships
+CREATE (alice)-[:FOLLOWS {since: date('2020-02-01')}]->(bob:User)
+CREATE (alice)-[:FRIENDS_WITH {since: date('2020-01-20'), confirmed: true}]->(carol:User)
+
+// Content
+CREATE (post:Post {
+  id: 'post_001',
+  content: 'Just learned about graph databases!',
+  timestamp: datetime('2024-01-15T10:30:00'),
+  likes: 0,
+  shares: 0
+})
+CREATE (alice)-[:POSTED]->(post)
+
+// Interactions
+CREATE (bob)-[:LIKED {timestamp: datetime('2024-01-15T11:00:00')}]->(post)
+CREATE (carol)-[:COMMENTED {
+  text: 'Great topic!',
+  timestamp: datetime('2024-01-15T11:15:00')
+}]->(post)</code></pre>
+
+        <h3>Advanced Social Features</h3>
+        
+        <h4>Groups and Communities</h4>
+        <pre><code>CREATE (group:Group {
+  id: 'group_001',
+  name: 'Graph Database Enthusiasts',
+  description: 'Learning and sharing about graph databases',
+  createdDate: date('2020-03-01'),
+  memberCount: 0
+})
+CREATE (alice)-[:MEMBER_OF {role: 'admin', joinedDate: date('2020-03-01')}]->(group)</code></pre>
+
+        <h4>Privacy and Visibility</h4>
+        <pre><code>// Privacy settings on posts
+CREATE (post:Post {
+  content: 'Private thought',
+  visibility: 'friends_only',
+  allowComments: true
+})
+
+// Query respecting privacy
+MATCH (viewer:User {id: $viewerId}), (post:Post)
+WHERE post.visibility = 'public'
+   OR (post.visibility = 'friends_only' 
+       AND (viewer)-[:FRIENDS_WITH]-(:User)-[:POSTED]->(post))
+   OR (viewer)-[:POSTED]->(post)
+RETURN post</code></pre>
+
+        <h2>Common Social Network Queries</h2>
+        
+        <h3>Friend Recommendations</h3>
+        <pre><code>// Suggest friends: friends of friends
+MATCH (user:User {id: $userId})-[:FRIENDS_WITH]->()-[:FRIENDS_WITH]->(suggestion:User)
+WHERE NOT (user)-[:FRIENDS_WITH]-(suggestion)
+  AND user <> suggestion
+WITH suggestion, count(*) AS mutualFriends
+ORDER BY mutualFriends DESC
+LIMIT 10
+MATCH (suggestion)<-[:FRIENDS_WITH]-(mutual)-[:FRIENDS_WITH]->(user)
+RETURN suggestion.name, 
+       suggestion.bio,
+       mutualFriends,
+       collect(mutual.name) AS mutualFriendsList</code></pre>
+
+        <h3>Trending Content</h3>
+        <pre><code>// Find trending posts (last 24 hours)
+MATCH (post:Post)
+WHERE post.timestamp > datetime() - duration({hours: 24})
+OPTIONAL MATCH (post)<-[:LIKED]-(liker)
+OPTIONAL MATCH (post)<-[:SHARED]-(sharer)
+WITH post, count(DISTINCT liker) AS likes, count(DISTINCT sharer) AS shares
+WITH post, likes, shares, (likes * 1.0 + shares * 2.0) AS trendScore
+RETURN post.content, 
+       likes, 
+       shares, 
+       trendScore
+ORDER BY trendScore DESC
+LIMIT 20</code></pre>
+
+        <h3>User Feed Generation</h3>
+        <pre><code>// Personalized feed
+MATCH (user:User {id: $userId})
+MATCH (user)-[:FOLLOWS]->(followed:User)-[:POSTED]->(post:Post)
+WHERE post.timestamp > datetime() - duration({days: 7})
+OPTIONAL MATCH (post)<-[interaction:LIKED|COMMENTED]-(interactor)
+  WHERE (user)-[:FOLLOWS]->(interactor)
+WITH post, followed, count(interaction) AS relevanceScore
+RETURN post.content,
+       followed.name AS author,
+       post.timestamp,
+       relevanceScore
+ORDER BY relevanceScore DESC, post.timestamp DESC
+LIMIT 50</code></pre>
+
+        <h2>Building Recommendation Systems</h2>
+        
+        <h3>Types of Recommendations</h3>
+        
+        <h4>1. Collaborative Filtering</h4>
+        <p>Recommend based on similar users' preferences:</p>
+        <pre><code>// User-based collaborative filtering
+MATCH (user:User {id: $userId})-[:PURCHASED]->(p:Product)
+      <-[:PURCHASED]-(similar:User)
+MATCH (similar)-[:PURCHASED]->(rec:Product)
+WHERE NOT (user)-[:PURCHASED]->(rec)
+WITH rec, count(DISTINCT similar) AS commonUsers
+RETURN rec.name, 
+       rec.description,
+       commonUsers AS score
+ORDER BY score DESC
+LIMIT 10</code></pre>
+
+        <h4>2. Content-Based Filtering</h4>
+        <p>Recommend similar items:</p>
+        <pre><code>// Products similar to user's purchases
+MATCH (user:User {id: $userId})-[:PURCHASED]->(p:Product)
+      -[:IN_CATEGORY]->(cat:Category)<-[:IN_CATEGORY]-(similar:Product)
+WHERE NOT (user)-[:PURCHASED]->(similar)
+  AND p <> similar
+WITH similar, count(DISTINCT cat) AS categoryOverlap
+RETURN similar.name, 
+       similar.price,
+       categoryOverlap
+ORDER BY categoryOverlap DESC
+LIMIT 10</code></pre>
+
+        <h4>3. Hybrid Approaches</h4>
+        <pre><code>// Combine multiple signals
+MATCH (user:User {id: $userId})
+
+// Collaborative signal
+OPTIONAL MATCH (user)-[:PURCHASED]->()<-[:PURCHASED]-(similar:User)
+                      -[:PURCHASED]->(collab:Product)
+WHERE NOT (user)-[:PURCHASED]->(collab)
+WITH user, collab, count(DISTINCT similar) AS collabScore
+
+// Content signal
+OPTIONAL MATCH (user)-[:PURCHASED]->(p:Product)
+                     -[:IN_CATEGORY]->(cat:Category)
+                     <-[:IN_CATEGORY]-(collab)
+WITH user, collab, collabScore, count(DISTINCT cat) AS contentScore
+
+// Social signal
+OPTIONAL MATCH (user)-[:FOLLOWS]->(friend:User)-[:LIKED]->(collab)
+WITH collab, collabScore, contentScore, count(DISTINCT friend) AS socialScore
+
+// Weighted combination
+WITH collab, 
+     (collabScore * 1.0 + contentScore * 0.5 + socialScore * 0.8) AS finalScore
+RETURN collab.name, 
+       finalScore
+ORDER BY finalScore DESC
+LIMIT 10</code></pre>
+
+        <h2>Advanced Recommendation Techniques</h2>
+        
+        <h3>Time-Decay Weighting</h3>
+        <pre><code>// Recent interactions weighted more
+MATCH (user:User {id: $userId})-[interaction:VIEWED|PURCHASED]->(item)
+WITH item, interaction.timestamp AS timestamp
+WITH item, 
+     sum(exp(-duration.between(timestamp, datetime()).days / 30.0)) AS decayedScore
+RETURN item.name, decayedScore
+ORDER BY decayedScore DESC</code></pre>
+
+        <h3>Diversity and Serendipity</h3>
+        <pre><code>// Diverse recommendations across categories
+MATCH (user:User {id: $userId})-[:PURCHASED]->(p:Product)
+      -[:IN_CATEGORY]->(userCat:Category)
+WITH user, collect(DISTINCT userCat.id) AS userCategories
+
+MATCH (rec:Product)-[:IN_CATEGORY]->(cat:Category)
+WHERE NOT rec.category IN userCategories
+  AND NOT (user)-[:PURCHASED]->(rec)
+WITH rec, cat, 
+     CASE WHEN cat.id IN userCategories THEN 0 ELSE 1 END AS diversityBonus
+RETURN rec.name, cat.name, diversityBonus
+ORDER BY diversityBonus DESC, rand()
+LIMIT 10</code></pre>
+
+        <h3>Session-Based Recommendations</h3>
+        <pre><code>// Recommend based on current session
+MATCH (user:User {id: $userId})-[v:VIEWED]->(item:Product)
+WHERE v.sessionId = $sessionId
+WITH collect(item) AS sessionItems
+
+MATCH (session_item)<-[:VIEWED]-(other:User)-[:VIEWED]->(rec:Product)
+WHERE session_item IN sessionItems
+  AND NOT rec IN sessionItems
+WITH rec, count(*) AS coOccurrence
+RETURN rec.name, coOccurrence
+ORDER BY coOccurrence DESC
+LIMIT 5</code></pre>
+
+        <h2>Evaluation Metrics</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Formula</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Precision@K</td>
+                    <td>Relevant in top K / K</td>
+                    <td>Accuracy of recommendations</td>
+                </tr>
+                <tr>
+                    <td>Recall@K</td>
+                    <td>Relevant in top K / Total Relevant</td>
+                    <td>Coverage of relevant items</td>
+                </tr>
+                <tr>
+                    <td>NDCG</td>
+                    <td>Normalized DCG</td>
+                    <td>Ranking quality</td>
+                </tr>
+                <tr>
+                    <td>Diversity</td>
+                    <td>Unique categories in top K</td>
+                    <td>Recommendation variety</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Real-Time Personalization</h2>
+        
+        <h3>Stream Processing Integration</h3>
+        <pre><code>// Update recommendations as user browses
+MATCH (user:User {id: $userId})
+MERGE (session:Session {id: $sessionId, userId: $userId})
+ON CREATE SET session.startTime = datetime()
+ON MATCH SET session.lastActivity = datetime()
+
+WITH user, session
+MATCH (product:Product {id: $productId})
+MERGE (session)-[v:VIEWED]->(product)
+ON CREATE SET v.timestamp = datetime(), v.count = 1
+ON MATCH SET v.timestamp = datetime(), v.count = v.count + 1
+
+// Trigger recommendation update
+WITH user, session
+CALL recommendations.update(user, session)
+YIELD recommendations
+RETURN recommendations</code></pre>
+
+        <h2>A/B Testing Recommendations</h2>
+        
+        <pre><code>// Track recommendation variants
+CREATE (experiment:Experiment {
+  id: 'exp_001',
+  name: 'Collaborative vs Content',
+  startDate: date(),
+  variants: ['collaborative', 'content-based']
+})
+
+// Assign user to variant
+MATCH (user:User {id: $userId}), (exp:Experiment {id: 'exp_001'})
+MERGE (user)-[p:PARTICIPATES_IN]->(exp)
+ON CREATE SET p.variant = exp.variants[toInteger(rand() * size(exp.variants))]
+RETURN p.variant
+
+// Track outcomes
+MATCH (user)-[p:PARTICIPATES_IN]->(exp),
+      (user)-[purchase:PURCHASED]->(product:Product)
+WHERE purchase.timestamp > exp.startDate
+CREATE (outcome:Outcome {
+  userId: user.id,
+  experimentId: exp.id,
+  variant: p.variant,
+  productId: product.id,
+  timestamp: purchase.timestamp,
+  revenue: purchase.amount
+})</code></pre>
+
+        </div>
+</body>
+</html>

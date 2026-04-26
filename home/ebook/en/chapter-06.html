@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 6: Booking System - WIA-HOME</title>
+</head>
+<body>
+<h1>Chapter 6: Booking System</h1>
+
+<blockquote>
+"Hongik Ingan: Every service business deserves professional scheduling."
+</blockquote>
+
+<hr>
+
+<h2>6.1 Booking Setup</h2>
+
+<pre>
+Enable Booking
+==============
+
+const home = new WIAHome({
+  name: 'Style Salon',
+  features: {
+    booking: true
+  }
+});
+
+
+Availability Configuration
+==========================
+
+home.booking.setup({
+  availability: {
+    days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+    hours: { start: '10:00', end: '20:00' },
+    slotDuration: 30, // minutes
+    maxAdvance: 30    // days ahead
+  }
+});
+
+
+Breaks and Blocked Dates
+========================
+
+home.booking.setup({
+  availability: {
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+    hours: { start: '09:00', end: '18:00' },
+    breaks: [
+      { start: '12:00', end: '13:00' }  // Lunch
+    ],
+    blockedDates: [
+      '2025-12-25',  // Christmas
+      '2025-01-01'   // New Year
+    ]
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.2 Services</h2>
+
+<pre>
+Define Services
+===============
+
+home.booking.addServices([
+  {
+    id: 'haircut',
+    name: 'Haircut',
+    duration: 30,
+    price: 15000,
+    description: 'Professional haircut'
+  },
+  {
+    id: 'perm',
+    name: 'Perm',
+    duration: 120,
+    price: 80000,
+    description: 'Full perm service'
+  },
+  {
+    id: 'color',
+    name: 'Color',
+    duration: 90,
+    price: 60000,
+    description: 'Hair coloring'
+  }
+]);
+
+
+Service Categories
+==================
+
+home.booking.addServices([
+  // Basic services
+  {
+    name: 'Consultation',
+    duration: 15,
+    price: 0,
+    category: 'consultation'
+  },
+
+  // Premium services
+  {
+    name: 'Full Package',
+    duration: 180,
+    price: 150000,
+    category: 'premium'
+  }
+]);
+
+
+Multiple Staff
+==============
+
+For businesses with multiple staff:
+
+home.booking.addStaff([
+  {
+    id: 'staff_1',
+    name: 'Kim Designer',
+    services: ['haircut', 'perm', 'color'],
+    availability: {
+      days: ['mon', 'tue', 'wed', 'thu', 'fri']
+    }
+  },
+  {
+    id: 'staff_2',
+    name: 'Park Designer',
+    services: ['haircut', 'color'],
+    availability: {
+      days: ['wed', 'thu', 'fri', 'sat']
+    }
+  }
+]);
+</pre>
+
+<hr>
+
+<h2>6.3 Calendar Management</h2>
+
+<pre>
+Calendar View
+=============
+
+// Get available slots
+const slots = await home.booking.getAvailableSlots({
+  date: '2025-12-20',
+  serviceId: 'haircut'
+});
+
+// Returns:
+[
+  { time: '10:00', available: true },
+  { time: '10:30', available: true },
+  { time: '11:00', available: false },  // Already booked
+  { time: '11:30', available: true },
+  ...
+]
+
+
+Monthly Overview
+================
+
+const calendar = await home.booking.getCalendar({
+  month: 12,
+  year: 2025
+});
+
+// Returns bookings per day:
+{
+  '2025-12-01': 3,
+  '2025-12-02': 5,
+  '2025-12-03': 2,
+  ...
+}
+
+
+Block Time
+==========
+
+// Block specific time (vacation, meeting, etc.)
+await home.booking.blockTime({
+  start: '2025-12-24 09:00',
+  end: '2025-12-26 18:00',
+  reason: 'Holiday closure'
+});
+</pre>
+
+<hr>
+
+<h2>6.4 Booking Flow</h2>
+
+<pre>
+Customer Booking Flow
+=====================
+
+1. Select Service
+   Customer chooses desired service
+
+2. Select Date
+   Calendar shows available dates
+
+3. Select Time
+   Available slots for chosen date
+
+4. Enter Information
+   Name, phone, email, notes
+
+5. Confirm
+   Booking created, notifications sent
+
+
+Booking Creation
+================
+
+// When customer books:
+home.on('booking_received', async (event) => {
+  const booking = event.data;
+
+  console.log('New booking!');
+  console.log('Service:', booking.service);
+  console.log('Date:', booking.date);
+  console.log('Time:', booking.time);
+  console.log('Customer:', booking.customerName);
+});
+
+
+Booking Operations
+==================
+
+// List bookings
+const bookings = await home.booking.list({
+  date: '2025-12-20',
+  status: 'confirmed'
+});
+
+// Confirm booking
+await home.booking.confirm(bookingId);
+
+// Cancel booking
+await home.booking.cancel(bookingId, {
+  reason: 'Customer request',
+  notifyCustomer: true
+});
+
+// Reschedule
+await home.booking.reschedule(bookingId, {
+  newDate: '2025-12-21',
+  newTime: '14:00'
+});
+</pre>
+
+<hr>
+
+<h2>6.5 Notifications</h2>
+
+<pre>
+Notification Setup
+==================
+
+home.booking.setNotifications({
+  // New booking notifications
+  newBooking: {
+    channels: ['kakao', 'sms'],
+    toOwner: true,
+    toCustomer: true
+  },
+
+  // Reminder before appointment
+  reminder: {
+    channels: ['kakao'],
+    beforeHours: 24,
+    toCustomer: true
+  },
+
+  // Cancellation notifications
+  cancellation: {
+    channels: ['kakao', 'sms'],
+    toOwner: true,
+    toCustomer: true
+  }
+});
+
+
+Notification Channels
+=====================
+
+Available channels:
+  - kakao (Kakao Talk)
+  - sms (Text message)
+  - email
+  - push (Browser notification)
+
+
+Notification Templates
+======================
+
+Customize messages:
+
+home.booking.setNotificationTemplates({
+  newBooking: {
+    customer: `
+      [Style Salon] Booking Confirmed!
+
+      Service: {service}
+      Date: {date}
+      Time: {time}
+
+      See you soon!
+    `,
+    owner: `
+      [New Booking]
+      Customer: {customerName}
+      Service: {service}
+      Date: {date} {time}
+      Phone: {customerPhone}
+    `
+  }
+});
+
+
+Automatic Reminders
+===================
+
+System automatically sends:
+  - 24 hours before: Reminder
+  - 2 hours before: Final reminder
+  - After appointment: Thank you + review request
+
+All customizable.
+</pre>
+
+<hr>
+
+<h2>6.6 Integration</h2>
+
+<pre>
+Naver Booking Integration
+=========================
+
+await home.integrate({
+  naver: {
+    booking: true,
+    bookingId: 'xxxxx'
+  }
+});
+
+// Bookings from Naver appear in your dashboard
+// Availability synced automatically
+
+
+Kakao Hairshop Integration
+==========================
+
+await home.integrate({
+  kakao: {
+    hairshop: true,
+    shopId: 'xxxxx'
+  }
+});
+
+// Popular for hair salons in Korea
+
+
+Google Calendar Sync
+====================
+
+await home.integrate({
+  google: {
+    calendar: true,
+    calendarId: 'primary'
+  }
+});
+
+// Bookings appear in your Google Calendar
+// Block time synced both ways
+
+
+Benefits
+========
+
+[OK] All bookings in one place
+[OK] No double booking
+[OK] Automated sync
+[OK] Single source of truth
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Complete booking system with services and availability</li>
+<li>[OK] Multi-staff support with individual schedules</li>
+<li>[OK] Calendar management with blocking and overrides</li>
+<li>[OK] Full booking flow from selection to confirmation</li>
+<li>[OK] Multi-channel notifications with templates</li>
+<li>[OK] Integration with Naver, Kakao, Google Calendar</li>
+</ul>
+</body>
+</html>

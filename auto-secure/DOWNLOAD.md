@@ -67,7 +67,8 @@ auto-secure/
 sha256sum wia-secure-install.sh
 
 # 예상 값 (v1.0)
-# [체크섬은 릴리스 시 업데이트됨]
+# v1.0 (patched)
+# d11f7bef500133d6292e26c1a05a75b8334d1dcfd2f002e346a655d7cd6f5ffe  wia-secure-install.sh
 ```
 
 ---

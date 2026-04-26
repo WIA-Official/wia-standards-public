@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 05: Graph Algorithms and Analytics | WIA-DATA-015</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .nav a { color: #10B981; text-decoration: none; font-size: 1.1rem; }
+        header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 3px solid #10B981; }
+        .chapter-number { color: #10B981; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+        h1 { font-size: 2.5rem; color: #e2e8f0; margin-bottom: 1rem; }
+        h2 { font-size: 1.8rem; color: #10B981; margin-top: 3rem; margin-bottom: 1rem; }
+        h3 { font-size: 1.4rem; color: #10B981; margin-top: 2rem; margin-bottom: 0.75rem; }
+        h4 { font-size: 1.2rem; color: #10B981; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        p { margin-bottom: 1.5rem; color: #cbd5e1; }
+        ul, ol { margin-left: 2rem; margin-bottom: 1.5rem; color: #cbd5e1; }
+        li { margin-bottom: 0.5rem; }
+        .highlight-box { background: #1e293b; border-left: 4px solid #10B981; padding: 1.5rem; margin: 2rem 0; border-radius: 0.5rem; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; border: 2px solid #334155; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; color: #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #1e293b; color: #10B981; font-weight: 600; }
+        .summary-box { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 0.5rem; margin: 3rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">Chapter 5</div>
+            <h1>Graph Algorithms and Analytics</h1>
+        </header>
+
+        <p>Graph algorithms unlock powerful insights from connected data. This chapter explores pathfinding, centrality measures, community detection, and other essential algorithms that transform raw graph data into actionable intelligence.</p>
+
+        <h2>Categories of Graph Algorithms</h2>
+
+        <h3>1. Pathfinding Algorithms</h3>
+        <p>Pathfinding algorithms discover routes between nodes, essential for navigation, logistics, and network analysis.</p>
+        
+        <h4>Shortest Path (Dijkstra's Algorithm)</h4>
+        <pre><code>// Cypher: Find shortest path
+MATCH path = shortestPath(
+  (start:Location {name: 'NYC'})-[:CONNECTED_TO*]-(end:Location {name: 'LA'})
+)
+RETURN path, reduce(dist = 0, r IN relationships(path) | dist + r.distance) AS totalDistance</code></pre>
+        
+        <h4>A* Algorithm</h4>
+        <p>Improves on Dijkstra by using heuristics. Excellent for geographic routing with latitude/longitude.</p>
+        
+        <h4>All Shortest Paths</h4>
+        <pre><code>MATCH paths = allShortestPaths(
+  (alice:Person {name: 'Alice'})-[:KNOWS*]-(bob:Person {name: 'Bob'})
+)
+RETURN paths, length(paths) AS pathLength</code></pre>
+
+        <h3>2. Centrality Algorithms</h3>
+        <p>Centrality measures identify important nodes in a network.</p>
+        
+        <h4>Degree Centrality</h4>
+        <p>Counts direct connections. Simple but effective for identifying hubs.</p>
+        <pre><code>MATCH (p:Person)
+RETURN p.name, size((p)-[:KNOWS]-()) AS connections
+ORDER BY connections DESC
+LIMIT 10</code></pre>
+        
+        <h4>PageRank</h4>
+        <p>Google's algorithm for ranking web pages. Measures importance based on incoming links weighted by the importance of source nodes.</p>
+        <pre><code>CALL gds.pageRank.stream('myGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score
+ORDER BY score DESC
+LIMIT 10</code></pre>
+        
+        <h4>Betweenness Centrality</h4>
+        <p>Identifies nodes that act as bridges. High betweenness indicates control over information flow.</p>
+        
+        <h4>Closeness Centrality</h4>
+        <p>Measures how close a node is to all other nodes. Useful for identifying influencers.</p>
+
+        <h3>3. Community Detection</h3>
+        <p>Discovers groups or clusters within the graph.</p>
+        
+        <h4>Louvain Method</h4>
+        <pre><code>CALL gds.louvain.stream('myGraph')
+YIELD nodeId, communityId
+RETURN communityId, collect(gds.util.asNode(nodeId).name) AS members, count(*) AS size
+ORDER BY size DESC</code></pre>
+        
+        <h4>Label Propagation</h4>
+        <p>Fast algorithm where nodes adopt labels from their neighbors.</p>
+        
+        <h4>Weakly Connected Components</h4>
+        <p>Finds isolated subgraphs that aren't connected to the rest of the network.</p>
+
+        <h3>4. Similarity Algorithms</h3>
+        <h4>Node Similarity</h4>
+        <p>Finds similar nodes based on their relationships.</p>
+        <pre><code>MATCH (p1:Person)-[:LIKES]->(product:Product)<-[:LIKES]-(p2:Person)
+WHERE p1 <> p2
+WITH p1, p2, count(product) AS common
+RETURN p1.name, p2.name, common
+ORDER BY common DESC</code></pre>
+
+        <h2>Implementing Graph Algorithms</h2>
+        
+        <h3>Neo4j Graph Data Science Library</h3>
+        <p>Neo4j provides a comprehensive library of production-quality algorithms.</p>
+        
+        <h4>Installation</h4>
+        <pre><code># Download GDS plugin
+# Place in plugins directory
+# Restart Neo4j
+# Verify installation
+RETURN gds.version()</code></pre>
+
+        <h4>Workflow</h4>
+        <ol>
+            <li><strong>Project Graph:</strong> Create in-memory projection</li>
+            <li><strong>Execute Algorithm:</strong> Run algorithm on projection</li>
+            <li><strong>Write Results:</strong> Save results back to database</li>
+        </ol>
+
+        <pre><code>// 1. Create projection
+CALL gds.graph.project(
+  'myGraph',
+  'Person',
+  'KNOWS',
+  {relationshipProperties: 'weight'}
+)
+
+// 2. Run algorithm
+CALL gds.pageRank.write('myGraph', {
+  writeProperty: 'pagerank',
+  dampingFactor: 0.85,
+  maxIterations: 20
+})
+
+// 3. Query results
+MATCH (p:Person)
+RETURN p.name, p.pagerank
+ORDER BY p.pagerank DESC
+LIMIT 10
+
+// 4. Drop projection
+CALL gds.graph.drop('myGraph')</code></pre>
+
+        <h2>Real-World Applications</h2>
+        
+        <h3>Fraud Detection</h3>
+        <p>Use algorithms to detect suspicious patterns:</p>
+        <ul>
+            <li><strong>Connected Components:</strong> Find fraud rings</li>
+            <li><strong>PageRank:</strong> Identify key fraudsters</li>
+            <li><strong>Triangle Count:</strong> Detect fake accounts</li>
+        </ul>
+
+        <h3>Recommendation Systems</h3>
+        <pre><code>// Collaborative filtering with similarity
+MATCH (user:User {id: $userId})-[:PURCHASED]->(p:Product)<-[:PURCHASED]-(other:User)
+MATCH (other)-[:PURCHASED]->(rec:Product)
+WHERE NOT (user)-[:PURCHASED]->(rec)
+WITH rec, count(*) AS score, collect(other.name) AS buyers
+RETURN rec.name, score, buyers
+ORDER BY score DESC
+LIMIT 10</code></pre>
+
+        <h3>Network Analysis</h3>
+        <p>Analyze infrastructure and dependencies:</p>
+        <ul>
+            <li><strong>Shortest Path:</strong> Optimize routing</li>
+            <li><strong>Betweenness:</strong> Find critical nodes</li>
+            <li><strong>Impact Analysis:</strong> What fails if this node fails?</li>
+        </ul>
+
+        <h2>Performance Considerations</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Time Complexity</th>
+                    <th>Space Complexity</th>
+                    <th>Best For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Shortest Path</td>
+                    <td>O(E log V)</td>
+                    <td>O(V)</td>
+                    <td>Navigation, routing</td>
+                </tr>
+                <tr>
+                    <td>PageRank</td>
+                    <td>O(E * k)</td>
+                    <td>O(V)</td>
+                    <td>Ranking, influence</td>
+                </tr>
+                <tr>
+                    <td>Louvain</td>
+                    <td>O(E log V)</td>
+                    <td>O(V + E)</td>
+                    <td>Community detection</td>
+                </tr>
+                <tr>
+                    <td>Betweenness</td>
+                    <td>O(V * E)</td>
+                    <td>O(V + E)</td>
+                    <td>Bridge finding</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Custom Algorithm Development</h2>
+        
+        <h3>Using APOC</h3>
+        <pre><code>// Custom traversal with APOC
+CALL apoc.path.expandConfig(startNode, {
+  relationshipFilter: 'KNOWS>',
+  minLevel: 1,
+  maxLevel: 3,
+  bfs: true,
+  uniqueness: 'NODE_GLOBAL'
+}) YIELD path
+RETURN path</code></pre>
+
+        <h3>Stored Procedures</h3>
+        <p>Implement custom algorithms in Java:</p>
+        <pre><code>@Procedure(value = "example.myAlgorithm", mode = Mode.READ)
+@Description("Custom algorithm implementation")
+public Stream<Output> myAlgorithm(@Name("startNode") Node startNode) {
+    // Algorithm logic
+    return results.stream();
+}</code></pre>
+
+        </div>
+</body>
+</html>

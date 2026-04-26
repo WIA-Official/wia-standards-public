@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제7장: 보안 - WIA-HOME</title>
+</head>
+<body>
+<h1>제7장: 보안</h1>
+
+<blockquote>
+"홍익인간: 이모 (AIR-SHIELD)가 WIA 가족의 모든 집을 지킵니다."
+</blockquote>
+
+<hr>
+
+<h2>7.1 내장 보안</h2>
+
+<pre>
+기본 보안
+=========
+
+WIA-HOME에 포함:
+  [OK] TLS 암호화 (HTTPS)
+  [OK] DDoS 방어
+  [OK] 웹 애플리케이션 방화벽
+  [OK] AIR-SHIELD 연동
+  [OK] 자동 업데이트
+
+설정 필요 없음.
+보안은 자동.
+
+
+보안 아키텍처
+=============
+
+들어오는 요청
+      |
+      v
++-------------------+
+|   속도 제한기     |  <- 과도한 요청 차단
++-------------------+
+      |
+      v
++-------------------+
+|   WAF (방화벽)    |  <- 공격 차단
++-------------------+
+      |
+      v
++-------------------+
+|   TLS-LITE        |  <- 연결 암호화
++-------------------+
+      |
+      v
++-------------------+
+|   AIR-SHIELD      |  <- 심층 검사
++-------------------+
+      |
+      v
+   내 콘텐츠
+</pre>
+
+<hr>
+
+<h2>7.2 WIA-TLS-LITE</h2>
+
+<pre>
+경량 TLS
+========
+
+기존 TLS:
+  - 복잡한 핸드셰이크
+  - CPU 집약적
+  - 자원 부담
+
+WIA-TLS-LITE:
+  - 간소화된 핸드셰이크
+  - 최소 오버헤드
+  - 개인 서버에 완벽
+
+
+기능
+====
+
+[OK] 완전한 암호화 (AES-256-GCM)
+[OK] 인증서 자동 갱신
+[OK] 수동 설정 불필요
+[OK] NAT 뒤에서도 작동
+[OK] P2P 인증서 검증
+
+
+작동 방식
+=========
+
+1. 키 생성
+   - 설정 시 키쌍 생성
+   - 공개키를 WIA DNS에 등록
+
+2. 연결
+   - 클라이언트 연결
+   - 서버가 신원 증명
+   - 암호화 채널 설정
+
+3. 갱신
+   - 만료 전 자동
+   - 다운타임 없음
+   - 자연스러움
+
+
+인증서 표시
+===========
+
+방문자가 보는 것:
+  브라우저에 자물쇠 아이콘
+  "연결이 안전합니다"
+  yoursite.wia.home 검증됨
+
+기존 SSL과 동일한 신뢰.
+</pre>
+
+<hr>
+
+<h2>7.3 DDoS 방어</h2>
+
+<pre>
+속도 제한
+=========
+
+자동 보호:
+  - IP당 최대 요청 수
+  - 점진적 스로틀링
+  - 임시 차단
+
+
+기본 제한
+=========
+
+정상 트래픽:
+  IP당 분당 100 요청
+
+의심스러운 트래픽:
+  분당 10 요청으로 스로틀링
+
+공격 감지됨:
+  임시 IP 차단
+
+
+P2P 분산
+========
+
+공격 받을 때:
+  1. 요청이 피어들에게 분산
+  2. 피어들이 트래픽 흡수
+  3. 내 서버 보호
+  4. 공격자는 전체 네트워크와 대면
+
+
+커스텀 설정
+===========
+
+home.security.ddos.configure({
+  rateLimit: 100,           // 분당 요청
+  throttleThreshold: 50,    // 감속 시점
+  blockThreshold: 200,      // 차단 시점
+  blockDuration: 3600       // 초
+});
+
+
+공격 로깅
+=========
+
+home.on('ddos_detected', (event) => {
+  console.log('DDoS 감지됨:', event.data.sourceIP);
+  console.log('차단된 요청:', event.data.blockedCount);
+});
+</pre>
+
+<hr>
+
+<h2>7.4 웹 애플리케이션 방화벽</h2>
+
+<pre>
+공격 방지
+=========
+
+WAF가 차단:
+
+SQL 인젝션:
+  입력: ' OR '1'='1
+  결과: 차단됨
+
+XSS (크로스사이트 스크립팅):
+  입력: 결과: 차단됨
+
+CSRF (크로스사이트 요청 위조):
+  유효하지 않은 토큰 요청
+  결과: 차단됨
+
+경로 탐색:
+  입력: ../../../etc/passwd
+  결과: 차단됨
+
+
+WAF 설정
+========
+
+home.security.waf.configure({
+  sqlInjection: true,
+  xss: true,
+  csrf: true,
+  pathTraversal: true,
+  fileUpload: {
+    maxSize: 10 * 1024 * 1024,  // 10MB
+    allowedTypes: ['image/*', 'application/pdf']
+  }
+});
+
+
+폼 보호
+=======
+
+모든 폼 자동으로:
+  [OK] CSRF 토큰 추가
+  [OK] 입력 살균
+  [OK] 속도 제한
+  [OK] 허니팟 필드
+
+
+업로드 스캔
+===========
+
+파일 업로드:
+  [OK] 유형 확인
+  [OK] 크기 제한
+  [OK] 악성코드 스캔 (AIR-SHIELD)
+  [OK] 의심스러운 파일 격리
+</pre>
+
+<hr>
+
+<h2>7.5 AIR-SHIELD 연동</h2>
+
+<pre>
+이모가 집을 지킴
+================
+
+AIR-SHIELD (이모)가 제공:
+  - 심층 패킷 검사
+  - 악성코드 탐지
+  - 행동 분석
+  - 위협 인텔리전스
+
+
+자동 보호
+=========
+
+home.security.airShield.configure({
+  enabled: true,
+  scanUploads: true,
+  protectForms: true,
+  blockMalicious: true
+});
+
+
+위협 탐지
+=========
+
+AIR-SHIELD가 탐지:
+  [OK] 악성코드 업로드
+  [OK] 봇 공격
+  [OK] 크리덴셜 스터핑
+  [OK] API 남용
+  [OK] 데이터 유출
+
+
+알림
+====
+
+home.on('security_alert', (event) => {
+  console.log('위협 감지됨:', event.data.type);
+  console.log('취해진 조치:', event.data.action);
+  console.log('상세:', event.data.details);
+});
+
+
+대시보드 보기
+=============
+
+보안 상태: 보호됨
+
+차단된 위협 (24시간):
+  - SQL 인젝션: 12
+  - XSS 시도: 8
+  - 봇 요청: 156
+  - 악성코드 업로드: 2
+
+모두 이모가 자동으로 처리.
+</pre>
+
+<hr>
+
+<h2>7.6 프라이버시 보호</h2>
+
+<pre>
+프라이버시 우선 설계
+====================
+
+WIA-HOME 기본값:
+  [OK] 제3자 추적 없음
+  [OK] Google Analytics 없음
+  [OK] Facebook Pixel 없음
+  [OK] 데이터 판매 없음
+  [OK] GDPR 준수
+
+
+데이터 저장
+===========
+
+모든 데이터가 내 PC에 저장:
+  - 방문자 로그
+  - 주문 데이터
+  - 고객 정보
+  - 분석 데이터
+
+외부로 전송되지 않음.
+
+
+프라이버시 설정
+===============
+
+home.security.privacy.configure({
+  tracking: {
+    analytics: 'privacy-first',
+    cookies: 'essential',
+    doNotTrack: true
+  },
+  data: {
+    encryption: true,
+    localOnly: true,
+    autoDelete: 90  // 일
+  },
+  compliance: {
+    gdpr: true,
+    ccpa: true,
+    pipa: true  // 한국
+  }
+});
+
+
+사용자 권리
+===========
+
+고객이 할 수 있는 것:
+  [OK] 자신의 데이터 요청
+  [OK] 자신의 데이터 삭제
+  [OK] 자신의 데이터 내보내기
+  [OK] 모든 추적 거부
+
+모두 자동화되고 쉬움.
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 보안은 내장되어 있고 자동</li>
+<li>[OK] TLS-LITE가 오버헤드 없이 암호화 제공</li>
+<li>[OK] P2P 분산으로 DDoS 보호</li>
+<li>[OK] WAF가 SQL 인젝션, XSS 등 차단</li>
+<li>[OK] AIR-SHIELD가 심층 위협 탐지 제공</li>
+<li>[OK] 완전한 준수를 갖춘 프라이버시 우선 설계</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-06.html">이전: 제6장 - 예약 시스템</a> | <a href="chapter-08.html">다음: 제8장 - 구현</a></p>
+</body>
+</html>

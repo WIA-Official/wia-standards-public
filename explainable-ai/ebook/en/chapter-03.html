@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: SHAP - Shapley Additive Explanations | WIA-AI-009</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Georgia, 'Times New Roman', serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #10B981, #34d399); color: white; padding: 3rem 2rem; margin: -2rem -2rem 3rem -2rem; }
+        .chapter-number { font-size: 1.2rem; opacity: 0.9; }
+        h1 { font-size: 2.5rem; margin-top: 0.5rem; }
+        .content { background: white; padding: 3rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        h2 { color: #10B981; margin: 2.5rem 0 1rem 0; font-size: 1.8rem; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
+        h3 { color: #059669; margin: 1.5rem 0 0.75rem 0; font-size: 1.3rem; }
+        p { margin: 1rem 0; text-align: justify; }
+        .highlight { background: #f0fdf4; border-left: 4px solid #10B981; padding: 1rem; margin: 1.5rem 0; }
+        .example { background: #f1f5f9; border-left: 4px solid #3b82f6; padding: 1rem; margin: 1.5rem 0; }
+        code { background: #1e293b; color: #10B981; padding: 0.2rem 0.5rem; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; color: inherit; }
+        ul, ol { margin: 1rem 0 1rem 2rem; }
+        li { margin: 0.5rem 0; }
+        .summary { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 2px solid #10B981; border-radius: 8px; padding: 2rem; margin: 3rem 0; }
+        .summary h2 { border: none; margin-top: 0; }
+        .questions { background: #fefce8; border: 2px solid #eab308; border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+        .questions h2 { color: #ca8a04; border-bottom: 2px solid #eab308; }
+        .nav { display: flex; justify-content: space-between; margin-top: 3rem; }
+        .nav a { background: #10B981; color: white; padding: 1rem 2rem; text-decoration: none; border-radius: 6px; transition: all 0.3s ease; }
+        .nav a:hover { background: #059669; transform: translateY(-2px); }
+        footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #e2e8f0; color: #64748b; }
+        .philosophy { color: #10B981; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
+        th { background: #10B981; color: white; }
+        tr:nth-child(even) { background: #f8fafc; }
+        .formula { background: #f0f9ff; border: 2px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 6px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="chapter-number">WIA-AI-009 | Chapter 3</div>
+            <h1>SHAP: Shapley Additive Explanations</h1>
+        </header>
+
+        <div class="content">
+            <h2>Introduction to SHAP</h2>
+            <p>
+                SHAP (SHapley Additive exPlanations) represents one of the most theoretically grounded and widely adopted
+                approaches to explainable AI. Developed by Scott Lundberg and Su-In Lee in 2017, SHAP builds on game theory
+                concepts to provide a unified framework for interpreting model predictions. Its mathematical rigor and
+                desirable theoretical properties make it a cornerstone of the WIA-AI-009 standard.
+            </p>
+
+            <p>
+                At its core, SHAP answers a deceptively simple question: How much did each feature contribute to moving
+                the model's prediction away from the average prediction? The answer provides both local explanations for
+                individual predictions and, through aggregation, global insights into model behavior. This dual capability,
+                combined with provable guarantees about explanation quality, makes SHAP exceptionally valuable for
+                high-stakes applications.
+            </p>
+
+            <div class="highlight">
+                <strong>弘益人間 Connection:</strong> SHAP embodies the principle of fairness—borrowed from cooperative
+                game theory—ensuring that credit for predictions is distributed equitably among features. This mathematical
+                fairness translates to human fairness in understanding AI decisions.
+            </div>
+
+            <h2>Game Theory Foundation: Shapley Values</h2>
+            <p>
+                To understand SHAP, we must first understand Shapley values, a concept from cooperative game theory introduced
+                by Lloyd Shapley in 1951 (for which he later won the Nobel Prize in Economics). The fundamental problem
+                Shapley addressed was: In a cooperative game where players work together to achieve a total payoff, how
+                should that payoff be fairly distributed among the players?
+            </p>
+
+            <h3>The Cooperative Game Analogy</h3>
+            <p>
+                Consider a simple example: Three friends—Alice, Bob, and Carol—start a company together. After a year, the
+                company makes $300,000 in profit. How should this be divided among the three founders?
+            </p>
+
+            <p>
+                A naive approach might split it equally: $100,000 each. But what if we know that:
+            </p>
+            <ul>
+                <li>Alice alone could generate $80,000</li>
+                <li>Bob alone could generate $60,000</li>
+                <li>Carol alone could generate $90,000</li>
+                <li>Alice + Bob together could generate $180,000</li>
+                <li>Alice + Carol together could generate $200,000</li>
+                <li>Bob + Carol together could generate $170,000</li>
+                <li>All three together generate $300,000</li>
+            </ul>
+
+            <p>
+                The Shapley value provides a principled answer: Calculate each person's average marginal contribution across
+                all possible orderings of team formation. If we computed this (we'll see how shortly), we might find that
+                Alice deserves $105,000, Bob $92,000, and Carol $103,000—reflecting each person's actual contribution to
+                the team's success.
+            </p>
+
+            <h3>From Business to Machine Learning</h3>
+            <p>
+                SHAP applies this same logic to machine learning:
+            </p>
+            <ul>
+                <li><strong>Players</strong> = Features in your dataset</li>
+                <li><strong>Payoff</strong> = Model's prediction</li>
+                <li><strong>Coalition</strong> = Subset of features used to make a prediction</li>
+                <li><strong>Shapley value</strong> = Each feature's fair contribution to the prediction</li>
+            </ul>
+
+            <p>
+                Just as we asked "How much did Alice contribute to the company's success?" SHAP asks "How much did the
+                credit score feature contribute to this loan approval prediction?"
+            </p>
+
+            <h2>Mathematical Definition of SHAP Values</h2>
+            <p>
+                The SHAP value for feature i is defined as:
+            </p>
+
+            <div class="formula">
+                φᵢ = Σ [|S|! × (M - |S| - 1)! / M!] × [f(S ∪ {i}) - f(S)]
+                <br><br>
+                where the sum is over all possible subsets S of features not containing i,
+                <br>M is the total number of features,
+                <br>f(S) is the model's prediction using only features in set S
+            </div>
+
+            <p>
+                Let's break down what this formula means:
+            </p>
+
+            <ul>
+                <li><strong>S:</strong> A subset of features (a "coalition") that doesn't include feature i</li>
+                <li><strong>f(S ∪ {i}) - f(S):</strong> The marginal contribution of adding feature i to coalition S</li>
+                <li><strong>|S|! × (M - |S| - 1)! / M!:</strong> A weighting factor ensuring all orderings are considered equally</li>
+                <li><strong>Sum over all S:</strong> Average the marginal contributions across all possible coalitions</li>
+            </ul>
+
+            <h3>Intuitive Interpretation</h3>
+            <p>
+                Imagine you're trying to predict loan default risk. You have 10 features. To compute the SHAP value for
+                "credit_score":
+            </p>
+
+            <ol>
+                <li>Consider every possible subset of the other 9 features</li>
+                <li>For each subset, make predictions with and without credit_score</li>
+                <li>The difference is credit_score's marginal contribution for that subset</li>
+                <li>Average all these marginal contributions (weighted appropriately)</li>
+                <li>This average is credit_score's SHAP value</li>
+            </ol>
+
+            <p>
+                With 10 features, there are 2⁹ = 512 subsets to consider. With 100 features, there are 2⁹⁹ subsets—
+                computationally infeasible to enumerate. This is why practical SHAP implementations use approximations and
+                optimizations, which we'll explore shortly.
+            </p>
+
+            <h2>Desirable Properties of SHAP</h2>
+            <p>
+                SHAP values satisfy four crucial axioms that make them theoretically attractive:
+            </p>
+
+            <h3>1. Local Accuracy (Additive Property)</h3>
+            <p>
+                The prediction equals the base value (average prediction) plus the sum of all SHAP values:
+            </p>
+
+            <div class="formula">
+                f(x) = E[f(X)] + Σ φᵢ
+            </div>
+
+            <p>
+                This means SHAP values fully account for the prediction. There's no unexplained residual. If the model
+                predicts 0.8 and the base value is 0.5, the SHAP values must sum to 0.3.
+            </p>
+
+            <div class="example">
+                <strong>Example:</strong><br>
+                Loan default prediction: 0.73<br>
+                Average default rate (base): 0.15<br>
+                SHAP values must sum to: 0.73 - 0.15 = 0.58<br><br>
+                credit_score: -0.22 (reduces risk)<br>
+                debt_ratio: +0.45 (increases risk)<br>
+                employment_years: -0.18 (reduces risk)<br>
+                recent_inquiries: +0.28 (increases risk)<br>
+                other features: +0.25<br>
+                Total: -0.22 + 0.45 - 0.18 + 0.28 + 0.25 = 0.58 ✓
+            </div>
+
+            <h3>2. Missingness</h3>
+            <p>
+                If a feature is missing (or has no impact on the model), its SHAP value is zero. This seems obvious but
+                not all explanation methods satisfy this property.
+            </p>
+
+            <h3>3. Consistency (Monotonicity)</h3>
+            <p>
+                If changing a model increases a feature's marginal contribution everywhere, that feature's SHAP value
+                cannot decrease. This ensures that explanations change consistently with model changes.
+            </p>
+
+            <h3>4. Symmetry</h3>
+            <p>
+                If two features contribute equally to all predictions, they receive equal SHAP values. This prevents
+                arbitrary inequality in attribution.
+            </p>
+
+            <div class="highlight">
+                <strong>Why These Properties Matter:</strong> These axioms ensure that SHAP explanations are mathematically
+                sound, don't miss or double-count contributions, and behave predictably. They give us confidence that SHAP
+                values reflect true feature contributions rather than artifacts of the explanation method.
+            </div>
+
+            <h2>SHAP Variants and Computational Approaches</h2>
+            <p>
+                Computing exact SHAP values is exponentially expensive. The original SHAP paper introduced several
+                approximation methods optimized for different model types:
+            </p>
+
+            <h3>TreeSHAP</h3>
+            <p>
+                For tree-based models (decision trees, random forests, XGBoost, LightGBM), TreeSHAP computes exact SHAP
+                values in polynomial time by exploiting the tree structure. Instead of enumerating all feature subsets,
+                it traces prediction paths through the trees.
+            </p>
+
+            <p>
+                TreeSHAP is remarkably efficient—often only 2-3x slower than making predictions—making it practical for
+                production use. This efficiency, combined with the popularity of tree-based models, makes TreeSHAP one of
+                the most widely deployed XAI methods.
+            </p>
+
+            <pre><code>// WIA-AI-009 TreeSHAP implementation example
+import { TreeSHAPExplainer } from 'wia-ai-009';
+
+const model = loadXGBoostModel('loan_model.json');
+const explainer = new TreeSHAPExplainer(model);
+
+const shapValues = explainer.explain({
+  credit_score: 720,
+  debt_ratio: 0.35,
+  employment_years: 8,
+  loan_amount: 250000
+});
+
+console.log(shapValues);
+// {
+//   credit_score: -0.22,
+//   debt_ratio: 0.45,
+//   employment_years: -0.18,
+//   loan_amount: 0.12,
+//   base_value: 0.15,
+//   prediction: 0.32
+// }</code></pre>
+
+            <h3>KernelSHAP</h3>
+            <p>
+                KernelSHAP is model-agnostic, working with any model type. It approximates SHAP values by:
+            </p>
+
+            <ol>
+                <li>Sampling feature coalitions (random subsets of features)</li>
+                <li>Making predictions with those coalitions</li>
+                <li>Fitting a weighted linear model to estimate each feature's contribution</li>
+                <li>The linear model's coefficients approximate SHAP values</li>
+            </ol>
+
+            <p>
+                KernelSHAP trades accuracy for flexibility. With sufficient samples (typically 1,000-10,000), it provides
+                good approximations even for complex neural networks.
+            </p>
+
+            <h3>LinearSHAP</h3>
+            <p>
+                For linear models, SHAP values have a closed-form solution. If your model is:
+            </p>
+
+            <div class="formula">
+                f(x) = β₀ + β₁x₁ + β₂x₂ + ... + βₘxₘ
+            </div>
+
+            <p>
+                Then the SHAP value for feature i is simply:
+            </p>
+
+            <div class="formula">
+                φᵢ = βᵢ × (xᵢ - E[Xᵢ])
+            </div>
+
+            <p>
+                This means the SHAP value is the coefficient times how much the feature value differs from its average.
+                LinearSHAP is instantaneous and exact.
+            </p>
+
+            <h3>DeepSHAP</h3>
+            <p>
+                DeepSHAP approximates SHAP values for deep neural networks by backpropagating contribution scores through
+                the network. It's faster than KernelSHAP for neural nets but makes approximations that may not satisfy
+                all SHAP axioms perfectly.
+            </p>
+
+            <h3>GradientSHAP</h3>
+            <p>
+                For differentiable models, GradientSHAP uses gradients to estimate SHAP values. It randomly samples points
+                along the path from a baseline to the input and averages the gradients, similar to Integrated Gradients.
+            </p>
+
+            <h2>Visualizing SHAP Values</h2>
+            <p>
+                SHAP provides several powerful visualization techniques that make complex model behavior accessible:
+            </p>
+
+            <h3>Force Plots (Local Explanations)</h3>
+            <p>
+                Force plots show how each feature pushes the prediction higher or lower from the base value. Red features
+                increase the prediction, blue features decrease it. The width indicates magnitude.
+            </p>
+
+            <div class="example">
+                <strong>Force Plot Interpretation:</strong><br>
+                Base value (average): 0.15 ───────────────────────►<br>
+                <span style="color: red;">+ debt_ratio (0.45)</span> ─────►<br>
+                <span style="color: red;">+ recent_inquiries (0.28)</span> ──►<br>
+                <span style="color: blue;">- credit_score (0.22)</span> ◄──<br>
+                <span style="color: blue;">- employment_years (0.18)</span> ◄─<br>
+                Final prediction: 0.48 ───────────────────────►
+            </div>
+
+            <h3>Summary Plots (Global Feature Importance)</h3>
+            <p>
+                Summary plots aggregate SHAP values across many instances to show global feature importance. They display:
+            </p>
+
+            <ul>
+                <li>Features ranked by average absolute SHAP value (importance)</li>
+                <li>Distribution of SHAP values (spread shows how much impact varies)</li>
+                <li>Color indicates feature value (high/low)</li>
+            </ul>
+
+            <p>
+                A summary plot might reveal that credit_score is the most important feature overall, and high credit scores
+                consistently decrease default risk while low scores increase it.
+            </p>
+
+            <h3>Dependence Plots</h3>
+            <p>
+                Dependence plots show how SHAP values for a feature vary with that feature's value, revealing the
+                relationship between feature value and prediction impact.
+            </p>
+
+            <p>
+                For example, plotting credit_score on the x-axis and its SHAP value on the y-axis might show a nonlinear
+                relationship: SHAP values drop sharply as credit score increases from 600 to 700, then flatten above 750.
+                This reveals that improving a poor credit score has more impact than further improving a good score.
+            </p>
+
+            <h3>Interaction Values</h3>
+            <p>
+                SHAP can be extended to capture feature interactions—how the combined effect of two features differs from
+                their individual effects. This helps identify synergies and dependencies between features.
+            </p>
+
+            <h2>Implementing SHAP in Production</h2>
+            <p>
+                Deploying SHAP in production systems requires attention to performance, consistency, and user experience:
+            </p>
+
+            <h3>Performance Optimization</h3>
+            <p>
+                <strong>Use the Right Variant:</strong> TreeSHAP for tree models, LinearSHAP for linear models, KernelSHAP
+                only when necessary.
+            </p>
+
+            <p>
+                <strong>Batch Processing:</strong> If real-time explanations aren't required, compute SHAP values in batch
+                overnight and cache them.
+            </p>
+
+            <p>
+                <strong>Approximation Tuning:</strong> For KernelSHAP, balance sample count against latency requirements.
+                Start with 100 samples for debugging, increase to 1,000+ for production.
+            </p>
+
+            <p>
+                <strong>Background Data Selection:</strong> SHAP requires a background dataset representing "typical" data.
+                Use a representative sample of training data (100-1,000 instances typically suffice).
+            </p>
+
+            <h3>Consistency Across Requests</h3>
+            <p>
+                Randomized SHAP variants (KernelSHAP) can produce slightly different explanations on repeated requests for
+                the same input. To ensure consistency:
+            </p>
+
+            <ul>
+                <li>Set random seeds for reproducibility</li>
+                <li>Cache explanations for identical inputs</li>
+                <li>Use deterministic variants (TreeSHAP, LinearSHAP) when possible</li>
+            </ul>
+
+            <h3>Integration with WIA-AI-009 Format</h3>
+            <pre><code>// WIA-AI-009 standardized SHAP output
+{
+  "standard": "WIA-AI-009",
+  "version": "1.0",
+  "explanation_type": "shap",
+  "timestamp": "2025-01-20T14:30:00Z",
+  "model_info": {
+    "model_id": "loan_model_v2.3",
+    "model_type": "xgboost",
+    "shap_variant": "TreeSHAP"
+  },
+  "prediction": {
+    "value": 0.48,
+    "class": "default_risk",
+    "confidence": 0.87
+  },
+  "explanation": {
+    "base_value": 0.15,
+    "shap_values": {
+      "credit_score": -0.22,
+      "debt_ratio": 0.45,
+      "employment_years": -0.18,
+      "recent_inquiries": 0.28,
+      "loan_amount": 0.12,
+      "age": -0.03
+    },
+    "feature_values": {
+      "credit_score": 720,
+      "debt_ratio": 0.52,
+      "employment_years": 8,
+      "recent_inquiries": 5,
+      "loan_amount": 250000,
+      "age": 35
+    }
+  },
+  "metadata": {
+    "computation_time_ms": 145,
+    "background_data_size": 500,
+    "shap_sum_check": 0.42
+  }
+}</code></pre>
+
+            <h2>SHAP for Different Model Types</h2>
+            <p>
+                The WIA-AI-009 standard provides guidance for applying SHAP across diverse model architectures:
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Model Type</th>
+                        <th>Recommended SHAP Variant</th>
+                        <th>Typical Latency</th>
+                        <th>Exactness</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Linear/Logistic Regression</td>
+                        <td>LinearSHAP</td>
+                        <td>&lt; 1ms</td>
+                        <td>Exact</td>
+                    </tr>
+                    <tr>
+                        <td>Decision Trees</td>
+                        <td>TreeSHAP</td>
+                        <td>1-10ms</td>
+                        <td>Exact</td>
+                    </tr>
+                    <tr>
+                        <td>Random Forest, XGBoost</td>
+                        <td>TreeSHAP</td>
+                        <td>10-100ms</td>
+                        <td>Exact</td>
+                    </tr>
+                    <tr>
+                        <td>Neural Networks</td>
+                        <td>DeepSHAP or KernelSHAP</td>
+                        <td>100-5000ms</td>
+                        <td>Approximate</td>
+                    </tr>
+                    <tr>
+                        <td>SVM, Other</td>
+                        <td>KernelSHAP</td>
+                        <td>500-10000ms</td>
+                        <td>Approximate</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Limitations and Considerations</h2>
+            <p>
+                While SHAP is powerful, it's important to understand its limitations:
+            </p>
+
+            <h3>Computational Cost</h3>
+            <p>
+                Even with optimizations, SHAP can be expensive for high-dimensional data or complex models. Real-time
+                explanations may be impractical without careful engineering.
+            </p>
+
+            <h3>Correlation vs. Causation</h3>
+            <p>
+                SHAP values reflect statistical associations in the model, not causal relationships. A high SHAP value
+                means a feature is correlated with the prediction, but changing that feature in the real world might not
+                change the outcome due to confounding variables.
+            </p>
+
+            <h3>Baseline Dependence</h3>
+            <p>
+                SHAP values depend on the choice of baseline (background dataset). Different baselines can yield different
+                values. The WIA-AI-009 standard recommends using a representative sample of training data as the baseline.
+            </p>
+
+            <h3>Interpretation Challenges</h3>
+            <p>
+                For models with hundreds of features, SHAP produces hundreds of attribution values per prediction. Presenting
+                all of them overwhelms users. In practice, show only the top 5-10 features by absolute SHAP value.
+            </p>
+
+            <h3>Correlated Features</h3>
+            <p>
+                When features are highly correlated, SHAP may distribute importance between them in ways that seem arbitrary.
+                The total importance is correct, but individual attributions may vary due to multicollinearity.
+            </p>
+
+            <div class="highlight">
+                <strong>Best Practice:</strong> Use SHAP as one tool in a comprehensive explainability strategy. Combine
+                it with other methods like LIME for cross-validation, domain knowledge for sanity checking, and counterfactuals
+                for actionability.
+            </div>
+
+            <h2>Advanced SHAP Techniques</h2>
+            <p>
+                Beyond basic feature attribution, SHAP enables sophisticated analyses:
+            </p>
+
+            <h3>Conditional Expectations</h3>
+            <p>
+                Instead of marginalizing over all features, condition on realistic feature combinations. This prevents
+                SHAP from considering impossible feature combinations (e.g., "age=20 AND employment_years=30").
+            </p>
+
+            <h3>Clustered SHAP</h3>
+            <p>
+                Group similar instances and show aggregate SHAP patterns for each cluster. This reveals that the model
+                behaves differently for different subpopulations.
+            </p>
+
+            <h3>SHAP-based Model Selection</h3>
+            <p>
+                Compare SHAP values across different models to understand not just which performs better, but how their
+                reasoning differs. Model A might rely heavily on feature X while Model B favors feature Y—informing which
+                model to deploy based on domain appropriateness.
+            </p>
+
+            <h3>Temporal SHAP</h3>
+            <p>
+                Track how SHAP values change over time as models are retrained. Sudden shifts in feature importance can
+                signal concept drift or data quality issues.
+            </p>
+
+            <div class="summary">
+                <h2>Chapter Summary</h2>
+                <p>
+                    SHAP (SHapley Additive exPlanations) provides a theoretically rigorous framework for interpreting
+                    machine learning models, grounded in cooperative game theory. By treating features as players in a
+                    game and predictions as payoffs, SHAP computes each feature's fair contribution to predictions.
+                </p>
+                <p>
+                    The four key axioms—local accuracy, missingness, consistency, and symmetry—ensure that SHAP explanations
+                    are mathematically sound and behaviorally sensible. These properties distinguish SHAP from ad-hoc
+                    explanation methods, providing confidence that attributions reflect true model behavior.
+                </p>
+                <p>
+                    Practical SHAP implementations (TreeSHAP, KernelSHAP, LinearSHAP, DeepSHAP) make the computationally
+                    expensive Shapley value calculation tractable for real-world models. TreeSHAP, in particular, enables
+                    efficient exact computation for tree-based models, making it practical for production deployment.
+                </p>
+                <p>
+                    SHAP's versatile visualizations—force plots, summary plots, dependence plots—make complex model behavior
+                    accessible to diverse audiences. Force plots explain individual predictions, while summary plots reveal
+                    global feature importance patterns.
+                </p>
+                <p>
+                    While powerful, SHAP has limitations: computational cost, baseline dependence, challenges with correlated
+                    features, and the fact that attributions reflect correlation not causation. The WIA-AI-009 standard
+                    recommends using SHAP as part of a comprehensive explainability strategy, combining it with complementary
+                    methods and domain expertise.
+                </p>
+            </div>
+
+            <div class="questions">
+                <h2>Review Questions</h2>
+                <ol>
+                    <li>Explain the connection between Shapley values from game theory and SHAP values for machine learning. How are "players," "coalitions," and "payoffs" translated?</li>
+                    <li>What are the four axioms that SHAP values satisfy? Why is each important?</li>
+                    <li>Why is computing exact SHAP values computationally expensive? How does TreeSHAP overcome this for tree-based models?</li>
+                    <li>Explain the "local accuracy" property. Why is it desirable that SHAP values sum to the difference between the prediction and base value?</li>
+                    <li>Compare TreeSHAP and KernelSHAP. When would you use each?</li>
+                    <li>What is a SHAP force plot, and what question does it answer?</li>
+                    <li>How can SHAP provide both local (instance-level) and global (model-level) explanations?</li>
+                    <li>What are the main limitations of SHAP? Describe two scenarios where SHAP might give misleading insights.</li>
+                    <li>What role does the "background dataset" play in SHAP computation? How should it be selected?</li>
+                    <li>Explain why SHAP values reflect correlation rather than causation. Why does this matter for practical applications?</li>
+                </ol>
+            </div>
+        </div>
+
+        </div>
+</body>
+</html>

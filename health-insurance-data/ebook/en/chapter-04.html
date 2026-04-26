@@ -1,0 +1,118 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Chapter 4: Authentication | WIA-MED-028 Health Insurance Data</title><style>body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.8;padding:2rem;max-width:900px;margin:0 auto;}h1{color:#A78BFA;}h2{color:#A78BFA;border-bottom:1px solid rgba(139,92,246,0.3);padding-bottom:0.5rem;}p,li{color:#cbd5e1;}ul{margin-left:2rem;}</style></head><body>
+<p><a href="index.html" style="color:#8B5CF6;">📦 Contents</a></p>
+<h1>Chapter 4: Authentication</h1>
+
+<h2>Purpose</h2>
+<p>This chapter covers the Chapter 4: Authentication area of the WIA-MED-028 Health Insurance Data standard. The standard defines a cross-vendor data and protocol layer for health-insurance claims, eligibility, prior authorization, and remittance, interoperable with HL7 FHIR R5, X12 EDI 270/271/278/834/835/837, and the NCPDP SCRIPT 2017071 standard.</p>
+
+<h2>Reference Standards (CITATION-POLICY ALLOW only)</h2>
+<ul>
+  <li>HL7 FHIR R5 — Coverage, ExplanationOfBenefit, Claim, ClaimResponse resources</li>
+  <li>X12 EDI 270/271 — Eligibility inquiry/response</li>
+  <li>X12 EDI 278 — Prior authorization request/response</li>
+  <li>X12 EDI 837/835 — Health care claim / payment</li>
+  <li>NCPDP SCRIPT 2017071 — pharmacy electronic prescribing</li>
+  <li>HIPAA 45 CFR Part 162 — Administrative requirements</li>
+  <li>HIPAA 45 CFR Part 164 — Security and Privacy</li>
+  <li>ISO/IEC 27001:2022, ISO/IEC 27018:2019, ISO/IEC 27701:2019</li>
+  <li>OpenAPI Specification 3.1, JSON Schema 2020-12</li>
+  <li>IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details)</li>
+  <li>Sigstore (DSSE envelope, Rekor transparency log)</li>
+</ul>
+
+<h2>Implementation Procedure</h2>
+<p>Health-insurance data exchange follows a four-stage protocol: eligibility verification, claim submission, adjudication, and remittance. Each stage produces a signed manifest anchored to a Sigstore Rekor entry so that downstream auditors can reconstruct the chain offline.</p>
+
+<h3>Eligibility Verification</h3>
+<p>The provider issues an eligibility inquiry (X12 EDI 270 or HL7 FHIR Coverage operation) to the payer's WIA-MED-028 endpoint. The payer responds within the SLA declared in the manifest (default p95: 2 seconds). Eligibility data is signed by the payer; the provider records both the inquiry and the response in its audit log.</p>
+
+<h3>Claim Submission</h3>
+<p>The provider submits a claim (X12 EDI 837 or HL7 FHIR Claim resource) to the payer. The submission includes the patient's pseudonymous identifier, service codes (CPT/HCPCS), diagnosis codes (ICD-11), and supporting documentation references. The submission is signed by the provider and acknowledged by the payer with a transaction-set acknowledgment.</p>
+
+<h3>Adjudication</h3>
+<p>The payer adjudicates the claim per its medical policy. The adjudication outcome is returned as a ClaimResponse (HL7 FHIR R5) or X12 EDI 277 status response. Denials include the reason code from the published code set and a human-readable description.</p>
+
+<h3>Remittance</h3>
+<p>The payer issues a remittance advice (X12 EDI 835 or HL7 FHIR ExplanationOfBenefit resource) to the provider. The remittance includes the paid amount, adjustment codes, and the patient responsibility amount. The remittance is signed by the payer and anchored to a Sigstore Rekor entry.</p>
+
+<h2>Privacy and Security</h2>
+<p>Personal data exchanged via this protocol is subject to HIPAA 45 CFR Parts 162 and 164 in the United States, GDPR Article 9 in the European Union, and equivalent national health-data privacy regulations. Implementations MUST encrypt data in transit (TLS 1.3) and at rest (AES-256-GCM or stronger), apply role-based access controls, and maintain tamper-evident audit logs.</p>
+
+<h2>Governance</h2>
+<p>Issues, errata, and proposals are tracked at github.com/WIA-Official/wia-standards/issues with the health-insurance-data label. The WIA Standards working group reviews open issues at the start of every minor release cycle.</p>
+
+<p style="text-align:center;margin-top:3rem;color:#94a3b8;">弘益人間 (Hongik Ingan) — Benefit All Humanity</p>
+
+<section style="margin-top:2rem;padding:1.5rem;background:rgba(139,92,246,0.05);border-left:4px solid #8B5CF6;">
+<h2 style="color:#A78BFA;">Reference Standards and Implementation Notes</h2>
+<p style="line-height:1.8;">
+This standard is designed to interoperate with established international
+frameworks. Implementations SHOULD treat the following as the single
+source of truth and use this PHASE document as the interoperability
+layer that maps existing data into a machine-readable, signed, and
+auditable shape.
+</p>
+<ul style="line-height:1.8;">
+  <li>OpenAPI Specification 3.1 — REST API definition</li>
+  <li>JSON Schema 2020-12 — schema validation</li>
+  <li>ISO/IEC 27001:2022 — information security management</li>
+  <li>ISO/IEC 27018:2019 — PII protection in public clouds</li>
+  <li>ISO/IEC 17065:2012 — product certification bodies</li>
+  <li>CycloneDX 1.5 / SPDX 2.3 — software bill of materials</li>
+  <li>Sigstore (DSSE envelope, Rekor transparency log) — signature anchoring</li>
+  <li>in-toto Attestation Framework 1.0 — build provenance</li>
+  <li>IETF RFC 9700 — OAuth 2.1</li>
+  <li>IETF RFC 9457 — Problem Details for HTTP APIs</li>
+  <li>IETF RFC 8615 — well-known URIs</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">Practical Implementation Checklist</h3>
+<ul style="line-height:1.8;">
+  <li>Manifest integrity — every published manifest is signed via
+      Sigstore DSSE. Tampering is detectable without trusting an
+      intermediary. Updates are issued as new manifests; the prior
+      manifest is preserved with a supersede marker.</li>
+  <li>Retention — keep signed evidence for at least seven years to
+      satisfy ISO/IEC 17065:2012 audit expectations. Some regulators
+      require longer retention; in that case the deployment policy
+      MUST extend the window rather than relying on the defaults.</li>
+  <li>Versioning — follow Semantic Versioning 2.0.0. Major version
+      bumps require at least a 90-day overlap with the prior major
+      version on every WIA-published reference implementation.</li>
+  <li>Negative-result reporting — a skipped indicator without
+      recorded justification is treated as a failed indicator at
+      audit time.</li>
+  <li>Key rotation — manifest signing keys are rotated per the
+      deployment policy. The previous key is preserved in a
+      published key history so that auditors can verify historical
+      manifests offline.</li>
+</ul>
+
+<h3 style="color:#8B5CF6;">Reference Topologies</h3>
+<p style="line-height:1.8;">
+Implementations declare their operational topology in the manifest:
+single-tenant edge (one runtime per organization), multi-tenant
+gateway (shared runtime with header-based isolation), federated mesh
+(multiple runtimes peer to one another and publish manifests to a
+directory service), or air-gapped batch (signed evidence package
+transported out-of-band). Each topology ships with reference test
+vectors so that implementations can validate their deployment
+matches the canonical pattern.
+</p>
+
+<h3 style="color:#8B5CF6;">Open Governance</h3>
+<p style="line-height:1.8;">
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the appropriate
+label. The WIA Standards working group reviews open issues at the
+start of every minor release cycle and publishes the resulting
+decision log alongside the release notes. Errata are issued as
+patch releases; new normative requirements trigger minor bumps;
+backwards-incompatible changes trigger major bumps.
+</p>
+
+<p style="text-align:center;margin-top:2rem;color:#94a3b8;">
+弘益人間 (Hongik Ingan) — Benefit All Humanity
+</p>
+</section>
+</body></html>
