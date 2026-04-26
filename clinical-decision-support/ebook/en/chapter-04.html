@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-MED-015 Clinical Decision Support - Chapter 04</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+<h1 style="color: #a855f7;">Chapter 04</h1>
+<p style="color: #94a3b8;">This chapter covers comprehensive details on CDSS topics including architecture, integration, guidelines, drug safety, diagnostics, data standards, alert optimization, and implementation best practices following WIA-MED-015 standards.</p>
+<h2 style="color: #c4b5fd;">Core Concepts</h2>
+<p style="color: #94a3b8;">Implementation requires careful attention to evidence-based medicine, interoperability standards (HL7 FHIR, SNOMED CT, LOINC), and user-centered design principles. Systems must balance safety alerts with usability to prevent alert fatigue while maintaining clinical effectiveness.</p>
+<p style="text-align: center; color: #ffd700; margin: 40px 0;">弘益人間 · Benefit All Humanity</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA</p>
+<section id="ebook-source"><h2>Source Markdown — Reference</h2><pre style="white-space:pre-wrap;color:#cbd5e1;font-size:0.9em;"># Chapter 4: Clinical Decision Support API Interface
+
+## Service APIs and Integration Patterns
+
+### 4.1 CDSS API Architecture
+
+The WIA-CLINICAL-DECISION-SUPPORT standard defines comprehensive APIs for integrating clinical decision support into healthcare workflows. These APIs support real-time decision support, asynchronous analysis, and bidirectional communication with clinical systems.
+
+```typescript
+// CDSS API Architecture Definition
+interface CDSSAPIArchitecture {
+  version: &#x27;1.0.0&#x27;;
+
+  apiStyles: {
+    rest: {
+      description: &#x27;RESTful APIs for synchronous operations&#x27;;
+      useCases: [&#x27;Point-of-care queries&#x27;, &#x27;Alert processing&#x27;, &#x27;Configuration&#x27;];
+    };
+    cdsHooks: {
+      description: &#x27;HL7 CDS Hooks for EHR integration&#x27;;
+      useCases: [&#x27;Order entry support&#x27;, &#x27;Patient chart review&#x27;];
+    };
+    fhir: {
+      description: &#x27;FHIR-native operations&#x27;;
+      useCases: [&#x27;Knowledge artifacts&#x27;, &#x27;Clinical data access&#x27;];
+    };
+    graphql: {
+      description: &#x27;GraphQL for flexible queries&#x27;;
+      useCases: [&#x27;Dashboard data&#x27;, &#x27;Complex aggregations&#x27;];
+    };
+    streaming: {
+      description: &#x27;Real-time event streaming&#x27;;
+      useCases: [&#x27;Continuous monitoring&#x27;, &#x27;Early warning systems&#x27;];
+    };
+  };
+
+  authentication: {
+    oauth2: &#x27;Primary authentication mechanism&#x27;;
+    smartOnFhir: &#x27;SMART on FHIR for EHR launch&#x27;;
+    mtls: &#x27;Mutual TLS for service-to-service&#x27;;
+    apiKeys: &#x27;For backend service integration&#x27;;
+  };
+
+  rateLimit: {
+    standard: &#x27;1000 requests/minute&#x27;;
+    burst: &#x27;100 requests/second&#x27;;
+    premium: &#x27;10000 requests/minute&#x27;;
+  };
+}
+```
+
+### 4.2 Core CDSS REST API
+
+```typescript
+// Core CDSS API Specification
+interface CDSSRestAPI {
+  baseUrl: &#x27;https://api.cdss.wia.org/v1&#x27;;
+
+  endpoints: {
+    recommendations: RecommendationEndpoints;
+    alerts: AlertEndpoints;
+    knowledge: KnowledgeEndpoints;
+    analytics: AnalyticsEndpoints;
+    audit: AuditEndpoints;
+  };
+}
+
+// Recommendation API Endpoints
+interface RecommendationEndpoints {
+  // Get clinical recommendations
+  getRecommendation: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/recommendations&#x27;;
+    description: &#x27;Request clinical decision support recommendation&#x27;;
+  };
+
+  // Get recommendation by ID
+  getRecommendationById: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/recommendations/{recommendationId}&#x27;;
+    description: &#x27;Retrieve a specific recommendation&#x27;;
+  };
+
+  // Update recommendation status
+  updateRecommendationStatus: {
+    method: &#x27;PATCH&#x27;;
+    path: &#x27;/recommendations/{recommendationId}/status&#x27;;
+    description: &#x27;Record action taken on recommendation&#x27;;
+  };
+}
+
+// Recommendation Request
+interface RecommendationRequest {
+  // Patient identification
+  patient: {
+    id: string;
+    identifiers?: Identifier[];
+  };
+
+  // Clinical context
+  context: {
+    encounterId?: string;
+    encounterType?: string;
+    department?: string;
+    careTeam?: Reference[];
+    urgency: &#x27;ROUTINE&#x27; | &#x27;URGENT&#x27; | &#x27;EMERGENT&#x27;;
+  };
+
+  // What kind of support is needed
+  query: {
+    type: QueryType;
+    focus?: CodeableConcept;
+    additionalContext?: string;
+  };
+
+  // User making the request
+  requestor: {
+    userId: string;
+    role: string;
+    specialty?: string;
+  };
+
+  // Data to include
+  dataScope?: {
+    includeMedications: boolean;
+    includeProblems: boolean;
+    includeAllergies: boolean;
+    includeLabs: boolean;
+    includeVitals: boolean;
+    labLookbackDays?: number;
+    vitalLookbackHours?: number;
+  };
+
+  // Response preferences
+  preferences?: {
+    explanationLevel: &#x27;BRIEF&#x27; | &#x27;STANDARD&#x27; | &#x27;DETAILED&#x27;;
+    maxRecommendations?: number;
+    includeAlternatives: boolean;
+    includeReferences: boolean;
+  };
+}
+
+type QueryType =
+  | &#x27;DIAGNOSIS_DIFFERENTIAL&#x27;
+  | &#x27;TREATMENT_OPTIONS&#x27;
+  | &#x27;DRUG_SELECTION&#x27;
+  | &#x27;DOSING_RECOMMENDATION&#x27;
+  | &#x27;SCREENING_DUE&#x27;
+  | &#x27;RISK_ASSESSMENT&#x27;
+  | &#x27;LAB_INTERPRETATION&#x27;
+  | &#x27;IMAGING_INTERPRETATION&#x27;
+  | &#x27;GUIDELINE_COMPLIANCE&#x27;
+  | &#x27;COMPREHENSIVE_REVIEW&#x27;;
+
+// Recommendation Response
+interface RecommendationResponse {
+  recommendationId: string;
+  status: &#x27;COMPLETE&#x27; | &#x27;PARTIAL&#x27; | &#x27;ERROR&#x27;;
+  timestamp: string;
+
+  // Query echo
+  query: {
+    type: QueryType;
+    focus?: CodeableConcept;
+  };
+
+  // The recommendations
+  recommendations: Recommendation[];
+
+  // Overall confidence
+  confidence: {
+    score: number;  // 0-1
+    level: &#x27;HIGH&#x27; | &#x27;MEDIUM&#x27; | &#x27;LOW&#x27;;
+    factors: ConfidenceFactor[];
+  };
+
+  // Data quality assessment
+  dataQuality: {
+    completeness: number;
+    timeliness: number;
+    missingCriticalData?: string[];
+  };
+
+  // Explanation
+  explanation: {
+    summary: string;
+    reasoning?: string;
+    keyFactors: string[];
+  };
+
+  // References
+  references?: Reference[];
+
+  // Warnings/caveats
+  warnings?: Warning[];
+
+  // Validity
+  validUntil: string;
+
+  // Links
+  _links: {
+    self: string;
+    patient: string;
+    feedback: string;
+  };
+}
+
+interface Recommendation {
+  id: string;
+  rank: number;
+  type: RecommendationType;
+
+  // What is recommended
+  action: {
+    description: string;
+    code?: CodeableConcept;
+    resource?: Resource;  // FHIR resource (e.g., MedicationRequest)
+  };
+
+  // Strength
+  strength: &#x27;STRONG&#x27; | &#x27;MODERATE&#x27; | &#x27;WEAK&#x27; | &#x27;CONDITIONAL&#x27;;
+  urgency: &#x27;IMMEDIATE&#x27; | &#x27;WITHIN_HOURS&#x27; | &#x27;WITHIN_DAYS&#x27; | &#x27;ROUTINE&#x27;;
+
+  // Rationale
+  rationale: string;
+  keyEvidence: string[];
+
+  // Evidence level
+  evidenceLevel: {
+    grade: &#x27;A&#x27; | &#x27;B&#x27; | &#x27;C&#x27; | &#x27;D&#x27; | &#x27;I&#x27;;
+    description: string;
+  };
+
+  // Contraindications (if any)
+  contraindications?: string[];
+
+  // Monitoring
+  monitoring?: {
+    parameters: string[];
+    frequency: string;
+    duration: string;
+  };
+
+  // Alternatives
+  alternatives?: Alternative[];
+}
+
+// CDSS API Implementation
+class CDSSAPIService {
+  private recommendationEngine: RecommendationEngine;
+  private dataService: PatientDataService;
+  private auditService: AuditService;
+
+  @Post(&#x27;/recommendations&#x27;)
+  @UseGuards(AuthGuard, RateLimitGuard)
+  @ApiOperation({ summary: &#x27;Get clinical recommendation&#x27; })
+  async getRecommendation(
+    @Body() request: RecommendationRequest,
+    @CurrentUser() user: User
+  ): Promise&lt;RecommendationResponse&gt; {
+    const startTime = Date.now();
+
+    try {
+      // Validate request
+      this.validateRequest(request);
+
+      // Get patient data
+      const patientData = await this.dataService.getPatientData(
+        request.patient.id,
+        request.dataScope
+      );
+
+      // Generate recommendations
+      const result = await this.recommendationEngine.generateRecommendations(
+        patientData,
+        request.query,
+        request.context
+      );
+
+      // Build response
+      const response = this.buildResponse(result, request);
+
+      // Audit log
+      await this.auditService.logRecommendationRequest(
+        request,
+        response,
+        user,
+        Date.now() - startTime
+      );
+
+      return response;
+
+    } catch (error) {
+      await this.auditService.logError(request, error, user);
+      throw this.handleError(error);
+    }
+  }
+
+  @Patch(&#x27;/recommendations/:id/status&#x27;)
+  @ApiOperation({ summary: &#x27;Update recommendation status&#x27; })
+  async updateStatus(
+    @Param(&#x27;id&#x27;) recommendationId: string,
+    @Body() update: StatusUpdate,
+    @CurrentUser() user: User
+  ): Promise&lt;StatusUpdateResponse&gt; {
+    // Record the action taken
+    const result = await this.recommendationEngine.recordAction(
+      recommendationId,
+      update,
+      user
+    );
+
+    // This feedback can be used for learning
+    if (update.outcome) {
+      await this.feedbackService.recordOutcome(
+        recommendationId,
+        update.outcome
+      );
+    }
+
+    return result;
+  }
+}
+
+interface StatusUpdate {
+  action: &#x27;ACCEPTED&#x27; | &#x27;MODIFIED&#x27; | &#x27;REJECTED&#x27; | &#x27;DEFERRED&#x27;;
+  reason?: string;
+  modifications?: string;
+  outcome?: {
+    outcomeType: string;
+    outcomeDate?: string;
+    notes?: string;
+  };
+}
+```
+
+### 4.3 Alert API
+
+```typescript
+// Alert API Specification
+interface AlertAPI {
+  // Process potential alert trigger
+  processAlert: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/alerts/evaluate&#x27;;
+  };
+
+  // Get active alerts for patient
+  getAlerts: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/alerts/patient/{patientId}&#x27;;
+  };
+
+  // Acknowledge alert
+  acknowledgeAlert: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/alerts/{alertId}/acknowledge&#x27;;
+  };
+
+  // Override alert
+  overrideAlert: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/alerts/{alertId}/override&#x27;;
+  };
+
+  // Get alert statistics
+  getAlertStats: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/alerts/statistics&#x27;;
+  };
+}
+
+// Alert Evaluation Request
+interface AlertEvaluationRequest {
+  trigger: {
+    type: AlertTriggerType;
+    source: string;
+    data: any;
+  };
+  patient: {
+    id: string;
+  };
+  context: {
+    encounterId?: string;
+    userId: string;
+    userRole: string;
+  };
+}
+
+type AlertTriggerType =
+  | &#x27;MEDICATION_ORDER&#x27;
+  | &#x27;LAB_RESULT&#x27;
+  | &#x27;VITAL_SIGN&#x27;
+  | &#x27;DIAGNOSIS_ENTRY&#x27;
+  | &#x27;ORDER_ENTRY&#x27;
+  | &#x27;DOCUMENTATION&#x27;
+  | &#x27;SCHEDULED_CHECK&#x27;;
+
+// Alert Response
+interface AlertEvaluationResponse {
+  alerts: Alert[];
+  evaluationId: string;
+  timestamp: string;
+  processingTime: number;
+}
+
+interface Alert {
+  alertId: string;
+  category: string;
+  severity: &#x27;INFO&#x27; | &#x27;WARNING&#x27; | &#x27;HIGH&#x27; | &#x27;CRITICAL&#x27;;
+  title: string;
+  message: string;
+  detail?: string;
+
+  // Source
+  source: {
+    system: string;
+    rule: string;
+    version: string;
+  };
+
+  // Patient
+  patient: {
+    id: string;
+    mrn?: string;
+  };
+
+  // Triggered by
+  trigger: {
+    type: string;
+    resource?: Resource;
+  };
+
+  // Actions
+  recommendedAction?: string;
+  suggestions?: AlertSuggestion[];
+
+  // Override options
+  overrideAllowed: boolean;
+  overrideReasons?: OverrideReason[];
+
+  // Links
+  links?: {
+    moreInfo?: string;
+    guideline?: string;
+    similar?: string;
+  };
+
+  // Timing
+  createdAt: string;
+  expiresAt?: string;
+
+  // Status
+  status: &#x27;ACTIVE&#x27; | &#x27;ACKNOWLEDGED&#x27; | &#x27;OVERRIDDEN&#x27; | &#x27;EXPIRED&#x27; | &#x27;AUTO_RESOLVED&#x27;;
+}
+
+// Alert Service Implementation
+class AlertAPIService {
+  private alertEngine: AlertEngine;
+  private alertRepository: AlertRepository;
+
+  @Post(&#x27;/alerts/evaluate&#x27;)
+  async evaluateAlerts(
+    @Body() request: AlertEvaluationRequest
+  ): Promise&lt;AlertEvaluationResponse&gt; {
+    const startTime = Date.now();
+
+    // Get patient context
+    const patientContext = await this.getPatientContext(request.patient.id);
+
+    // Evaluate alert rules
+    const alerts = await this.alertEngine.evaluate(
+      request.trigger,
+      patientContext,
+      request.context
+    );
+
+    // Apply suppression rules
+    const filteredAlerts = await this.applySuppressionRules(
+      alerts,
+      request.patient.id,
+      request.context.userId
+    );
+
+    // Store alerts
+    await this.alertRepository.storeAlerts(filteredAlerts);
+
+    return {
+      alerts: filteredAlerts,
+      evaluationId: generateUUID(),
+      timestamp: new Date().toISOString(),
+      processingTime: Date.now() - startTime
+    };
+  }
+
+  @Post(&#x27;/alerts/:alertId/override&#x27;)
+  async overrideAlert(
+    @Param(&#x27;alertId&#x27;) alertId: string,
+    @Body() override: AlertOverride,
+    @CurrentUser() user: User
+  ): Promise&lt;OverrideResponse&gt; {
+    // Validate override is allowed
+    const alert = await this.alertRepository.getAlert(alertId);
+    if (!alert.overrideAllowed) {
+      throw new ForbiddenException(&#x27;This alert cannot be overridden&#x27;);
+    }
+
+    // Validate reason
+    if (alert.overrideReasons) {
+      const validReason = alert.overrideReasons.find(
+        r =&gt; r.code === override.reasonCode
+      );
+      if (!validReason) {
+        throw new BadRequestException(&#x27;Invalid override reason&#x27;);
+      }
+    }
+
+    // Record override
+    const result = await this.alertRepository.recordOverride(
+      alertId,
+      override,
+      user
+    );
+
+    // Audit log (important for safety)
+    await this.auditService.logAlertOverride(
+      alert,
+      override,
+      user
+    );
+
+    return result;
+  }
+
+  @Get(&#x27;/alerts/statistics&#x27;)
+  async getAlertStatistics(
+    @Query() params: AlertStatsParams
+  ): Promise&lt;AlertStatistics&gt; {
+    return {
+      period: params.period,
+      totalAlerts: await this.getAlertCount(params),
+      bySeverity: await this.getAlertsBySeverity(params),
+      byCategory: await this.getAlertsByCategory(params),
+      overrideRate: await this.calculateOverrideRate(params),
+      acknowledgeTime: await this.calculateAcknowledgeTime(params),
+      topAlertTypes: await this.getTopAlertTypes(params),
+      alertFatigueTrend: await this.calculateAlertFatigueTrend(params)
+    };
+  }
+}
+
+interface AlertStatistics {
+  period: DateRange;
+  totalAlerts: number;
+  bySeverity: {
+    critical: number;
+    high: number;
+    warning: number;
+    info: number;
+  };
+  byCategory: { [category: string]: number };
+  overrideRate: {
+    overall: number;
+    bySeverity: { [severity: string]: number };
+    byCategory: { [category: string]: number };
+  };
+  acknowledgeTime: {
+    median: number;
+    p90: number;
+    bySeverity: { [severity: string]: number };
+  };
+  topAlertTypes: { type: string; count: number; overrideRate: number }[];
+  alertFatigueTrend: { date: string; alertsPerUser: number }[];
+}
+```
+
+### 4.4 Knowledge Management API
+
+```typescript
+// Knowledge Management API
+interface KnowledgeAPI {
+  // Guidelines
+  listGuidelines: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/guidelines&#x27;;
+  };
+  getGuideline: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/guidelines/{guidelineId}&#x27;;
+  };
+  evaluateGuideline: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/knowledge/guidelines/{guidelineId}/evaluate&#x27;;
+  };
+
+  // Alert Rules
+  listAlertRules: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/alert-rules&#x27;;
+  };
+  getAlertRule: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/alert-rules/{ruleId}&#x27;;
+  };
+  createAlertRule: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/knowledge/alert-rules&#x27;;
+  };
+  updateAlertRule: {
+    method: &#x27;PUT&#x27;;
+    path: &#x27;/knowledge/alert-rules/{ruleId}&#x27;;
+  };
+
+  // Order Sets
+  listOrderSets: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/order-sets&#x27;;
+  };
+  getOrderSet: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/order-sets/{orderSetId}&#x27;;
+  };
+
+  // Calculators
+  listCalculators: {
+    method: &#x27;GET&#x27;;
+    path: &#x27;/knowledge/calculators&#x27;;
+  };
+  executeCalculator: {
+    method: &#x27;POST&#x27;;
+    path: &#x27;/knowledge/calculators/{calculatorId}/execute&#x27;;
+  };
+}
+
+// Guideline Evaluation
+interface GuidelineEvaluationRequest {
+  patientId: string;
+  guidelineId: string;
+  evaluationContext?: {
+    encounterId?: string;
+    assessmentDate?: string;
+  };
+  returnActions: boolean;
+}
+
+interface GuidelineEvaluationResponse {
+  guidelineId: string;
+  guidelineTitle: string;
+  evaluationTimestamp: string;
+  patientId: string;
+
+  // Applicability
+  applicable: boolean;
+  applicabilityReason?: string;
+
+  // Compliance assessment
+  compliance: {
+    overall: &#x27;COMPLIANT&#x27; | &#x27;PARTIALLY_COMPLIANT&#x27; | &#x27;NON_COMPLIANT&#x27; | &#x27;NOT_APPLICABLE&#x27;;
+    score: number;  // 0-100
+    gaps: ComplianceGap[];
+  };
+
+  // Recommended actions
+  recommendedActions?: GuidelineAction[];
+
+  // Evidence
+  evidence: {
+    dataUsed: string[];
+    assumptions: string[];
+  };
+}
+
+interface ComplianceGap {
+  recommendation: string;
+  status: &#x27;MET&#x27; | &#x27;NOT_MET&#x27; | &#x27;PARTIALLY_MET&#x27; | &#x27;NOT_ASSESSED&#x27;;
+  reason?: string;
+  suggestedAction?: string;
+  priority: &#x27;HIGH&#x27; | &#x27;MEDIUM&#x27; | &#x27;LOW&#x27;;
+}
+
+// Calculator Execution
+interface CalculatorExecutionRequest {
+  calculatorId: string;
+  inputs: { [inputId: string]: any };
+  patientId?: string;  // For auto-population
+}
+
+interface CalculatorExecutionResponse {
+  calculatorId: string;
+  calculatorName: string;
+  executionTimestamp: string;
+
+  // Inputs used
+  inputs: {
+    id: string;
+    name: string;
+    value: any;
+    source: &#x27;PROVIDED&#x27; | &#x27;AUTO_POPULATED&#x27; | &#x27;DEFAULT&#x27;;
+  }[];
+
+  // Result
+  result: {
+    value: number | string;
+    unit?: string;
+    formattedValue: string;
+  };
+
+  // Interpretation
+  interpretation?: {
+    category: string;
+    description: string;
+    recommendation?: string;
+    riskLevel?: &#x27;LOW&#x27; | &#x27;MODERATE&#x27; | &#x27;HIGH&#x27; | &#x27;VERY_HIGH&#x27;;
+  };
+
+  // Confidence
+  confidence?: {
+    level: &#x27;HIGH&#x27; | &#x27;MEDIUM&#x27; | &#x27;LOW&#x27;;
+    limitations: string[];
+  };
+
+  // References
+  references?: Reference[];
+}
+
+// Knowledge Service Implementation
+class KnowledgeAPIService {
+  private guidelineRepository: GuidelineRepository;
+  private guidelineEngine: GuidelineEngine;
+  private calculatorService: CalculatorService;
+
+  @Get(&#x27;/knowledge/guidelines&#x27;)
+  async listGuidelines(
+    @Query() params: GuidelineSearchParams
+  ): Promise&lt;GuidelineListResponse&gt; {
+    const guidelines = await this.guidelineRepository.search({
+      category: params.category,
+      specialty: params.specialty,
+      status: params.status ?? &#x27;active&#x27;,
+      search: params.search,
+      pagination: {
+        page: params.page ?? 1,
+        pageSize: params.pageSize ?? 20
+      }
+    });
+
+    return {
+      guidelines: guidelines.items.map(g =&gt; ({
+        id: g.id,
+        title: g.title,
+        version: g.version,
+        category: g.category,
+        publisher: g.publisher,
+        lastUpdated: g.lastUpdated,
+        status: g.status
+      })),
+      pagination: {
+        page: guidelines.page,
+        pageSize: guidelines.pageSize,
+        total: guidelines.total,
+        totalPages: Math.ceil(guidelines.total / guidelines.pageSize)
+      }
+    };
+  }
+
+  @Post(&#x27;/knowledge/guidelines/:id/evaluate&#x27;)
+  async evaluateGuideline(
+    @Param(&#x27;id&#x27;) guidelineId: string,
+    @Body() request: GuidelineEvaluationRequest
+  ): Promise&lt;GuidelineEvaluationResponse&gt; {
+    // Get guideline
+    const guideline = await this.guidelineRepository.getById(guidelineId);
+    if (!guideline) {
+      throw new NotFoundException(&#x27;Guideline not found&#x27;);
+    }
+
+    // Get patient data
+    const patientData = await this.patientDataService.getPatientData(
+      request.patientId
+    );
+
+    // Evaluate
+    const evaluation = await this.guidelineEngine.evaluate(
+      guideline,
+      patientData,
+      request.evaluationContext
+    );
+
+    return evaluation;
+  }
+
+  @Post(&#x27;/knowledge/calculators/:id/execute&#x27;)
+  async executeCalculator(
+    @Param(&#x27;id&#x27;) calculatorId: string,
+    @Body() request: CalculatorExecutionRequest
+  ): Promise&lt;CalculatorExecutionResponse&gt; {
+    // Get calculator definition
+    const calculator = await this.calculatorRepository.getById(calculatorId);
+    if (!calculator) {
+      throw new NotFoundException(&#x27;Calculator not found&#x27;);
+    }
+
+    // Auto-populate inputs if patient provided
+    let inputs = { ...request.inputs };
+    if (request.patientId) {
+      inputs = await this.autoPopulateInputs(
+        calculator,
+        request.patientId,
+        inputs
+      );
+    }
+
+    // Validate inputs
+    this.validateCalculatorInputs(calculator, inputs);
+
+    // Execute
+    const result = await this.calculatorService.execute(calculator, inputs);
+
+    return result;
+  }
+}
+```
+
+### 4.5 Streaming API for Real-Time CDSS
+
+```typescript
+// Real-Time Streaming API
+interface CDSSStreamingAPI {
+  protocols: {
+    websocket: &#x27;wss://api.cdss.wia.org/v1/stream&#x27;;
+    sse: &#x27;https://api.cdss.wia.org/v1/events&#x27;;
+    mqtt: &#x27;mqtts://mqtt.cdss.wia.org&#x27;;
+  };
+
+  channels: {
+    patientAlerts: PatientAlertChannel;
+    vitalSignMonitoring: VitalSignChannel;
+    earlyWarning: EarlyWarningChannel;
+    orderRecommendations: OrderRecommendationChannel;
+  };
+}
+
+// WebSocket Implementation
+class CDSSWebSocketService {
+  private connections: Map&lt;string, WebSocket&gt; = new Map();
+  private subscriptions: Map&lt;string, Set&lt;string&gt;&gt; = new Map();
+
+  @WebSocketGateway(&#x27;/stream&#x27;)
+  handleConnection(client: WebSocket, request: IncomingMessage) {
+    const userId = this.authenticateConnection(request);
+    this.connections.set(userId, client);
+
+    client.on(&#x27;message&#x27;, (message) =&gt; this.handleMessage(userId, message));
+    client.on(&#x27;close&#x27;, () =&gt; this.handleDisconnect(userId));
+  }
+
+  private handleMessage(userId: string, message: WebSocket.Data) {
+    const parsed = JSON.parse(message.toString());
+
+    switch (parsed.type) {
+      case &#x27;SUBSCRIBE&#x27;:
+        this.handleSubscribe(userId, parsed);
+        break;
+      case &#x27;UNSUBSCRIBE&#x27;:
+        this.handleUnsubscribe(userId, parsed);
+        break;
+      case &#x27;ACKNOWLEDGE&#x27;:
+        this.handleAcknowledge(userId, parsed);
+        break;
+    }
+  }
+
+  private handleSubscribe(userId: string, subscription: SubscriptionRequest) {
+    const channelKey = this.buildChannelKey(subscription);
+
+    if (!this.subscriptions.has(channelKey)) {
+      this.subscriptions.set(channelKey, new Set());
+    }
+    this.subscriptions.get(channelKey)!.add(userId);
+
+    // Start monitoring if patient subscription
+    if (subscription.channel === &#x27;PATIENT_ALERTS&#x27;) {
+      this.startPatientMonitoring(subscription.patientId);
+    }
+
+    this.sendToUser(userId, {
+      type: &#x27;SUBSCRIBED&#x27;,
+      channel: subscription.channel,
+      subscriptionId: generateUUID()
+    });
+  }
+
+  // Broadcast alert to subscribed users
+  async broadcastAlert(alert: Alert) {
+    const channelKey = `PATIENT_ALERTS:${alert.patient.id}`;
+    const subscribers = this.subscriptions.get(channelKey);
+
+    if (subscribers) {
+      const message: AlertMessage = {
+        type: &#x27;ALERT&#x27;,
+        alert,
+        timestamp: new Date().toISOString()
+      };
+
+      for (const userId of subscribers) {
+        await this.sendToUser(userId, message);
+      }
+    }
+  }
+
+  private async sendToUser(userId: string, message: any) {
+    const connection = this.connections.get(userId);
+    if (connection &amp;&amp; connection.readyState === WebSocket.OPEN) {
+      connection.send(JSON.stringify(message));
+    }
+  }
+}
+
+// Early Warning System Streaming
+interface EarlyWarningChannel {
+  description: &#x27;Real-time early warning scores and alerts&#x27;;
+
+  subscriptionRequest: {
+    channel: &#x27;EARLY_WARNING&#x27;;
+    patientId: string;
+    thresholds?: {
+      newsScore?: number;
+      customScores?: { [scoreName: string]: number };
+    };
+  };
+
+  events: {
+    SCORE_UPDATE: {
+      patientId: string;
+      scoreType: string;
+      score: number;
+      previousScore?: number;
+      trend: &#x27;IMPROVING&#x27; | &#x27;STABLE&#x27; | &#x27;WORSENING&#x27;;
+      timestamp: string;
+      components: ScoreComponent[];
+    };
+    THRESHOLD_BREACH: {
+      patientId: string;
+      scoreType: string;
+      score: number;
+      threshold: number;
+      severity: &#x27;WARNING&#x27; | &#x27;CRITICAL&#x27;;
+      timestamp: string;
+      recommendedActions: string[];
+    };
+    RAPID_DETERIORATION: {
+      patientId: string;
+      indicators: string[];
+      confidence: number;
+      timeToEvent?: string;
+      timestamp: string;
+    };
+  };
+}
+
+// Early Warning Score Service
+class EarlyWarningService {
+  private scoreCalculators: Map&lt;string, ScoreCalculator&gt; = new Map();
+  private monitoredPatients: Map&lt;string, PatientMonitor&gt; = new Map();
+
+  async startMonitoring(patientId: string, config: MonitoringConfig) {
+    // Create patient monitor
+    const monitor = new PatientMonitor(patientId, config);
+
+    // Subscribe to vital sign stream
+    monitor.subscribeToVitals(async (vitals) =&gt; {
+      // Calculate scores
+      const scores = await this.calculateScores(patientId, vitals);
+
+      // Check for threshold breaches
+      for (const score of scores) {
+        if (score.value &gt;= config.thresholds[score.type]) {
+          await this.handleThresholdBreach(patientId, score, config);
+        }
+      }
+
+      // Emit score updates
+      await this.emitScoreUpdate(patientId, scores);
+    });
+
+    this.monitoredPatients.set(patientId, monitor);
+  }
+
+  private async calculateScores(
+    patientId: string,
+    vitals: VitalSigns
+  ): Promise&lt;CalculatedScore[]&gt; {
+    const scores: CalculatedScore[] = [];
+
+    // NEWS2 (National Early Warning Score 2)
+    const news2 = await this.calculateNEWS2(vitals);
+    scores.push({
+      type: &#x27;NEWS2&#x27;,
+      value: news2.total,
+      components: news2.components,
+      interpretation: this.interpretNEWS2(news2.total)
+    });
+
+    // MEWS (Modified Early Warning Score)
+    const mews = await this.calculateMEWS(vitals);
+    scores.push({
+      type: &#x27;MEWS&#x27;,
+      value: mews.total,
+      components: mews.components
+    });
+
+    return scores;
+  }
+
+  private calculateNEWS2(vitals: VitalSigns): NEWS2Score {
+    const components: ScoreComponent[] = [];
+
+    // Respiratory rate
+    const rrScore = this.scoreRespiratoryRate(vitals.respiratoryRate?.value);
+    components.push({ name: &#x27;Respiratory Rate&#x27;, value: vitals.respiratoryRate?.value, score: rrScore });
+
+    // SpO2 (two scales based on O2 supplementation)
+    const spo2Score = this.scoreSpO2(
+      vitals.oxygenSaturation?.value,
+      vitals.oxygenSaturation?.supplementalOxygen
+    );
+    components.push({ name: &#x27;SpO2&#x27;, value: vitals.oxygenSaturation?.value, score: spo2Score });
+
+    // Air or oxygen
+    const airScore = vitals.oxygenSaturation?.supplementalOxygen ? 2 : 0;
+    components.push({ name: &#x27;Air or Oxygen&#x27;, value: vitals.oxygenSaturation?.supplementalOxygen ? &#x27;Oxygen&#x27; : &#x27;Air&#x27;, score: airScore });
+
+    // Systolic BP
+    const sbpScore = this.scoreSystolicBP(vitals.bloodPressure?.systolic);
+    components.push({ name: &#x27;Systolic BP&#x27;, value: vitals.bloodPressure?.systolic, score: sbpScore });
+
+    // Heart rate
+    const hrScore = this.scoreHeartRate(vitals.heartRate?.value);
+    components.push({ name: &#x27;Heart Rate&#x27;, value: vitals.heartRate?.value, score: hrScore });
+
+    // Consciousness (AVPU or GCS)
+    const consciousnessScore = this.scoreConsciousness(vitals.consciousness);
+    components.push({ name: &#x27;Consciousness&#x27;, value: vitals.consciousness, score: consciousnessScore });
+
+    // Temperature
+    const tempScore = this.scoreTemperature(vitals.temperature?.value);
+    components.push({ name: &#x27;Temperature&#x27;, value: vitals.temperature?.value, score: tempScore });
+
+    const total = components.reduce((sum, c) =&gt; sum + c.score, 0);
+
+    return { total, components };
+  }
+
+  private interpretNEWS2(score: number): NEWS2Interpretation {
+    if (score &gt;= 7) {
+      return {
+        level: &#x27;HIGH&#x27;,
+        clinicalRisk: &#x27;High&#x27;,
+        response: &#x27;Emergency response team review&#x27;,
+        frequency: &#x27;Continuous monitoring&#x27;,
+        color: &#x27;RED&#x27;
+      };
+    } else if (score &gt;= 5) {
+      return {
+        level: &#x27;MEDIUM&#x27;,
+        clinicalRisk: &#x27;Medium&#x27;,
+        response: &#x27;Urgent review by clinician&#x27;,
+        frequency: &#x27;Minimum 1-hourly&#x27;,
+        color: &#x27;ORANGE&#x27;
+      };
+    } else if (score &gt;= 1) {
+      return {
+        level: &#x27;LOW_MEDIUM&#x27;,
+        clinicalRisk: &#x27;Low-Medium&#x27;,
+        response: &#x27;Assessment by ward nurse&#x27;,
+        frequency: &#x27;Minimum 4-6 hourly&#x27;,
+        color: &#x27;YELLOW&#x27;
+      };
+    } else {
+      return {
+        level: &#x27;LOW&#x27;,
+        clinicalRisk: &#x27;Low&#x27;,
+        response: &#x27;Continue routine monitoring&#x27;,
+        frequency: &#x27;Minimum 12-hourly&#x27;,
+        color: &#x27;GREEN&#x27;
+      };
+    }
+  }
+}
+```
+
+### 4.6 GraphQL API for Complex Queries
+
+```typescript
+// GraphQL Schema for CDSS
+const cdssGraphQLSchema = `
+  type Query {
+    # Patient queries
+    patient(id: ID!): Patient
+    patientRecommendations(patientId: ID!, types: [RecommendationType!]): [Recommendation!]!
+
+    # Alert queries
+    alerts(
+      patientId: ID
+      severity: [AlertSeverity!]
+      status: [AlertStatus!]
+      dateRange: DateRangeInput
+    ): AlertConnection!
+
+    # Knowledge queries
+    guidelines(
+      category: String
+      specialty: String
+      search: String
+    ): GuidelineConnection!
+
+    calculators(category: String): [Calculator!]!
+
+    # Analytics queries
+    alertStatistics(
+      dateRange: DateRangeInput!
+      groupBy: StatisticsGroupBy
+    ): AlertStatistics!
+
+    complianceReport(
+      guidelineId: ID!
+      patientId: ID
+      departmentId: ID
+    ): ComplianceReport!
+  }
+
+  type Mutation {
+    # Recommendation actions
+    acknowledgeRecommendation(
+      recommendationId: ID!
+      action: RecommendationAction!
+      reason: String
+    ): RecommendationActionResult!
+
+    # Alert actions
+    acknowledgeAlert(alertId: ID!): Alert!
+    overrideAlert(alertId: ID!, reason: OverrideReasonInput!): Alert!
+
+    # Feedback
+    submitFeedback(input: FeedbackInput!): FeedbackResult!
+  }
+
+  type Subscription {
+    # Real-time alerts
+    patientAlerts(patientId: ID!): Alert!
+    departmentAlerts(departmentId: ID!): Alert!
+
+    # Early warning
+    earlyWarningScore(patientId: ID!): EarlyWarningEvent!
+  }
+
+  type Patient {
+    id: ID!
+    mrn: String
+    name: HumanName!
+    birthDate: Date!
+    age: Int!
+    gender: Gender!
+
+    # Clinical data
+    conditions: [Condition!]!
+    medications: [Medication!]!
+    allergies: [Allergy!]!
+    recentLabs(days: Int = 30): [LabResult!]!
+    vitals: VitalSigns
+
+    # CDSS data
+    activeAlerts: [Alert!]!
+    recommendations: [Recommendation!]!
+    riskScores: [RiskScore!]!
+    guidelineCompliance: [GuidelineCompliance!]!
+  }
+
+  type Recommendation {
+    id: ID!
+    type: RecommendationType!
+    title: String!
+    description: String!
+    strength: RecommendationStrength!
+    urgency: Urgency!
+    evidenceLevel: EvidenceLevel!
+    rationale: String!
+    actions: [RecommendedAction!]!
+    alternatives: [Alternative!]
+    references: [Reference!]
+    createdAt: DateTime!
+    expiresAt: DateTime
+    status: RecommendationStatus!
+  }
+
+  type Alert {
+    id: ID!
+    category: AlertCategory!
+    severity: AlertSeverity!
+    title: String!
+    message: String!
+    detail: String
+    patient: Patient!
+    trigger: AlertTrigger!
+    recommendedAction: String
+    overrideAllowed: Boolean!
+    overrideReasons: [OverrideReason!]
+    status: AlertStatus!
+    createdAt: DateTime!
+    acknowledgedAt: DateTime
+    acknowledgedBy: User
+    overriddenAt: DateTime
+    overriddenBy: User
+    overrideReason: String
+  }
+
+  enum RecommendationType {
+    DIAGNOSIS_DIFFERENTIAL
+    TREATMENT_RECOMMENDATION
+    DRUG_SELECTION
+    DOSING_RECOMMENDATION
+    SCREENING
+    RISK_ASSESSMENT
+    LAB_INTERPRETATION
+    GUIDELINE_COMPLIANCE
+  }
+
+  enum AlertSeverity {
+    INFO
+    WARNING
+    HIGH
+    CRITICAL
+  }
+
+  enum AlertStatus {
+    ACTIVE
+    ACKNOWLEDGED
+    OVERRIDDEN
+    EXPIRED
+    AUTO_RESOLVED
+  }
+`;
+
+// GraphQL Resolvers
+class CDSSGraphQLResolvers {
+  @Query(&#x27;patient&#x27;)
+  async getPatient(@Args(&#x27;id&#x27;) id: string): Promise&lt;Patient&gt; {
+    return this.patientService.getPatient(id);
+  }
+
+  @Query(&#x27;patientRecommendations&#x27;)
+  async getPatientRecommendations(
+    @Args(&#x27;patientId&#x27;) patientId: string,
+    @Args(&#x27;types&#x27;) types?: RecommendationType[]
+  ): Promise&lt;Recommendation[]&gt; {
+    return this.recommendationService.getPatientRecommendations(
+      patientId,
+      types
+    );
+  }
+
+  @Query(&#x27;alerts&#x27;)
+  async getAlerts(
+    @Args() args: AlertQueryArgs
+  ): Promise&lt;AlertConnection&gt; {
+    return this.alertService.queryAlerts(args);
+  }
+
+  @Mutation(&#x27;acknowledgeAlert&#x27;)
+  async acknowledgeAlert(
+    @Args(&#x27;alertId&#x27;) alertId: string,
+    @CurrentUser() user: User
+  ): Promise&lt;Alert&gt; {
+    return this.alertService.acknowledge(alertId, user);
+  }
+
+  @Subscription(&#x27;patientAlerts&#x27;)
+  subscribeToPatientAlerts(
+    @Args(&#x27;patientId&#x27;) patientId: string
+  ): AsyncIterator&lt;Alert&gt; {
+    return this.pubSub.asyncIterator(`PATIENT_ALERTS:${patientId}`);
+  }
+
+  @ResolveField(&#x27;Patient.recommendations&#x27;)
+  async resolveRecommendations(
+    @Parent() patient: Patient
+  ): Promise&lt;Recommendation[]&gt; {
+    return this.recommendationService.getActiveRecommendations(patient.id);
+  }
+
+  @ResolveField(&#x27;Patient.riskScores&#x27;)
+  async resolveRiskScores(
+    @Parent() patient: Patient
+  ): Promise&lt;RiskScore[]&gt; {
+    return this.riskService.calculateRiskScores(patient.id);
+  }
+}
+```
+
+---
+
+**WIA-CLINICAL-DECISION-SUPPORT API Interface**
+**Version**: 1.0.0
+**Last Updated**: 2025
+**License**: MIT
+
+© 2025 World Interoperability Alliance (WIA)
+弘益人間 (홍익인간) - Benefit All Humanity
+</pre></section></body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6장: 보안 및 프라이버시 - WIA-AIR-SHIELD</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-AIR-SHIELD v1.0</div>
+    <h1>6장</h1>
+    <p class="subtitle">보안 및 프라이버시</p>
+    <p class="subtitle">RF 공격 방어 및 대응</p>
+  </header>
+
+  <main>
+    <h2>6.1 RF 스니핑 보호</h2>
+
+    <p>RF(무선 주파수) 스니핑은 가장 일반적인 무선 공격 벡터 중 하나입니다. WIA-AIR-SHIELD는 모든 형태의 RF 가로채기에 대한 포괄적인 보호를 제공합니다.</p>
+
+    <h3>6.1.1 RF 계층 암호화</h3>
+
+    <pre><code>// 물리 계층 암호화
+const rfProtection = {
+  // 전송 전 RF 신호 스크램블
+  rfScrambling: {
+    enabled: true,
+    algorithm: 'LFSR', // 선형 피드백 시프트 레지스터
+    polynominal: 'x^7 + x^4 + 1',
+    seedRotation: 'per_packet'
+  },
+
+  // 확산 스펙트럼 기법
+  spreadSpectrum: {
+    type: 'FHSS', // 주파수 호핑 확산 스펙트럼
+    hoppingPattern: 'cryptographically_random',
+    hopRate: '1600_hops_per_second',
+    channelRange: [2400, 2483] // MHz
+  }
+};</code></pre>
+
+    <h3>6.1.2 패킷 캡처 방지</h3>
+
+    <pre><code>// 패킷 스니핑에 대한 다중 계층 보호
+async function protectAgainstSniffing(shield) {
+  // 계층 1: 물리 암호화
+  await shield.enableRFScrambling();
+
+  // 계층 2: 링크 계층 암호화 (WPA3)
+  await shield.setEncryption('WPA3-SAE');
+
+  // 계층 3: 네트워크 계층 암호화 (VPN)
+  await shield.enableVPN({
+    protocol: 'WireGuard',
+    encryption: 'ChaCha20-Poly1305'
+  });
+
+  // 계층 4: 애플리케이션 계층 암호화 (TLS 1.3)
+  await shield.requireTLS('1.3_or_higher');
+
+  // 추가 난독화
+  await shield.cloak.enable();
+  await shield.noise.startDecoy();
+
+  console.log('다중 계층 스니핑 보호 활성');
+}</code></pre>
+
+    <h2>6.2 사이드채널 공격 방지</h2>
+
+    <h3>6.2.1 전력 분석 공격 방어</h3>
+
+    <p>전력 분석 공격은 암호화 작업 중 전력 소비 패턴을 분석하여 비밀을 추출하려고 시도합니다.</p>
+
+    <pre><code>// 포괄적인 전력 분석 방어
+const powerDefense = {
+  // 일정한 전력 소비
+  constantPower: {
+    enabled: true,
+    technique: 'dual_rail_precharge_logic',
+    powerLeveling: 'active',
+    tolerance: '±3%'
+  },
+
+  // 노이즈 주입
+  noiseInjection: {
+    enabled: true,
+    noiseType: 'gaussian_white_noise',
+    snrReduction: '30dB', // 신호 대 잡음비 감소
+    randomizedTiming: true
+  },
+
+  // 암호화 마스킹
+  operationMasking: {
+    enabled: true,
+    maskingScheme: 'boolean_masking',
+    maskOrder: 'second_order', // 2차 공격에 저항
+    maskRefresh: 'per_operation'
+  }
+};</code></pre>
+
+    <h3>6.2.2 타이밍 공격 방어</h3>
+
+    <pre><code>// 상수 시간 구현
+class TimingDefense {
+  // 상수 시간 비교
+  static constantTimeCompare(a, b) {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+      result |= a[i] ^ b[i];
+    }
+
+    return result === 0;
+  }
+
+  // 랜덤 지연 추가
+  static async addRandomDelay() {
+    const delayMs = cryptoRandom(10, 100);
+    await sleep(delayMs);
+  }
+}</code></pre>
+
+    <h2>6.3 중간자 공격 (MITM) 방지</h2>
+
+    <h3>6.3.1 인증서 핀</h3>
+
+    <pre><code>// 인증서 피닝을 통한 MITM 방지
+const certificatePinning = {
+  // 특정 인증서 고정
+  pinnedCertificates: [
+    {
+      domain: 'api.example.com',
+      pins: [
+        'sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        'sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=' // 백업
+      ],
+      includeSubdomains: false
+    }
+  ],
+
+  // 핀 실패 시 동작
+  onPinFailure: 'reject_connection',
+  reportUri: 'https://report.example.com/pin-failure'
+};</code></pre>
+
+    <h3>6.3.2 상호 인증</h3>
+
+    <pre><code>// 양 당사자가 서로를 인증
+async function mutualAuth(shield, target) {
+  // 클라이언트가 서버 인증
+  const serverAuth = await shield.verify.verifyServer(target);
+  if (!serverAuth.valid) {
+    throw new Error('서버 인증 실패');
+  }
+
+  // 서버가 클라이언트 인증
+  const clientProof = await shield.zk.prover.createIdentityProof(myIdentity);
+  const serverVerification = await target.verifyClient(clientProof);
+
+  if (!serverVerification) {
+    throw new Error('클라이언트 인증 거부됨');
+  }
+
+  // 상호 인증 후 보안 채널 확립
+  const secureChannel = await shield.createSecureChannel(target);
+  return secureChannel;
+}</code></pre>
+
+    <h2>6.4 Evil Twin 공격 방지</h2>
+
+    <h3>6.4.1 다중 요소 AP 검증</h3>
+
+    <pre><code>// 포괄적인 액세스 포인트 검증
+async function verifyAccessPoint(shield, ap) {
+  const checks = [];
+
+  // 확인 1: 인증서 검증
+  checks.push({
+    name: 'certificate',
+    result: await shield.verify.validateCertificate(ap.cert)
+  });
+
+  // 확인 2: 신호 지문 인식
+  checks.push({
+    name: 'signal_fingerprint',
+    result: await shield.verify.matchSignalFingerprint(ap)
+  });
+
+  // 확인 3: 이력 일관성
+  checks.push({
+    name: 'history',
+    result: await shield.verify.checkAPHistory(ap)
+  });
+
+  // 확인 4: 지리적 타당성
+  checks.push({
+    name: 'location',
+    result: await shield.verify.verifyAPLocation(ap)
+  });
+
+  // 확인 5: 커뮤니티 검증
+  checks.push({
+    name: 'crowd',
+    result: await shield.verify.getCommunityTrust(ap)
+  });
+
+  // 결과 집계
+  const score = checks.reduce((sum, check) =>
+    sum + (check.result ? 1 : 0), 0
+  ) / checks.length;
+
+  return {
+    authentic: score >= 0.8,
+    confidence: score,
+    checks: checks
+  };
+}</code></pre>
+
+    <h2>6.5 다크웹 방어</h2>
+
+    <h3>6.5.1 데이터 수집 방지</h3>
+
+    <pre><code>// 조직화된 데이터 수집으로부터 보호
+const darkWebDefense = {
+  // 데이터 노출 최소화
+  dataMinimization: {
+    collectOnlyNecessary: true,
+    deleteAfterUse: true,
+    anonymizeWherePossible: true
+  },
+
+  // 수집 시도 감지
+  harvestingDetection: {
+    // 비정상적인 데이터 접근 패턴
+    anomalyDetection: true,
+
+    // 여러 번의 실패한 인증 시도
+    bruteForceDetection: true,
+
+    // 스크래핑 행동
+    scrapingDetection: {
+      requestRate: 'abnormally_high',
+      sequentialAccess: 'suspicious_patterns',
+      headerAnalysis: 'bot_signatures'
+    }
+  },
+
+  // 적극적 방어
+  activeDefense: {
+    // 속도 제한
+    rateLimit: {
+      requests: '100_per_hour',
+      dataTransfer: '10MB_per_hour'
+    },
+
+    // 의심스러운 활동 시 CAPTCHA
+    captchaChallenge: 'on_suspicion',
+
+    // 허니팟
+    honeypots: {
+      fakeData: true,
+      trackedAccess: true
+    }
+  }
+};</code></pre>
+
+    <h2>6.6 프라이버시 모범 사례</h2>
+
+    <h3>6.6.1 데이터 최소화</h3>
+
+    <div class="info-box">
+      <h4>WIA-AIR-SHIELD 데이터 수집 정책</h4>
+      <p><strong>수집하는 데이터 (보안을 위해서만):</strong></p>
+      <ul>
+        <li>신호 강도 (위협 탐지용)</li>
+        <li>연결 메타데이터 (검증용)</li>
+        <li>위협 시그니처 (패턴 매칭용)</li>
+      </ul>
+      <p><strong>절대 수집하지 않는 데이터:</strong></p>
+      <ul>
+        <li>메시지 내용</li>
+        <li>개인 신원</li>
+        <li>위치 정보</li>
+        <li>브라우징 기록</li>
+        <li>연락처 목록</li>
+        <li>모든 개인 식별 정보 (PII)</li>
+      </ul>
+    </div>
+
+    <h3>6.6.2 로컬 처리</h3>
+
+    <pre><code>// 모든 처리는 로컬에서
+const privacyConfig = {
+  // 로컬 전용 처리
+  processing: {
+    threatDetection: 'local',
+    anomalyDetection: 'local',
+    mlModels: 'on_device',
+    patternMatching: 'local'
+  },
+
+  // 서버 전송 없음
+  transmission: {
+    threatSignatures: 'local_database',
+    analytics: 'none',
+    telemetry: 'opt_in_only',
+    cloudSync: 'disabled_by_default'
+  },
+
+  // 데이터 보존
+  retention: {
+    logs: '7_days',
+    threatHistory: '30_days',
+    autoDelete: true,
+    userControlled: true
+  }
+};</code></pre>
+
+    <h2>6.7 규정 준수</h2>
+
+    <h3>6.7.1 GDPR 준수</h3>
+
+    <pre><code>// GDPR 준수 기능
+const gdprCompliance = {
+  // 접근 권리
+  dataAccess: {
+    supported: true,
+    format: ['JSON', 'XML', 'PDF'],
+    deliveryTime: 'immediate'
+  },
+
+  // 삭제 권리
+  dataErasure: {
+    supported: true,
+    scope: 'all_personal_data',
+    verification: 'immediate',
+    confirmation: 'provided'
+  },
+
+  // 설계에 의한 프라이버시
+  privacyByDesign: {
+    dataMinimization: true,
+    purposeLimitation: true,
+    storageLimitation: true,
+    encryption: 'always'
+  }
+};</code></pre>
+
+    <div class="warning-box">
+      <h4>보안 경고</h4>
+      <ul>
+        <li><strong>만능 해결책 없음:</strong> WIA-AIR-SHIELD는 보안을 크게 향상시키지만 절대적인 보호를 보장할 수 없습니다</li>
+        <li><strong>최신 상태 유지:</strong> 새로운 위협으로부터 보호하기 위해 방패 소프트웨어를 정기적으로 업데이트</li>
+        <li><strong>심층 방어:</strong> 포괄적인 보안 전략의 일부로 WIA-AIR-SHIELD 사용</li>
+        <li><strong>물리적 보안:</strong> 기기에 대한 물리적 접근은 무선 보호를 우회할 수 있습니다</li>
+      </ul>
+    </div>
+
+    <div class="info-box">
+      <h4>프라이버시 보장</h4>
+      <ul>
+        <li><strong>데이터 판매 금지:</strong> 귀하의 데이터는 절대 판매, 공유 또는 수익화되지 않습니다</li>
+        <li><strong>로컬 처리:</strong> 모든 처리는 사용자 기기에서 발생합니다</li>
+        <li><strong>최소 수집:</strong> 보안에 필수적인 데이터만 수집됩니다</li>
+        <li><strong>사용자 제어:</strong> 모든 프라이버시 설정을 제어할 수 있습니다</li>
+        <li><strong>투명성:</strong> 모든 활동에 대한 완전한 가시성</li>
+        <li><strong>삭제 권리:</strong> 언제든지 즉시 모든 데이터 삭제 가능</li>
+        <li><strong>오픈 소스:</strong> 핵심 알고리즘은 검증을 위해 오픈 소스입니다</li>
+      </ul>
+    </div>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter5.html" class="nav-button prev">이전 장</a>
+    <a href="chapter7.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

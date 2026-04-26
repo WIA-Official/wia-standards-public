@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 7: Implementation Examples - WIA-AIR-SHIELD</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-AIR-SHIELD v1.0</div>
+    <h1>Chapter 7</h1>
+    <p class="subtitle">Implementation Examples</p>
+    <p class="subtitle">Code for Wireless Shielding</p>
+  </header>
+
+  <main>
+    <h2>7.1 Python Implementation</h2>
+
+    <h3>7.1.1 Basic Shield Setup</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+WIA-AIR-SHIELD Python Implementation
+Protect your wireless communications
+"""
+
+from wia_air_shield import AirShield, ProtectionMode
+from wia_air_shield.layers import CloakLayer, NoiseLayer, VerifyLayer, AlertLayer
+import asyncio
+
+async def basic_shield_example():
+    """Basic shield protection example"""
+
+    # Create shield instance
+    shield = AirShield(
+        mode=ProtectionMode.BALANCED,
+        auto_detect=True
+    )
+
+    # Set up alert callback
+    def on_threat(threat):
+        print(f"⚠️ Threat detected: {threat.type}")
+        print(f"   Severity: {threat.severity}")
+        print(f"   Recommendation: {threat.recommendation}")
+
+    shield.alert.on_threat(on_threat)
+
+    # Activate shield
+    await shield.activate()
+    print("✅ Shield activated")
+
+    # Get status
+    status = shield.get_status()
+    print(f"Protection mode: {status.mode}")
+    print(f"Threat level: {status.threat_level}")
+
+    # Scan for threats
+    threats = await shield.scan()
+    print(f"Threats detected: {len(threats)}")
+
+    return shield
+
+if __name__ == "__main__":
+    asyncio.run(basic_shield_example())</code></pre>
+
+    <h3>7.1.2 Public WiFi Protection</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+Automatic public WiFi protection
+"""
+
+from wia_air_shield import AirShield, ProtectionMode
+from wia_air_shield.network import NetworkMonitor
+import asyncio
+
+class PublicWiFiProtector:
+    def __init__(self):
+        self.shield = AirShield(mode=ProtectionMode.AUTO)
+        self.monitor = NetworkMonitor()
+
+    async def protect_public_wifi(self):
+        """Automatically protect when on public WiFi"""
+
+        # Monitor network changes
+        self.monitor.on_network_change(self.handle_network_change)
+
+        # Activate shield
+        await self.shield.activate()
+        print("🛡️ Public WiFi protector active")
+
+        # Keep running
+        await self.monitor.start()
+
+    async def handle_network_change(self, network):
+        """Handle network environment changes"""
+
+        print(f"\n📡 Network changed: {network.ssid}")
+
+        # Assess trust level
+        trust_level = await self.shield.assess_trust(network)
+        print(f"Trust level: {trust_level}")
+
+        if trust_level == "untrusted" or network.type == "public_wifi":
+            await self.protect_untrusted_network(network)
+        elif trust_level == "trusted":
+            await self.optimize_for_performance()
+
+    async def protect_untrusted_network(self, network):
+        """Maximum protection for untrusted networks"""
+
+        print("⚠️ Untrusted network detected - enabling maximum protection")
+
+        # Switch to fortress mode
+        await self.shield.set_mode(ProtectionMode.FORTRESS)
+
+        # Verify access point
+        verification = await self.shield.verify.verify_access_point(network.ap)
+
+        if not verification.authentic:
+            print("🚨 DANGER: Suspicious WiFi network!")
+            print(f"Confidence: {verification.confidence}%")
+            print("Recommendation: DO NOT CONNECT")
+            return
+
+        # Enable all shields
+        await self.shield.cloak.set_level(5)
+        await self.shield.noise.set_intensity(80)
+        await self.shield.verify.set_strictness("paranoid")
+
+        # Enable VPN
+        await self.shield.enable_vpn()
+
+        print("✅ Maximum protection enabled")
+
+    async def optimize_for_performance(self):
+        """Optimize for trusted networks"""
+
+        print("✅ Trusted network - optimizing for performance")
+        await self.shield.set_mode(ProtectionMode.BALANCED)
+
+async def main():
+    protector = PublicWiFiProtector()
+    await protector.protect_public_wifi()
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+
+    <h3>7.1.3 Zero-Knowledge Authentication</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+Zero-knowledge proof implementation
+Prove identity without revealing it
+"""
+
+from wia_air_shield import AirShield
+from wia_air_shield.zk import ZKProver, ZKVerifier
+import asyncio
+
+async def zero_knowledge_example():
+    """Demonstrate zero-knowledge proofs"""
+
+    shield = AirShield()
+    await shield.activate()
+
+    # --- PROVER SIDE ---
+
+    # Prove age over 18 without revealing exact age
+    my_age = 25  # Secret
+
+    age_proof = await shield.zk.prover.create_attribute_proof(
+        attribute="age",
+        predicate={"greater_than": 18},
+        actual_value=my_age  # Not revealed
+    )
+
+    print("✅ Created proof: Age over 18 (without revealing age)")
+
+    # Prove sufficient balance without revealing amount
+    my_balance = 1000.0  # Secret
+    required_amount = 500.0
+
+    balance_proof = await shield.zk.prover.create_range_proof(
+        value=my_balance,  # Not revealed
+        range=(required_amount, float('inf'))
+    )
+
+    print(f"✅ Created proof: Balance ≥ ${required_amount} (without revealing balance)")
+
+    # --- VERIFIER SIDE ---
+
+    # Verify age proof
+    age_valid = await shield.zk.verifier.verify(age_proof)
+    print(f"Age proof valid: {age_valid}")
+    print(f"Verifier learned: User is over 18")
+    print(f"Verifier did NOT learn: Actual age")
+
+    # Verify balance proof
+    balance_valid = await shield.zk.verifier.verify(balance_proof)
+    print(f"Balance proof valid: {balance_valid}")
+    print(f"Verifier learned: User has sufficient balance")
+    print(f"Verifier did NOT learn: Actual balance")
+
+if __name__ == "__main__":
+    asyncio.run(zero_knowledge_example())</code></pre>
+
+    <h2>7.2 TypeScript Implementation</h2>
+
+    <h3>7.2.1 Node.js Server Protection</h3>
+
+    <pre><code>/**
+ * WIA-AIR-SHIELD TypeScript Implementation
+ * Protect Node.js server wireless communications
+ */
+
+import { AirShield, ProtectionMode } from '@anthropic/wia-air-shield';
+import { createServer } from 'https';
+import { readFileSync } from 'fs';
+
+class SecureServer {
+  private shield: AirShield;
+
+  constructor() {
+    this.shield = new AirShield({
+      mode: ProtectionMode.FORTRESS,
+      autoDetect: true,
+      deviceProfile: 'server'
+    });
+  }
+
+  async start(): Promise&lt;void&gt; {
+    // Activate shield before starting server
+    await this.shield.activate();
+    console.log('🛡️ Shield activated');
+
+    // Configure server-specific protection
+    await this.configureServerProtection();
+
+    // Create HTTPS server with shield protection
+    const server = createServer(
+      {
+        key: readFileSync('server-key.pem'),
+        cert: readFileSync('server-cert.pem'),
+
+        // Enhanced TLS settings
+        minVersion: 'TLSv1.3',
+        ciphers: this.shield.getRecommendedCiphers(),
+
+        // Certificate verification
+        requestCert: true,
+        rejectUnauthorized: true
+      },
+      this.handleRequest.bind(this)
+    );
+
+    // Monitor incoming connections
+    server.on('connection', this.verifyConnection.bind(this));
+
+    server.listen(443, () => {
+      console.log('✅ Secure server listening on port 443');
+    });
+  }
+
+  private async configureServerProtection(): Promise&lt;void&gt; {
+    // Enable all shields
+    await this.shield.cloak.enable();
+    await this.shield.noise.setIntensity(70);
+    await this.shield.verify.setStrictness('strict');
+
+    // Real-time monitoring
+    this.shield.monitor.start({
+      interval: 5000,
+      deepScan: false
+    });
+
+    // Alert on threats
+    this.shield.alert.onThreat((threat) => {
+      console.error(`🚨 Server threat: ${threat.type}`);
+
+      if (threat.severity === 'critical') {
+        // Activate incident response
+        this.handleSecurityIncident(threat);
+      }
+    });
+
+    // Side-channel protection
+    await this.shield.enableSideChannelProtection({
+      powerAnalysisDefense: true,
+      timingDefense: true
+    });
+  }
+
+  private async verifyConnection(socket: any): Promise&lt;void&gt; {
+    const remoteAddress = socket.remoteAddress;
+
+    // Verify connecting device
+    const verification = await this.shield.verify.verifyDevice({
+      address: remoteAddress,
+      port: socket.remotePort
+    });
+
+    if (!verification.authentic) {
+      console.warn(`⚠️ Rejected suspicious connection from ${remoteAddress}`);
+      socket.destroy();
+      return;
+    }
+
+    console.log(`✅ Verified connection from ${remoteAddress}`);
+  }
+
+  private handleRequest(req: any, res: any): void {
+    // Request handling with shield protection
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY'
+    });
+
+    res.end(JSON.stringify({
+      status: 'protected',
+      shield: 'active'
+    }));
+  }
+
+  private handleSecurityIncident(threat: any): void {
+    // Incident response
+    console.error('🚨 SECURITY INCIDENT 🚨');
+    console.error(`Type: ${threat.type}`);
+    console.error(`Severity: ${threat.severity}`);
+
+    // Log for forensics
+    this.shield.logIncident(threat);
+
+    // Notify security team
+    // notifySecurityTeam(threat);
+  }
+}
+
+// Start secure server
+const server = new SecureServer();
+server.start().catch(console.error);</code></pre>
+
+    <h3>7.2.2 React Application Protection</h3>
+
+    <pre><code>/**
+ * React application with WIA-AIR-SHIELD
+ */
+
+import React, { useEffect, useState } from 'react';
+import { AirShield, ProtectionMode } from '@anthropic/wia-air-shield';
+
+const useAirShield = () => {
+  const [shield, setShield] = useState&lt;AirShield | null&gt;(null);
+  const [threatLevel, setThreatLevel] = useState&lt;string&gt;('safe');
+  const [protected, setProtected] = useState(false);
+
+  useEffect(() => {
+    const initShield = async () => {
+      const airShield = new AirShield({
+        mode: ProtectionMode.BALANCED,
+        autoDetect: true
+      });
+
+      // Monitor threats
+      airShield.alert.onThreat((threat) => {
+        setThreatLevel(threat.level);
+      });
+
+      await airShield.activate();
+      setShield(airShield);
+      setProtected(true);
+    };
+
+    initShield();
+
+    return () => {
+      shield?.deactivate();
+    };
+  }, []);
+
+  return { shield, threatLevel, protected };
+};
+
+const App: React.FC = () => {
+  const { shield, threatLevel, protected } = useAirShield();
+
+  return (
+    &lt;div className="app"&gt;
+      &lt;ProtectionStatus
+        active={protected}
+        threatLevel={threatLevel}
+      /&gt;
+
+      &lt;SecureContent shield={shield} /&gt;
+    &lt;/div&gt;
+  );
+};
+
+const ProtectionStatus: React.FC&lt;{
+  active: boolean;
+  threatLevel: string;
+}&gt; = ({ active, threatLevel }) => {
+  const getStatusColor = () => {
+    const colors = {
+      safe: '#10B981',
+      low: '#3B82F6',
+      medium: '#F59E0B',
+      high: '#EF4444',
+      critical: '#DC2626'
+    };
+    return colors[threatLevel] || '#6B7280';
+  };
+
+  return (
+    &lt;div style={{
+      background: getStatusColor(),
+      color: 'white',
+      padding: '1rem'
+    }}&gt;
+      🛡️ Shield: {active ? 'ACTIVE' : 'INACTIVE'}
+      {' | '}
+      Threat Level: {threatLevel.toUpperCase()}
+    &lt;/div&gt;
+  );
+};
+
+export default App;</code></pre>
+
+    <h2>7.3 Bash Script Implementation</h2>
+
+    <h3>7.3.1 WiFi Security Checker</h3>
+
+    <pre><code>#!/bin/bash
+#
+# WIA-AIR-SHIELD WiFi Security Checker
+# Check if current WiFi network is safe
+#
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check if wia-air-shield is installed
+if ! command -v wia-shield &gt;/dev/null 2&gt;&1; then
+    echo -e "${RED}Error: wia-air-shield not installed${NC}"
+    echo "Install: npm install -g @anthropic/wia-air-shield-cli"
+    exit 1
+fi
+
+# Get current network
+CURRENT_SSID=$(wia-shield network current --format ssid)
+CURRENT_BSSID=$(wia-shield network current --format bssid)
+
+echo "Checking network: $CURRENT_SSID"
+echo "BSSID: $CURRENT_BSSID"
+echo ""
+
+# Activate shield
+echo "Activating shield..."
+wia-shield activate --mode fortress
+
+# Scan for threats
+echo "Scanning for threats..."
+SCAN_RESULT=$(wia-shield scan --format json)
+
+# Parse results
+THREAT_COUNT=$(echo "$SCAN_RESULT" | jq '.threats | length')
+THREAT_LEVEL=$(echo "$SCAN_RESULT" | jq -r '.threat_level')
+
+# Report results
+echo ""
+echo "=== SCAN RESULTS ==="
+echo "Threats detected: $THREAT_COUNT"
+echo "Threat level: $THREAT_LEVEL"
+echo ""
+
+# Check for evil twins
+EVIL_TWINS=$(echo "$SCAN_RESULT" | jq '[.threats[] | select(.type == "evil_twin")] | length')
+
+if [ "$EVIL_TWINS" -gt 0 ]; then
+    echo -e "${RED}⚠️ WARNING: Evil Twin Access Point Detected!${NC}"
+    echo -e "${RED}Do NOT use this network for sensitive activities${NC}"
+    echo ""
+fi
+
+# Verify access point
+echo "Verifying access point..."
+VERIFY_RESULT=$(wia-shield verify access-point \
+    --ssid "$CURRENT_SSID" \
+    --bssid "$CURRENT_BSSID" \
+    --format json)
+
+AUTHENTIC=$(echo "$VERIFY_RESULT" | jq -r '.authentic')
+CONFIDENCE=$(echo "$VERIFY_RESULT" | jq -r '.confidence')
+
+if [ "$AUTHENTIC" = "true" ]; then
+    echo -e "${GREEN}✅ Access point verified (${CONFIDENCE}% confidence)${NC}"
+else
+    echo -e "${RED}❌ Access point verification FAILED${NC}"
+    echo -e "${RED}Recommendation: Disconnect immediately${NC}"
+    exit 1
+fi
+
+# Overall recommendation
+echo ""
+echo "=== RECOMMENDATION ==="
+
+if [ "$THREAT_LEVEL" = "safe" ]; then
+    echo -e "${GREEN}✅ Network appears safe${NC}"
+    echo "You may use this network with basic precautions"
+elif [ "$THREAT_LEVEL" = "low" ] || [ "$THREAT_LEVEL" = "medium" ]; then
+    echo -e "${YELLOW}⚠️ Caution recommended${NC}"
+    echo "Use VPN and avoid sensitive transactions"
+else
+    echo -e "${RED}🚨 DANGER: High threat environment${NC}"
+    echo "Switch to mobile data or trusted network immediately"
+fi
+
+echo ""
+echo "Shield remains active for ongoing protection"</code></pre>
+
+    <h3>7.3.2 Automated Shield Daemon</h3>
+
+    <pre><code>#!/bin/bash
+#
+# WIA-AIR-SHIELD Daemon
+# Continuously monitor and protect wireless connections
+#
+
+set -euo pipefail
+
+SHIELD_MODE="balanced"
+CHECK_INTERVAL=30  # seconds
+LOG_FILE="/var/log/wia-air-shield.log"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+activate_shield() {
+    log "Activating shield in $SHIELD_MODE mode..."
+    wia-shield activate --mode "$SHIELD_MODE" --daemon
+    log "Shield activated"
+}
+
+check_threats() {
+    local result
+    result=$(wia-shield scan --format json 2&gt;/dev/null || echo '{"threats":[]}')
+
+    local threat_count
+    threat_count=$(echo "$result" | jq '.threats | length')
+
+    if [ "$threat_count" -gt 0 ]; then
+        log "WARNING: $threat_count threat(s) detected"
+
+        # Log each threat
+        echo "$result" | jq -c '.threats[]' | while read -r threat; do
+            local threat_type
+            local severity
+            threat_type=$(echo "$threat" | jq -r '.type')
+            severity=$(echo "$threat" | jq -r '.severity')
+
+            log "  - $threat_type (severity: $severity)"
+
+            # Take action based on severity
+            if [ "$severity" = "critical" ]; then
+                handle_critical_threat "$threat"
+            fi
+        done
+    fi
+}
+
+handle_critical_threat() {
+    local threat=$1
+    local threat_type
+    threat_type=$(echo "$threat" | jq -r '.type')
+
+    log "CRITICAL THREAT: $threat_type"
+
+    # Disconnect from network
+    log "Disconnecting from network for safety..."
+    nmcli device disconnect wlan0 || true
+
+    # Send alert
+    notify-send "WIA-AIR-SHIELD" \
+        "Critical threat detected. Network disconnected for your safety." \
+        --urgency=critical
+
+    # Wait before allowing reconnection
+    sleep 10
+}
+
+monitor_network() {
+    log "Starting network monitoring..."
+
+    while true; do
+        # Check if connected to network
+        if nmcli device status | grep -q "wlan0.*connected"; then
+            check_threats
+        fi
+
+        sleep "$CHECK_INTERVAL"
+    done
+}
+
+main() {
+    log "WIA-AIR-SHIELD Daemon starting..."
+
+    # Activate shield
+    activate_shield
+
+    # Start monitoring
+    monitor_network
+}
+
+# Handle signals
+trap 'log "Daemon stopped"; wia-shield deactivate; exit 0' SIGTERM SIGINT
+
+# Start daemon
+main</code></pre>
+
+    <h2>7.4 Complete Integration Example</h2>
+
+    <h3>7.4.1 Full-Stack Protected Application</h3>
+
+    <pre><code>/**
+ * Complete example: Full-stack app with WIA-AIR-SHIELD
+ * Backend (Node.js) + Frontend (React) + Database
+ */
+
+// ===== BACKEND (server.ts) =====
+
+import express from 'express';
+import { AirShield } from '@anthropic/wia-air-shield';
+import { createServer } from 'https';
+
+class ProtectedServer {
+  private app = express();
+  private shield: AirShield;
+
+  constructor() {
+    this.shield = new AirShield({
+      mode: 'fortress',
+      deviceProfile: 'server'
+    });
+  }
+
+  async start() {
+    // Activate shield
+    await this.shield.activate();
+
+    // Middleware: Verify all incoming connections
+    this.app.use(async (req, res, next) => {
+      const clientIP = req.ip;
+
+      const verified = await this.shield.verify.verifyDevice({
+        address: clientIP
+      });
+
+      if (!verified.authentic) {
+        return res.status(403).json({
+          error: 'Connection verification failed'
+        });
+      }
+
+      next();
+    });
+
+    // API endpoint with ZK authentication
+    this.app.post('/api/auth', async (req, res) => {
+      const { zkProof } = req.body;
+
+      // Verify zero-knowledge proof
+      const valid = await this.shield.zk.verifier.verify(zkProof);
+
+      if (valid) {
+        const token = generateToken();
+        res.json({ success: true, token });
+      } else {
+        res.status(401).json({ error: 'Authentication failed' });
+      }
+    });
+
+    // Protected data endpoint
+    this.app.get('/api/data', authenticateToken, async (req, res) => {
+      // Data transmitted with shield protection
+      const secureChannel = await this.shield.createSecureChannel(req.socket);
+
+      const data = await fetchSensitiveData();
+
+      await secureChannel.send({
+        data,
+        encrypted: true,
+        postQuantum: true
+      });
+
+      res.json({ success: true });
+    });
+
+    // Start HTTPS server
+    const server = createServer(
+      this.shield.getTLSOptions(),
+      this.app
+    );
+
+    server.listen(443, () => {
+      console.log('🛡️ Protected server running');
+    });
+  }
+}
+
+new ProtectedServer().start();
+
+// ===== FRONTEND (App.tsx) =====
+
+import React, { useEffect } from 'react';
+import { AirShield } from '@anthropic/wia-air-shield';
+
+function App() {
+  useEffect(() => {
+    const initShield = async () => {
+      const shield = new AirShield({
+        mode: 'balanced',
+        autoDetect: true
+      });
+
+      await shield.activate();
+
+      // Create ZK proof for authentication
+      const zkProof = await shield.zk.prover.createIdentityProof(
+        userIdentity
+      );
+
+      // Send to server
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ zkProof })
+      });
+
+      const { token } = await response.json();
+      localStorage.setItem('token', token);
+    };
+
+    initShield();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Protected Application&lt;/h1&gt;
+      &lt;p&gt;All communications are shielded&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+export default App;</code></pre>
+
+    <div class="info-box">
+      <h4>Implementation Tips</h4>
+      <ul>
+        <li><strong>Start Simple:</strong> Begin with basic protection and add features gradually</li>
+        <li><strong>Test Thoroughly:</strong> Test in safe environments before production</li>
+        <li><strong>Monitor Logs:</strong> Regularly check shield logs for issues</li>
+        <li><strong>Update Regularly:</strong> Keep shield software up to date</li>
+        <li><strong>Handle Errors:</strong> Implement proper error handling for network issues</li>
+        <li><strong>Performance:</strong> Balance security with performance needs</li>
+        <li><strong>User Experience:</strong> Make security transparent to users</li>
+      </ul>
+    </div>
+
+    <div class="example-box">
+      <h4>Quick Start Template</h4>
+      <pre><code>// Copy-paste starter template
+import { AirShield } from '@anthropic/wia-air-shield';
+
+async function quickStart() {
+  // 1. Create shield
+  const shield = new AirShield({ mode: 'balanced' });
+
+  // 2. Set up alerts
+  shield.alert.onThreat(threat =&gt; {
+    console.warn('Threat:', threat);
+  });
+
+  // 3. Activate
+  await shield.activate();
+
+  // 4. You're protected!
+  console.log('🛡️ Protected');
+
+  // Your code here...
+}
+
+quickStart();</code></pre>
+    </div>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter6.html" class="nav-button prev">Previous Chapter</a>
+    <a href="chapter8.html" class="nav-button next">Next Chapter</a>
+  </div>
+</body>
+</html>

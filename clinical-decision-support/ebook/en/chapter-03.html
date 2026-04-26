@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-MED-015 Clinical Decision Support - Chapter 03</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+<h1 style="color: #a855f7;">Chapter 03</h1>
+<p style="color: #94a3b8;">This chapter covers comprehensive details on CDSS topics including architecture, integration, guidelines, drug safety, diagnostics, data standards, alert optimization, and implementation best practices following WIA-MED-015 standards.</p>
+<h2 style="color: #c4b5fd;">Core Concepts</h2>
+<p style="color: #94a3b8;">Implementation requires careful attention to evidence-based medicine, interoperability standards (HL7 FHIR, SNOMED CT, LOINC), and user-centered design principles. Systems must balance safety alerts with usability to prevent alert fatigue while maintaining clinical effectiveness.</p>
+<p style="text-align: center; color: #ffd700; margin: 40px 0;">弘益人間 · Benefit All Humanity</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA</p>
+<section id="ebook-source"><h2>Source Markdown — Reference</h2><pre style="white-space:pre-wrap;color:#cbd5e1;font-size:0.9em;"># Chapter 3: Clinical Decision Support Data Formats
+
+## Healthcare Data Models and Interoperability Standards
+
+### 3.1 Healthcare Data Standards Overview
+
+Clinical decision support systems require seamless integration with healthcare data from multiple sources. This chapter defines the data formats, standards, and models that enable interoperability and effective clinical decision support.
+
+```typescript
+// Healthcare Data Standards Framework
+interface HealthcareDataStandards {
+  version: &#x27;1.0.0&#x27;;
+
+  interoperabilityStandards: {
+    hl7Fhir: {
+      version: &#x27;R4 (4.0.1)&#x27;;
+      scope: &#x27;Primary data exchange standard&#x27;;
+      resources: FHIRResource[];
+      adoption: &#x27;Mandated by US regulations (21st Century Cures)&#x27;;
+    };
+    hl7V2: {
+      version: &#x27;2.5.1+&#x27;;
+      scope: &#x27;Legacy message exchange&#x27;;
+      usage: &#x27;Lab results, ADT, orders&#x27;;
+      status: &#x27;Still widely used, gradually migrating to FHIR&#x27;;
+    };
+    cda: {
+      version: &#x27;R2&#x27;;
+      scope: &#x27;Clinical document exchange&#x27;;
+      usage: &#x27;CCDs, discharge summaries&#x27;;
+      status: &#x27;Being superseded by FHIR documents&#x27;;
+    };
+    dicom: {
+      version: &#x27;2024a&#x27;;
+      scope: &#x27;Medical imaging&#x27;;
+      usage: &#x27;All imaging modalities, SR for reports&#x27;;
+    };
+  };
+
+  terminologyStandards: {
+    snomedCt: {
+      scope: &#x27;Clinical terminology&#x27;;
+      coverage: &#x27;Diagnoses, procedures, findings, organisms&#x27;;
+      concepts: &#x27;350,000+ concepts&#x27;;
+    };
+    icd: {
+      versions: [&#x27;ICD-10-CM&#x27;, &#x27;ICD-11&#x27;];
+      scope: &#x27;Diagnosis coding&#x27;;
+      usage: &#x27;Billing, epidemiology&#x27;;
+    };
+    loinc: {
+      scope: &#x27;Laboratory and clinical observations&#x27;;
+      codes: &#x27;90,000+ codes&#x27;;
+      usage: &#x27;Lab tests, vital signs, documents&#x27;;
+    };
+    rxnorm: {
+      scope: &#x27;Medications&#x27;;
+      coverage: &#x27;Drug names, ingredients, forms, strengths&#x27;;
+      usage: &#x27;Prescription data, drug databases&#x27;;
+    };
+    cpt: {
+      scope: &#x27;Procedure coding&#x27;;
+      usage: &#x27;Billing, service documentation&#x27;;
+    };
+  };
+}
+
+// FHIR Resources for CDSS
+const fhirResourcesForCDSS: FHIRResourceCoverage = {
+  patientData: {
+    Patient: {
+      usage: &#x27;Demographics, identifiers&#x27;,
+      cdssRelevance: &#x27;Patient identification, age-based rules&#x27;,
+      keyElements: [&#x27;identifier&#x27;, &#x27;name&#x27;, &#x27;birthDate&#x27;, &#x27;gender&#x27;, &#x27;address&#x27;]
+    },
+    Condition: {
+      usage: &#x27;Problems, diagnoses&#x27;,
+      cdssRelevance: &#x27;Rule triggers, risk factors, contraindications&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;clinicalStatus&#x27;, &#x27;verificationStatus&#x27;, &#x27;onset&#x27;, &#x27;severity&#x27;]
+    },
+    MedicationRequest: {
+      usage: &#x27;Prescription orders&#x27;,
+      cdssRelevance: &#x27;Drug interaction checking, dosing recommendations&#x27;,
+      keyElements: [&#x27;medication&#x27;, &#x27;dosageInstruction&#x27;, &#x27;status&#x27;, &#x27;intent&#x27;]
+    },
+    MedicationStatement: {
+      usage: &#x27;Medication usage records&#x27;,
+      cdssRelevance: &#x27;Active medication list for interaction checking&#x27;,
+      keyElements: [&#x27;medication&#x27;, &#x27;status&#x27;, &#x27;effectivePeriod&#x27;, &#x27;dosage&#x27;]
+    },
+    AllergyIntolerance: {
+      usage: &#x27;Allergies and adverse reactions&#x27;,
+      cdssRelevance: &#x27;Allergy alerts, contraindication checking&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;clinicalStatus&#x27;, &#x27;type&#x27;, &#x27;category&#x27;, &#x27;criticality&#x27;, &#x27;reaction&#x27;]
+    },
+    Observation: {
+      usage: &#x27;Lab results, vital signs, assessments&#x27;,
+      cdssRelevance: &#x27;Rule triggers, trend analysis, risk scores&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;value&#x27;, &#x27;effectiveDateTime&#x27;, &#x27;status&#x27;, &#x27;interpretation&#x27;]
+    },
+    Procedure: {
+      usage: &#x27;Procedures performed&#x27;,
+      cdssRelevance: &#x27;Care history, follow-up recommendations&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;status&#x27;, &#x27;performedDateTime&#x27;, &#x27;outcome&#x27;]
+    },
+    Immunization: {
+      usage: &#x27;Vaccination records&#x27;,
+      cdssRelevance: &#x27;Immunization recommendations, due dates&#x27;,
+      keyElements: [&#x27;vaccineCode&#x27;, &#x27;occurrenceDateTime&#x27;, &#x27;status&#x27;, &#x27;doseQuantity&#x27;]
+    }
+  },
+
+  clinicalResources: {
+    Encounter: {
+      usage: &#x27;Healthcare visits&#x27;,
+      cdssRelevance: &#x27;Context for recommendations, visit type-specific rules&#x27;,
+      keyElements: [&#x27;status&#x27;, &#x27;class&#x27;, &#x27;type&#x27;, &#x27;period&#x27;, &#x27;reasonCode&#x27;]
+    },
+    DiagnosticReport: {
+      usage: &#x27;Lab reports, imaging reports&#x27;,
+      cdssRelevance: &#x27;Test interpretation support, abnormal flagging&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;status&#x27;, &#x27;effectiveDateTime&#x27;, &#x27;conclusion&#x27;, &#x27;result&#x27;]
+    },
+    CarePlan: {
+      usage: &#x27;Treatment plans&#x27;,
+      cdssRelevance: &#x27;Care pathway adherence, intervention scheduling&#x27;,
+      keyElements: [&#x27;status&#x27;, &#x27;intent&#x27;, &#x27;category&#x27;, &#x27;activity&#x27;, &#x27;goal&#x27;]
+    },
+    Goal: {
+      usage: &#x27;Clinical goals&#x27;,
+      cdssRelevance: &#x27;Outcome tracking, goal-directed recommendations&#x27;,
+      keyElements: [&#x27;lifecycleStatus&#x27;, &#x27;description&#x27;, &#x27;target&#x27;, &#x27;achievementStatus&#x27;]
+    },
+    RiskAssessment: {
+      usage: &#x27;Risk evaluations&#x27;,
+      cdssRelevance: &#x27;Risk scores, predictive model outputs&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;prediction&#x27;, &#x27;mitigation&#x27;, &#x27;note&#x27;]
+    }
+  },
+
+  cdssSpecificResources: {
+    Library: {
+      usage: &#x27;Knowledge artifacts (CQL libraries)&#x27;,
+      cdssRelevance: &#x27;Clinical logic definitions&#x27;,
+      keyElements: [&#x27;content&#x27;, &#x27;type&#x27;, &#x27;dataRequirement&#x27;, &#x27;parameter&#x27;]
+    },
+    PlanDefinition: {
+      usage: &#x27;Protocols, order sets, guidelines&#x27;,
+      cdssRelevance: &#x27;Computable clinical guidelines&#x27;,
+      keyElements: [&#x27;action&#x27;, &#x27;goal&#x27;, &#x27;trigger&#x27;, &#x27;condition&#x27;, &#x27;dynamicValue&#x27;]
+    },
+    ActivityDefinition: {
+      usage: &#x27;Order templates&#x27;,
+      cdssRelevance: &#x27;Recommended orders, activities&#x27;,
+      keyElements: [&#x27;code&#x27;, &#x27;timing&#x27;, &#x27;dosage&#x27;, &#x27;productReference&#x27;]
+    },
+    RequestGroup: {
+      usage: &#x27;Grouped recommendations&#x27;,
+      cdssRelevance: &#x27;CDSS output - bundled recommendations&#x27;,
+      keyElements: [&#x27;status&#x27;, &#x27;intent&#x27;, &#x27;action&#x27;, &#x27;priority&#x27;]
+    },
+    GuidanceResponse: {
+      usage: &#x27;CDS response&#x27;,
+      cdssRelevance: &#x27;Standard CDSS response format&#x27;,
+      keyElements: [&#x27;status&#x27;, &#x27;outputParameters&#x27;, &#x27;result&#x27;, &#x27;dataRequirement&#x27;]
+    }
+  }
+};
+```
+
+### 3.2 CDSS Data Models
+
+```typescript
+// Core CDSS Data Models
+interface CDSSPatientData {
+  demographics: PatientDemographics;
+  problems: ProblemList;
+  medications: MedicationList;
+  allergies: AllergyList;
+  vitals: VitalSignHistory;
+  labs: LaboratoryResults;
+  procedures: ProcedureHistory;
+  immunizations: ImmunizationRecord;
+  familyHistory: FamilyHistoryRecord;
+  socialHistory: SocialHistoryRecord;
+}
+
+// Patient Demographics
+interface PatientDemographics {
+  patientId: string;
+  mrn: string;
+  name: HumanName;
+  birthDate: Date;
+  age: AgeValue;
+  gender: &#x27;male&#x27; | &#x27;female&#x27; | &#x27;other&#x27; | &#x27;unknown&#x27;;
+  administrativeGender: string;
+  race: CodeableConcept[];
+  ethnicity: CodeableConcept[];
+  addresses: Address[];
+  telecom: ContactPoint[];
+  maritalStatus: CodeableConcept;
+  communication: Communication[];
+  contacts: PatientContact[];
+}
+
+interface AgeValue {
+  years: number;
+  months?: number;
+  days?: number;
+  ageGroup: &#x27;NEONATE&#x27; | &#x27;INFANT&#x27; | &#x27;CHILD&#x27; | &#x27;ADOLESCENT&#x27; | &#x27;ADULT&#x27; | &#x27;ELDERLY&#x27;;
+}
+
+// Problem List for Clinical Context
+interface ProblemList {
+  active: ClinicalProblem[];
+  inactive: ClinicalProblem[];
+  resolved: ClinicalProblem[];
+}
+
+interface ClinicalProblem {
+  id: string;
+  code: {
+    system: &#x27;http://snomed.info/sct&#x27; | &#x27;http://hl7.org/fhir/sid/icd-10-cm&#x27;;
+    code: string;
+    display: string;
+  };
+  clinicalStatus: &#x27;active&#x27; | &#x27;recurrence&#x27; | &#x27;relapse&#x27; | &#x27;inactive&#x27; | &#x27;remission&#x27; | &#x27;resolved&#x27;;
+  verificationStatus: &#x27;unconfirmed&#x27; | &#x27;provisional&#x27; | &#x27;differential&#x27; | &#x27;confirmed&#x27;;
+  severity: &#x27;mild&#x27; | &#x27;moderate&#x27; | &#x27;severe&#x27;;
+  category: &#x27;problem-list-item&#x27; | &#x27;encounter-diagnosis&#x27;;
+  onset: {
+    dateTime?: Date;
+    age?: AgeValue;
+    period?: Period;
+    string?: string;
+  };
+  recordedDate: Date;
+  note: string[];
+}
+
+// Medication Data Model
+interface MedicationList {
+  active: MedicationRecord[];
+  completed: MedicationRecord[];
+  discontinued: MedicationRecord[];
+}
+
+interface MedicationRecord {
+  id: string;
+  medication: {
+    rxnormCode: string;
+    display: string;
+    ingredients: Ingredient[];
+    drugClass: DrugClass[];
+  };
+  status: &#x27;active&#x27; | &#x27;completed&#x27; | &#x27;entered-in-error&#x27; | &#x27;intended&#x27; | &#x27;stopped&#x27; | &#x27;on-hold&#x27;;
+  intent: &#x27;proposal&#x27; | &#x27;plan&#x27; | &#x27;order&#x27; | &#x27;instance-order&#x27; | &#x27;option&#x27;;
+  dosage: Dosage[];
+  route: CodeableConcept;
+  frequency: Frequency;
+  duration: Duration;
+  prescribedDate: Date;
+  prescriber: Reference;
+  indication: CodeableConcept[];
+  substitution: SubstitutionInfo;
+}
+
+interface Dosage {
+  sequence: number;
+  text: string;
+  timing: Timing;
+  route: CodeableConcept;
+  method: CodeableConcept;
+  doseQuantity: Quantity;
+  maxDosePerPeriod: Ratio;
+  maxDosePerAdministration: Quantity;
+  maxDosePerLifetime: Quantity;
+}
+
+// Allergy and Intolerance Data
+interface AllergyList {
+  allergies: AllergyRecord[];
+}
+
+interface AllergyRecord {
+  id: string;
+  clinicalStatus: &#x27;active&#x27; | &#x27;inactive&#x27; | &#x27;resolved&#x27;;
+  verificationStatus: &#x27;unconfirmed&#x27; | &#x27;confirmed&#x27; | &#x27;refuted&#x27;;
+  type: &#x27;allergy&#x27; | &#x27;intolerance&#x27;;
+  category: (&#x27;food&#x27; | &#x27;medication&#x27; | &#x27;environment&#x27; | &#x27;biologic&#x27;)[];
+  criticality: &#x27;low&#x27; | &#x27;high&#x27; | &#x27;unable-to-assess&#x27;;
+  code: {
+    system: string;
+    code: string;
+    display: string;
+  };
+  reactions: AllergyReaction[];
+  onsetDateTime: Date;
+  recordedDate: Date;
+  recorder: Reference;
+  note: string[];
+}
+
+interface AllergyReaction {
+  substance: CodeableConcept;
+  manifestation: CodeableConcept[];
+  severity: &#x27;mild&#x27; | &#x27;moderate&#x27; | &#x27;severe&#x27;;
+  exposureRoute: CodeableConcept;
+  note: string[];
+}
+
+// Laboratory Results Model
+interface LaboratoryResults {
+  recent: LabResult[];
+  historical: LabResult[];
+  panels: LabPanel[];
+}
+
+interface LabResult {
+  id: string;
+  code: {
+    loinc: string;
+    display: string;
+    loincPartNumber?: string;
+  };
+  status: &#x27;registered&#x27; | &#x27;preliminary&#x27; | &#x27;final&#x27; | &#x27;amended&#x27; | &#x27;corrected&#x27; | &#x27;cancelled&#x27;;
+  category: string;
+  effectiveDateTime: Date;
+  issued: Date;
+  value: LabValue;
+  interpretation: {
+    code: &#x27;H&#x27; | &#x27;L&#x27; | &#x27;A&#x27; | &#x27;AA&#x27; | &#x27;HH&#x27; | &#x27;LL&#x27; | &#x27;N&#x27; | &#x27;U&#x27; | &#x27;D&#x27; | &#x27;B&#x27; | &#x27;W&#x27;;
+    display: string;
+  };
+  referenceRange: ReferenceRange[];
+  specimen: SpecimenInfo;
+  performer: Reference;
+  note: string[];
+}
+
+type LabValue =
+  | { type: &#x27;quantity&#x27;; value: number; unit: string; system: string; code: string }
+  | { type: &#x27;string&#x27;; value: string }
+  | { type: &#x27;codeableConcept&#x27;; coding: Coding[] }
+  | { type: &#x27;ratio&#x27;; numerator: Quantity; denominator: Quantity }
+  | { type: &#x27;range&#x27;; low: Quantity; high: Quantity };
+
+interface ReferenceRange {
+  low?: Quantity;
+  high?: Quantity;
+  type?: CodeableConcept;
+  appliesTo?: CodeableConcept[];
+  age?: Range;
+  text?: string;
+}
+
+// Vital Signs Model
+interface VitalSignHistory {
+  current: VitalSigns;
+  history: VitalSignReading[];
+  trends: VitalTrend[];
+}
+
+interface VitalSigns {
+  timestamp: Date;
+  bloodPressure?: {
+    systolic: number;
+    diastolic: number;
+    position: &#x27;sitting&#x27; | &#x27;standing&#x27; | &#x27;supine&#x27;;
+    cuffSize: string;
+  };
+  heartRate?: {
+    value: number;
+    rhythm: &#x27;regular&#x27; | &#x27;irregular&#x27;;
+    method: &#x27;palpation&#x27; | &#x27;auscultation&#x27; | &#x27;device&#x27;;
+  };
+  respiratoryRate?: {
+    value: number;
+  };
+  temperature?: {
+    value: number;
+    unit: &#x27;Cel&#x27; | &#x27;[degF]&#x27;;
+    site: &#x27;oral&#x27; | &#x27;tympanic&#x27; | &#x27;axillary&#x27; | &#x27;rectal&#x27; | &#x27;temporal&#x27;;
+  };
+  oxygenSaturation?: {
+    value: number;
+    supplementalOxygen: boolean;
+    oxygenFlowRate?: number;
+  };
+  weight?: {
+    value: number;
+    unit: &#x27;kg&#x27; | &#x27;[lb_av]&#x27;;
+  };
+  height?: {
+    value: number;
+    unit: &#x27;cm&#x27; | &#x27;[in_i]&#x27;;
+  };
+  bmi?: number;
+  painScore?: {
+    value: number;
+    scale: &#x27;0-10&#x27; | &#x27;FACES&#x27; | &#x27;FLACC&#x27;;
+  };
+}
+```
+
+### 3.3 Clinical Knowledge Representation
+
+```typescript
+// Clinical Knowledge Formats
+interface ClinicalKnowledgeFormats {
+  guidelines: GuidelineFormat;
+  alerts: AlertRuleFormat;
+  orderSets: OrderSetFormat;
+  calculators: ClinicalCalculatorFormat;
+  evidenceSynthesis: EvidenceFormat;
+}
+
+// Guideline Representation (PlanDefinition)
+interface GuidelineFormat {
+  id: string;
+  url: string;
+  version: string;
+  name: string;
+  title: string;
+  status: &#x27;draft&#x27; | &#x27;active&#x27; | &#x27;retired&#x27; | &#x27;unknown&#x27;;
+  experimental: boolean;
+  date: Date;
+  publisher: string;
+  description: string;
+  purpose: string;
+
+  // Applicability
+  useContext: UseContext[];
+  jurisdiction: CodeableConcept[];
+
+  // Timing
+  effectivePeriod: Period;
+
+  // Topics
+  topic: CodeableConcept[];
+
+  // Contributors
+  author: ContactDetail[];
+  editor: ContactDetail[];
+  reviewer: ContactDetail[];
+  endorser: ContactDetail[];
+
+  // Related artifacts
+  relatedArtifact: RelatedArtifact[];
+
+  // Library references (CQL logic)
+  library: string[];
+
+  // Goals
+  goal: GoalDefinition[];
+
+  // Actions (the guideline steps)
+  action: GuidelineAction[];
+}
+
+interface GuidelineAction {
+  id: string;
+  prefix: string;
+  title: string;
+  description: string;
+  textEquivalent: string;
+  priority: &#x27;routine&#x27; | &#x27;urgent&#x27; | &#x27;asap&#x27; | &#x27;stat&#x27;;
+  code: CodeableConcept[];
+  reason: CodeableConcept[];
+  documentation: RelatedArtifact[];
+
+  // Applicability conditions
+  condition: {
+    kind: &#x27;applicability&#x27; | &#x27;start&#x27; | &#x27;stop&#x27;;
+    expression: Expression;
+  }[];
+
+  // Triggers
+  trigger: TriggerDefinition[];
+
+  // Inputs/Outputs
+  input: DataRequirement[];
+  output: DataRequirement[];
+
+  // Timing
+  timing: Timing;
+
+  // Participants
+  participant: ActionParticipant[];
+
+  // Related actions
+  relatedAction: RelatedAction[];
+
+  // Dynamic values (calculated)
+  dynamicValue: DynamicValue[];
+
+  // Nested actions
+  action?: GuidelineAction[];
+
+  // What to do
+  definitionCanonical?: string;  // ActivityDefinition reference
+  definitionUri?: string;
+
+  // Selection behavior
+  selectionBehavior: &#x27;any&#x27; | &#x27;all&#x27; | &#x27;all-or-none&#x27; | &#x27;exactly-one&#x27; | &#x27;at-most-one&#x27; | &#x27;one-or-more&#x27;;
+  requiredBehavior: &#x27;must&#x27; | &#x27;could&#x27; | &#x27;must-unless-documented&#x27;;
+  precheckBehavior: &#x27;yes&#x27; | &#x27;no&#x27;;
+  cardinalityBehavior: &#x27;single&#x27; | &#x27;multiple&#x27;;
+}
+
+// Alert Rule Format
+interface AlertRuleFormat {
+  ruleId: string;
+  ruleName: string;
+  version: string;
+  category: AlertCategory;
+  severity: AlertSeverity;
+  status: &#x27;active&#x27; | &#x27;draft&#x27; | &#x27;retired&#x27;;
+
+  // When the rule applies
+  applicability: {
+    patientCriteria: Expression;
+    encounterCriteria?: Expression;
+    settingCriteria?: string[];
+  };
+
+  // Trigger conditions
+  triggers: AlertTrigger[];
+
+  // Alert content
+  alert: {
+    titleTemplate: string;
+    messageTemplate: string;
+    detailTemplate?: string;
+    recommendedAction: string;
+    references: Reference[];
+  };
+
+  // Override options
+  overrideOptions: {
+    allowOverride: boolean;
+    requireReason: boolean;
+    acceptedReasons: OverrideReason[];
+    requireDocumentation: boolean;
+  };
+
+  // Suppression rules
+  suppression: {
+    cooldownPeriod?: Duration;
+    maxPerEncounter?: number;
+    maxPerDay?: number;
+    suppressIfAcknowledged?: boolean;
+  };
+
+  // Evidence and references
+  evidence: {
+    level: EvidenceLevel;
+    sources: Citation[];
+    lastReviewed: Date;
+    nextReviewDue: Date;
+  };
+}
+
+type AlertCategory =
+  | &#x27;DRUG_DRUG_INTERACTION&#x27;
+  | &#x27;DRUG_ALLERGY&#x27;
+  | &#x27;DRUG_DISEASE&#x27;
+  | &#x27;DRUG_AGE&#x27;
+  | &#x27;DRUG_PREGNANCY&#x27;
+  | &#x27;DRUG_RENAL&#x27;
+  | &#x27;DRUG_HEPATIC&#x27;
+  | &#x27;DRUG_DUPLICATE&#x27;
+  | &#x27;DOSE_ALERT&#x27;
+  | &#x27;LAB_CRITICAL&#x27;
+  | &#x27;LAB_ABNORMAL&#x27;
+  | &#x27;VITAL_SIGN_ALERT&#x27;
+  | &#x27;SCREENING_DUE&#x27;
+  | &#x27;IMMUNIZATION_DUE&#x27;
+  | &#x27;GUIDELINE_RECOMMENDATION&#x27;
+  | &#x27;RISK_ALERT&#x27;
+  | &#x27;DOCUMENTATION_REMINDER&#x27;;
+
+type AlertSeverity = &#x27;LOW&#x27; | &#x27;MEDIUM&#x27; | &#x27;HIGH&#x27; | &#x27;CRITICAL&#x27;;
+
+// Order Set Format
+interface OrderSetFormat {
+  id: string;
+  name: string;
+  version: string;
+  status: &#x27;active&#x27; | &#x27;draft&#x27; | &#x27;retired&#x27;;
+  category: string[];
+  indication: CodeableConcept[];
+  description: string;
+
+  // Order items
+  orders: OrderItem[];
+
+  // Selection behavior
+  defaultSelections: string[];  // IDs of pre-selected items
+  requiredItems: string[];  // IDs of required items
+  mutuallyExclusive: string[][];  // Groups of mutually exclusive items
+
+  // Evidence
+  evidence: {
+    guidelines: Reference[];
+    lastReviewed: Date;
+    institution: string;
+  };
+}
+
+interface OrderItem {
+  id: string;
+  sequence: number;
+  category: &#x27;MEDICATION&#x27; | &#x27;LAB&#x27; | &#x27;IMAGING&#x27; | &#x27;PROCEDURE&#x27; | &#x27;CONSULT&#x27; | &#x27;NURSING&#x27; | &#x27;DIET&#x27; | &#x27;ACTIVITY&#x27;;
+  selected: boolean;
+  required: boolean;
+
+  // Order details (varies by category)
+  medication?: MedicationOrderTemplate;
+  labOrder?: LabOrderTemplate;
+  imagingOrder?: ImagingOrderTemplate;
+  procedure?: ProcedureOrderTemplate;
+  consult?: ConsultOrderTemplate;
+  nursingOrder?: NursingOrderTemplate;
+
+  // Conditions for inclusion
+  condition?: Expression;
+
+  // Notes
+  comment?: string;
+}
+
+interface MedicationOrderTemplate {
+  medication: {
+    rxnormCode: string;
+    display: string;
+    generic: boolean;
+  };
+  dose: {
+    value: number | string;  // Can be calculated
+    unit: string;
+  };
+  route: CodeableConcept;
+  frequency: CodeableConcept;
+  duration?: Duration;
+  prn: boolean;
+  prnReason?: CodeableConcept[];
+  instructions?: string;
+  substitutionAllowed: boolean;
+  maxDailyDose?: Quantity;
+  monitoringRequired?: MonitoringRequirement[];
+}
+
+// Clinical Calculator Format
+interface ClinicalCalculatorFormat {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  category: string[];
+  indication: string;
+
+  // Inputs
+  inputs: CalculatorInput[];
+
+  // Calculation logic
+  formula: CalculatorFormula;
+
+  // Output interpretation
+  interpretation: ScoreInterpretation[];
+
+  // Evidence
+  validation: {
+    originalStudy: Citation;
+    validationStudies: Citation[];
+    populations: string[];
+    limitations: string[];
+  };
+
+  // Display
+  displayOptions: {
+    showFormula: boolean;
+    showInterpretation: boolean;
+    showReferences: boolean;
+  };
+}
+
+interface CalculatorInput {
+  id: string;
+  name: string;
+  description: string;
+  type: &#x27;numeric&#x27; | &#x27;categorical&#x27; | &#x27;boolean&#x27; | &#x27;date&#x27;;
+  required: boolean;
+
+  // For numeric
+  numericConfig?: {
+    unit: string;
+    min: number;
+    max: number;
+    precision: number;
+  };
+
+  // For categorical
+  categoricalConfig?: {
+    options: { value: string | number; label: string; points?: number }[];
+  };
+
+  // Source (auto-populate from EHR)
+  autoPopulate?: {
+    fhirPath: string;
+    loincCode?: string;
+    defaultValue?: any;
+  };
+}
+
+interface CalculatorFormula {
+  type: &#x27;expression&#x27; | &#x27;lookup&#x27; | &#x27;algorithm&#x27;;
+
+  // For expression (e.g., GFR calculation)
+  expression?: string;
+
+  // For lookup (e.g., body surface area charts)
+  lookupTable?: LookupTable;
+
+  // For algorithm (e.g., cardiovascular risk)
+  algorithm?: string;  // CQL or JavaScript
+}
+
+// Example: CKD-EPI eGFR Calculator
+const ckdEpiCalculator: ClinicalCalculatorFormat = {
+  id: &#x27;ckd-epi-egfr-2021&#x27;,
+  name: &#x27;CKD-EPI eGFR (2021)&#x27;,
+  version: &#x27;2021&#x27;,
+  description: &#x27;Estimates glomerular filtration rate using CKD-EPI 2021 equation (race-free)&#x27;,
+  category: [&#x27;Nephrology&#x27;, &#x27;Laboratory&#x27;],
+  indication: &#x27;Assessment of kidney function&#x27;,
+
+  inputs: [
+    {
+      id: &#x27;serum_creatinine&#x27;,
+      name: &#x27;Serum Creatinine&#x27;,
+      description: &#x27;Serum creatinine level&#x27;,
+      type: &#x27;numeric&#x27;,
+      required: true,
+      numericConfig: {
+        unit: &#x27;mg/dL&#x27;,
+        min: 0.1,
+        max: 20,
+        precision: 2
+      },
+      autoPopulate: {
+        fhirPath: &quot;Observation.where(code.coding.where(system=&#x27;http://loinc.org&#x27; and code=&#x27;2160-0&#x27;)).value.value&quot;,
+        loincCode: &#x27;2160-0&#x27;
+      }
+    },
+    {
+      id: &#x27;age&#x27;,
+      name: &#x27;Age&#x27;,
+      description: &#x27;Patient age in years&#x27;,
+      type: &#x27;numeric&#x27;,
+      required: true,
+      numericConfig: {
+        unit: &#x27;years&#x27;,
+        min: 18,
+        max: 120,
+        precision: 0
+      },
+      autoPopulate: {
+        fhirPath: &quot;Patient.birthDate.toAge()&quot;
+      }
+    },
+    {
+      id: &#x27;sex&#x27;,
+      name: &#x27;Sex&#x27;,
+      description: &#x27;Biological sex&#x27;,
+      type: &#x27;categorical&#x27;,
+      required: true,
+      categoricalConfig: {
+        options: [
+          { value: &#x27;female&#x27;, label: &#x27;Female&#x27; },
+          { value: &#x27;male&#x27;, label: &#x27;Male&#x27; }
+        ]
+      },
+      autoPopulate: {
+        fhirPath: &quot;Patient.gender&quot;
+      }
+    }
+  ],
+
+  formula: {
+    type: &#x27;expression&#x27;,
+    expression: `
+      // CKD-EPI 2021 equation (race-free)
+      let kappa = sex == &#x27;female&#x27; ? 0.7 : 0.9;
+      let alpha = sex == &#x27;female&#x27; ? -0.241 : -0.302;
+      let sexCoef = sex == &#x27;female&#x27; ? 1.012 : 1.0;
+
+      let scrKappa = serum_creatinine / kappa;
+      let term1 = Math.min(scrKappa, 1) ** alpha;
+      let term2 = Math.max(scrKappa, 1) ** -1.200;
+
+      return 142 * term1 * term2 * (0.9938 ** age) * sexCoef;
+    `
+  },
+
+  interpretation: [
+    {
+      range: { min: 90, max: Infinity },
+      stage: &#x27;G1&#x27;,
+      description: &#x27;Normal or high&#x27;,
+      recommendation: &#x27;If no other evidence of kidney disease, may not indicate CKD&#x27;
+    },
+    {
+      range: { min: 60, max: 89 },
+      stage: &#x27;G2&#x27;,
+      description: &#x27;Mildly decreased&#x27;,
+      recommendation: &#x27;May indicate early CKD if other markers present&#x27;
+    },
+    {
+      range: { min: 45, max: 59 },
+      stage: &#x27;G3a&#x27;,
+      description: &#x27;Mildly to moderately decreased&#x27;,
+      recommendation: &#x27;CKD stage 3a - monitor and manage risk factors&#x27;
+    },
+    {
+      range: { min: 30, max: 44 },
+      stage: &#x27;G3b&#x27;,
+      description: &#x27;Moderately to severely decreased&#x27;,
+      recommendation: &#x27;CKD stage 3b - nephrology referral recommended&#x27;
+    },
+    {
+      range: { min: 15, max: 29 },
+      stage: &#x27;G4&#x27;,
+      description: &#x27;Severely decreased&#x27;,
+      recommendation: &#x27;CKD stage 4 - prepare for renal replacement therapy&#x27;
+    },
+    {
+      range: { min: 0, max: 14 },
+      stage: &#x27;G5&#x27;,
+      description: &#x27;Kidney failure&#x27;,
+      recommendation: &#x27;CKD stage 5 - dialysis or transplant may be needed&#x27;
+    }
+  ],
+
+  validation: {
+    originalStudy: {
+      authors: &#x27;Inker LA, et al.&#x27;,
+      title: &#x27;New Creatinine- and Cystatin C-Based Equations to Estimate GFR without Race&#x27;,
+      journal: &#x27;N Engl J Med&#x27;,
+      year: 2021,
+      doi: &#x27;10.1056/NEJMoa2102953&#x27;
+    },
+    validationStudies: [],
+    populations: [&#x27;Adults ≥18 years&#x27;],
+    limitations: [
+      &#x27;Less accurate in acute kidney injury&#x27;,
+      &#x27;May be inaccurate with extremes of muscle mass&#x27;,
+      &#x27;Not validated in children or pregnant women&#x27;
+    ]
+  },
+
+  displayOptions: {
+    showFormula: true,
+    showInterpretation: true,
+    showReferences: true
+  }
+};
+```
+
+### 3.4 CDS Hooks Specification
+
+```typescript
+// CDS Hooks Standard Implementation
+interface CDSHooksSpecification {
+  version: &#x27;2.0&#x27;;
+  description: &#x27;HL7 CDS Hooks for EHR integration&#x27;;
+
+  hooks: {
+    patientView: PatientViewHook;
+    orderSelect: OrderSelectHook;
+    orderSign: OrderSignHook;
+    appointmentBook: AppointmentBookHook;
+    encounterStart: EncounterStartHook;
+    encounterDischarge: EncounterDischargeHook;
+  };
+}
+
+// CDS Hooks Request/Response
+interface CDSHookRequest {
+  hook: string;
+  hookInstance: string;  // UUID
+  fhirServer: string;
+  fhirAuthorization?: FHIRAuthorization;
+  context: HookContext;
+  prefetch?: PrefetchData;
+}
+
+interface HookContext {
+  userId: string;  // Practitioner/[id]
+  patientId: string;
+  encounterId?: string;
+
+  // Hook-specific context
+  selections?: string[];  // For order-select
+  draftOrders?: Bundle;  // For order-sign
+}
+
+interface CDSHookResponse {
+  cards: Card[];
+  systemActions?: SystemAction[];
+}
+
+interface Card {
+  uuid: string;
+  summary: string;  // Max 140 chars
+  detail?: string;  // Markdown
+  indicator: &#x27;info&#x27; | &#x27;warning&#x27; | &#x27;critical&#x27;;
+  source: CardSource;
+  suggestions?: Suggestion[];
+  selectionBehavior?: &#x27;at-most-one&#x27;;
+  overrideReasons?: OverrideReason[];
+  links?: Link[];
+}
+
+interface CardSource {
+  label: string;  // Organization name
+  url?: string;
+  icon?: string;  // PNG 100x100
+  topic?: Coding;
+}
+
+interface Suggestion {
+  label: string;
+  uuid?: string;
+  isRecommended?: boolean;
+  actions: SuggestionAction[];
+}
+
+interface SuggestionAction {
+  type: &#x27;create&#x27; | &#x27;update&#x27; | &#x27;delete&#x27;;
+  description: string;
+  resource?: Resource;  // FHIR resource
+  resourceId?: string;  // For update/delete
+}
+
+// CDS Hooks Service Implementation
+class CDSHooksService {
+  private ruleEngine: RuleEngine;
+  private mlService: MLInferenceService;
+  private knowledgeBase: ClinicalKnowledgeBase;
+
+  async handleHook(request: CDSHookRequest): Promise&lt;CDSHookResponse&gt; {
+    const startTime = Date.now();
+
+    try {
+      // Get patient data (from prefetch or fetch)
+      const patientData = await this.resolvePatientData(request);
+
+      // Determine applicable rules and services
+      const applicableServices = await this.findApplicableServices(
+        request.hook,
+        patientData
+      );
+
+      // Execute services in parallel
+      const results = await Promise.all(
+        applicableServices.map(service =&gt;
+          this.executeService(service, patientData, request)
+        )
+      );
+
+      // Aggregate and prioritize cards
+      const cards = this.aggregateAndPrioritize(results);
+
+      // Log for audit
+      await this.auditLog(request, cards, Date.now() - startTime);
+
+      return { cards };
+
+    } catch (error) {
+      console.error(&#x27;CDS Hooks error:&#x27;, error);
+      return { cards: [] };  // Fail silently to not block clinician
+    }
+  }
+
+  private async resolvePatientData(
+    request: CDSHookRequest
+  ): Promise&lt;PatientData&gt; {
+    // Use prefetch if available
+    if (request.prefetch) {
+      return this.extractFromPrefetch(request.prefetch);
+    }
+
+    // Otherwise fetch from FHIR server
+    return this.fetchPatientData(
+      request.fhirServer,
+      request.context.patientId,
+      request.fhirAuthorization
+    );
+  }
+
+  private aggregateAndPrioritize(
+    results: ServiceResult[]
+  ): Card[] {
+    // Flatten all cards
+    let allCards = results.flatMap(r =&gt; r.cards);
+
+    // Remove duplicates (by knowledge source)
+    allCards = this.deduplicateCards(allCards);
+
+    // Sort by priority
+    allCards.sort((a, b) =&gt; {
+      const priority = { &#x27;critical&#x27;: 0, &#x27;warning&#x27;: 1, &#x27;info&#x27;: 2 };
+      return priority[a.indicator] - priority[b.indicator];
+    });
+
+    // Apply maximum card limit
+    const MAX_CARDS = 5;
+    return allCards.slice(0, MAX_CARDS);
+  }
+}
+
+// Example: Drug Interaction CDS Service
+class DrugInteractionCDSService implements CDSService {
+  serviceName = &#x27;Drug-Drug Interaction Check&#x27;;
+  supportedHooks = [&#x27;order-select&#x27;, &#x27;order-sign&#x27;];
+
+  async execute(
+    patientData: PatientData,
+    request: CDSHookRequest
+  ): Promise&lt;ServiceResult&gt; {
+    const cards: Card[] = [];
+
+    // Get current medications
+    const currentMeds = patientData.medications.active;
+
+    // Get draft orders (medications only)
+    const draftMeds = this.extractDraftMedications(request.context.draftOrders);
+
+    // Check for interactions
+    for (const draftMed of draftMeds) {
+      for (const currentMed of currentMeds) {
+        const interaction = await this.checkInteraction(draftMed, currentMed);
+
+        if (interaction &amp;&amp; interaction.severity !== &#x27;NONE&#x27;) {
+          cards.push(this.createInteractionCard(draftMed, currentMed, interaction));
+        }
+      }
+
+      // Also check draft-to-draft interactions
+      for (const otherDraft of draftMeds) {
+        if (otherDraft.id === draftMed.id) continue;
+
+        const interaction = await this.checkInteraction(draftMed, otherDraft);
+        if (interaction &amp;&amp; interaction.severity !== &#x27;NONE&#x27;) {
+          cards.push(this.createInteractionCard(draftMed, otherDraft, interaction));
+        }
+      }
+    }
+
+    return { cards };
+  }
+
+  private createInteractionCard(
+    drug1: MedicationOrder,
+    drug2: MedicationRecord,
+    interaction: DrugInteraction
+  ): Card {
+    return {
+      uuid: generateUUID(),
+      summary: `${interaction.severity} interaction: ${drug1.display} + ${drug2.medication.display}`,
+      detail: `**Effect:** ${interaction.effect}\n\n**Mechanism:** ${interaction.mechanism}\n\n**Management:** ${interaction.management}`,
+      indicator: this.mapSeverityToIndicator(interaction.severity),
+      source: {
+        label: &#x27;Drug Interaction Database&#x27;,
+        url: &#x27;https://www.drugs.com/interactions.html&#x27;
+      },
+      suggestions: interaction.alternatives?.map(alt =&gt; ({
+        label: `Consider ${alt.name} instead`,
+        isRecommended: alt.recommended,
+        actions: [{
+          type: &#x27;update&#x27;,
+          description: `Replace ${drug1.display} with ${alt.name}`,
+          resource: this.createAlternativeMedication(drug1, alt)
+        }]
+      })),
+      overrideReasons: [
+        { code: &#x27;patient-tolerated&#x27;, display: &#x27;Patient has tolerated this combination&#x27; },
+        { code: &#x27;benefit-outweighs-risk&#x27;, display: &#x27;Clinical benefit outweighs risk&#x27; },
+        { code: &#x27;monitoring-in-place&#x27;, display: &#x27;Appropriate monitoring in place&#x27; }
+      ]
+    };
+  }
+}
+```
+
+---
+
+**WIA-CLINICAL-DECISION-SUPPORT Data Formats**
+**Version**: 1.0.0
+**Last Updated**: 2025
+**License**: MIT
+
+© 2025 World Interoperability Alliance (WIA)
+弘益人間 (홍익인간) - Benefit All Humanity
+</pre></section></body>
+</html>

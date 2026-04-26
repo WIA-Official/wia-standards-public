@@ -1,169 +1,372 @@
-# Augmentation Safety — Phase 3: Protocol Specification
+# WIA-AUG-013 PHASE 3 — Protocol Specification
 
-> **Version:** 1.0.0
-> **Status:** Official
-> **Last Updated:** 2025-01-01
-> **Philosophy:** 弘益人間 (Benefit All Humanity)
-
----
-
-## 1. Overview
-
-Phase 3 defines communication protocols for real-time data exchange between Augmentation Safety components, including enhancement systems and bioethics platforms. This specification ensures secure, efficient, and interoperable data streaming.
-
-### 1.1 Protocol Stack
-
-```
-┌─────────────────────────────────────┐
-│      Application Layer              │
-│   (augmentation-safety Messages)             │
-├─────────────────────────────────────┤
-│      Presentation Layer             │
-│   (JSON / Protocol Buffers)         │
-├─────────────────────────────────────┤
-│      Session Layer                  │
-│   (Connection Management)           │
-├─────────────────────────────────────┤
-│      Transport Layer                │
-│   (WebSocket / gRPC / MQTT)         │
-├─────────────────────────────────────┤
-│      Security Layer                 │
-│   (TLS 1.3 / mTLS)                 │
-└─────────────────────────────────────┘
-```
+**Standard:** WIA-AUG-013
+**Phase:** 3 — Protocol
+**Version:** 1.0
+**Status:** Stable
+**Source:** synthesized from the original `PHASE-1-DATA-FORMAT.md` (quarter 3 of 4)
 
 ---
 
-## 2. Transport Layer
+### 6.2 Clinical Testing Requirements
 
-### 2.1 Supported Transports
+| Level | Phase I | Phase II | Phase III | Post-Market |
+|-------|---------|----------|-----------|-------------|
+| 3 | 10 subjects | 50 subjects | 200 subjects | 2 years |
+| 4 | 20 subjects | 100 subjects | 500 subjects | 5 years |
+| 5 | 30 subjects | 200 subjects | 1000 subjects | 10 years |
 
-| Transport | Port | Use Case | Latency |
-|-----------|------|----------|---------|
-| WebSocket | 443 | Web clients, dashboards | Low |
-| gRPC | 443 | Server-to-server, high throughput | Very Low |
-| MQTT | 8883 | IoT devices, sensors | Low |
-| HTTP/2 | 443 | REST fallback, batch operations | Medium |
-
-### 2.2 Connection Management
-
-- Heartbeat interval: 30 seconds
-- Connection timeout: 60 seconds
-- Maximum reconnection attempts: 10 with exponential backoff
-- Session resumption supported via session tokens
-
----
-
-## 3. Message Format
-
-### 3.1 Message Envelope
+### 6.3 Testing Data Requirements
 
 ```json
 {
-  "header": {
-    "messageId": "uuid-v4",
-    "type": "DATA|COMMAND|EVENT|ACK|ERROR",
-    "source": "node-id",
-    "destination": "node-id-or-broadcast",
-    "timestamp": "2025-01-15T10:30:00.000Z",
-    "correlationId": "uuid-v4",
-    "version": "1.0.0"
+  "deviceId": "AUG-2025-001",
+  "testPhase": "Phase II",
+  "subjects": 100,
+  "duration": "12 months",
+  "endpoints": {
+    "primary": ["safety", "functionality"],
+    "secondary": ["quality of life", "user satisfaction"]
   },
-  "payload": {},
-  "signature": "base64-encoded-hmac"
+  "adverseEvents": {
+    "serious": 0,
+    "moderate": 3,
+    "minor": 12
+  },
+  "successRate": 0.97,
+  "confidence": 0.95
 }
 ```
 
-### 3.2 Message Types
-
-| Type | Direction | Description |
-|------|-----------|-------------|
-| DATA | Uni/Bi | augmentation parameters transmission |
-| COMMAND | Request | Control instruction |
-| EVENT | Publish | State change notification |
-| ACK | Response | Delivery confirmation |
-| ERROR | Response | Error notification |
-
 ---
 
-## 4. Protocol Flow
+## 7. Emergency Procedures
 
-### 4.1 Connection Establishment
+### 7.1 Emergency Categories
 
 ```
-Client                          Server
-  │                                │
-  │─── 1. TLS Handshake ─────────▶│
-  │◀── 2. Certificate Verify ─────│
-  │─── 3. Auth Token ────────────▶│
-  │◀── 4. Session Established ────│
-  │─── 5. Subscribe Channels ────▶│
-  │◀── 6. Subscription ACK ──────│
-  │                                │
-  │◀══ 7. Data Stream ═══════════▶│
+Category A: Life-threatening - Immediate response
+Category B: Serious - Response within 1 hour
+Category C: Moderate - Response within 24 hours
+Category D: Minor - Scheduled response
 ```
 
-### 4.2 Data Exchange
+### 7.2 Emergency Response Protocol
 
-1. Publisher sends DATA message to designated channel
-2. Server validates message schema and permissions
-3. Server routes to subscribed consumers
-4. Consumers send ACK upon successful processing
-5. Server tracks delivery status per consumer
+```
+1. Detection (Automatic or Manual)
+   ↓
+2. Classification (A/B/C/D)
+   ↓
+3. Notification (User, Medical team, Manufacturer)
+   ↓
+4. Safe Mode Activation
+   ↓
+5. Medical Response
+   ↓
+6. Device Assessment
+   ↓
+7. Resolution or Removal
+   ↓
+8. Documentation and Reporting
+```
+
+### 7.3 Safe Mode Requirements
+
+All Level 3+ devices must implement safe modes:
+
+```typescript
+interface SafeMode {
+  trigger: 'manual' | 'automatic' | 'remote';
+  actions: string[];
+  powerState: 'off' | 'minimal' | 'backup';
+  communication: 'active' | 'beacon' | 'silent';
+  reversible: boolean;
+  timeout: number; // seconds
+}
+
+const defaultSafeMode: SafeMode = {
+  trigger: 'automatic',
+  actions: ['cease_active_functions', 'maintain_vital_support'],
+  powerState: 'minimal',
+  communication: 'beacon',
+  reversible: true,
+  timeout: 3600
+};
+```
+
+### 7.4 Device Removal Protocol
+
+For emergencies requiring device removal:
+
+```
+1. Stabilize patient
+2. Assess device status
+3. Plan removal strategy
+4. Surgical removal
+5. Post-operative care
+6. Device analysis
+7. Root cause investigation
+8. Regulatory reporting
+```
 
 ---
 
-## 5. State Machine
+## 8. Long-term Monitoring
 
-### 5.1 Connection States
+### 8.1 Monitoring Requirements
 
-| State | Description | Transitions |
-|-------|-------------|-------------|
-| DISCONNECTED | No active connection | → CONNECTING |
-| CONNECTING | Handshake in progress | → CONNECTED, DISCONNECTED |
-| CONNECTED | Authenticated session | → SUBSCRIBED, DISCONNECTED |
-| SUBSCRIBED | Receiving data | → CONNECTED, DISCONNECTED |
-| RECONNECTING | Auto-reconnect | → CONNECTED, DISCONNECTED |
+| Level | Frequency | Duration | Data Points |
+|-------|-----------|----------|-------------|
+| 1 | Annual | 2 years | Basic metrics |
+| 2 | Quarterly | 5 years | Standard metrics |
+| 3 | Monthly | 10 years | Extended metrics |
+| 4 | Weekly | Lifetime | Comprehensive |
+| 5 | Continuous | Lifetime | Full telemetry |
 
-### 5.2 Message Processing States
+### 8.2 Monitoring Data Schema
 
-| State | Description |
-|-------|-------------|
-| PENDING | Message queued for delivery |
-| DELIVERED | Message received by consumer |
-| PROCESSED | Consumer acknowledged processing |
-| FAILED | Delivery or processing failed |
-| EXPIRED | TTL exceeded |
+```typescript
+interface MonitoringData {
+  deviceId: string;
+  timestamp: Date;
+  metrics: {
+    powerLevel: number;           // 0-100%
+    signalQuality: number;        // 0-100%
+    operatingTemperature: number; // Celsius
+    impedance: number[];          // Ohms per channel
+    functionality: number;        // 0-100%
+    biomarkers: Biomarker[];
+  };
+  alerts: Alert[];
+  userFeedback: UserFeedback;
+}
+
+interface Biomarker {
+  name: string;
+  value: number;
+  unit: string;
+  normal: { min: number; max: number };
+  status: 'normal' | 'warning' | 'critical';
+}
+```
+
+### 8.3 Alert Thresholds
+
+```
+Power Level:
+  - Warning: < 20%
+  - Critical: < 5%
+
+Signal Quality:
+  - Warning: < 70%
+  - Critical: < 50%
+
+Temperature:
+  - Warning: > 38°C or < 35°C
+  - Critical: > 40°C or < 33°C
+
+Impedance (Neural):
+  - Warning: > 1 MΩ or < 100 Ω
+  - Critical: > 5 MΩ or < 10 Ω
+```
+
+### 8.4 Reporting Requirements
+
+```
+Adverse Event Reporting:
+- Serious: Within 24 hours
+- Moderate: Within 7 days
+- Minor: Monthly summary
+
+Periodic Reports:
+- Safety Summary: Quarterly
+- Efficacy Report: Semi-annually
+- Comprehensive Review: Annually
+```
 
 ---
 
-## 6. Quality of Service
 
-| QoS Level | Guarantee | Use Case |
-|-----------|-----------|----------|
-| 0 | At most once | Telemetry, non-critical |
-| 1 | At least once | Standard operations |
-| 2 | Exactly once | Financial, safety-critical |
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
 
----
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
 
-## 7. Security
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-### 7.1 Requirements
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-- TLS 1.3 mandatory for all connections
-- Mutual TLS (mTLS) for server-to-server
-- Message-level signing with HMAC-SHA256
-- Token rotation every 3600 seconds
+## Annex F — Adoption Roadmap
 
-### 7.2 Access Control
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-Channel-based permissions with role-based access control (RBAC):
-- `publish`: Send messages to channel
-- `subscribe`: Receive messages from channel
-- `admin`: Manage channel configuration
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
----
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-**© 2025 SmileStory Inc. / WIA - World Certification Industry Association**
-**弘益人間 · Benefit All Humanity**
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+
+## Annex G — Test Vectors and Conformance Evidence
+
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
+
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
+
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.
+
+## Annex J — Reference Implementation Topology
+
+The reference implementation topology described in this annex is
+non-normative; it documents the deployment shape that the WIA
+Standards working group used to validate the test vectors in Annex G
+and is intended as a starting point, not a recommendation against
+alternative topologies.
+
+- **Single-tenant edge** — one runtime per organization, no shared
+  state. Used for early-pilot deployments where conformance evidence
+  is published manually. Sufficient for PHASE-3-PROTOCOL validation when the
+  organization signs the manifest itself.
+- **Multi-tenant gateway** — one shared runtime serves multiple
+  tenants via header-based isolation. Typically backed by a
+  rate-limited gateway (Envoy or NGINX) and a shared OAuth 2.1
+  identity provider. The manifest is per-tenant; the runtime
+  publishes a federation manifest that aggregates tenant manifests.
+- **Federated mesh** — multiple runtimes peer to one another and
+  publish their manifests to a directory service. Each peer signs
+  its own manifest; the directory service signs the aggregated
+  index. This is the topology used by cross-organization deployments
+  that need to compose conformance.
+- **Air-gapped batch** — no network connection between the runtime
+  and the directory service. The runtime emits a signed evidence
+  package on each batch and the operator transports the package via
+  out-of-band channels. This is the topology used by regulators that
+  prohibit live connectivity from sensitive environments.
+
+Implementations declare their topology in the manifest (see Annex I).
+A topology change MUST be reflected in a new manifest signature; the
+prior topology's manifest remains valid for the deprecation window
+described in Annex H to preserve audit traceability.

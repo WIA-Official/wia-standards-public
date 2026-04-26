@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제6장: EHR 통합 및 데이터 표준 - WIA-MED-015</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #a855f7;">제6장: EHR 통합 및 데이터 표준</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0;">
+<p style="color: #10b981; font-style: italic;">"상호운용성 없이는 진정한 CDSS는 불가능합니다. 표준 기반 데이터 교환은 의료 시스템 간 원활한 정보 흐름을 가능하게 합니다."</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">6.1 HL7 FHIR 표준</h2>
+
+<p><strong style="color: #a855f7;">FHIR (Fast Healthcare Interoperability Resources)</strong>는 현대 의료 데이터 교환의 표준입니다.</p>
+
+<h3 style="color: #a855f7;">🎯 FHIR의 핵심 개념</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">개념</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">설명</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Resources</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Patient, Observation, Medication 등 데이터 단위</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>RESTful API</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HTTP 기반 표준 API (GET, POST, PUT, DELETE)</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>JSON/XML</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">웹 친화적 데이터 형식</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Extensions</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">표준 확장 메커니즘</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">📋 주요 FHIR Resources</h3>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; color: #94a3b8; border: 1px solid #334155;">
+// Patient Resource 예시 (JSON)
+{
+  "resourceType": "Patient",
+  "id": "example",
+  "name": [{
+    "family": "김",
+    "given": ["민수"]
+  }],
+  "gender": "male",
+  "birthDate": "1985-03-15",
+  "address": [{
+    "city": "서울",
+    "postalCode": "06234"
+  }]
+}
+
+// Observation Resource (혈압)
+{
+  "resourceType": "Observation",
+  "status": "final",
+  "category": "vital-signs",
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "85354-9",
+      "display": "Blood pressure"
+    }]
+  },
+  "subject": {"reference": "Patient/example"},
+  "effectiveDateTime": "2025-01-15T09:30:00Z",
+  "component": [
+    {
+      "code": {"text": "Systolic"},
+      "valueQuantity": {"value": 140, "unit": "mmHg"}
+    },
+    {
+      "code": {"text": "Diastolic"},
+      "valueQuantity": {"value": 90, "unit": "mmHg"}
+    }
+  ]
+}
+</pre>
+
+<h3 style="color: #a855f7;">🔗 FHIR API 작업</h3>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; color: #94a3b8; border: 1px solid #334155;">
+# 환자 조회
+GET /Patient/12345
+
+# 환자의 최근 혈압 관찰
+GET /Observation?patient=12345&code=85354-9&_sort=-date&_count=10
+
+# 환자의 활성 약물
+GET /MedicationStatement?patient=12345&status=active
+
+# 새 처방 생성
+POST /MedicationRequest
+{
+  "resourceType": "MedicationRequest",
+  "status": "active",
+  "intent": "order",
+  "subject": {"reference": "Patient/12345"},
+  "medicationCodeableConcept": {
+    "coding": [{
+      "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+      "code": "197361",
+      "display": "Lisinopril 10 MG Oral Tablet"
+    }]
+  },
+  "dosageInstruction": [{
+    "text": "하루 1회 10mg 복용"
+  }]
+}
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">6.2 의료 용어 표준</h2>
+
+<p>일관된 의료 데이터 교환을 위해 표준화된 용어 체계가 필수입니다.</p>
+
+<h3 style="color: #a855f7;">📚 주요 용어 체계</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">표준</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">용도</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">예시</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>SNOMED CT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">진단, 증상, 처치</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">44054006 = 당뇨병</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>LOINC</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">검사 및 관찰</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">2345-7 = 혈당</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>RxNorm</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">약물</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">197361 = Lisinopril 10mg</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>ICD-10</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">진단 코드 (청구)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">E11.9 = 제2형 당뇨병</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>CPT</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">처치 코드 (청구)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">99213 = 외래 진찰</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>UCUM</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">단위</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">mg/dL, mmHg</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🌐 한국 표준</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">KCD (한국표준질병사인분류)</strong> — ICD-10 기반</li>
+    <li><strong style="color: #e2e8f0;">EDI 코드</strong> — 보험 청구</li>
+    <li><strong style="color: #e2e8f0;">ATC 코드</strong> — 약물 분류</li>
+    <li><strong style="color: #e2e8f0;">의약품 표준 코드</strong> — 식약처 지정</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">6.3 CDS Hooks 표준</h2>
+
+<p>CDS Hooks는 EHR 워크플로우에 CDSS를 통합하는 표준입니다.</p>
+
+<h3 style="color: #a855f7;">⚡ CDS Hooks 흐름</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #94a3b8; border: 1px solid #334155;">
+1. EHR에서 이벤트 발생
+   ↓
+2. Hook 트리거 (예: "medication-prescribe")
+   ↓
+3. EHR → CDS 서비스 요청
+   {
+     "hook": "medication-prescribe",
+     "context": {
+       "patientId": "12345",
+       "medications": [...]
+     }
+   }
+   ↓
+4. CDS 서비스 분석 수행
+   - DDI 검사
+   - 알레르기 확인
+   - 용량 검증
+   ↓
+5. CDS 서비스 → EHR 응답 (Cards)
+   {
+     "cards": [
+       {
+         "summary": "⚠️ Warfarin-Aspirin 상호작용",
+         "indicator": "warning",
+         "detail": "출혈 위험 증가...",
+         "suggestions": [
+           {"label": "Clopidogrel로 대체"}
+         ]
+       }
+     ]
+   }
+   ↓
+6. EHR이 카드를 UI에 표시
+   ↓
+7. 의사 결정 (승인/대안 선택/무시)
+</pre>
+
+<h3 style="color: #a855f7;">🔧 주요 Hook 유형</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">Hook</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">트리거 시점</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>patient-view</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">환자 차트 열람 시</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>medication-prescribe</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">약물 처방 시</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>order-select</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">검사/처치 오더 시</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>order-sign</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">오더 서명 (확정) 시</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>encounter-discharge</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">퇴원 처리 시</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">6.4 데이터 품질 관리</h2>
+
+<h3 style="color: #a855f7;">✅ 데이터 품질 차원</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">차원</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">설명</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">검증 방법</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>완전성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">필수 데이터 누락 없음</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">필수 필드 체크</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>정확성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">데이터가 현실 반영</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">범위 검증, 논리 확인</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>일관성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">모순 없음</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">교차 검증</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>적시성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">최신 데이터</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">타임스탬프 확인</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>유효성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">형식/표준 준수</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">스키마 검증</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔍 데이터 검증 예시</h3>
+
+<pre style="background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; color: #94a3b8; border: 1px solid #334155;">
+// 혈압 데이터 검증
+{
+  "systolic": 140,
+  "diastolic": 90
+}
+
+검증 규칙:
+✅ 완전성: systolic AND diastolic 존재
+✅ 범위: 50 < systolic < 300
+✅ 범위: 30 < diastolic < 200
+✅ 논리: systolic > diastolic
+⚠️ 경고: systolic >= 140 (고혈압)
+
+// 약물 데이터 검증
+{
+  "medication": "Lisinopril",
+  "dose": "10",
+  "unit": "mg",
+  "route": "PO"
+}
+
+검증:
+✅ RxNorm 코드 매칭
+✅ 용량 범위 (2.5-40 mg)
+✅ 투여 경로 유효성
+✅ 빈도 형식
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">6.5 개인정보 보호 및 보안</h2>
+
+<h3 style="color: #a855f7;">🔒 규정 준수</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">규정</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">지역</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">핵심 요구사항</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>HIPAA</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">미국</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">PHI 보호, 암호화, 감사 로그</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>GDPR</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">EU</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">동의, 접근권, 삭제권</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>PIPL</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">중국</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">개인정보 보호, 데이터 현지화</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>개인정보보호법</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">한국</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">수집 동의, 안전조치, 유출 신고</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🛡️ 보안 기술</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">암호화</strong> — 전송: TLS 1.3, 저장: AES-256</li>
+    <li><strong style="color: #e2e8f0;">접근 제어</strong> — RBAC, ABAC, OAuth 2.0</li>
+    <li><strong style="color: #e2e8f0;">감사 로그</strong> — 모든 접근 기록</li>
+    <li><strong style="color: #e2e8f0;">익명화</strong> — 분석 시 식별정보 제거</li>
+    <li><strong style="color: #e2e8f0;">백업 및 복구</strong> — 재해 복구 계획</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">장 요약</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">핵심 포인트</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요약</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>HL7 FHIR</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">RESTful API, JSON/XML, Resources</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>용어 표준</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">SNOMED CT, LOINC, RxNorm, ICD-10</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>CDS Hooks</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">워크플로우 통합 표준</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>데이터 품질</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">완전성, 정확성, 일관성, 적시성, 유효성</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>보안</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HIPAA, GDPR 준수, 암호화, 접근 제어</td>
+    </tr>
+</table>
+
+<p style="text-align: center; color: #ffd700; margin-top: 40px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA - World Certification Industry Association</p>
+</body>
+</html>

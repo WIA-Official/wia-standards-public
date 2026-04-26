@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA Rehabilitation Exoskeleton</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Rehabilitation Exoskeleton Standard</h1>
+        <p class="subtitle">Chapter 4: Protocol Specification</p>
+    </header>
+
+    <main>
+        <h1>Chapter 4: Protocol Specification</h1>
+
+        <h2>4.1 Overview</h2>
+
+        <p>This chapter defines the real-time communication protocols and safety interlocks that ensure reliable, safe operation of rehabilitation exoskeleton systems. The WIA protocol operates at multiple levels, from low-level motor control to high-level therapy management.</p>
+
+        <h2>4.2 Protocol Stack</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>Protocol</th>
+                    <th>Update Rate</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Application</td>
+                    <td>WIA Exo Protocol</td>
+                    <td>Variable</td>
+                    <td>Therapy session management</td>
+                </tr>
+                <tr>
+                    <td>Control</td>
+                    <td>Real-time Control</td>
+                    <td>100-1000 Hz</td>
+                    <td>Joint control commands</td>
+                </tr>
+                <tr>
+                    <td>Safety</td>
+                    <td>Safety Monitor</td>
+                    <td>1000 Hz</td>
+                    <td>Continuous safety checking</td>
+                </tr>
+                <tr>
+                    <td>Transport</td>
+                    <td>UDP/TCP</td>
+                    <td>-</td>
+                    <td>Network communication</td>
+                </tr>
+                <tr>
+                    <td>Physical</td>
+                    <td>Ethernet/CAN</td>
+                    <td>-</td>
+                    <td>Hardware interface</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.3 Real-time Control Protocol</h2>
+
+        <h3>4.3.1 Control Loop Timing</h3>
+
+        <div class="info-box">
+            <h4>Critical Timing Requirements</h4>
+            <ul>
+                <li><strong>Control Frequency:</strong> Minimum 100 Hz, recommended 200 Hz</li>
+                <li><strong>Maximum Latency:</strong> 10 ms from sensor reading to motor command</li>
+                <li><strong>Jitter:</strong> Less than 1 ms variation in control cycle time</li>
+                <li><strong>Watchdog Timeout:</strong> 50 ms (trigger safety stop if exceeded)</li>
+            </ul>
+        </div>
+
+        <h3>4.3.2 Control Command Structure</h3>
+
+        <pre><code>{
+  "header": {
+    "sequenceNumber": 1234,
+    "timestamp": 1702598400000,
+    "commandType": "position_control"
+  },
+  "targets": [
+    {
+      "joint": "hip",
+      "side": "left",
+      "targetAngle": 25.5,
+      "maxVelocity": 120.0,
+      "maxTorque": 40.0
+    },
+    {
+      "joint": "knee",
+      "side": "left",
+      "targetAngle": 45.0,
+      "maxVelocity": 150.0,
+      "maxTorque": 50.0
+    }
+  ],
+  "safetyFlags": {
+    "emergencyStop": false,
+    "limitOverride": false,
+    "torqueLimit": 0.85
+  }
+}</code></pre>
+
+        <h3>4.3.3 Feedback Message Structure</h3>
+
+        <pre><code>{
+  "header": {
+    "sequenceNumber": 1234,
+    "timestamp": 1702598400010,
+    "responseType": "state_update"
+  },
+  "states": [
+    {
+      "joint": "hip",
+      "side": "left",
+      "currentAngle": 25.2,
+      "currentVelocity": 118.5,
+      "currentTorque": 15.3,
+      "motorCurrent": 2.5,
+      "temperature": 35.2
+    }
+  ],
+  "status": {
+    "controlActive": true,
+    "errors": [],
+    "warnings": []
+  }
+}</code></pre>
+
+        <h2>4.4 Safety Interlocks</h2>
+
+        <h3>4.4.1 Hierarchical Safety System</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Level</th>
+                    <th>Response Time</th>
+                    <th>Action</th>
+                    <th>Override</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Hardware E-Stop</td>
+                    <td>&lt; 1 ms</td>
+                    <td>Cut motor power</td>
+                    <td>None</td>
+                </tr>
+                <tr>
+                    <td>Watchdog Timer</td>
+                    <td>&lt; 50 ms</td>
+                    <td>Controlled stop</td>
+                    <td>None</td>
+                </tr>
+                <tr>
+                    <td>Limit Switch</td>
+                    <td>&lt; 5 ms</td>
+                    <td>Stop motion, reverse</td>
+                    <td>Therapist</td>
+                </tr>
+                <tr>
+                    <td>Torque Limit</td>
+                    <td>&lt; 10 ms</td>
+                    <td>Reduce torque</td>
+                    <td>Therapist</td>
+                </tr>
+                <tr>
+                    <td>Software Limit</td>
+                    <td>&lt; 10 ms</td>
+                    <td>Decelerate to stop</td>
+                    <td>Therapist</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.4.2 Emergency Stop Protocol</h3>
+
+        <div class="warning-box">
+            <h4>E-Stop Sequence</h4>
+            <ol>
+                <li><strong>Detection (0 ms):</strong> E-stop button pressed or safety condition triggered</li>
+                <li><strong>Signal (0-1 ms):</strong> Hardware interrupt to all motor controllers</li>
+                <li><strong>Power Cut (1-5 ms):</strong> Motor power relays open, brakes engage</li>
+                <li><strong>Verification (5-10 ms):</strong> Confirm all motors stopped</li>
+                <li><strong>Logging (10-100 ms):</strong> Record event with full system state</li>
+                <li><strong>Notification (100-500 ms):</strong> Alert operator and safety personnel</li>
+            </ol>
+        </div>
+
+        <h3>4.4.3 Safety Conditions</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Condition</th>
+                    <th>Threshold</th>
+                    <th>Response</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Joint Angle Limit</td>
+                    <td>Beyond safe range</td>
+                    <td>Stop motion, reverse direction</td>
+                </tr>
+                <tr>
+                    <td>Velocity Limit</td>
+                    <td>&gt; 200 deg/s</td>
+                    <td>Reduce speed, controlled stop</td>
+                </tr>
+                <tr>
+                    <td>Torque Overload</td>
+                    <td>&gt; 150% rated</td>
+                    <td>Immediate reduction to safe level</td>
+                </tr>
+                <tr>
+                    <td>Motor Temperature</td>
+                    <td>&gt; 80°C</td>
+                    <td>Reduce load, increase cooling time</td>
+                </tr>
+                <tr>
+                    <td>Battery Voltage</td>
+                    <td>&lt; 20V</td>
+                    <td>Warning, prepare for shutdown</td>
+                </tr>
+                <tr>
+                    <td>Communication Loss</td>
+                    <td>&gt; 50 ms</td>
+                    <td>Watchdog timeout, controlled stop</td>
+                </tr>
+                <tr>
+                    <td>Fall Detection</td>
+                    <td>IMU threshold</td>
+                    <td>Increase stability, alert operator</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.5 Gait Cycle Synchronization</h2>
+
+        <h3>4.5.1 Phase Detection</h3>
+
+        <p>The system continuously detects the current phase of the gait cycle using multiple sensors:</p>
+
+        <pre><code>{
+  "phaseDetection": {
+    "method": "multi_sensor_fusion",
+    "inputs": {
+      "groundReactionForce": {
+        "leftFoot": 650,
+        "rightFoot": 120,
+        "threshold": 50
+      },
+      "jointAngles": {
+        "hipLeft": 15.2,
+        "kneeLeft": 25.3,
+        "ankleLeft": -5.1
+      },
+      "imu": {
+        "hipAcceleration": 1.2,
+        "trunkAngle": 2.5
+      }
+    },
+    "detectedPhase": "midstance_left",
+    "confidence": 0.95
+  }
+}</code></pre>
+
+        <h3>4.5.2 Transition Events</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Transition</th>
+                    <th>Primary Trigger</th>
+                    <th>Secondary Verification</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Heel Strike</td>
+                    <td>GRF &gt; 20 N</td>
+                    <td>Heel pressure sensor active</td>
+                </tr>
+                <tr>
+                    <td>Foot Flat</td>
+                    <td>Full foot pressure</td>
+                    <td>Ankle angle near 0°</td>
+                </tr>
+                <tr>
+                    <td>Heel Off</td>
+                    <td>Heel pressure = 0</td>
+                    <td>Center of pressure moves forward</td>
+                </tr>
+                <tr>
+                    <td>Toe Off</td>
+                    <td>GRF &lt; 20 N</td>
+                    <td>Toe pressure sensor inactive</td>
+                </tr>
+                <tr>
+                    <td>Mid-swing</td>
+                    <td>Maximum knee flexion</td>
+                    <td>Hip angle increasing</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.6 Assistance Control Protocols</h2>
+
+        <h3>4.6.1 Impedance Control</h3>
+
+        <p>Torque is calculated based on virtual spring-damper parameters:</p>
+
+        <pre><code>τ = K(θ₀ - θ) + B(0 - θ̇)
+
+Where:
+- τ = motor torque
+- K = virtual stiffness (Nm/rad)
+- θ₀ = equilibrium angle
+- θ = current angle
+- B = virtual damping (Nm·s/rad)
+- θ̇ = current angular velocity</code></pre>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Assistance Level</th>
+                    <th>Stiffness (Nm/rad)</th>
+                    <th>Damping (Nm·s/rad)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Minimal (0-20%)</td>
+                    <td>0-10</td>
+                    <td>0.5-2</td>
+                </tr>
+                <tr>
+                    <td>Light (20-40%)</td>
+                    <td>10-30</td>
+                    <td>2-5</td>
+                </tr>
+                <tr>
+                    <td>Moderate (40-60%)</td>
+                    <td>30-50</td>
+                    <td>5-10</td>
+                </tr>
+                <tr>
+                    <td>High (60-80%)</td>
+                    <td>50-80</td>
+                    <td>10-15</td>
+                </tr>
+                <tr>
+                    <td>Maximum (80-100%)</td>
+                    <td>80-120</td>
+                    <td>15-20</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.6.2 Adaptive Assistance Algorithm</h3>
+
+        <pre><code>if (RMSE > threshold_high):
+    assistance = min(current + adaptation_rate, max_assistance)
+elif (RMSE < threshold_low):
+    assistance = max(current - adaptation_rate/2, min_assistance)
+else:
+    assistance = current  # Maintain current level
+
+Where RMSE is root-mean-square error between target and actual gait pattern.</code></pre>
+
+        <h2>4.7 Intent Detection Protocol</h2>
+
+        <h3>4.7.1 Movement Intent Sources</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Signal</th>
+                    <th>Detection Latency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>EMG (Electromyography)</td>
+                    <td>Muscle activation</td>
+                    <td>50-100 ms</td>
+                </tr>
+                <tr>
+                    <td>Force Sensors</td>
+                    <td>User-applied torque</td>
+                    <td>10-20 ms</td>
+                </tr>
+                <tr>
+                    <td>Pressure Sensors</td>
+                    <td>Weight shift</td>
+                    <td>20-50 ms</td>
+                </tr>
+                <tr>
+                    <td>IMU</td>
+                    <td>Trunk movement</td>
+                    <td>20-50 ms</td>
+                </tr>
+                <tr>
+                    <td>Pattern Recognition</td>
+                    <td>Gait cycle phase</td>
+                    <td>50-100 ms</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.7.2 Intent Classification</h3>
+
+        <pre><code>{
+  "intentDetection": {
+    "timestamp": 1702598400000,
+    "detectedIntent": "initiate_step",
+    "confidence": 0.89,
+    "evidence": {
+      "emgActivation": 0.75,
+      "trunkLean": 3.2,
+      "weightShift": 0.65,
+      "gaitPhase": "terminal_stance"
+    },
+    "recommendedAction": {
+      "action": "assist_leg_swing",
+      "assistanceLevel": 60,
+      "timing": "immediate"
+    }
+  }
+}</code></pre>
+
+        <h2>4.8 Fault Detection and Recovery</h2>
+
+        <h3>4.8.1 Fault Categories</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fault Type</th>
+                    <th>Detection Method</th>
+                    <th>Recovery Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Sensor Failure</td>
+                    <td>Data validation, range checking</td>
+                    <td>Switch to redundant sensor or safe mode</td>
+                </tr>
+                <tr>
+                    <td>Communication Loss</td>
+                    <td>Watchdog timeout</td>
+                    <td>Controlled stop, attempt reconnection</td>
+                </tr>
+                <tr>
+                    <td>Motor Overload</td>
+                    <td>Current monitoring</td>
+                    <td>Reduce torque, increase cooling</td>
+                </tr>
+                <tr>
+                    <td>Battery Depletion</td>
+                    <td>Voltage monitoring</td>
+                    <td>Gradual shutdown, notify operator</td>
+                </tr>
+                <tr>
+                    <td>Software Exception</td>
+                    <td>Exception handling</td>
+                    <td>Log error, restart affected module</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.8.2 Graceful Degradation</h3>
+
+        <div class="info-box">
+            <h4>Degradation Hierarchy</h4>
+            <ol>
+                <li><strong>Full Operation:</strong> All systems nominal</li>
+                <li><strong>Reduced Performance:</strong> Limited torque or speed, but functional</li>
+                <li><strong>Safe Mode:</strong> Minimal assistance, safety functions only</li>
+                <li><strong>Passive Mode:</strong> Motors disabled, mechanical support only</li>
+                <li><strong>Emergency Stop:</strong> Complete shutdown</li>
+            </ol>
+        </div>
+
+        <h2>4.9 Data Logging Protocol</h2>
+
+        <h3>4.9.1 Logging Levels</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Level</th>
+                    <th>Content</th>
+                    <th>Frequency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>High-frequency</td>
+                    <td>Joint states, sensor data</td>
+                    <td>200 Hz</td>
+                </tr>
+                <tr>
+                    <td>Medium-frequency</td>
+                    <td>Gait events, phase transitions</td>
+                    <td>Per event</td>
+                </tr>
+                <tr>
+                    <td>Low-frequency</td>
+                    <td>Session summaries, assessments</td>
+                    <td>Per session</td>
+                </tr>
+                <tr>
+                    <td>Event-driven</td>
+                    <td>Errors, warnings, safety events</td>
+                    <td>As occurred</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.9.2 Required Metadata</h3>
+
+        <pre><code>{
+  "logMetadata": {
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "deviceId": "EXO-2025-001",
+    "firmwareVersion": "2.5.1",
+    "protocolVersion": "1.0.0",
+    "calibrationDate": "2025-12-01",
+    "startTime": "2025-12-14T09:00:00Z",
+    "sampleRate": 200,
+    "timezone": "UTC"
+  }
+}</code></pre>
+
+        <h2>4.10 Protocol Versioning</h2>
+
+        <div class="info-box">
+            <h3>Semantic Versioning</h3>
+            <p>The WIA Exoskeleton Protocol follows semantic versioning (MAJOR.MINOR.PATCH):</p>
+            <ul>
+                <li><strong>MAJOR:</strong> Incompatible API changes</li>
+                <li><strong>MINOR:</strong> Backward-compatible functionality additions</li>
+                <li><strong>PATCH:</strong> Backward-compatible bug fixes</li>
+            </ul>
+            <p><strong>Current Version:</strong> 1.0.0</p>
+        </div>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter5.html" style="color: var(--primary-color); font-weight: 600;">Chapter 5: Integration Guide</a> to learn how to integrate exoskeleton systems with therapy management platforms and electronic health records.</p>
+        </div>
+
+        </main>
+</body>
+</html>

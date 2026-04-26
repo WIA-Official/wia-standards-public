@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Data Schema - WIA AIR-POWER Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 2: Data Schema</h1>
+
+        <section>
+            <h2>2.1 Introduction to AIR-POWER Data Models</h2>
+            <p>The WIA AIR-POWER standard defines comprehensive JSON schemas for representing power transmitters, receivers, power zones, and charging configurations. These schemas enable interoperability between different manufacturers and provide a consistent API for power management.</p>
+
+            <div class="alert alert-info">
+                <strong>Schema Purpose:</strong> These data models ensure that any AIR-POWER compliant device can communicate with any compliant transmitter, regardless of manufacturer - enabling a truly universal wireless power ecosystem.
+            </div>
+        </section>
+
+        <section>
+            <h2>2.2 Transmitter (TX) Schema</h2>
+            <p>The transmitter schema defines all properties and capabilities of a power transmitter, including supported modes, coverage area, power output, and safety parameters.</p>
+
+            <div class="code-header">JSON Schema - Power Transmitter</div>
+            <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA AIR-POWER Transmitter",
+  "type": "object",
+  "properties": {
+    "txId": {
+      "type": "string",
+      "description": "Unique transmitter identifier (UUID)",
+      "format": "uuid"
+    },
+    "txType": {
+      "type": "string",
+      "enum": ["home", "commercial", "public", "vehicle"],
+      "description": "Transmitter deployment type"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "latitude": {"type": "number"},
+        "longitude": {"type": "number"},
+        "altitude": {"type": "number"},
+        "indoor": {"type": "boolean"},
+        "venue": {"type": "string"}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "supportedModes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["rf", "magnetic_resonance", "infrared", "hybrid"]
+          }
+        },
+        "maxPowerOutput": {
+          "type": "number",
+          "description": "Maximum total power output in watts"
+        },
+        "maxDevices": {
+          "type": "integer",
+          "description": "Maximum simultaneous devices supported"
+        },
+        "beamforming": {"type": "boolean"},
+        "deviceTracking": {"type": "boolean"},
+        "multiDevice": {"type": "boolean"}
+      },
+      "required": ["supportedModes", "maxPowerOutput"]
+    },
+    "coverageZone": {
+      "type": "object",
+      "properties": {
+        "shape": {
+          "type": "string",
+          "enum": ["sphere", "cylinder", "cone", "polygon"]
+        },
+        "radius": {
+          "type": "number",
+          "description": "Coverage radius in meters"
+        },
+        "coordinates": {
+          "type": "array",
+          "description": "Polygon coordinates if shape is polygon",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {"type": "number"},
+              "y": {"type": "number"},
+              "z": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "accessControl": {
+          "type": "string",
+          "enum": ["open", "authenticated", "private"]
+        },
+        "encryption": {"type": "boolean"},
+        "authenticationRequired": {"type": "boolean"}
+      }
+    },
+    "safetyConfig": {
+      "type": "object",
+      "properties": {
+        "sarMonitoring": {"type": "boolean"},
+        "humanDetection": {"type": "boolean"},
+        "autoShutoff": {"type": "boolean"},
+        "maxSAR": {
+          "type": "number",
+          "description": "Maximum SAR in W/kg"
+        }
+      },
+      "required": ["sarMonitoring", "humanDetection", "autoShutoff"]
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "online": {"type": "boolean"},
+        "activeDevices": {"type": "integer"},
+        "currentPowerOutput": {"type": "number"},
+        "availablePower": {"type": "number"},
+        "lastHealthCheck": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "required": ["txId", "txType", "capabilities", "safetyConfig"]
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.3 Receiver (RX) Schema</h2>
+            <p>The receiver schema describes the capabilities and requirements of power-receiving devices, including power needs, battery status, and charging preferences.</p>
+
+            <div class="code-header">JSON Schema - Power Receiver</div>
+            <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA AIR-POWER Receiver",
+  "type": "object",
+  "properties": {
+    "rxId": {
+      "type": "string",
+      "description": "Unique receiver identifier (UUID)",
+      "format": "uuid"
+    },
+    "deviceInfo": {
+      "type": "object",
+      "properties": {
+        "deviceType": {
+          "type": "string",
+          "enum": ["smartphone", "tablet", "laptop", "wearable",
+                   "earbud", "iot", "sensor", "appliance"]
+        },
+        "manufacturer": {"type": "string"},
+        "model": {"type": "string"},
+        "serialNumber": {"type": "string"}
+      },
+      "required": ["deviceType"]
+    },
+    "powerRequirements": {
+      "type": "object",
+      "properties": {
+        "powerClass": {
+          "type": "string",
+          "enum": ["class_a", "class_b", "class_c", "class_d", "class_e"]
+        },
+        "minPower": {
+          "type": "number",
+          "description": "Minimum power in watts for operation"
+        },
+        "optimalPower": {
+          "type": "number",
+          "description": "Optimal power in watts for fast charging"
+        },
+        "maxPower": {
+          "type": "number",
+          "description": "Maximum power receiver can handle"
+        },
+        "supportedModes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["rf", "magnetic_resonance", "infrared"]
+          }
+        }
+      },
+      "required": ["powerClass", "minPower", "maxPower"]
+    },
+    "battery": {
+      "type": "object",
+      "properties": {
+        "capacity": {
+          "type": "number",
+          "description": "Battery capacity in mAh"
+        },
+        "currentLevel": {
+          "type": "number",
+          "description": "Current battery level percentage (0-100)"
+        },
+        "voltage": {"type": "number"},
+        "temperature": {"type": "number"},
+        "health": {
+          "type": "string",
+          "enum": ["good", "fair", "poor", "critical"]
+        },
+        "cycleCount": {"type": "integer"}
+      }
+    },
+    "chargingPreferences": {
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "normal", "low"]
+        },
+        "chargingStrategy": {
+          "type": "string",
+          "enum": ["fast", "balanced", "trickle", "battery_saver"]
+        },
+        "maxChargingTemp": {"type": "number"},
+        "stopAtPercentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "isCharging": {"type": "boolean"},
+        "connectedTxId": {"type": "string"},
+        "currentPowerReceived": {"type": "number"},
+        "chargingMode": {"type": "string"},
+        "estimatedFullTime": {
+          "type": "integer",
+          "description": "Minutes until full charge"
+        }
+      }
+    }
+  },
+  "required": ["rxId", "deviceInfo", "powerRequirements"]
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.4 Power Zone Schema</h2>
+            <p>Power zones represent geographical areas covered by one or more transmitters, defining coverage, access policies, and pricing models.</p>
+
+            <div class="code-header">JSON Schema - Power Zone</div>
+            <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA AIR-POWER Zone",
+  "type": "object",
+  "properties": {
+    "zoneId": {
+      "type": "string",
+      "description": "Unique zone identifier",
+      "format": "uuid"
+    },
+    "zoneName": {
+      "type": "string",
+      "description": "Human-readable zone name"
+    },
+    "zoneType": {
+      "type": "string",
+      "enum": ["home", "office", "cafe", "public", "transport", "outdoor"]
+    },
+    "transmitters": {
+      "type": "array",
+      "description": "List of transmitter IDs in this zone",
+      "items": {"type": "string"}
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "totalArea": {
+          "type": "number",
+          "description": "Coverage area in square meters"
+        },
+        "geometry": {
+          "type": "object",
+          "description": "GeoJSON geometry defining coverage area"
+        },
+        "floors": {
+          "type": "array",
+          "items": {"type": "integer"}
+        }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "properties": {
+        "totalPowerAvailable": {"type": "number"},
+        "maxDevices": {"type": "integer"},
+        "currentDevices": {"type": "integer"},
+        "utilization": {
+          "type": "number",
+          "description": "Percentage of capacity in use (0-100)"
+        }
+      }
+    },
+    "accessPolicy": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["public", "private", "subscription", "payment"]
+        },
+        "authenticationRequired": {"type": "boolean"},
+        "whitelistedDevices": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["free", "subscription", "pay_per_use", "included"]
+        },
+        "currency": {"type": "string"},
+        "ratePerKWh": {"type": "number"},
+        "subscriptionTier": {"type": "string"}
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "alwaysOn": {"type": "boolean"},
+        "operatingHours": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": {"type": "string"},
+              "start": {"type": "string", "format": "time"},
+              "end": {"type": "string", "format": "time"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["zoneId", "zoneName", "zoneType", "transmitters"]
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.5 Charging Session Schema</h2>
+            <p>Charging sessions track individual power transfer events, including duration, energy delivered, efficiency metrics, and billing information.</p>
+
+            <div class="code-header">JSON Schema - Charging Session</div>
+            <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA AIR-POWER Charging Session",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "rxId": {"type": "string"},
+    "txId": {"type": "string"},
+    "zoneId": {"type": "string"},
+    "timing": {
+      "type": "object",
+      "properties": {
+        "startTime": {"type": "string", "format": "date-time"},
+        "endTime": {"type": "string", "format": "date-time"},
+        "duration": {
+          "type": "integer",
+          "description": "Session duration in seconds"
+        }
+      }
+    },
+    "powerMetrics": {
+      "type": "object",
+      "properties": {
+        "averagePower": {"type": "number"},
+        "peakPower": {"type": "number"},
+        "totalEnergyDelivered": {
+          "type": "number",
+          "description": "Total energy in watt-hours"
+        },
+        "efficiency": {
+          "type": "number",
+          "description": "Transfer efficiency percentage"
+        },
+        "mode": {"type": "string"}
+      }
+    },
+    "batteryChange": {
+      "type": "object",
+      "properties": {
+        "startLevel": {"type": "number"},
+        "endLevel": {"type": "number"},
+        "percentageGained": {"type": "number"}
+      }
+    },
+    "billing": {
+      "type": "object",
+      "properties": {
+        "cost": {"type": "number"},
+        "currency": {"type": "string"},
+        "pricingModel": {"type": "string"},
+        "paymentMethod": {"type": "string"}
+      }
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "averageSignalStrength": {"type": "number"},
+        "interruptions": {"type": "integer"},
+        "qualityScore": {
+          "type": "number",
+          "description": "Overall quality score 0-100"
+        }
+      }
+    }
+  },
+  "required": ["sessionId", "rxId", "txId", "timing"]
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.6 Safety Configuration Schema</h2>
+            <p>Safety configurations define limits, thresholds, and protective measures to ensure safe wireless power transmission compliant with regulatory standards.</p>
+
+            <div class="code-header">JSON Schema - Safety Configuration</div>
+            <pre><code>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA AIR-POWER Safety Configuration",
+  "type": "object",
+  "properties": {
+    "regulatoryCompliance": {
+      "type": "object",
+      "properties": {
+        "certifications": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["FCC", "CE", "KC", "TELEC", "CCC", "IC"]
+          }
+        },
+        "standards": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["IEC_62311", "IEEE_C95.1", "ICNIRP"]
+          }
+        }
+      }
+    },
+    "sarLimits": {
+      "type": "object",
+      "properties": {
+        "wholebody": {
+          "type": "number",
+          "description": "Whole body SAR limit in W/kg"
+        },
+        "partial": {
+          "type": "number",
+          "description": "Partial body SAR limit in W/kg"
+        },
+        "monitoring": {
+          "type": "string",
+          "enum": ["continuous", "periodic", "disabled"]
+        }
+      }
+    },
+    "humanProtection": {
+      "type": "object",
+      "properties": {
+        "detectionMethods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["radar", "thermal", "motion", "camera"]
+          }
+        },
+        "actionOnDetection": {
+          "type": "string",
+          "enum": ["reduce_power", "redirect_beam", "shutoff", "none"]
+        },
+        "exclusionZones": {
+          "type": "array",
+          "description": "Areas where transmission is prohibited",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reason": {"type": "string"},
+              "geometry": {"type": "object"}
+            }
+          }
+        }
+      }
+    },
+    "deviceProtection": {
+      "type": "object",
+      "properties": {
+        "overchargeProtection": {"type": "boolean"},
+        "thermalManagement": {"type": "boolean"},
+        "maxTemperature": {"type": "number"},
+        "foreignObjectDetection": {"type": "boolean"}
+      }
+    },
+    "emergencyShutdown": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["sar_exceeded", "overheat", "foreign_object",
+                     "human_proximity", "system_fault"]
+          }
+        },
+        "responseTime": {
+          "type": "number",
+          "description": "Shutdown response time in milliseconds"
+        }
+      }
+    }
+  },
+  "required": ["regulatoryCompliance", "sarLimits", "humanProtection"]
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>2.7 Power Class Definitions</h2>
+            <p>The WIA AIR-POWER standard defines five power classes to categorize devices based on their power requirements.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Class</th>
+                        <th>Name</th>
+                        <th>Power Range</th>
+                        <th>Typical Devices</th>
+                        <th>Charging Characteristic</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Class A</strong></td>
+                        <td>Ambient Power</td>
+                        <td>0 - 100mW</td>
+                        <td>RFID tags, sensors, beacons</td>
+                        <td>Battery-free operation possible</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Class B</strong></td>
+                        <td>Wearable Power</td>
+                        <td>100mW - 2W</td>
+                        <td>Smartwatches, fitness bands, earbuds</td>
+                        <td>Continuous trickle charge, never depletes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Class C</strong></td>
+                        <td>Mobile Power</td>
+                        <td>2W - 15W</td>
+                        <td>Smartphones, tablets</td>
+                        <td>Continuous top-up, always near full</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Class D</strong></td>
+                        <td>Computing Power</td>
+                        <td>15W - 100W</td>
+                        <td>Laptops, monitors, tablets</td>
+                        <td>Sufficient for use while charging</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Class E</strong></td>
+                        <td>Appliance Power</td>
+                        <td>100W - 1kW+</td>
+                        <td>TVs, vacuums, kitchen appliances</td>
+                        <td>Future high-power applications</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        </main>
+</body>
+</html>

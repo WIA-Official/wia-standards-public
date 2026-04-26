@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Security & Privacy - WIA Rehabilitation Exoskeleton</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Rehabilitation Exoskeleton Standard</h1>
+        <p class="subtitle">Chapter 6: Security & Privacy</p>
+    </header>
+
+    <main>
+        <h1>Chapter 6: Security & Privacy</h1>
+
+        <h2>6.1 Overview</h2>
+
+        <p>Patient data protection and device security are critical for rehabilitation exoskeleton systems. This chapter outlines comprehensive security requirements following HIPAA, GDPR, and medical device cybersecurity standards.</p>
+
+        <h2>6.2 Data Classification</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Classification</th>
+                    <th>Protection Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Patient Identity (PHI)</td>
+                    <td>Highly Sensitive</td>
+                    <td>Maximum encryption, strict access control</td>
+                </tr>
+                <tr>
+                    <td>Session Biomechanics</td>
+                    <td>Sensitive</td>
+                    <td>Encryption, role-based access</td>
+                </tr>
+                <tr>
+                    <td>Device Telemetry</td>
+                    <td>Internal</td>
+                    <td>Encryption, authenticated access</td>
+                </tr>
+                <tr>
+                    <td>Aggregate Statistics</td>
+                    <td>De-identified</td>
+                    <td>Standard encryption</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.3 Encryption Requirements</h2>
+
+        <h3>6.3.1 Data at Rest</h3>
+
+        <div class="info-box">
+            <ul>
+                <li><strong>Algorithm:</strong> AES-256-GCM</li>
+                <li><strong>Key Management:</strong> Hardware Security Module (HSM) or cloud KMS</li>
+                <li><strong>Key Rotation:</strong> Every 90 days</li>
+                <li><strong>Scope:</strong> All patient data, session recordings, device logs</li>
+            </ul>
+        </div>
+
+        <h3>6.3.2 Data in Transit</h3>
+
+        <ul>
+            <li><strong>TLS 1.3</strong> for all API communications</li>
+            <li><strong>Certificate pinning</strong> for mobile applications</li>
+            <li><strong>Perfect forward secrecy</strong> enabled</li>
+            <li><strong>Mutual TLS</strong> for device-to-server communication</li>
+        </ul>
+
+        <h2>6.4 Authentication and Authorization</h2>
+
+        <h3>6.4.1 User Authentication</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>User Type</th>
+                    <th>Authentication Method</th>
+                    <th>MFA Required</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Therapist</td>
+                    <td>Username/password + TOTP</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Administrator</td>
+                    <td>Smart card + PIN</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Device</td>
+                    <td>X.509 certificate</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td>Patient Portal</td>
+                    <td>Username/password + SMS</td>
+                    <td>Optional</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>6.4.2 Role-Based Access Control</h3>
+
+        <pre><code>{
+  "roles": [
+    {
+      "name": "therapist",
+      "permissions": [
+        "session:create",
+        "session:manage",
+        "patient:read",
+        "device:control",
+        "assessment:record"
+      ]
+    },
+    {
+      "name": "physician",
+      "permissions": [
+        "patient:read",
+        "patient:write",
+        "assessment:approve",
+        "report:generate"
+      ]
+    },
+    {
+      "name": "patient",
+      "permissions": [
+        "self:read",
+        "report:view"
+      ]
+    }
+  ]
+}</code></pre>
+
+        <h2>6.5 Device Security</h2>
+
+        <h3>6.5.1 Secure Boot</h3>
+
+        <div class="warning-box">
+            <h4>Boot Security Chain</h4>
+            <ol>
+                <li><strong>Hardware Root of Trust:</strong> TPM or secure element validates bootloader</li>
+                <li><strong>Signed Bootloader:</strong> Cryptographically signed by manufacturer</li>
+                <li><strong>Kernel Verification:</strong> Bootloader verifies OS kernel signature</li>
+                <li><strong>Application Verification:</strong> Only signed applications execute</li>
+            </ol>
+        </div>
+
+        <h3>6.5.2 Firmware Security</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Security Feature</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Code Signing</td>
+                    <td>All firmware signed with manufacturer private key</td>
+                </tr>
+                <tr>
+                    <td>Secure Updates</td>
+                    <td>Encrypted channel, signature verification before install</td>
+                </tr>
+                <tr>
+                    <td>Rollback Protection</td>
+                    <td>Version counter prevents downgrade attacks</td>
+                </tr>
+                <tr>
+                    <td>Memory Protection</td>
+                    <td>DEP, ASLR, stack canaries enabled</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.6 Network Security</h2>
+
+        <h3>6.6.1 Network Segmentation</h3>
+
+        <pre><code>Medical Device Network (VLAN 100)
+├── Exoskeleton Devices (192.168.100.0/24)
+│   └── Isolated from general network
+├── Therapy Control Station (192.168.100.128/25)
+│   └── Firewalled connection to EHR
+└── Data Server (192.168.100.200/29)
+    └── One-way data flow to warehouse</code></pre>
+
+        <h3>6.6.2 Firewall Rules</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Port</th>
+                    <th>Protocol</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Exoskeleton</td>
+                    <td>Control Station</td>
+                    <td>8443</td>
+                    <td>HTTPS (mutual TLS)</td>
+                </tr>
+                <tr>
+                    <td>Control Station</td>
+                    <td>EHR Server</td>
+                    <td>443</td>
+                    <td>HTTPS</td>
+                </tr>
+                <tr>
+                    <td>Data Server</td>
+                    <td>Warehouse</td>
+                    <td>5432</td>
+                    <td>PostgreSQL (TLS)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.7 Audit Logging</h2>
+
+        <h3>6.7.1 Required Audit Events</h3>
+
+        <pre><code>{
+  "auditLog": {
+    "eventId": "audit-123456",
+    "timestamp": "2025-12-14T09:15:32Z",
+    "eventType": "patient_data_access",
+    "user": {
+      "userId": "therapist-123",
+      "role": "therapist",
+      "ipAddress": "192.168.100.50"
+    },
+    "resource": {
+      "type": "patient_record",
+      "patientId": "patient-001",
+      "action": "read",
+      "dataAccessed": ["session_data", "progress_metrics"]
+    },
+    "outcome": "success"
+  }
+}</code></pre>
+
+        <h3>6.7.2 Log Retention</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Log Type</th>
+                    <th>Retention Period</th>
+                    <th>Storage Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Security Events</td>
+                    <td>7 years</td>
+                    <td>WORM storage</td>
+                </tr>
+                <tr>
+                    <td>Access Logs</td>
+                    <td>6 years</td>
+                    <td>Encrypted archive</td>
+                </tr>
+                <tr>
+                    <td>Safety Events</td>
+                    <td>10 years</td>
+                    <td>Secure archive</td>
+                </tr>
+                <tr>
+                    <td>System Logs</td>
+                    <td>90 days</td>
+                    <td>Online storage</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.8 Privacy by Design</h2>
+
+        <h3>6.8.1 Data Minimization</h3>
+
+        <div class="info-box">
+            <p>Collect and retain only data necessary for:</p>
+            <ul>
+                <li>Patient therapy and safety</li>
+                <li>Clinical decision support</li>
+                <li>Regulatory compliance</li>
+                <li>Quality improvement</li>
+            </ul>
+        </div>
+
+        <h3>6.8.2 Anonymization for Research</h3>
+
+        <pre><code>{
+  "anonymization": {
+    "patientId": "SHA256(patient-001 + salt)",
+    "age": "70-75",
+    "diagnosis": "SCI",
+    "sessionData": {
+      "biomechanics": "included",
+      "timestamps": "relative_to_session_start",
+      "location": "removed"
+    }
+  }
+}</code></pre>
+
+        <h2>6.9 Incident Response</h2>
+
+        <h3>6.9.1 Security Incident Categories</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Examples</th>
+                    <th>Response Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Critical</td>
+                    <td>Data breach, ransomware</td>
+                    <td>Immediate</td>
+                </tr>
+                <tr>
+                    <td>High</td>
+                    <td>Unauthorized access attempt</td>
+                    <td>&lt; 1 hour</td>
+                </tr>
+                <tr>
+                    <td>Medium</td>
+                    <td>Suspicious network activity</td>
+                    <td>&lt; 4 hours</td>
+                </tr>
+                <tr>
+                    <td>Low</td>
+                    <td>Failed login attempts</td>
+                    <td>&lt; 24 hours</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.10 Compliance Checklist</h2>
+
+        <div class="success-box">
+            <h3>Security Compliance Requirements</h3>
+            <ul>
+                <li>✓ HIPAA Security Rule compliance</li>
+                <li>✓ GDPR Article 32 (Security of processing)</li>
+                <li>✓ FDA Cybersecurity Guidance</li>
+                <li>✓ IEC 62443 (Industrial cybersecurity)</li>
+                <li>✓ ISO 27001 (Information security management)</li>
+                <li>✓ NIST Cybersecurity Framework</li>
+            </ul>
+        </div>
+
+        </main>
+</body>
+</html>

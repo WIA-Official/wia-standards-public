@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-MED-015 Clinical Decision Support - Chapter 05</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+<h1 style="color: #a855f7;">Chapter 05</h1>
+<p style="color: #94a3b8;">This chapter covers comprehensive details on CDSS topics including architecture, integration, guidelines, drug safety, diagnostics, data standards, alert optimization, and implementation best practices following WIA-MED-015 standards.</p>
+<h2 style="color: #c4b5fd;">Core Concepts</h2>
+<p style="color: #94a3b8;">Implementation requires careful attention to evidence-based medicine, interoperability standards (HL7 FHIR, SNOMED CT, LOINC), and user-centered design principles. Systems must balance safety alerts with usability to prevent alert fatigue while maintaining clinical effectiveness.</p>
+<p style="text-align: center; color: #ffd700; margin: 40px 0;">弘益人間 · Benefit All Humanity</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA</p>
+<section id="ebook-source"><h2>Source Markdown — Reference</h2><pre style="white-space:pre-wrap;color:#cbd5e1;font-size:0.9em;"># Chapter 5: Clinical Decision Support Control Protocols
+
+## Inference Engines, Reasoning Systems, and AI Models
+
+### 5.1 CDSS Reasoning Architecture
+
+The WIA-CLINICAL-DECISION-SUPPORT standard defines comprehensive control protocols for clinical reasoning systems, including rule engines, machine learning models, and hybrid approaches that combine multiple inference methods.
+
+```typescript
+// CDSS Reasoning Architecture
+interface CDSSReasoningArchitecture {
+  version: &#x27;1.0.0&#x27;;
+
+  reasoningLayers: {
+    ruleBasedLayer: {
+      description: &#x27;Deterministic clinical rules&#x27;;
+      engines: [&#x27;Drools&#x27;, &#x27;OpenL Tablets&#x27;, &#x27;CQL Engine&#x27;];
+      useCases: [&#x27;Alerts&#x27;, &#x27;Contraindications&#x27;, &#x27;Guidelines&#x27;];
+    };
+    probabilisticLayer: {
+      description: &#x27;Bayesian and probabilistic reasoning&#x27;;
+      methods: [&#x27;Bayesian networks&#x27;, &#x27;Markov models&#x27;];
+      useCases: [&#x27;Diagnostic reasoning&#x27;, &#x27;Risk assessment&#x27;];
+    };
+    machineLearningLayer: {
+      description: &#x27;Statistical learning models&#x27;;
+      frameworks: [&#x27;scikit-learn&#x27;, &#x27;XGBoost&#x27;, &#x27;LightGBM&#x27;];
+      useCases: [&#x27;Risk prediction&#x27;, &#x27;Classification&#x27;, &#x27;Anomaly detection&#x27;];
+    };
+    deepLearningLayer: {
+      description: &#x27;Neural network models&#x27;;
+      frameworks: [&#x27;TensorFlow&#x27;, &#x27;PyTorch&#x27;, &#x27;ONNX&#x27;];
+      useCases: [&#x27;Image analysis&#x27;, &#x27;NLP&#x27;, &#x27;Sequence prediction&#x27;];
+    };
+    llmLayer: {
+      description: &#x27;Large language model reasoning&#x27;;
+      models: [&#x27;GPT-4&#x27;, &#x27;Med-PaLM&#x27;, &#x27;Clinical BERT&#x27;];
+      useCases: [&#x27;Summarization&#x27;, &#x27;Q&amp;A&#x27;, &#x27;Report generation&#x27;];
+    };
+  };
+
+  orchestration: {
+    type: &#x27;Ensemble with confidence-weighted fusion&#x27;;
+    conflictResolution: &#x27;Priority-based with clinical review&#x27;;
+    explainability: &#x27;Multi-level explanation generation&#x27;;
+  };
+}
+```
+
+### 5.2 Rule Engine Implementation
+
+```typescript
+// Clinical Rule Engine
+interface ClinicalRuleEngine {
+  ruleTypes: {
+    alertRules: AlertRule[];
+    recommendationRules: RecommendationRule[];
+    guidelineRules: GuidelineRule[];
+    qualityRules: QualityRule[];
+  };
+
+  executionModel: {
+    forwardChaining: boolean;
+    backwardChaining: boolean;
+    conflictResolution: ConflictResolutionStrategy;
+  };
+}
+
+// Rule Definition Using CQL (Clinical Quality Language)
+const drugInteractionRule: CQLLibrary = {
+  libraryId: &#x27;DrugInteractionAlerts&#x27;,
+  version: &#x27;1.0.0&#x27;,
+  cql: `
+library DrugInteractionAlerts version &#x27;1.0.0&#x27;
+
+using FHIR version &#x27;4.0.1&#x27;
+
+include FHIRHelpers version &#x27;4.0.1&#x27; called FHIRHelpers
+
+codesystem &quot;RxNorm&quot;: &#x27;http://www.nlm.nih.gov/research/umls/rxnorm&#x27;
+
+valueset &quot;Warfarin&quot;: &#x27;http://cts.nlm.nih.gov/ValueSet/warfarin&#x27;
+valueset &quot;NSAIDs&quot;: &#x27;http://cts.nlm.nih.gov/ValueSet/nsaids&#x27;
+valueset &quot;SSRIs&quot;: &#x27;http://cts.nlm.nih.gov/ValueSet/ssris&#x27;
+
+context Patient
+
+define &quot;Active Warfarin&quot;:
+  [MedicationRequest: &quot;Warfarin&quot;] MR
+    where MR.status = &#x27;active&#x27;
+
+define &quot;Active NSAIDs&quot;:
+  [MedicationRequest: &quot;NSAIDs&quot;] MR
+    where MR.status = &#x27;active&#x27;
+
+define &quot;Active SSRIs&quot;:
+  [MedicationRequest: &quot;SSRIs&quot;] MR
+    where MR.status = &#x27;active&#x27;
+
+define &quot;Warfarin NSAID Interaction&quot;:
+  exists(&quot;Active Warfarin&quot;) and exists(&quot;Active NSAIDs&quot;)
+
+define &quot;Warfarin SSRI Interaction&quot;:
+  exists(&quot;Active Warfarin&quot;) and exists(&quot;Active SSRIs&quot;)
+
+define &quot;Triple Therapy Risk&quot;:
+  exists(&quot;Active Warfarin&quot;) and exists(&quot;Active NSAIDs&quot;) and exists(&quot;Active SSRIs&quot;)
+
+define &quot;Interaction Severity&quot;:
+  case
+    when &quot;Triple Therapy Risk&quot; then &#x27;CRITICAL&#x27;
+    when &quot;Warfarin NSAID Interaction&quot; then &#x27;HIGH&#x27;
+    when &quot;Warfarin SSRI Interaction&quot; then &#x27;MODERATE&#x27;
+    else &#x27;NONE&#x27;
+  end
+
+define &quot;Alert Message&quot;:
+  case
+    when &quot;Triple Therapy Risk&quot; then
+      &#x27;CRITICAL: Triple therapy (Warfarin + NSAID + SSRI) significantly increases bleeding risk&#x27;
+    when &quot;Warfarin NSAID Interaction&quot; then
+      &#x27;HIGH: Concurrent Warfarin and NSAID use increases bleeding risk&#x27;
+    when &quot;Warfarin SSRI Interaction&quot; then
+      &#x27;MODERATE: Concurrent Warfarin and SSRI use may increase bleeding risk&#x27;
+    else null
+  end
+  `
+};
+
+// Rule Engine Implementation
+class ClinicalRuleEngineService {
+  private cqlEngine: CQLEngine;
+  private ruleRepository: RuleRepository;
+  private auditLogger: AuditLogger;
+
+  async evaluateRules(
+    patientData: PatientData,
+    context: RuleContext
+  ): Promise&lt;RuleEvaluationResult&gt; {
+    const startTime = Date.now();
+    const results: RuleResult[] = [];
+
+    // Get applicable rules
+    const applicableRules = await this.getApplicableRules(context);
+
+    // Execute rules in priority order
+    for (const rule of applicableRules) {
+      try {
+        const result = await this.executeRule(rule, patientData, context);
+        results.push(result);
+
+        // Check for stop conditions
+        if (result.triggered &amp;&amp; rule.stopOnTrigger) {
+          break;
+        }
+      } catch (error) {
+        this.logRuleError(rule, error);
+      }
+    }
+
+    // Apply conflict resolution
+    const resolvedResults = this.resolveConflicts(results);
+
+    // Audit log
+    await this.auditLogger.logRuleExecution({
+      context,
+      rulesEvaluated: applicableRules.length,
+      rulesTriggered: results.filter(r =&gt; r.triggered).length,
+      executionTime: Date.now() - startTime
+    });
+
+    return {
+      results: resolvedResults,
+      metadata: {
+        rulesEvaluated: applicableRules.length,
+        executionTime: Date.now() - startTime
+      }
+    };
+  }
+
+  private async executeRule(
+    rule: ClinicalRule,
+    patientData: PatientData,
+    context: RuleContext
+  ): Promise&lt;RuleResult&gt; {
+    // Convert patient data to FHIR bundle
+    const fhirBundle = this.convertToFHIR(patientData);
+
+    // Execute CQL
+    const cqlResult = await this.cqlEngine.execute(
+      rule.cqlLibrary,
+      fhirBundle,
+      {
+        libraryName: rule.cqlLibrary,
+        expressions: rule.expressions
+      }
+    );
+
+    // Check if rule triggered
+    const triggered = this.evaluateTriggerCondition(rule, cqlResult);
+
+    if (triggered) {
+      return {
+        ruleId: rule.id,
+        ruleName: rule.name,
+        triggered: true,
+        severity: cqlResult[&#x27;Interaction Severity&#x27;] || rule.defaultSeverity,
+        message: cqlResult[&#x27;Alert Message&#x27;] || rule.defaultMessage,
+        details: this.extractDetails(cqlResult),
+        suggestions: rule.suggestions,
+        references: rule.references
+      };
+    }
+
+    return {
+      ruleId: rule.id,
+      ruleName: rule.name,
+      triggered: false
+    };
+  }
+
+  private resolveConflicts(results: RuleResult[]): RuleResult[] {
+    // Group by conflict category
+    const groups = this.groupByConflictCategory(results);
+
+    const resolved: RuleResult[] = [];
+
+    for (const [category, groupResults] of Object.entries(groups)) {
+      if (groupResults.length === 1) {
+        resolved.push(...groupResults);
+      } else {
+        // Apply conflict resolution strategy
+        const winner = this.selectWinner(groupResults);
+        resolved.push(winner);
+      }
+    }
+
+    return resolved;
+  }
+
+  private selectWinner(results: RuleResult[]): RuleResult {
+    // Priority order: CRITICAL &gt; HIGH &gt; MODERATE &gt; LOW
+    const severityOrder = { &#x27;CRITICAL&#x27;: 0, &#x27;HIGH&#x27;: 1, &#x27;MODERATE&#x27;: 2, &#x27;LOW&#x27;: 3 };
+
+    return results.sort((a, b) =&gt;
+      severityOrder[a.severity] - severityOrder[b.severity]
+    )[0];
+  }
+}
+
+// Temporal Reasoning for Clinical Rules
+class TemporalReasoningEngine {
+  async evaluateTemporalConditions(
+    patientData: PatientData,
+    temporalRules: TemporalRule[]
+  ): Promise&lt;TemporalResult[]&gt; {
+    const results: TemporalResult[] = [];
+
+    for (const rule of temporalRules) {
+      const result = await this.evaluateTemporalRule(rule, patientData);
+      if (result.satisfied) {
+        results.push(result);
+      }
+    }
+
+    return results;
+  }
+
+  private async evaluateTemporalRule(
+    rule: TemporalRule,
+    patientData: PatientData
+  ): Promise&lt;TemporalResult&gt; {
+    switch (rule.temporalOperator) {
+      case &#x27;BEFORE&#x27;:
+        return this.evaluateBefore(rule, patientData);
+      case &#x27;AFTER&#x27;:
+        return this.evaluateAfter(rule, patientData);
+      case &#x27;DURING&#x27;:
+        return this.evaluateDuring(rule, patientData);
+      case &#x27;WITHIN&#x27;:
+        return this.evaluateWithin(rule, patientData);
+      case &#x27;SEQUENCE&#x27;:
+        return this.evaluateSequence(rule, patientData);
+      default:
+        throw new Error(`Unknown temporal operator: ${rule.temporalOperator}`);
+    }
+  }
+
+  // Example: Check if INR was measured within 7 days before warfarin prescription
+  private async evaluateWithin(
+    rule: TemporalRule,
+    patientData: PatientData
+  ): Promise&lt;TemporalResult&gt; {
+    const events1 = this.getEvents(patientData, rule.event1);
+    const events2 = this.getEvents(patientData, rule.event2);
+
+    for (const e2 of events2) {
+      const windowStart = this.subtractDuration(e2.timestamp, rule.duration);
+      const windowEnd = e2.timestamp;
+
+      const matchingE1 = events1.find(e1 =&gt;
+        e1.timestamp &gt;= windowStart &amp;&amp; e1.timestamp &lt;= windowEnd
+      );
+
+      if (!matchingE1 &amp;&amp; rule.requireMatch) {
+        return {
+          ruleId: rule.id,
+          satisfied: true,  // Rule violation detected
+          message: `${rule.event1.display} not found within ${rule.duration} before ${rule.event2.display}`,
+          recommendation: rule.recommendation
+        };
+      }
+    }
+
+    return { ruleId: rule.id, satisfied: false };
+  }
+}
+```
+
+### 5.3 Machine Learning Inference
+
+```typescript
+// ML Inference Service
+interface MLInferenceService {
+  models: {
+    riskPrediction: RiskPredictionModel[];
+    diagnosticSupport: DiagnosticModel[];
+    treatmentSelection: TreatmentModel[];
+    prognosis: PrognosticModel[];
+  };
+
+  infrastructure: {
+    modelRegistry: ModelRegistry;
+    featureStore: FeatureStore;
+    inferenceEngine: InferenceEngine;
+    monitoringService: ModelMonitoringService;
+  };
+}
+
+// Risk Prediction Model Interface
+interface RiskPredictionModel {
+  modelId: string;
+  modelName: string;
+  version: string;
+  modelType: &#x27;LOGISTIC_REGRESSION&#x27; | &#x27;RANDOM_FOREST&#x27; | &#x27;GRADIENT_BOOSTING&#x27; | &#x27;NEURAL_NETWORK&#x27;;
+  targetOutcome: string;
+  predictionHorizon: string;
+  features: ModelFeature[];
+  performance: ModelPerformance;
+  calibration: CalibrationInfo;
+}
+
+// ML Inference Implementation
+class MLInferenceEngine {
+  private modelRegistry: ModelRegistry;
+  private featureStore: FeatureStore;
+  private modelServers: Map&lt;string, ModelServer&gt;;
+  private explainer: ModelExplainer;
+
+  async predict(
+    modelId: string,
+    patientData: PatientData,
+    options?: PredictionOptions
+  ): Promise&lt;PredictionResult&gt; {
+    // Get model
+    const model = await this.modelRegistry.getModel(modelId);
+    if (!model) {
+      throw new ModelNotFoundError(modelId);
+    }
+
+    // Extract features
+    const features = await this.extractFeatures(model, patientData);
+
+    // Validate features
+    const validation = this.validateFeatures(model, features);
+    if (!validation.valid) {
+      return this.handleMissingFeatures(model, features, validation);
+    }
+
+    // Run inference
+    const rawPrediction = await this.runInference(model, features);
+
+    // Calibrate
+    const calibratedPrediction = this.calibrate(model, rawPrediction);
+
+    // Generate explanation
+    const explanation = await this.explainer.explain(
+      model,
+      features,
+      calibratedPrediction,
+      options?.explanationLevel ?? &#x27;STANDARD&#x27;
+    );
+
+    // Calculate confidence
+    const confidence = this.calculateConfidence(
+      model,
+      features,
+      calibratedPrediction,
+      validation
+    );
+
+    return {
+      modelId,
+      modelName: model.modelName,
+      modelVersion: model.version,
+      prediction: {
+        value: calibratedPrediction.probability,
+        class: calibratedPrediction.class,
+        threshold: model.decisionThreshold
+      },
+      confidence,
+      explanation,
+      features: this.summarizeFeatures(features),
+      warnings: validation.warnings,
+      timestamp: new Date()
+    };
+  }
+
+  private async extractFeatures(
+    model: MLModel,
+    patientData: PatientData
+  ): Promise&lt;FeatureVector&gt; {
+    const features: FeatureVector = {};
+
+    for (const featureDef of model.features) {
+      const value = await this.extractFeature(featureDef, patientData);
+      features[featureDef.name] = value;
+    }
+
+    // Apply transformations
+    return this.applyTransformations(model, features);
+  }
+
+  private async extractFeature(
+    featureDef: ModelFeature,
+    patientData: PatientData
+  ): Promise&lt;any&gt; {
+    switch (featureDef.source) {
+      case &#x27;DEMOGRAPHICS&#x27;:
+        return this.extractDemographicFeature(featureDef, patientData.demographics);
+      case &#x27;LABS&#x27;:
+        return this.extractLabFeature(featureDef, patientData.labs);
+      case &#x27;VITALS&#x27;:
+        return this.extractVitalFeature(featureDef, patientData.vitals);
+      case &#x27;DIAGNOSES&#x27;:
+        return this.extractDiagnosisFeature(featureDef, patientData.problems);
+      case &#x27;MEDICATIONS&#x27;:
+        return this.extractMedicationFeature(featureDef, patientData.medications);
+      case &#x27;CALCULATED&#x27;:
+        return this.calculateFeature(featureDef, patientData);
+      default:
+        throw new Error(`Unknown feature source: ${featureDef.source}`);
+    }
+  }
+
+  private async runInference(
+    model: MLModel,
+    features: FeatureVector
+  ): Promise&lt;RawPrediction&gt; {
+    const modelServer = this.modelServers.get(model.servingEndpoint);
+
+    // Convert features to model input format
+    const inputTensor = this.featuresToTensor(model, features);
+
+    // Call model server
+    const response = await modelServer.predict({
+      modelId: model.modelId,
+      modelVersion: model.version,
+      inputs: inputTensor
+    });
+
+    return {
+      probability: response.outputs[0],
+      class: response.outputs[0] &gt;= model.decisionThreshold ? 1 : 0,
+      rawScores: response.outputs
+    };
+  }
+
+  private calibrate(
+    model: MLModel,
+    prediction: RawPrediction
+  ): CalibratedPrediction {
+    if (!model.calibration) {
+      return prediction;
+    }
+
+    // Apply Platt scaling or isotonic regression
+    const calibratedProbability = this.applyCalibration(
+      prediction.probability,
+      model.calibration
+    );
+
+    return {
+      ...prediction,
+      probability: calibratedProbability,
+      class: calibratedProbability &gt;= model.decisionThreshold ? 1 : 0
+    };
+  }
+}
+
+// SHAP Explainer for Model Explanations
+class SHAPExplainer implements ModelExplainer {
+  async explain(
+    model: MLModel,
+    features: FeatureVector,
+    prediction: CalibratedPrediction,
+    level: ExplanationLevel
+  ): Promise&lt;Explanation&gt; {
+    // Calculate SHAP values
+    const shapValues = await this.calculateSHAPValues(model, features);
+
+    // Get feature importance ranking
+    const featureImportance = this.rankFeatures(shapValues);
+
+    // Generate explanation
+    return {
+      type: &#x27;SHAP&#x27;,
+
+      summary: this.generateSummary(
+        model,
+        prediction,
+        featureImportance,
+        level
+      ),
+
+      featureContributions: featureImportance.slice(0, level === &#x27;BRIEF&#x27; ? 3 : 10).map(f =&gt; ({
+        feature: f.name,
+        displayName: f.displayName,
+        value: features[f.name],
+        contribution: f.shapValue,
+        direction: f.shapValue &gt; 0 ? &#x27;INCREASES_RISK&#x27; : &#x27;DECREASES_RISK&#x27;,
+        magnitude: Math.abs(f.shapValue)
+      })),
+
+      baseline: model.baselineRisk,
+
+      visualization: level === &#x27;DETAILED&#x27; ? {
+        type: &#x27;WATERFALL&#x27;,
+        data: this.generateWaterfallData(featureImportance, model.baselineRisk)
+      } : undefined,
+
+      confidence: this.assessExplanationConfidence(shapValues)
+    };
+  }
+
+  private generateSummary(
+    model: MLModel,
+    prediction: CalibratedPrediction,
+    featureImportance: FeatureImportance[],
+    level: ExplanationLevel
+  ): string {
+    const riskLevel = this.getRiskLevel(prediction.probability);
+    const topFactors = featureImportance.slice(0, 3);
+
+    const increasingFactors = topFactors.filter(f =&gt; f.shapValue &gt; 0);
+    const decreasingFactors = topFactors.filter(f =&gt; f.shapValue &lt; 0);
+
+    let summary = `${model.targetOutcome} risk is ${riskLevel} (${(prediction.probability * 100).toFixed(1)}%). `;
+
+    if (increasingFactors.length &gt; 0) {
+      summary += `Key factors increasing risk: ${increasingFactors.map(f =&gt; f.displayName).join(&#x27;, &#x27;)}. `;
+    }
+
+    if (decreasingFactors.length &gt; 0) {
+      summary += `Protective factors: ${decreasingFactors.map(f =&gt; f.displayName).join(&#x27;, &#x27;)}.`;
+    }
+
+    return summary;
+  }
+}
+
+// Example: Sepsis Early Warning Model
+const sepsisEarlyWarningModel: RiskPredictionModel = {
+  modelId: &#x27;sepsis-ew-v3&#x27;,
+  modelName: &#x27;Sepsis Early Warning Score&#x27;,
+  version: &#x27;3.2.1&#x27;,
+  modelType: &#x27;GRADIENT_BOOSTING&#x27;,
+  targetOutcome: &#x27;Sepsis onset within 6 hours&#x27;,
+  predictionHorizon: &#x27;6 hours&#x27;,
+
+  features: [
+    {
+      name: &#x27;heart_rate&#x27;,
+      displayName: &#x27;Heart Rate&#x27;,
+      source: &#x27;VITALS&#x27;,
+      extraction: &#x27;LATEST&#x27;,
+      required: true,
+      validation: { min: 20, max: 250 }
+    },
+    {
+      name: &#x27;respiratory_rate&#x27;,
+      displayName: &#x27;Respiratory Rate&#x27;,
+      source: &#x27;VITALS&#x27;,
+      extraction: &#x27;LATEST&#x27;,
+      required: true,
+      validation: { min: 4, max: 60 }
+    },
+    {
+      name: &#x27;temperature&#x27;,
+      displayName: &#x27;Temperature&#x27;,
+      source: &#x27;VITALS&#x27;,
+      extraction: &#x27;LATEST&#x27;,
+      required: true,
+      validation: { min: 30, max: 45 }
+    },
+    {
+      name: &#x27;systolic_bp&#x27;,
+      displayName: &#x27;Systolic Blood Pressure&#x27;,
+      source: &#x27;VITALS&#x27;,
+      extraction: &#x27;LATEST&#x27;,
+      required: true,
+      validation: { min: 40, max: 300 }
+    },
+    {
+      name: &#x27;wbc&#x27;,
+      displayName: &#x27;White Blood Cell Count&#x27;,
+      source: &#x27;LABS&#x27;,
+      loincCode: &#x27;6690-2&#x27;,
+      extraction: &#x27;LATEST_WITHIN_24H&#x27;,
+      required: false
+    },
+    {
+      name: &#x27;lactate&#x27;,
+      displayName: &#x27;Lactate&#x27;,
+      source: &#x27;LABS&#x27;,
+      loincCode: &#x27;2524-7&#x27;,
+      extraction: &#x27;LATEST_WITHIN_12H&#x27;,
+      required: false
+    },
+    {
+      name: &#x27;age&#x27;,
+      displayName: &#x27;Age&#x27;,
+      source: &#x27;DEMOGRAPHICS&#x27;,
+      extraction: &#x27;CALCULATED&#x27;,
+      required: true
+    },
+    {
+      name: &#x27;hr_trend&#x27;,
+      displayName: &#x27;Heart Rate Trend (6h)&#x27;,
+      source: &#x27;CALCULATED&#x27;,
+      calculation: &#x27;linear_regression_slope(heart_rate, 6h)&#x27;,
+      required: false
+    }
+  ],
+
+  performance: {
+    auc: 0.89,
+    sensitivity: 0.85,
+    specificity: 0.82,
+    ppv: 0.45,
+    npv: 0.97,
+    calibrationSlope: 1.02,
+    calibrationIntercept: -0.01,
+    validationCohort: &#x27;Multi-center ICU (n=45,000)&#x27;,
+    validationDate: new Date(&#x27;2024-06-15&#x27;)
+  },
+
+  calibration: {
+    method: &#x27;isotonic&#x27;,
+    parameters: { /* isotonic regression mapping */ }
+  }
+};
+```
+
+### 5.4 Deep Learning for Clinical Images and NLP
+
+```typescript
+// Deep Learning Service
+interface DeepLearningService {
+  imagingModels: {
+    radiology: RadiologyModel[];
+    pathology: PathologyModel[];
+    dermatology: DermatologyModel[];
+    ophthalmology: OphthalmologyModel[];
+  };
+
+  nlpModels: {
+    namedEntityRecognition: NERModel;
+    relationExtraction: RelationModel;
+    documentClassification: ClassificationModel;
+    summarization: SummarizationModel;
+  };
+}
+
+// Medical Image Analysis
+class MedicalImageAnalyzer {
+  private modelRegistry: ModelRegistry;
+  private preprocessor: ImagePreprocessor;
+  private postprocessor: ResultPostprocessor;
+
+  async analyzeImage(
+    image: MedicalImage,
+    analysisType: ImageAnalysisType,
+    options?: ImageAnalysisOptions
+  ): Promise&lt;ImageAnalysisResult&gt; {
+    // Select appropriate model
+    const model = await this.selectModel(image.modality, analysisType);
+
+    // Preprocess image
+    const preprocessed = await this.preprocessor.process(image, model.inputSpec);
+
+    // Run inference
+    const rawOutput = await this.runInference(model, preprocessed);
+
+    // Post-process results
+    const findings = await this.postprocessor.process(
+      rawOutput,
+      model,
+      analysisType
+    );
+
+    // Generate explanation
+    const explanation = await this.generateExplanation(
+      model,
+      preprocessed,
+      rawOutput,
+      findings
+    );
+
+    return {
+      imageId: image.id,
+      studyId: image.studyId,
+      modality: image.modality,
+      analysisType,
+      model: {
+        id: model.id,
+        name: model.name,
+        version: model.version
+      },
+      findings,
+      explanation,
+      confidence: this.calculateOverallConfidence(findings),
+      processingTime: Date.now() - startTime,
+      disclaimers: this.getDisclaimers(model, analysisType)
+    };
+  }
+
+  private async generateExplanation(
+    model: ImagingModel,
+    image: ProcessedImage,
+    output: ModelOutput,
+    findings: Finding[]
+  ): Promise&lt;ImageExplanation&gt; {
+    // Generate attention/saliency map
+    const attentionMap = await this.generateAttentionMap(model, image);
+
+    // Generate GradCAM visualization
+    const gradCam = await this.generateGradCAM(model, image, output);
+
+    return {
+      type: &#x27;IMAGE_ATTENTION&#x27;,
+      attentionMap: attentionMap,
+      gradCam: gradCam,
+      highlightedRegions: findings.map(f =&gt; f.location),
+      textDescription: this.generateTextExplanation(findings)
+    };
+  }
+}
+
+// Example: Chest X-Ray Analysis Model
+const chestXRayModel: RadiologyModel = {
+  id: &#x27;cxr-findings-v4&#x27;,
+  name: &#x27;Chest X-Ray Findings Detector&#x27;,
+  version: &#x27;4.1.0&#x27;,
+  modality: &#x27;CR&#x27;,  // Computed Radiography
+  bodyPart: &#x27;CHEST&#x27;,
+
+  architecture: &#x27;DenseNet-121 with multi-label head&#x27;,
+  inputSpec: {
+    imageSize: [1024, 1024],
+    channels: 1,
+    normalization: &#x27;ImageNet&#x27;,
+    preprocessing: [&#x27;CLAHE&#x27;, &#x27;resize&#x27;, &#x27;normalize&#x27;]
+  },
+
+  findings: [
+    { code: &#x27;consolidation&#x27;, display: &#x27;Consolidation&#x27;, icd10: &#x27;R91.1&#x27; },
+    { code: &#x27;pneumothorax&#x27;, display: &#x27;Pneumothorax&#x27;, icd10: &#x27;J93.9&#x27; },
+    { code: &#x27;cardiomegaly&#x27;, display: &#x27;Cardiomegaly&#x27;, icd10: &#x27;I51.7&#x27; },
+    { code: &#x27;pleural_effusion&#x27;, display: &#x27;Pleural Effusion&#x27;, icd10: &#x27;J90&#x27; },
+    { code: &#x27;atelectasis&#x27;, display: &#x27;Atelectasis&#x27;, icd10: &#x27;J98.11&#x27; },
+    { code: &#x27;nodule&#x27;, display: &#x27;Pulmonary Nodule&#x27;, icd10: &#x27;R91.1&#x27; },
+    { code: &#x27;mass&#x27;, display: &#x27;Lung Mass&#x27;, icd10: &#x27;R91.8&#x27; },
+    { code: &#x27;fracture&#x27;, display: &#x27;Rib Fracture&#x27;, icd10: &#x27;S22.3&#x27; }
+  ],
+
+  performance: {
+    overall_auc: 0.91,
+    per_finding: {
+      consolidation: { auc: 0.94, sensitivity: 0.89, specificity: 0.92 },
+      pneumothorax: { auc: 0.97, sensitivity: 0.95, specificity: 0.96 },
+      cardiomegaly: { auc: 0.92, sensitivity: 0.88, specificity: 0.90 },
+      pleural_effusion: { auc: 0.95, sensitivity: 0.91, specificity: 0.93 },
+      atelectasis: { auc: 0.86, sensitivity: 0.80, specificity: 0.85 },
+      nodule: { auc: 0.88, sensitivity: 0.82, specificity: 0.87 },
+      mass: { auc: 0.90, sensitivity: 0.85, specificity: 0.89 },
+      fracture: { auc: 0.89, sensitivity: 0.84, specificity: 0.88 }
+    },
+    validation: &#x27;NIH ChestX-ray14 + Internal (n=200,000)&#x27;
+  },
+
+  regulatory: {
+    fdaClearance: &#x27;510(k) K221234&#x27;,
+    ceMarking: &#x27;Class IIa&#x27;,
+    intendedUse: &#x27;Aid to radiologist in detecting findings on chest X-rays&#x27;
+  }
+};
+
+// Clinical NLP Service
+class ClinicalNLPService {
+  private nerModel: NERModel;
+  private relationModel: RelationExtractor;
+  private llmService: MedicalLLMService;
+
+  async extractClinicalEntities(
+    text: string,
+    documentType: string
+  ): Promise&lt;ClinicalEntities&gt; {
+    // Named Entity Recognition
+    const entities = await this.nerModel.extract(text);
+
+    // Entity linking to standard terminologies
+    const linkedEntities = await this.linkEntities(entities);
+
+    // Relation extraction
+    const relations = await this.relationModel.extract(text, linkedEntities);
+
+    // Assertion detection (negation, uncertainty, etc.)
+    const assertions = await this.detectAssertions(linkedEntities, text);
+
+    return {
+      entities: linkedEntities,
+      relations,
+      assertions,
+      sections: await this.detectSections(text, documentType)
+    };
+  }
+
+  async summarizeClinicalDocument(
+    document: ClinicalDocument,
+    options: SummarizationOptions
+  ): Promise&lt;DocumentSummary&gt; {
+    // Extract key information
+    const entities = await this.extractClinicalEntities(
+      document.text,
+      document.type
+    );
+
+    // Generate summary using LLM
+    const summary = await this.llmService.summarize(
+      document,
+      entities,
+      options
+    );
+
+    return {
+      documentId: document.id,
+      documentType: document.type,
+      summary: {
+        brief: summary.oneSentence,
+        standard: summary.paragraph,
+        structured: summary.structured
+      },
+      keyFindings: summary.keyFindings,
+      medications: entities.entities.filter(e =&gt; e.type === &#x27;MEDICATION&#x27;),
+      diagnoses: entities.entities.filter(e =&gt; e.type === &#x27;DIAGNOSIS&#x27;),
+      procedures: entities.entities.filter(e =&gt; e.type === &#x27;PROCEDURE&#x27;),
+      followUp: summary.followUpItems
+    };
+  }
+}
+```
+
+### 5.5 Large Language Model Integration
+
+```typescript
+// Medical LLM Service
+interface MedicalLLMService {
+  models: {
+    general: &#x27;GPT-4&#x27; | &#x27;Claude-3&#x27; | &#x27;Gemini&#x27;;
+    medical: &#x27;Med-PaLM 2&#x27; | &#x27;Clinical-T5&#x27; | &#x27;BioGPT&#x27;;
+  };
+
+  capabilities: {
+    questionAnswering: boolean;
+    summarization: boolean;
+    reasoning: boolean;
+    codeGeneration: boolean;  // For CQL, etc.
+    translation: boolean;  // Medical terminology
+  };
+
+  safeguards: {
+    groundingRequired: boolean;
+    citationRequired: boolean;
+    uncertaintyEstimation: boolean;
+    hallucinationDetection: boolean;
+  };
+}
+
+// Medical LLM Implementation
+class MedicalLLMEngine {
+  private llmClient: LLMClient;
+  private groundingService: MedicalGroundingService;
+  private safetyChecker: LLMSafetyChecker;
+  private promptTemplates: PromptTemplateRepository;
+
+  async answerClinicalQuestion(
+    question: ClinicalQuestion,
+    context: ClinicalContext
+  ): Promise&lt;LLMClinicalResponse&gt; {
+    // Build grounded prompt
+    const prompt = await this.buildGroundedPrompt(question, context);
+
+    // Call LLM with medical system prompt
+    const rawResponse = await this.llmClient.complete({
+      model: &#x27;gpt-4-turbo&#x27;,
+      systemPrompt: MEDICAL_SYSTEM_PROMPT,
+      userPrompt: prompt.text,
+      temperature: 0.3,  // Lower for clinical accuracy
+      maxTokens: 2000
+    });
+
+    // Ground response in medical knowledge
+    const groundedResponse = await this.groundingService.ground(
+      rawResponse,
+      context
+    );
+
+    // Safety check
+    const safetyResult = await this.safetyChecker.check(groundedResponse);
+    if (!safetyResult.safe) {
+      return this.handleUnsafeResponse(safetyResult);
+    }
+
+    // Extract citations
+    const citations = await this.extractCitations(groundedResponse);
+
+    // Estimate uncertainty
+    const uncertainty = await this.estimateUncertainty(
+      question,
+      groundedResponse
+    );
+
+    return {
+      answer: groundedResponse.text,
+      confidence: 1 - uncertainty.overall,
+      citations,
+      evidenceLevel: this.assessEvidenceLevel(citations),
+      uncertaintyFactors: uncertainty.factors,
+      disclaimers: this.generateDisclaimers(question, uncertainty),
+      relatedQuestions: await this.suggestRelatedQuestions(question)
+    };
+  }
+
+  private async buildGroundedPrompt(
+    question: ClinicalQuestion,
+    context: ClinicalContext
+  ): Promise&lt;GroundedPrompt&gt; {
+    // Retrieve relevant knowledge
+    const relevantKnowledge = await this.retrieveRelevantKnowledge(question);
+
+    // Get patient context if available
+    const patientContext = context.patientId
+      ? await this.formatPatientContext(context.patientId)
+      : null;
+
+    // Build prompt with RAG
+    const template = await this.promptTemplates.get(question.type);
+
+    return {
+      text: template.format({
+        question: question.text,
+        context: patientContext,
+        knowledge: relevantKnowledge,
+        guidelines: await this.getRelevantGuidelines(question)
+      }),
+      sources: relevantKnowledge.sources
+    };
+  }
+
+  async generateDifferentialDiagnosis(
+    presentation: ClinicalPresentation,
+    patientContext: PatientContext
+  ): Promise&lt;DifferentialDiagnosisResult&gt; {
+    const prompt = `
+Given the following clinical presentation and patient context, generate a differential diagnosis list:
+
+**Patient Context:**
+${this.formatPatientContext(patientContext)}
+
+**Presenting Symptoms:**
+${presentation.symptoms.map(s =&gt; `- ${s.name} (${s.severity}, ${s.duration})`).join(&#x27;\n&#x27;)}
+
+**Physical Exam Findings:**
+${presentation.examFindings.map(f =&gt; `- ${f.finding}: ${f.value}`).join(&#x27;\n&#x27;)}
+
+**Recent Labs:**
+${presentation.recentLabs?.map(l =&gt; `- ${l.name}: ${l.value} ${l.unit} (${l.flag || &#x27;normal&#x27;})`).join(&#x27;\n&#x27;) || &#x27;Not available&#x27;}
+
+Please provide:
+1. Top 5 differential diagnoses ranked by likelihood
+2. For each diagnosis:
+   - Key supporting features
+   - Key features against
+   - Recommended workup
+3. &quot;Can&#x27;t miss&quot; diagnoses to rule out
+4. Recommended next steps
+
+Base your reasoning on current clinical evidence and guidelines.
+`;
+
+    const response = await this.llmClient.complete({
+      model: &#x27;gpt-4-turbo&#x27;,
+      systemPrompt: DIFFERENTIAL_DIAGNOSIS_SYSTEM_PROMPT,
+      userPrompt: prompt,
+      temperature: 0.2
+    });
+
+    // Parse structured response
+    const parsed = await this.parseDifferentialResponse(response);
+
+    // Ground in medical knowledge
+    const grounded = await this.groundDifferentials(parsed);
+
+    // Add ICD codes
+    const withCodes = await this.addDiagnosisCodes(grounded);
+
+    return {
+      differentials: withCodes.diagnoses,
+      cantMiss: withCodes.cantMiss,
+      recommendedWorkup: withCodes.workup,
+      reasoning: parsed.reasoning,
+      confidence: this.assessDifferentialConfidence(parsed),
+      citations: grounded.citations
+    };
+  }
+}
+
+// Safety and Grounding
+const MEDICAL_SYSTEM_PROMPT = `
+You are a clinical decision support assistant. Your role is to help healthcare professionals by providing accurate, evidence-based medical information.
+
+IMPORTANT GUIDELINES:
+1. Always cite sources for medical claims
+2. Clearly state uncertainty when present
+3. Never make definitive diagnoses - provide differential considerations
+4. Include relevant warnings and contraindications
+5. Recommend consulting specialists when appropriate
+6. Do not provide advice that could harm patients
+7. Acknowledge limitations of AI in clinical decision-making
+
+When uncertain, say so explicitly. When information is incomplete, note what additional information would be helpful.
+
+Your responses should support, not replace, clinical judgment.
+`;
+```
+
+---
+
+**WIA-CLINICAL-DECISION-SUPPORT Control Protocols**
+**Version**: 1.0.0
+**Last Updated**: 2025
+**License**: MIT
+
+© 2025 World Interoperability Alliance (WIA)
+弘益人間 (홍익인간) - Benefit All Humanity
+</pre></section></body>
+</html>

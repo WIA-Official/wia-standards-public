@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA Rehabilitation Exoskeleton</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Rehabilitation Exoskeleton Standard</h1>
+        <p class="subtitle">Chapter 7: Implementation Examples</p>
+    </header>
+
+    <main>
+        <h1>Chapter 7: Implementation Examples</h1>
+
+        <h2>7.1 Overview</h2>
+
+        <p>This chapter provides practical code examples for implementing WIA-compliant exoskeleton control systems in Python, TypeScript, and Bash. These examples demonstrate key operations like device control, session management, and data processing.</p>
+
+        <h2>7.2 Python Implementation</h2>
+
+        <h3>7.2.1 Device Control Client</h3>
+
+        <pre><code>import requests
+import json
+from typing import Dict, Optional
+
+class ExoskeletonController:
+    """WIA-compliant exoskeleton control client"""
+    
+    def __init__(self, base_url: str, api_key: str):
+        self.base_url = base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+    
+    def send_control_command(
+        self,
+        device_id: str,
+        joint: str,
+        side: str,
+        mode: str,
+        params: Dict
+    ) -> Dict:
+        """Send control command to exoskeleton"""
+        
+        command = {
+            "commandId": f"cmd-{int(time.time() * 1000)}",
+            "timestamp": int(time.time() * 1000),
+            "joint": joint,
+            "side": side,
+            "mode": mode,
+            "params": params,
+            "priority": "normal"
+        }
+        
+        url = f"{self.base_url}/devices/{device_id}/control"
+        response = requests.post(url, json=command, headers=self.headers)
+        response.raise_for_status()
+        
+        return response.json()
+    
+    def get_device_status(self, device_id: str) -> Dict:
+        """Get current device status"""
+        
+        url = f"{self.base_url}/devices/{device_id}/status"
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        
+        return response.json()
+    
+    def emergency_stop(self, device_id: str, reason: str) -> Dict:
+        """Trigger emergency stop"""
+        
+        url = f"{self.base_url}/devices/{device_id}/emergency-stop"
+        data = {
+            "reason": reason,
+            "timestamp": int(time.time() * 1000)
+        }
+        
+        response = requests.post(url, json=data, headers=self.headers)
+        response.raise_for_status()
+        
+        return response.json()
+
+# Usage example
+if __name__ == "__main__":
+    controller = ExoskeletonController(
+        base_url="https://api.exo.example.com/v1",
+        api_key="your_api_key_here"
+    )
+    
+    # Check device status
+    status = controller.get_device_status("EXO-2025-001")
+    print(f"Device status: {status['status']}")
+    print(f"Battery: {status['battery']}%")
+    
+    # Send position control command
+    result = controller.send_control_command(
+        device_id="EXO-2025-001",
+        joint="knee",
+        side="right",
+        mode="position",
+        params={
+            "targetAngle": 45.0,
+            "maxVelocity": 100.0,
+            "kp": 2.5,
+            "kd": 0.1
+        }
+    )
+    print(f"Command status: {result['status']}")</code></pre>
+
+        <h3>7.2.2 Session Data Processing</h3>
+
+        <pre><code>import pandas as pd
+import numpy as np
+from typing import List, Dict
+
+class GaitAnalyzer:
+    """Analyze gait data from exoskeleton sessions"""
+    
+    @staticmethod
+    def calculate_symmetry(left_values: List[float], 
+                          right_values: List[float]) -> float:
+        """Calculate temporal/spatial symmetry"""
+        
+        left_mean = np.mean(left_values)
+        right_mean = np.mean(right_values)
+        
+        ratio = min(left_mean, right_mean) / max(left_mean, right_mean)
+        return ratio
+    
+    @staticmethod
+    def detect_gait_cycles(
+        grf_data: List[float],
+        timestamps: List[int],
+        threshold: float = 50.0
+    ) -> List[Dict]:
+        """Detect gait cycles from ground reaction force"""
+        
+        cycles = []
+        in_stance = False
+        cycle_start = None
+        
+        for i, (grf, ts) in enumerate(zip(grf_data, timestamps)):
+            # Heel strike detection
+            if not in_stance and grf > threshold:
+                if cycle_start is not None:
+                    # Complete previous cycle
+                    cycles.append({
+                        'start': cycle_start,
+                        'end': ts,
+                        'duration': ts - cycle_start
+                    })
+                cycle_start = ts
+                in_stance = True
+            
+            # Toe off detection
+            elif in_stance and grf < threshold:
+                in_stance = False
+        
+        return cycles
+    
+    @staticmethod
+    def calculate_gait_metrics(session_data: Dict) -> Dict:
+        """Calculate comprehensive gait metrics"""
+        
+        joint_states = session_data['timeSeries']['jointStates']
+        
+        # Extract data for analysis
+        left_stance_times = []
+        right_stance_times = []
+        left_step_lengths = []
+        right_step_lengths = []
+        
+        # Process gait cycles
+        for cycle in session_data['timeSeries']['gaitCycles']:
+            if 'left' in cycle['side']:
+                left_stance_times.append(cycle['timing']['stanceDuration'])
+                left_step_lengths.append(cycle['spatial']['stepLength'])
+            else:
+                right_stance_times.append(cycle['timing']['stanceDuration'])
+                right_step_lengths.append(cycle['spatial']['stepLength'])
+        
+        # Calculate symmetry
+        temporal_symmetry = GaitAnalyzer.calculate_symmetry(
+            left_stance_times, right_stance_times
+        )
+        spatial_symmetry = GaitAnalyzer.calculate_symmetry(
+            left_step_lengths, right_step_lengths
+        )
+        
+        return {
+            'temporal_symmetry': temporal_symmetry,
+            'spatial_symmetry': spatial_symmetry,
+            'overall_symmetry': (temporal_symmetry + spatial_symmetry) / 2,
+            'avg_cadence': len(left_stance_times + right_stance_times) / 
+                          (session_data['summary']['duration']['walking'] / 60000),
+            'avg_step_length': np.mean(left_step_lengths + right_step_lengths)
+        }</code></pre>
+
+        <h2>7.3 TypeScript Implementation</h2>
+
+        <h3>7.3.1 Real-time WebSocket Client</h3>
+
+        <pre><code>import WebSocket from 'ws';
+
+interface JointState {
+  joint: string;
+  side: string;
+  kinematics: {
+    angle: number;
+    angularVelocity: number;
+  };
+  kinetics: {
+    torque: number;
+    assistTorque: number;
+  };
+}
+
+interface StreamMessage {
+  timestamp: number;
+  type: string;
+  data: JointState;
+}
+
+class ExoskeletonStreamClient {
+  private ws: WebSocket | null = null;
+  private handlers: Map<string, (data: any) => void> = new Map();
+  
+  constructor(private sessionId: string, private authToken: string) {}
+  
+  connect(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(url, {
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`
+        }
+      });
+      
+      this.ws.on('open', () => {
+        console.log('WebSocket connected');
+        this.subscribe(['joint_state', 'gait_phase', 'safety_warning']);
+        resolve();
+      });
+      
+      this.ws.on('message', (data: WebSocket.Data) => {
+        const message: StreamMessage = JSON.parse(data.toString());
+        this.handleMessage(message);
+      });
+      
+      this.ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+        reject(error);
+      });
+      
+      this.ws.on('close', () => {
+        console.log('WebSocket closed');
+      });
+    });
+  }
+  
+  subscribe(eventTypes: string[]): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        action: 'subscribe',
+        eventTypes
+      }));
+    }
+  }
+  
+  on(eventType: string, handler: (data: any) => void): void {
+    this.handlers.set(eventType, handler);
+  }
+  
+  private handleMessage(message: StreamMessage): void {
+    const handler = this.handlers.get(message.type);
+    if (handler) {
+      handler(message.data);
+    }
+  }
+  
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+}
+
+// Usage example
+async function main() {
+  const client = new ExoskeletonStreamClient(
+    'session-123',
+    'your_auth_token'
+  );
+  
+  // Register event handlers
+  client.on('joint_state', (data: JointState) => {
+    console.log(`${data.joint} ${data.side}: ${data.kinematics.angle}°`);
+  });
+  
+  client.on('safety_warning', (data) => {
+    console.warn('Safety warning:', data);
+  });
+  
+  // Connect to stream
+  await client.connect('wss://api.exo.example.com/stream/session-123');
+  
+  // Keep connection alive for 30 seconds
+  setTimeout(() => {
+    client.disconnect();
+  }, 30000);
+}
+
+main().catch(console.error);</code></pre>
+
+        <h2>7.4 Bash Implementation</h2>
+
+        <h3>7.4.1 Session Management Scripts</h3>
+
+        <pre><code>#!/bin/bash
+# WIA Exoskeleton Session Management Script
+
+API_BASE="https://api.exo.example.com/v1"
+API_KEY="your_api_key_here"
+
+# Function to create a new session
+create_session() {
+    local user_id=$1
+    local device_id=$2
+    
+    curl -X POST "${API_BASE}/sessions" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"userId\": \"${user_id}\",
+            \"deviceId\": \"${device_id}\",
+            \"configuration\": {
+                \"assistanceMode\": \"active_assist\",
+                \"assistanceLevel\": 60,
+                \"jointLimits\": {
+                    \"hip\": {\"min\": -10, \"max\": 100},
+                    \"knee\": {\"min\": 0, \"max\": 120},
+                    \"ankle\": {\"min\": -20, \"max\": 40}
+                }
+            }
+        }" \
+        | jq -r '.sessionId'
+}
+
+# Function to start session
+start_session() {
+    local session_id=$1
+    
+    curl -X POST "${API_BASE}/sessions/${session_id}/start" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        | jq '.status'
+}
+
+# Function to get session data
+get_session_data() {
+    local session_id=$1
+    
+    curl -X GET "${API_BASE}/sessions/${session_id}" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        | jq '.'
+}
+
+# Function to end session
+end_session() {
+    local session_id=$1
+    local feedback=$2
+    
+    curl -X POST "${API_BASE}/sessions/${session_id}/end" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"summary\": {
+                \"therapistNotes\": \"${feedback}\"
+            }
+        }" \
+        | jq '.status'
+}
+
+# Main workflow
+main() {
+    echo "Creating new therapy session..."
+    SESSION_ID=$(create_session "patient-001" "EXO-2025-001")
+    echo "Session created: ${SESSION_ID}"
+    
+    echo "Starting session..."
+    start_session "${SESSION_ID}"
+    
+    echo "Session active. Press Enter to end session..."
+    read
+    
+    echo "Ending session..."
+    end_session "${SESSION_ID}" "Good progress today"
+    
+    echo "Session complete!"
+}
+
+main</code></pre>
+
+        <h3>7.4.2 Data Export Script</h3>
+
+        <pre><code>#!/bin/bash
+# Export session data for analysis
+
+export_session_data() {
+    local session_id=$1
+    local output_file=$2
+    
+    # Fetch session data
+    curl -X GET "${API_BASE}/sessions/${session_id}" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        > "${output_file}.json"
+    
+    # Convert to CSV for gait analysis
+    jq -r '.timeSeries.gaitCycles[] | 
+        [.timing.cycleDuration, 
+         .spatial.strideLength, 
+         .spatial.cadence, 
+         .spatial.velocity] | @csv' \
+        "${output_file}.json" \
+        > "${output_file}_gait.csv"
+    
+    echo "Data exported to ${output_file}.json and ${output_file}_gait.csv"
+}
+
+# Export multiple sessions
+batch_export() {
+    local patient_id=$1
+    local start_date=$2
+    local end_date=$3
+    
+    # Get all sessions for patient
+    curl -X GET "${API_BASE}/patients/${patient_id}/sessions?startDate=${start_date}&endDate=${end_date}" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        | jq -r '.sessions[].sessionId' \
+        | while read session_id; do
+            export_session_data "${session_id}" "data/${session_id}"
+        done
+}
+
+batch_export "patient-001" "2025-11-01" "2025-12-14"</code></pre>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter8.html" style="color: var(--primary-color); font-weight: 600;">Chapter 8: Certification & Compliance</a> to learn about medical device certification requirements and safety standards.</p>
+        </div>
+
+        </main>
+</body>
+</html>

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: API Endpoints - WIA Rehabilitation Exoskeleton</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>WIA Rehabilitation Exoskeleton Standard</h1>
+        <p class="subtitle">Chapter 3: API Endpoints</p>
+    </header>
+
+    <main>
+        <h1>Chapter 3: API Endpoints</h1>
+
+        <h2>3.1 Overview</h2>
+
+        <p>The WIA Rehabilitation Exoskeleton API provides a standardized interface for controlling exoskeleton devices, managing therapy sessions, and tracking patient progress. All endpoints follow RESTful principles and use JSON for data exchange.</p>
+
+        <div class="info-box">
+            <h3>Base URL</h3>
+            <p><code>https://api.exoskeleton.example.com/v1</code></p>
+            <p>All endpoints require authentication via Bearer token in the Authorization header.</p>
+        </div>
+
+        <h2>3.2 Device Control Endpoints</h2>
+
+        <h3>3.2.1 Get Device Status</h3>
+
+        <pre><code>GET /devices/{deviceId}/status</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "deviceId": "EXO-2025-001",
+  "status": "ready",
+  "battery": 85.5,
+  "temperature": 32.1,
+  "uptime": 3600000,
+  "errors": [],
+  "warnings": []
+}</code></pre>
+
+        <h3>3.2.2 Send Control Command</h3>
+
+        <pre><code>POST /devices/{deviceId}/control</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "commandId": "cmd-001",
+  "timestamp": 1702598400000,
+  "joint": "knee",
+  "side": "right",
+  "mode": "position",
+  "params": {
+    "targetAngle": 45.0,
+    "maxVelocity": 100.0,
+    "kp": 2.5,
+    "kd": 0.1
+  },
+  "priority": "normal",
+  "timeout": 5000
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "commandId": "cmd-001",
+  "status": "accepted",
+  "timestamp": 1702598400005,
+  "estimatedCompletion": 1702598401000
+}</code></pre>
+
+        <h3>3.2.3 Emergency Stop</h3>
+
+        <pre><code>POST /devices/{deviceId}/emergency-stop</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "reason": "patient_request",
+  "timestamp": 1702598400000
+}</code></pre>
+
+        <div class="warning-box">
+            <h3>Safety Note</h3>
+            <p>Emergency stop commands have the highest priority and will immediately halt all motor activity. This endpoint should be accessible even if other API functions are unavailable.</p>
+        </div>
+
+        <h2>3.3 Session Management Endpoints</h2>
+
+        <h3>3.3.1 Create Session</h3>
+
+        <pre><code>POST /sessions</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "userId": "patient-001",
+  "deviceId": "EXO-2025-001",
+  "therapistId": "therapist-123",
+  "configuration": {
+    "assistanceMode": "active_assist",
+    "assistanceLevel": 60,
+    "jointLimits": {
+      "hip": { "min": -10, "max": 100 },
+      "knee": { "min": 0, "max": 120 },
+      "ankle": { "min": -20, "max": 40 }
+    }
+  }
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "created",
+  "startTime": "2025-12-14T09:00:00Z"
+}</code></pre>
+
+        <h3>3.3.2 Start Session</h3>
+
+        <pre><code>POST /sessions/{sessionId}/start</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "active",
+  "startTime": "2025-12-14T09:00:00Z"
+}</code></pre>
+
+        <h3>3.3.3 Get Session Data</h3>
+
+        <pre><code>GET /sessions/{sessionId}</code></pre>
+
+        <p><strong>Query Parameters:</strong></p>
+        <ul>
+            <li><code>includeSensors</code>: Include raw sensor data (default: false)</li>
+            <li><code>startTime</code>: Filter data from this timestamp</li>
+            <li><code>endTime</code>: Filter data until this timestamp</li>
+        </ul>
+
+        <h3>3.3.4 End Session</h3>
+
+        <pre><code>POST /sessions/{sessionId}/end</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "summary": {
+    "patientFeedback": {
+      "comfortRating": 8,
+      "fatigueLevel": 6,
+      "painLevel": 2
+    },
+    "therapistNotes": "Good progress, increase speed next session"
+  }
+}</code></pre>
+
+        <h2>3.4 Progress Tracking Endpoints</h2>
+
+        <h3>3.4.1 Get Patient Progress</h3>
+
+        <pre><code>GET /patients/{userId}/progress</code></pre>
+
+        <p><strong>Query Parameters:</strong></p>
+        <ul>
+            <li><code>startDate</code>: Beginning of date range (ISO 8601)</li>
+            <li><code>endDate</code>: End of date range (ISO 8601)</li>
+            <li><code>metrics</code>: Comma-separated list of metrics to include</li>
+        </ul>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "userId": "patient-001",
+  "dateRange": {
+    "start": "2025-11-01",
+    "end": "2025-12-14"
+  },
+  "summary": {
+    "totalSessions": 36,
+    "totalDistance": 5420.5,
+    "averageSpeed": 0.85,
+    "assistanceReduction": 45
+  },
+  "metrics": {
+    "walkingSpeed": {
+      "baseline": 0.4,
+      "current": 0.85,
+      "target": 1.0,
+      "trend": "improving"
+    },
+    "gaitSymmetry": {
+      "baseline": 0.65,
+      "current": 0.88,
+      "target": 0.90,
+      "trend": "improving"
+    }
+  }
+}</code></pre>
+
+        <h3>3.4.2 Get Gait Analysis</h3>
+
+        <pre><code>GET /sessions/{sessionId}/gait-analysis</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+  "gaitCycles": 125,
+  "spatialParameters": {
+    "averageStrideLength": 145.2,
+    "averageStepLength": 72.8,
+    "averageStepWidth": 10.5,
+    "averageCadence": 109
+  },
+  "temporalParameters": {
+    "averageStanceTime": 0.66,
+    "averageSwingTime": 0.44,
+    "doubleSupportPercentage": 22
+  },
+  "symmetryIndices": {
+    "temporal": 0.92,
+    "spatial": 0.88,
+    "overall": 0.90
+  }
+}</code></pre>
+
+        <h3>3.4.3 Record Assessment</h3>
+
+        <pre><code>POST /patients/{userId}/assessments</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "assessmentType": "10_meter_walk",
+  "date": "2025-12-14",
+  "results": {
+    "selfSelectedSpeed": {
+      "time": 8.5,
+      "speed": 1.18,
+      "steps": 14
+    },
+    "fastSpeed": {
+      "time": 6.2,
+      "speed": 1.61,
+      "steps": 12
+    }
+  },
+  "assistiveDevice": "exoskeleton",
+  "notes": "Patient showed good confidence"
+}</code></pre>
+
+        <h2>3.5 Real-time Data Streaming</h2>
+
+        <h3>3.5.1 WebSocket Connection</h3>
+
+        <pre><code>WS /stream/sessions/{sessionId}</code></pre>
+
+        <p><strong>Message Format:</strong></p>
+        <pre><code>{
+  "timestamp": 1702598400000,
+  "type": "joint_state",
+  "data": {
+    "joint": "knee",
+    "side": "right",
+    "kinematics": { "angle": 45.2, "angularVelocity": 120.5 },
+    "kinetics": { "torque": 12.5, "assistTorque": 8.3 }
+  }
+}</code></pre>
+
+        <h3>3.5.2 Subscribe to Events</h3>
+
+        <pre><code>{
+  "action": "subscribe",
+  "eventTypes": ["joint_state", "gait_phase", "safety_warning"]
+}</code></pre>
+
+        <h2>3.6 Configuration Endpoints</h2>
+
+        <h3>3.6.1 Get Device Configuration</h3>
+
+        <pre><code>GET /devices/{deviceId}/configuration</code></pre>
+
+        <h3>3.6.2 Update Configuration</h3>
+
+        <pre><code>PUT /devices/{deviceId}/configuration</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "sampleRate": 200,
+  "safetyLimits": {
+    "maxVelocity": 180,
+    "maxTorque": 60,
+    "emergencyStopDeceleration": 500
+  },
+  "calibrationParameters": {
+    "imuDriftCompensation": true,
+    "gravityCompensation": true
+  }
+}</code></pre>
+
+        <h2>3.7 Error Handling</h2>
+
+        <div class="error-box">
+            <h3>Standard Error Response</h3>
+            <pre><code>{
+  "error": {
+    "code": "INVALID_COMMAND",
+    "message": "Target angle exceeds joint limit",
+    "details": {
+      "joint": "knee",
+      "targetAngle": 150,
+      "maxAngle": 135
+    },
+    "timestamp": 1702598400000
+  }
+}</code></pre>
+        </div>
+
+        <h3>HTTP Status Codes</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Meaning</th>
+                    <th>Usage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>200</td>
+                    <td>OK</td>
+                    <td>Successful GET request</td>
+                </tr>
+                <tr>
+                    <td>201</td>
+                    <td>Created</td>
+                    <td>Successful POST creating new resource</td>
+                </tr>
+                <tr>
+                    <td>400</td>
+                    <td>Bad Request</td>
+                    <td>Invalid request parameters</td>
+                </tr>
+                <tr>
+                    <td>401</td>
+                    <td>Unauthorized</td>
+                    <td>Missing or invalid authentication</td>
+                </tr>
+                <tr>
+                    <td>403</td>
+                    <td>Forbidden</td>
+                    <td>Insufficient permissions</td>
+                </tr>
+                <tr>
+                    <td>404</td>
+                    <td>Not Found</td>
+                    <td>Resource does not exist</td>
+                </tr>
+                <tr>
+                    <td>409</td>
+                    <td>Conflict</td>
+                    <td>Resource state conflict</td>
+                </tr>
+                <tr>
+                    <td>500</td>
+                    <td>Internal Server Error</td>
+                    <td>Server-side error</td>
+                </tr>
+                <tr>
+                    <td>503</td>
+                    <td>Service Unavailable</td>
+                    <td>Device offline or maintenance</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>3.8 Rate Limiting</h2>
+
+        <div class="info-box">
+            <h3>API Rate Limits</h3>
+            <ul>
+                <li><strong>Control Commands:</strong> 100 requests/minute per device</li>
+                <li><strong>Session Data:</strong> 1000 requests/hour per user</li>
+                <li><strong>Progress Queries:</strong> 500 requests/hour per user</li>
+                <li><strong>WebSocket Messages:</strong> Unlimited (limited by device sample rate)</li>
+            </ul>
+            <p>Rate limit headers are included in responses:</p>
+            <pre><code>X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 87
+X-RateLimit-Reset: 1702598460</code></pre>
+        </div>
+
+        <h2>3.9 Authentication</h2>
+
+        <h3>OAuth 2.0 Flow</h3>
+
+        <pre><code>POST /oauth/token</code></pre>
+
+        <p><strong>Request Body:</strong></p>
+        <pre><code>{
+  "grant_type": "password",
+  "username": "therapist@example.com",
+  "password": "secure_password",
+  "scope": "device:control session:manage patient:read"
+}</code></pre>
+
+        <p><strong>Response:</strong></p>
+        <pre><code>{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "def50200a3f7e...",
+  "scope": "device:control session:manage patient:read"
+}</code></pre>
+
+        <h3>Authorization Scopes</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Permissions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>device:control</code></td>
+                    <td>Send control commands to devices</td>
+                </tr>
+                <tr>
+                    <td><code>device:configure</code></td>
+                    <td>Modify device configuration</td>
+                </tr>
+                <tr>
+                    <td><code>session:manage</code></td>
+                    <td>Create, start, and end therapy sessions</td>
+                </tr>
+                <tr>
+                    <td><code>session:read</code></td>
+                    <td>View session data</td>
+                </tr>
+                <tr>
+                    <td><code>patient:read</code></td>
+                    <td>View patient progress and assessments</td>
+                </tr>
+                <tr>
+                    <td><code>patient:write</code></td>
+                    <td>Record assessments and update patient data</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="success-box">
+            <h3>Next Steps</h3>
+            <p>Continue to <a href="chapter4.html" style="color: var(--primary-color); font-weight: 600;">Chapter 4: Protocol Specification</a> to understand the real-time communication protocols and safety interlocks.</p>
+        </div>
+
+        </main>
+</body>
+</html>

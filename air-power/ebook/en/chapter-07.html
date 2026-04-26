@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Implementation Examples - WIA AIR-POWER Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 7: Implementation Examples</h1>
+
+        <section>
+            <h2>7.1 Overview</h2>
+            <p>This chapter provides production-ready code examples for implementing WIA AIR-POWER systems in Python, TypeScript, and Bash. These examples demonstrate transmitter management, receiver operations, power zone configuration, and monitoring.</p>
+
+            <div class="alert alert-info">
+                <strong>Code Repository:</strong> All examples are available at <code>github.com/wia-official/air-power-examples</code>
+            </div>
+        </section>
+
+        <section>
+            <h2>7.2 Python Implementation</h2>
+
+            <h3>Example 1: Transmitter Manager</h3>
+            <div class="code-header">Python - AIR-POWER Transmitter Manager</div>
+            <pre><code>import requests
+import logging
+from typing import List, Dict, Optional
+from datetime import datetime
+import time
+
+class AirPowerTransmitter:
+    """
+    WIA AIR-POWER Transmitter Management Class
+    Manages power transmitter operations, monitoring, and safety
+    """
+
+    def __init__(self, api_base_url: str, api_key: str):
+        self.api_base_url = api_base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        self.logger = logging.getLogger(__name__)
+
+    def register_transmitter(self, tx_config: Dict) -> Dict:
+        """Register a new transmitter in the system"""
+        try:
+            response = requests.post(
+                f'{self.api_base_url}/api/v1/transmitters',
+                headers=self.headers,
+                json=tx_config
+            )
+            response.raise_for_status()
+
+            tx_data = response.json()
+            self.logger.info(f"Registered transmitter: {tx_data['data']['txId']}")
+            return tx_data['data']
+
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to register transmitter: {e}")
+            raise
+
+    def power_on(self, tx_id: str) -> bool:
+        """Activate transmitter and begin power transmission"""
+        try:
+            # Perform pre-flight safety checks
+            if not self._safety_check(tx_id):
+                self.logger.error(f"Safety check failed for {tx_id}")
+                return False
+
+            response = requests.post(
+                f'{self.api_base_url}/api/v1/transmitters/{tx_id}/power-on',
+                headers=self.headers
+            )
+            response.raise_for_status()
+
+            self.logger.info(f"Transmitter {tx_id} powered on successfully")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to power on {tx_id}: {e}")
+            return False
+
+    def power_off(self, tx_id: str) -> bool:
+        """Deactivate transmitter gracefully"""
+        try:
+            response = requests.post(
+                f'{self.api_base_url}/api/v1/transmitters/{tx_id}/power-off',
+                headers=self.headers
+            )
+            response.raise_for_status()
+
+            self.logger.info(f"Transmitter {tx_id} powered off")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to power off {tx_id}: {e}")
+            return False
+
+    def get_status(self, tx_id: str) -> Dict:
+        """Get real-time transmitter status"""
+        try:
+            response = requests.get(
+                f'{self.api_base_url}/api/v1/transmitters/{tx_id}/status',
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()['data']
+
+        except Exception as e:
+            self.logger.error(f"Failed to get status for {tx_id}: {e}")
+            return {}
+
+    def get_connected_devices(self, tx_id: str) -> List[Dict]:
+        """List all devices currently receiving power"""
+        try:
+            response = requests.get(
+                f'{self.api_base_url}/api/v1/transmitters/{tx_id}/connected-devices',
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()['data']['devices']
+
+        except Exception as e:
+            self.logger.error(f"Failed to get connected devices: {e}")
+            return []
+
+    def monitor_safety(self, tx_id: str, duration_seconds: int = 3600):
+        """Continuously monitor safety parameters"""
+        self.logger.info(f"Starting safety monitoring for {tx_id}")
+
+        start_time = time.time()
+        while time.time() - start_time < duration_seconds:
+            try:
+                status = self.get_status(tx_id)
+
+                # Check SAR levels
+                sar = status.get('safety', {}).get('currentSAR', 0)
+                if sar > 1.6:  # W/kg limit
+                    self.logger.warning(f"SAR level high: {sar} W/kg")
+                    self._reduce_power(tx_id, 0.5)  # Reduce by 50%
+
+                # Check temperature
+                temp = status.get('temperature', 0)
+                if temp > 45:
+                    self.logger.warning(f"Temperature high: {temp}°C")
+                    self.power_off(tx_id)
+                    break
+
+                # Check connected devices
+                device_count = status.get('activeDevices', 0)
+                self.logger.info(f"Monitoring: {device_count} devices, SAR: {sar}, Temp: {temp}°C")
+
+                time.sleep(10)  # Check every 10 seconds
+
+            except Exception as e:
+                self.logger.error(f"Monitoring error: {e}")
+                time.sleep(10)
+
+    def _safety_check(self, tx_id: str) -> bool:
+        """Perform comprehensive safety check before power on"""
+        try:
+            response = requests.post(
+                f'{self.api_base_url}/api/v1/transmitters/{tx_id}/health-check',
+                headers=self.headers
+            )
+            response.raise_for_status()
+
+            health = response.json()['data']
+
+            checks = [
+                health.get('sarMonitoring') == True,
+                health.get('humanDetection') == True,
+                health.get('systemStatus') == 'healthy'
+            ]
+
+            return all(checks)
+
+        except Exception as e:
+            self.logger.error(f"Safety check failed: {e}")
+            return False
+
+    def _reduce_power(self, tx_id: str, factor: float):
+        """Reduce transmitter power output"""
+        try:
+            response = requests.put(
+                f'{self.api_base_url}/api/v1/transmitters/{tx_id}',
+                headers=self.headers,
+                json={'powerReduction': factor}
+            )
+            response.raise_for_status()
+            self.logger.info(f"Reduced power by {factor*100}%")
+
+        except Exception as e:
+            self.logger.error(f"Failed to reduce power: {e}")</code></pre>
+
+            <h3>Example 2: Receiver Client</h3>
+            <div class="code-header">Python - AIR-POWER Receiver Client</div>
+            <pre><code>import requests
+from typing import Dict, List, Optional
+
+class AirPowerReceiver:
+    """
+    WIA AIR-POWER Receiver Client
+    Manages device charging requests and battery monitoring
+    """
+
+    def __init__(self, api_base_url: str, device_id: str):
+        self.api_base_url = api_base_url
+        self.device_id = device_id
+        self.current_session = None
+
+    def discover_transmitters(self, max_distance: float = 15.0) -> List[Dict]:
+        """Find nearby transmitters within range"""
+        try:
+            response = requests.get(
+                f'{self.api_base_url}/api/v1/receivers/{self.device_id}/nearby-transmitters',
+                params={'maxDistance': max_distance}
+            )
+            response.raise_for_status()
+
+            transmitters = response.json()['data']['transmitters']
+            # Sort by signal strength and available power
+            transmitters.sort(
+                key=lambda t: (t['signalStrength'], t['availablePower']),
+                reverse=True
+            )
+            return transmitters
+
+        except Exception as e:
+            print(f"Discovery failed: {e}")
+            return []
+
+    def request_power(self, tx_id: str, requested_watts: float,
+                     priority: str = 'normal') -> Optional[str]:
+        """Request power from a specific transmitter"""
+        try:
+            response = requests.post(
+                f'{self.api_base_url}/api/v1/sessions/start',
+                json={
+                    'rxId': self.device_id,
+                    'txId': tx_id,
+                    'requestedPower': requested_watts,
+                    'priority': priority,
+                    'mode': 'auto'
+                }
+            )
+            response.raise_for_status()
+
+            session_data = response.json()['data']
+            self.current_session = session_data['sessionId']
+
+            print(f"Charging started: {requested_watts}W from {tx_id}")
+            print(f"Estimated full charge: {session_data['estimatedFullTime']} min")
+
+            return self.current_session
+
+        except Exception as e:
+            print(f"Power request failed: {e}")
+            return None
+
+    def stop_charging(self):
+        """Stop current charging session"""
+        if not self.current_session:
+            return
+
+        try:
+            response = requests.post(
+                f'{self.api_base_url}/api/v1/sessions/{self.current_session}/stop'
+            )
+            response.raise_for_status()
+
+            print(f"Charging session {self.current_session} stopped")
+            self.current_session = None
+
+        except Exception as e:
+            print(f"Failed to stop charging: {e}")
+
+    def get_battery_status(self) -> Dict:
+        """Get current battery level and health"""
+        try:
+            response = requests.get(
+                f'{self.api_base_url}/api/v1/receivers/{self.device_id}/battery-status'
+            )
+            response.raise_for_status()
+            return response.json()['data']
+
+        except Exception as e:
+            print(f"Failed to get battery status: {e}")
+            return {}
+
+    def auto_charge(self, target_percentage: int = 80):
+        """Automatically find and request charging"""
+        print(f"Auto-charge to {target_percentage}%...")
+
+        # Check current battery
+        battery = self.get_battery_status()
+        current_level = battery.get('currentLevel', 0)
+
+        if current_level >= target_percentage:
+            print(f"Battery already at {current_level}%")
+            return
+
+        # Find best transmitter
+        transmitters = self.discover_transmitters()
+        if not transmitters:
+            print("No transmitters found nearby")
+            return
+
+        best_tx = transmitters[0]
+        print(f"Found transmitter: {best_tx['name']} ({best_tx['distance']}m away)")
+
+        # Request power
+        self.request_power(
+            tx_id=best_tx['txId'],
+            requested_watts=10.0,  # 10W charging
+            priority='normal'
+        )</code></pre>
+        </section>
+
+        <section>
+            <h2>7.3 TypeScript Implementation</h2>
+
+            <h3>Example 3: Zone Manager</h3>
+            <div class="code-header">TypeScript - Power Zone Manager</div>
+            <pre><code>import axios, { AxiosInstance } from 'axios';
+
+interface PowerZone {
+    zoneId: string;
+    zoneName: string;
+    zoneType: string;
+    transmitters: string[];
+    capacity: {
+        totalPowerAvailable: number;
+        maxDevices: number;
+        currentDevices: number;
+    };
+}
+
+class PowerZoneManager {
+    private api: AxiosInstance;
+
+    constructor(apiBaseUrl: string, apiKey: string) {
+        this.api = axios.create({
+            baseURL: apiBaseUrl,
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+
+    async createZone(zoneConfig: Partial<PowerZone>): Promise<PowerZone> {
+        try {
+            const response = await this.api.post('/api/v1/zones', zoneConfig);
+            console.log(`Created zone: ${response.data.data.zoneName}`);
+            return response.data.data;
+        } catch (error) {
+            console.error('Failed to create zone:', error);
+            throw error;
+        }
+    }
+
+    async getZoneCapacity(zoneId: string): Promise<any> {
+        try {
+            const response = await this.api.get(`/api/v1/zones/${zoneId}/capacity`);
+            return response.data.data;
+        } catch (error) {
+            console.error('Failed to get capacity:', error);
+            throw error;
+        }
+    }
+
+    async optimizeAllocation(zoneId: string): Promise<void> {
+        try {
+            const capacity = await this.getZoneCapacity(zoneId);
+            const utilization = capacity.utilization;
+
+            console.log(`Zone ${zoneId} utilization: ${utilization}%`);
+
+            if (utilization > 90) {
+                console.log('High utilization detected, rebalancing...');
+                await this.rebalancePower(zoneId);
+            }
+        } catch (error) {
+            console.error('Optimization failed:', error);
+        }
+    }
+
+    private async rebalancePower(zoneId: string): Promise<void> {
+        // Get all active sessions in zone
+        const response = await this.api.get(`/api/v1/zones/${zoneId}/active-sessions`);
+        const sessions = response.data.data.sessions;
+
+        // Priority-based reallocation
+        const priorityMap = { critical: 100, high: 75, normal: 50, low: 25 };
+
+        sessions.sort((a: any, b: any) => {
+            const aPriority = priorityMap[a.priority as keyof typeof priorityMap] || 0;
+            const bPriority = priorityMap[b.priority as keyof typeof priorityMap] || 0;
+            return bPriority - aPriority;
+        });
+
+        console.log(`Rebalanced ${sessions.length} sessions by priority`);
+    }
+
+    async monitorZones(zoneIds: string[]): Promise<void> {
+        console.log(`Monitoring ${zoneIds.length} zones...`);
+
+        setInterval(async () => {
+            for (const zoneId of zoneIds) {
+                await this.optimizeAllocation(zoneId);
+            }
+        }, 60000); // Check every minute
+    }
+}
+
+// Usage example
+const zoneManager = new PowerZoneManager(
+    'https://api.airpower.wia.org/v1',
+    'your-api-key'
+);
+
+(async () => {
+    const zone = await zoneManager.createZone({
+        zoneName: 'Downtown Cafe',
+        zoneType: 'cafe',
+        transmitters: ['tx-001', 'tx-002']
+    });
+
+    await zoneManager.monitorZones([zone.zoneId]);
+})();</code></pre>
+        </section>
+
+        <section>
+            <h2>7.4 Bash Implementation</h2>
+
+            <h3>Example 4: System Monitoring Script</h3>
+            <div class="code-header">Bash - AIR-POWER System Monitor</div>
+            <pre><code>#!/bin/bash
+
+# WIA AIR-POWER System Monitoring Script
+# Monitors transmitters, zones, and safety metrics
+
+API_BASE="https://api.airpower.wia.org/v1"
+API_KEY="your-api-key-here"
+LOG_FILE="/var/log/airpower-monitor.log"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+api_call() {
+    local endpoint=$1
+    curl -s -H "Authorization: Bearer $API_KEY" \
+         -H "Content-Type: application/json" \
+         "$API_BASE$endpoint"
+}
+
+check_transmitter_health() {
+    local tx_id=$1
+    log "Checking health of transmitter: $tx_id"
+
+    response=$(api_call "/transmitters/$tx_id/status")
+
+    online=$(echo "$response" | jq -r '.data.status.online')
+    sar=$(echo "$response" | jq -r '.data.safety.currentSAR')
+    temp=$(echo "$response" | jq -r '.data.temperature')
+    devices=$(echo "$response" | jq -r '.data.status.activeDevices')
+
+    echo -e "${GREEN}Transmitter: $tx_id${NC}"
+    echo "  Online: $online"
+    echo "  SAR Level: $sar W/kg"
+    echo "  Temperature: $temp°C"
+    echo "  Active Devices: $devices"
+
+    # Safety checks
+    if (( $(echo "$sar > 1.6" | bc -l) )); then
+        echo -e "${RED}WARNING: SAR exceeds limit!${NC}"
+        log "ALERT: SAR exceeded for $tx_id: $sar W/kg"
+        emergency_shutdown "$tx_id"
+    fi
+
+    if (( $(echo "$temp > 45" | bc -l) )); then
+        echo -e "${RED}WARNING: Temperature critical!${NC}"
+        log "ALERT: Temperature critical for $tx_id: $temp°C"
+        emergency_shutdown "$tx_id"
+    fi
+}
+
+emergency_shutdown() {
+    local tx_id=$1
+    log "EMERGENCY SHUTDOWN: $tx_id"
+
+    curl -s -X POST \
+         -H "Authorization: Bearer $API_KEY" \
+         "$API_BASE/safety/emergency-shutdown" \
+         -d "{\"txId\": \"$tx_id\", \"reason\": \"safety_threshold_exceeded\"}"
+
+    echo -e "${RED}Emergency shutdown executed for $tx_id${NC}"
+}
+
+monitor_all_transmitters() {
+    log "Starting system-wide monitoring..."
+
+    transmitters=$(api_call "/transmitters" | jq -r '.data.transmitters[].txId')
+
+    for tx_id in $transmitters; do
+        check_transmitter_health "$tx_id"
+        echo "---"
+    done
+}
+
+generate_report() {
+    log "Generating daily report..."
+
+    # Get analytics
+    usage=$(api_call "/analytics/usage?period=24h")
+    efficiency=$(api_call "/analytics/efficiency?period=24h")
+
+    echo "=== AIR-POWER Daily Report ===" > /tmp/report.txt
+    echo "Date: $(date '+%Y-%m-%d')" >> /tmp/report.txt
+    echo "" >> /tmp/report.txt
+    echo "$usage" | jq -r '.data' >> /tmp/report.txt
+    echo "" >> /tmp/report.txt
+    echo "$efficiency" | jq -r '.data' >> /tmp/report.txt
+
+    log "Report generated: /tmp/report.txt"
+}
+
+# Main monitoring loop
+main() {
+    log "AIR-POWER System Monitor started"
+
+    while true; do
+        monitor_all_transmitters
+        sleep 300  # Check every 5 minutes
+    done
+}
+
+# Run with: ./monitor.sh [--once|--report]
+case "${1}" in
+    --once)
+        monitor_all_transmitters
+        ;;
+    --report)
+        generate_report
+        ;;
+    *)
+        main
+        ;;
+esac</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5장: 통합 가이드 - WIA-AIR-SHIELD</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-AIR-SHIELD v1.0</div>
+    <h1>5장</h1>
+    <p class="subtitle">통합 가이드</p>
+    <p class="subtitle">무선 환경 보호하기</p>
+  </header>
+
+  <main>
+    <h2>5.1 홈 네트워크 보호</h2>
+
+    <p>가정 무선 환경을 보호하는 것은 개인 프라이버시를 위한 첫 번째 방어선입니다.</p>
+
+    <h3>5.1.1 기본 홈 설정</h3>
+
+    <pre><code>import { AirShield } from '@anthropic/wia-air-shield';
+
+// 홈 네트워크용 방패 초기화
+const homeShield = new AirShield({
+  mode: 'balanced',
+  environment: 'trusted_home',
+  autoDetect: true,
+  deviceProfile: 'home_router'
+});
+
+// 홈 전용 설정 구성
+await homeShield.configure({
+  trustedDevices: [
+    { name: '거실 TV', mac: '00:11:22:33:44:55' },
+    { name: '스마트 스피커', mac: 'AA:BB:CC:DD:EE:FF' }
+  ],
+  guestNetwork: {
+    enabled: true,
+    isolationMode: 'strict', // 게스트는 서로 볼 수 없음
+    timeLimit: 24 // 시간
+  },
+  iotProtection: {
+    enabled: true,
+    allowedServices: ['local_only'],
+    blockCloudByDefault: true
+  }
+});
+
+await homeShield.activate();</code></pre>
+
+    <h3>5.1.2 IoT 기기 보호</h3>
+
+    <pre><code>// 감시로부터 IoT 기기 보호
+const iotShield = new AirShield({
+  mode: 'fortress',
+  deviceProfile: 'iot'
+});
+
+// 엄격한 IoT 보호 설정
+await iotShield.configure({
+  // 기본적으로 모든 클라우드 통신 차단
+  cloudAccess: 'deny',
+
+  // 특정 로컬 서비스만 허용
+  allowedConnections: [
+    { type: 'local', service: 'home_assistant' },
+    { type: 'local', service: 'mqtt_broker' }
+  ],
+
+  // 예기치 않은 통신 시 경보
+  alertOnUnexpected: true,
+
+  // IoT를 위한 데이터 최소화
+  dataCollection: {
+    telemetry: false,
+    analytics: false,
+    diagnostics: 'local_only'
+  }
+});</code></pre>
+
+    <h2>5.2 기업 통합</h2>
+
+    <h3>5.2.1 회사 WiFi 보호</h3>
+
+    <pre><code>import { AirShield } from '@anthropic/wia-air-shield';
+import { EnterprisePolicy } from '@anthropic/wia-air-shield/enterprise';
+
+// 기업급 보호
+const enterpriseShield = new AirShield({
+  mode: 'fortress',
+  environment: 'enterprise',
+  policyEngine: new EnterprisePolicy({
+    compliance: ['GDPR', 'HIPAA', 'SOC2'],
+    logging: 'detailed',
+    reporting: 'enabled'
+  })
+});
+
+// 기업 정책 설정
+await enterpriseShield.setPolicies({
+  // 필수 암호화
+  encryption: {
+    minimum: 'WPA3-Enterprise',
+    postQuantum: true,
+    certificateValidation: 'strict'
+  },
+
+  // 기기 규정 준수
+  deviceCompliance: {
+    requireMDM: true,
+    requireEncryption: true,
+    requireUpdates: true,
+    blockJailbroken: true
+  },
+
+  // 제로 트러스트 아키텍처
+  zeroTrust: {
+    verifyEveryConnection: true,
+    leastPrivilegeAccess: true,
+    continuousMonitoring: true
+  }
+});</code></pre>
+
+    <h2>5.3 공용 WiFi 보호</h2>
+
+    <h3>5.3.1 자동 공용 WiFi 방어</h3>
+
+    <pre><code>// 공용 WiFi 연결 시 자동 보호
+const mobileShield = new AirShield({
+  mode: 'auto',
+  autoDetect: true
+});
+
+// 환경 변화 감지 및 대응
+mobileShield.onNetworkChange(async (network) => {
+  const trustLevel = await mobileShield.assessTrust(network);
+
+  if (trustLevel === 'untrusted' || network.type === 'public_wifi') {
+    console.log('공용 WiFi 감지 - 최대 보호 활성화');
+
+    // 요새 모드로 전환
+    await mobileShield.setMode('fortress');
+
+    // 액세스 포인트 검증
+    const verification = await mobileShield.verify.verifyAccessPoint(network.ap);
+
+    if (!verification.authentic) {
+      mobileShield.alert.notify({
+        level: 'critical',
+        message: '⚠️ 의심스러운 WiFi 네트워크 감지!',
+        recommendation: '연결하지 마세요. 모바일 데이터를 대신 사용하세요.'
+      });
+      return;
+    }
+
+    // 모든 보호 계층 활성화
+    await mobileShield.cloak.setLevel(5);
+    await mobileShield.noise.setIntensity(80);
+    await mobileShield.enableVPN();
+
+    console.log('✅ 보호된 연결 확립');
+  }
+});</code></pre>
+
+    <h3>5.3.2 카페/공항 시나리오</h3>
+
+    <pre><code>// 시나리오 기반 보호
+async function protectPublicSession(location) {
+  const shield = new AirShield({ mode: 'paranoid' });
+
+  // 위치별 설정
+  const scenarios = {
+    cafe: {
+      threatLevel: 'medium',
+      duration: 'short', // 1-2시간
+      sensitivity: 'medium'
+    },
+    airport: {
+      threatLevel: 'high',
+      duration: 'short',
+      sensitivity: 'high' // 더 표적화된 공격
+    },
+    hotel: {
+      threatLevel: 'high',
+      duration: 'extended', // 며칠
+      sensitivity: 'high'
+    },
+    conference: {
+      threatLevel: 'very_high', // 고급 적대자
+      duration: 'medium',
+      sensitivity: 'maximum'
+    }
+  };
+
+  const config = scenarios[location];
+
+  await shield.configure({
+    mode: config.threatLevel === 'very_high' ? 'paranoid' : 'fortress',
+
+    // 공격적인 Evil Twin 탐지
+    evilTwinDetection: {
+      sensitivity: config.sensitivity,
+      checkFrequency: '10_seconds'
+    },
+
+    // VPN 필수
+    vpn: {
+      required: true,
+      protocol: 'WireGuard',
+      doubleHop: config.threatLevel === 'very_high'
+    },
+
+    // 연결 해제 시 흔적 제거
+    cleanupOnDisconnect: true
+  });
+
+  await shield.activate();
+  return shield;
+}</code></pre>
+
+    <h2>5.4 무선 전력 통합</h2>
+
+    <h3>5.4.1 무선 충전 보호</h3>
+
+    <pre><code>import { AirShield } from '@anthropic/wia-air-shield';
+import { AirPower } from '@anthropic/wia-air-power';
+
+// 이모와 삼촌이 함께 일하기
+const shield = new AirShield();
+const power = new AirPower();
+
+// 전력을 받기 전에 송신기 검증
+power.onDiscoverTransmitter(async (transmitter) => {
+  console.log('새 무선 충전기 감지...');
+
+  // 이모가 삼촌의 친구 검증
+  const verification = await shield.verify.verifyTransmitter(transmitter);
+
+  if (!verification.authentic) {
+    console.warn('🛡️ 이모: 이 충전기 수상해!');
+    console.warn(`이유: ${verification.warnings.join(', ')}`);
+
+    power.rejectTransmitter(transmitter);
+    shield.alert.raise('malicious_transmitter', {
+      transmitter,
+      verification
+    });
+    return;
+  }
+
+  console.log('✅ 송신기 검증됨 - 안전하게 충전 가능');
+});
+
+// 충전 중 사이드채널 공격 방어
+power.onChargingStart(async (session) => {
+  // 전력 분석 방어 활성화
+  await shield.enableSideChannelProtection({
+    powerAnalysisDefense: true,
+    constantPowerConsumption: true,
+    noiseInjection: 'high'
+  });
+
+  // 데이터 유출 시도 모니터링
+  shield.monitor.watchFor('data_exfiltration', (threat) => {
+    console.error('🚨 충전 중 데이터 유출 시도!');
+    power.pauseCharging();
+    shield.alert.raise('charging_attack', threat);
+  });
+
+  console.log('🛡️ 충전 중 사이드채널 보호 활성화');
+});
+
+power.onChargingEnd(() => {
+  // 충전하지 않을 때 비용이 큰 보호 비활성화
+  shield.disableSideChannelProtection();
+  shield.monitor.stopWatching('data_exfiltration');
+});</code></pre>
+
+    <h2>5.5 모바일 앱 통합</h2>
+
+    <h3>5.5.1 React Native 통합</h3>
+
+    <pre><code>import React, { useEffect, useState } from 'react';
+import { AirShield } from '@anthropic/wia-air-shield-react-native';
+
+function PrivacyProtectedApp() {
+  const [shield, setShield] = useState(null);
+  const [threatLevel, setThreatLevel] = useState('safe');
+
+  useEffect(() => {
+    // 앱 시작 시 방패 초기화
+    const initShield = async () => {
+      const airShield = new AirShield({
+        mode: 'balanced',
+        autoDetect: true
+      });
+
+      // 위협 청취
+      airShield.alert.onThreat((threat) => {
+        setThreatLevel(threat.level);
+        // 사용자에게 알림 표시
+        showNotification({
+          title: '보안 경고',
+          body: `${threat.type} 감지`,
+          urgent: threat.level === 'critical'
+        });
+      });
+
+      await airShield.activate();
+      setShield(airShield);
+    };
+
+    initShield();
+
+    return () => {
+      // 언마운트 시 정리
+      shield?.deactivate();
+    };
+  }, []);
+
+  return (
+    &lt;View&gt;
+      &lt;ProtectionIndicator level={threatLevel} /&gt;
+      {/* 앱 콘텐츠 */}
+    &lt;/View&gt;
+  );
+}</code></pre>
+
+    <div class="info-box">
+      <h4>통합 모범 사례</h4>
+      <ul>
+        <li><strong>보수적으로 시작:</strong> 균형 모드로 시작하고 필요에 따라 증가</li>
+        <li><strong>먼저 모니터링:</strong> 적용 전에 모니터링 모드로 실행</li>
+        <li><strong>철저히 테스트:</strong> 프로덕션 전에 모든 통합 포인트 테스트</li>
+        <li><strong>롤백 계획:</strong> 문제 발생 시 롤백 계획 수립</li>
+        <li><strong>사용자 교육:</strong> 새로운 보안 기능에 대해 사용자 교육</li>
+        <li><strong>설정 문서화:</strong> 구성에 대한 상세한 기록 유지</li>
+        <li><strong>정기 업데이트:</strong> 방패 소프트웨어를 최신 상태로 유지</li>
+      </ul>
+    </div>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter4.html" class="nav-button prev">이전 장</a>
+    <a href="chapter6.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>

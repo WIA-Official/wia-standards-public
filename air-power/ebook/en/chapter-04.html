@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Protocol Specification - WIA AIR-POWER Standard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        </header>
+
+    <main class="container">
+        <h1>Chapter 4: Protocol Specification</h1>
+
+        <section>
+            <h2>4.1 Protocol Overview</h2>
+            <p>The WIA AIR-POWER protocol defines the complete communication and power transfer sequence between transmitters and receivers. The protocol is designed to be automatic, efficient, and fault-tolerant, requiring no user intervention.</p>
+
+            <div class="alert alert-info">
+                <strong>Protocol Phases:</strong> Discovery → Negotiation → Power Transfer → Monitoring → Shutdown
+            </div>
+
+            <h3>Protocol Stack</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Layer</th>
+                        <th>Function</th>
+                        <th>Key Protocols</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Application Layer</strong></td>
+                        <td>Power management logic, user preferences</td>
+                        <td>HTTP/REST, WebSocket</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Session Layer</strong></td>
+                        <td>Session management, authentication</td>
+                        <td>TLS, OAuth 2.0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Transport Layer</strong></td>
+                        <td>Reliable data transfer, error correction</td>
+                        <td>TCP, UDP</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Discovery Layer</strong></td>
+                        <td>Device discovery, capability exchange</td>
+                        <td>mDNS, BLE, Beacon</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Physical Layer</strong></td>
+                        <td>Actual power transmission</td>
+                        <td>RF, Magnetic Resonance, Infrared</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4.2 Discovery Protocol</h2>
+            <p>The discovery protocol allows receivers to find nearby transmitters and transmitters to advertise their capabilities and availability.</p>
+
+            <h3>TX Beacon Advertisement</h3>
+            <div class="code-header">Transmitter Beacon Protocol</div>
+            <pre><code>tx_beacon:
+  interval: 100ms  # Broadcast every 100ms
+
+  beacon_packet:
+    tx_id: "uuid"
+    tx_type: "home | commercial | public | vehicle"
+
+    capabilities:
+      available_power: watts
+      supported_modes: ["rf", "resonance", "infrared"]
+      max_devices: integer
+
+    coverage:
+      radius: meters
+      center_coordinates: [lat, lon, alt]
+
+    security:
+      access_type: "open | authenticated | private"
+      encryption_supported: boolean
+
+    status:
+      online: true
+      current_load: percentage
+
+  broadcast_method:
+    primary: BLE_advertisement
+    secondary: mDNS_service
+    fallback: WiFi_beacon</code></pre>
+
+            <h3>RX Scanning Process</h3>
+            <div class="code-header">Receiver Discovery Protocol</div>
+            <pre><code>rx_scan:
+  interval: 1s  # Scan every second when not connected
+
+  scan_process:
+    1. Listen for TX beacons
+    2. Measure signal strength (RSSI)
+    3. Estimate distance
+    4. Filter by compatibility
+    5. Rank by signal strength & available power
+    6. Build nearby TX list
+
+  discovery_response:
+    rx_id: "uuid"
+    rx_type: "smartphone | wearable | iot | laptop"
+
+    power_needs:
+      min_power: watts
+      optimal_power: watts
+      power_class: "class_a | class_b | class_c | class_d | class_e"
+
+    battery:
+      current_level: percentage
+      charging_urgency: "critical | normal | low"
+
+    preferences:
+      priority: "critical | high | normal | low"
+      payment_method: "free | subscription | credits"</code></pre>
+        </section>
+
+        <section>
+            <h2>4.3 Negotiation Protocol</h2>
+            <p>Once a receiver discovers suitable transmitters, the negotiation protocol establishes power allocation and transfer parameters.</p>
+
+            <h3>Power Request Handshake</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Step</th>
+                        <th>Action</th>
+                        <th>Packet</th>
+                        <th>Response</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>RX sends power request</td>
+                        <td>POWER_REQUEST</td>
+                        <td>TX acknowledges</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>TX validates request</td>
+                        <td>-</td>
+                        <td>Checks capacity & auth</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>TX sends allocation</td>
+                        <td>POWER_GRANT</td>
+                        <td>RX confirms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>Channel establishment</td>
+                        <td>CHANNEL_SETUP</td>
+                        <td>Both confirm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>Safety verification</td>
+                        <td>SAFETY_CHECK</td>
+                        <td>All clear signal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>6</strong></td>
+                        <td>Begin power transfer</td>
+                        <td>START_TRANSFER</td>
+                        <td>Charging active</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-header">Power Negotiation Message Format</div>
+            <pre><code>power_request:
+  message_type: "POWER_REQUEST"
+  from: rx_id
+  to: tx_id
+  timestamp: iso8601
+
+  request_details:
+    requested_power: watts
+    duration: "continuous | seconds"
+    priority: "critical | high | normal | low"
+
+  payment:
+    method: "free | subscription | credits | pay_per_use"
+    account_id: string
+
+  mode_preference:
+    preferred: ["magnetic_resonance", "rf", "infrared"]
+    auto_select: true
+
+---
+
+power_grant:
+  message_type: "POWER_GRANT"
+  from: tx_id
+  to: rx_id
+  timestamp: iso8601
+
+  allocation:
+    granted_power: watts
+    mode: "rf | magnetic_resonance | infrared"
+    channel: frequency_or_beam_id
+
+  timing:
+    start_time: iso8601
+    estimated_duration: seconds
+
+  conditions:
+    can_reduce: boolean
+    can_interrupt: boolean
+    priority_level: integer</code></pre>
+        </section>
+
+        <section>
+            <h2>4.4 Power Transfer Protocol</h2>
+            <p>The power transfer protocol manages the actual wireless energy transmission with real-time adjustments and safety monitoring.</p>
+
+            <h3>Transfer Phases</h3>
+            <div class="card">
+                <h3>Phase 1: Initialization</h3>
+                <ul>
+                    <li>Establish secure communication channel</li>
+                    <li>Perform safety pre-checks (human detection, foreign objects)</li>
+                    <li>Configure power output parameters</li>
+                    <li>Synchronize TX and RX timing</li>
+                    <li>Start at low power (10%) for verification</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Phase 2: Ramp-Up</h3>
+                <ul>
+                    <li>Gradually increase power output</li>
+                    <li>Monitor efficiency at each step</li>
+                    <li>Adjust beam focusing (if beamforming supported)</li>
+                    <li>Verify RX reception at each level</li>
+                    <li>Reach target power within 5 seconds</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Phase 3: Steady State</h3>
+                <ul>
+                    <li>Maintain constant power delivery</li>
+                    <li>Real-time efficiency optimization</li>
+                    <li>Continuous safety monitoring</li>
+                    <li>Track device position (for beamforming)</li>
+                    <li>Adjust for environmental changes</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Phase 4: Shutdown</h3>
+                <ul>
+                    <li>Gradual power reduction</li>
+                    <li>Session summary generation</li>
+                    <li>Billing/usage recording</li>
+                    <li>Channel release</li>
+                    <li>Return to discovery mode</li>
+                </ul>
+            </div>
+
+            <h3>Real-Time Adjustments</h3>
+            <div class="code-header">Dynamic Power Optimization</div>
+            <pre><code>real_time_optimization:
+  # Efficiency monitoring
+  measure_interval: 100ms
+
+  efficiency_calculation:
+    power_transmitted: watts_tx
+    power_received: watts_rx
+    efficiency: (watts_rx / watts_tx) * 100
+
+  adjustment_triggers:
+    - efficiency_drop: > 10%
+    - rx_movement: detected
+    - interference: detected
+    - new_device: enters_zone
+
+  optimization_actions:
+    - adjust_frequency: fine_tune
+    - adjust_beam: reorient
+    - switch_mode: if_better_available
+    - rebalance_power: among_devices
+
+  # Beamforming tracking
+  device_tracking:
+    method: "radar | rf_fingerprint | triangulation"
+    update_rate: 100Hz
+    accuracy: sub_centimeter
+
+    beam_steering:
+      continuous: true
+      latency: < 10ms
+      max_angle_change: 45_degrees_per_second</code></pre>
+        </section>
+
+        <section>
+            <h2>4.5 Safety Protocol</h2>
+            <p>The safety protocol ensures that wireless power transmission is safe for humans, animals, and devices at all times.</p>
+
+            <h3>Safety Monitoring System</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Monitor</th>
+                        <th>Measurement</th>
+                        <th>Threshold</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SAR Level</strong></td>
+                        <td>Specific Absorption Rate</td>
+                        <td>< 2.0 W/kg</td>
+                        <td>Reduce power or redirect</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Human Detection</strong></td>
+                        <td>Presence in beam path</td>
+                        <td>Detection = True</td>
+                        <td>Immediate beam redirect or shutoff</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Device Temperature</strong></td>
+                        <td>RX temperature</td>
+                        <td>< 45°C</td>
+                        <td>Throttle charging rate</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Foreign Object</strong></td>
+                        <td>Metal detection in field</td>
+                        <td>Detection = True</td>
+                        <td>Immediate shutoff</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Interference</strong></td>
+                        <td>Signal quality</td>
+                        <td>SNR > 20dB</td>
+                        <td>Change frequency or pause</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-header">Safety Protocol Implementation</div>
+            <pre><code>safety_protocol:
+  # Continuous monitoring
+  monitoring:
+    sar_measurement:
+      frequency: continuous
+      sensors: distributed_array
+      calculation: real_time
+      threshold: regulatory_compliant
+
+    human_detection:
+      methods: [radar, thermal, motion_sensor, camera]
+      detection_zone: 360_degrees
+      response_time: < 50ms
+
+    thermal_monitoring:
+      rx_temperature: continuous
+      ambient_temperature: continuous
+      thermal_imaging: if_available
+
+  # Automatic responses
+  safety_actions:
+    when_human_detected:
+      immediate:
+        - reduce_power: to_safe_level
+        - redirect_beam: away_from_human
+        - if_unavoidable: complete_shutoff
+
+    when_sar_exceeded:
+      - reduce_power: proportional
+      - expand_beam: reduce_density
+      - switch_mode: if_safer_available
+
+    when_overheating:
+      - throttle_charging: gradual
+      - if_critical: stop_charging
+      - notify: user_and_system
+
+  # Emergency shutdown
+  emergency_shutdown:
+    triggers:
+      - sar_critical: > threshold
+      - temperature_critical: > 50C
+      - foreign_object: metallic
+      - system_fault: detected
+      - manual_trigger: activated
+
+    response:
+      shutoff_time: < 100ms
+      notification: immediate
+      logging: mandatory
+      restart: manual_approval_required</code></pre>
+        </section>
+
+        <section>
+            <h2>4.6 Multi-Device Coordination</h2>
+            <p>When multiple devices request power simultaneously, the coordination protocol manages fair allocation and priority handling.</p>
+
+            <h3>Power Allocation Strategies</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Description</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Fair Share</strong></td>
+                        <td>Equal power to all devices</td>
+                        <td>Public spaces, democratic access</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Priority Based</strong></td>
+                        <td>Allocate by device priority level</td>
+                        <td>Critical devices get preference</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Need Based</strong></td>
+                        <td>Low battery devices get more</td>
+                        <td>Optimize overall satisfaction</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Auction</strong></td>
+                        <td>Highest bidder gets power</td>
+                        <td>Commercial environments</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Time Division</strong></td>
+                        <td>Rotate power among devices</td>
+                        <td>Capacity-constrained scenarios</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-header">Multi-Device Coordination Algorithm</div>
+            <pre><code>multi_device_coordination:
+  rebalance_interval: 10s  # Re-evaluate every 10 seconds
+
+  priority_levels:
+    critical: 100  # Medical devices, emergency phones
+    high: 75       # Primary work devices, low battery
+    normal: 50     # Regular devices
+    low: 25        # Fully charged, standby devices
+
+  allocation_algorithm:
+    1. Calculate total power demand
+    2. Compare to available power
+    3. If sufficient:
+       - Allocate requested power to all
+    4. If insufficient:
+       - Sort devices by priority score
+       - Allocate to critical first (100%)
+       - Distribute remaining to others proportionally
+       - Devices below minimum get queued
+
+  priority_score_calculation:
+    base_score = priority_level
+    battery_multiplier = (100 - battery_level) / 100
+    time_waiting_bonus = minutes_waiting * 0.5
+
+    final_score = base_score * (1 + battery_multiplier) + time_waiting_bonus
+
+  preemption_rules:
+    critical_can_preempt: [high, normal, low]
+    high_can_preempt: [normal, low]
+    others: no_preemption</code></pre>
+        </section>
+
+        </main>
+</body>
+</html>

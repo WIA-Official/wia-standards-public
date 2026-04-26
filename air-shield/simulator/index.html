@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA AIR-SHIELD - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #EC4899;
+            --primary-dark: #DB2777;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Top Navigation */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        /* Hero */
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        /* Tabs */
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        /* Panels */
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        /* Forms */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+
+        /* Checkboxes */
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 15px; margin: 15px 0; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 10px 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+        .checkbox-item:hover { border-color: var(--primary); }
+        .checkbox-item.checked { border-color: var(--primary); background: rgba(236, 72, 153, 0.1); }
+        .checkbox-item input { display: none; }
+
+        /* Buttons */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        /* Output */
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        /* Sub-sections */
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        /* Shield Cards */
+        .shield-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin: 20px 0; }
+        .shield-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; transition: all 0.2s; }
+        .shield-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .shield-card.active { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .shield-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .shield-card .name { font-weight: 600; margin-bottom: 5px; }
+        .shield-card .status { font-size: 0.8rem; color: var(--text-muted); }
+        .shield-card .status.on { color: var(--secondary); }
+
+        /* Status Grid */
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .status-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .status-item .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .status-item .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        /* Threat List */
+        .threat-list { margin: 15px 0; }
+        .threat-item { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--bg); border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--border); }
+        .threat-item.critical { border-left-color: var(--danger); }
+        .threat-item.warning { border-left-color: var(--warning); }
+        .threat-item.safe { border-left-color: var(--secondary); }
+        .threat-icon { font-size: 1.5rem; }
+        .threat-info { flex: 1; }
+        .threat-name { font-weight: 600; }
+        .threat-desc { font-size: 0.85rem; color: var(--text-muted); }
+        .threat-action { padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+
+        /* Progress Ring */
+        .security-score { display: flex; justify-content: center; margin: 30px 0; }
+        .score-circle { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(var(--secondary) 0deg, var(--secondary) calc(var(--score) * 3.6deg), var(--border) calc(var(--score) * 3.6deg)); display: flex; align-items: center; justify-content: center; }
+        .score-inner { width: 120px; height: 120px; border-radius: 50%; background: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .score-value { font-size: 2.5rem; font-weight: bold; color: var(--secondary); }
+        .score-label { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Table */
+        .styled-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .styled-table th, .styled-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        .styled-table th { background: var(--primary); color: white; font-weight: 600; }
+        .styled-table tr:hover { background: rgba(236, 72, 153, 0.05); }
+
+        /* Footer */
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">AIR-SHIELD</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank" data-en="🎮 109+ Simulators" data-ko="🎮 109+ 시뮬레이터">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header>
+            <div class="logo">🛡️ WIA-AIR-SHIELD</div>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <h1 data-en="Wireless Privacy Shield Standard" data-ko="무선 프라이버시 보호 표준">Wireless Privacy Shield Standard</h1>
+            <p data-en="Invisible protection in wireless space — Guarding your privacy" data-ko="보이지 않는 공간의 수호자 — 당신의 프라이버시를 지킵니다">Invisible protection in wireless space — Guarding your privacy</p>
+            <p class="philosophy" data-en="이모 - 내가 지켜줄게 🛡️" data-ko="이모 - 내가 지켜줄게 🛡️">이모 - 내가 지켜줄게 🛡️</p>
+        </section>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🛡️ Cloak" data-ko="🛡️ 은폐">🛡️ Cloak</div>
+            <div class="tab" onclick="showPanel(1)" data-en="📡 Noise" data-ko="📡 교란">📡 Noise</div>
+            <div class="tab" onclick="showPanel(2)" data-en="✅ Verify" data-ko="✅ 검증">✅ Verify</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🚨 Alert" data-ko="🚨 경보">🚨 Alert</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📊 Dashboard" data-ko="📊 대시보드">📊 Dashboard</div>
+        </div>
+
+        <!-- Panel 0: Cloak -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🛡️ Cloak Shield (은폐)" data-ko="🛡️ 은폐 방패">🛡️ Cloak Shield (은폐)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Hide your digital presence — Make yourself invisible" data-ko="디지털 존재를 숨김 — 보이지 않게 만들기">Hide your digital presence — Make yourself invisible</p>
+
+            <div class="sub-section">
+                <h4 data-en="Cloak Options" data-ko="은폐 옵션">Cloak Options</h4>
+                <div class="checkbox-group" id="cloakOptions">
+                    <div class="checkbox-item checked" onclick="toggleCheck(this)">
+                        <input type="checkbox" checked> 
+                        <span data-en="🔒 Hide Metadata" data-ko="🔒 메타데이터 은폐">🔒 Hide Metadata</span>
+                    </div>
+                    <div class="checkbox-item checked" onclick="toggleCheck(this)">
+                        <input type="checkbox" checked>
+                        <span data-en="📍 Hide Location" data-ko="📍 위치 은폐">📍 Hide Location</span>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheck(this)">
+                        <input type="checkbox">
+                        <span data-en="📱 Hide Device Fingerprint" data-ko="📱 기기 지문 은폐">📱 Hide Device Fingerprint</span>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheck(this)">
+                        <input type="checkbox">
+                        <span data-en="📊 Hide Traffic Pattern" data-ko="📊 트래픽 패턴 은폐">📊 Hide Traffic Pattern</span>
+                    </div>
+                    <div class="checkbox-item checked" onclick="toggleCheck(this)">
+                        <input type="checkbox" checked>
+                        <span data-en="🔗 Hide Connection Info" data-ko="🔗 연결 정보 은폐">🔗 Hide Connection Info</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="activateCloak()" data-en="🛡️ Activate Cloak" data-ko="🛡️ 은폐 활성화">🛡️ Activate Cloak</button>
+                <button class="btn btn-secondary" onclick="deactivateCloak()" data-en="Deactivate" data-ko="비활성화">Deactivate</button>
+            </div>
+            <div class="output" id="cloakOutput"></div>
+        </div>
+
+        <!-- Panel 1: Noise -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="📡 Noise Shield (교란)" data-ko="📡 교란 방패">📡 Noise Shield (교란)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Hide real signals in fake ones — Confuse attackers" data-ko="가짜 신호 속에 진짜를 숨김 — 공격자 교란">Hide real signals in fake ones — Confuse attackers</p>
+
+            <div class="sub-section">
+                <h4 data-en="Noise Configuration" data-ko="교란 설정">Noise Configuration</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Decoy Traffic Level" data-ko="디코이 트래픽 수준">Decoy Traffic Level</label>
+                        <select id="decoyLevel">
+                            <option value="LOW" data-en="Low (10%)" data-ko="낮음 (10%)">Low (10%)</option>
+                            <option value="MEDIUM" selected data-en="Medium (30%)" data-ko="중간 (30%)">Medium (30%)</option>
+                            <option value="HIGH" data-en="High (50%)" data-ko="높음 (50%)">High (50%)</option>
+                            <option value="PARANOID" data-en="Paranoid (80%)" data-ko="편집증 (80%)">Paranoid (80%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Timing Randomization" data-ko="타이밍 랜덤화">Timing Randomization</label>
+                        <select id="timingRandom">
+                            <option value="OFF">Off</option>
+                            <option value="LOW">±10ms</option>
+                            <option value="MEDIUM" selected>±50ms</option>
+                            <option value="HIGH">±200ms</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Power Pattern Scramble" data-ko="전력 패턴 스크램블">Power Pattern Scramble</label>
+                        <select id="powerScramble">
+                            <option value="OFF">Off</option>
+                            <option value="ON" selected>On</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="activateNoise()" data-en="📡 Generate Noise" data-ko="📡 노이즈 생성">📡 Generate Noise</button>
+            </div>
+            <div class="output" id="noiseOutput"></div>
+        </div>
+
+        <!-- Panel 2: Verify -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="✅ Verify Shield (검증)" data-ko="✅ 검증 방패">✅ Verify Shield (검증)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Verify authenticity — Detect fake transmitters and evil twins" data-ko="진위 확인 — 가짜 송신기와 Evil Twin 탐지">Verify authenticity — Detect fake transmitters and evil twins</p>
+
+            <div class="sub-section">
+                <h4 data-en="Nearby Transmitters" data-ko="주변 송신기">Nearby Transmitters</h4>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th data-en="Name" data-ko="이름">Name</th>
+                            <th data-en="Type" data-ko="유형">Type</th>
+                            <th data-en="Signal" data-ko="신호">Signal</th>
+                            <th data-en="Status" data-ko="상태">Status</th>
+                            <th data-en="Action" data-ko="작업">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="txList">
+                        <tr>
+                            <td>Home_WiFi_5G</td>
+                            <td>WiFi AP</td>
+                            <td>-42dBm</td>
+                            <td style="color: var(--secondary);">✅ Verified</td>
+                            <td><button class="threat-action" onclick="verifyTX('Home_WiFi')">Re-verify</button></td>
+                        </tr>
+                        <tr>
+                            <td>AirPower_TX_01</td>
+                            <td>Power TX</td>
+                            <td>-38dBm</td>
+                            <td style="color: var(--secondary);">✅ Verified</td>
+                            <td><button class="threat-action" onclick="verifyTX('AirPower')">Re-verify</button></td>
+                        </tr>
+                        <tr>
+                            <td>Free_WiFi_Guest</td>
+                            <td>WiFi AP</td>
+                            <td>-55dBm</td>
+                            <td style="color: var(--warning);">⚠️ Unknown</td>
+                            <td><button class="threat-action" onclick="verifyTX('Free_WiFi')">Verify</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="scanAndVerify()" data-en="🔍 Scan & Verify All" data-ko="🔍 전체 스캔 및 검증">🔍 Scan & Verify All</button>
+            </div>
+            <div class="output" id="verifyOutput"></div>
+        </div>
+
+        <!-- Panel 3: Alert -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🚨 Alert Shield (경보)" data-ko="🚨 경보 방패">🚨 Alert Shield (경보)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Real-time threat detection — Stay protected" data-ko="실시간 위협 탐지 — 항상 보호">Real-time threat detection — Stay protected</p>
+
+            <div class="sub-section">
+                <h4 data-en="Active Threats" data-ko="활성 위협">Active Threats</h4>
+                <div class="threat-list" id="threatList">
+                    <div class="threat-item warning">
+                        <div class="threat-icon">⚠️</div>
+                        <div class="threat-info">
+                            <div class="threat-name" data-en="Unknown AP Detected" data-ko="알 수 없는 AP 감지">Unknown AP Detected</div>
+                            <div class="threat-desc" data-en="'Free_WiFi_Guest' - Unverified access point nearby" data-ko="'Free_WiFi_Guest' - 미확인 AP가 근처에 있음">Unverified access point nearby</div>
+                        </div>
+                        <button class="threat-action" onclick="blockThreat('unknown_ap')" data-en="Block" data-ko="차단">Block</button>
+                    </div>
+                    <div class="threat-item safe">
+                        <div class="threat-icon">✅</div>
+                        <div class="threat-info">
+                            <div class="threat-name" data-en="RF Sniffing Attempt" data-ko="RF 도청 시도">RF Sniffing Attempt</div>
+                            <div class="threat-desc" data-en="Blocked 3 minutes ago — Cloak shield active" data-ko="3분 전 차단됨 — 은폐 방패 활성">Blocked 3 minutes ago</div>
+                        </div>
+                        <span style="color: var(--secondary);">Resolved</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="runThreatScan()" data-en="🔍 Scan for Threats" data-ko="🔍 위협 스캔">🔍 Scan for Threats</button>
+                <button class="btn btn-danger" onclick="panicMode()" data-en="🚨 Panic Mode" data-ko="🚨 긴급 모드">🚨 Panic Mode</button>
+            </div>
+            <div class="output" id="alertOutput"></div>
+        </div>
+
+        <!-- Panel 4: Dashboard -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📊 Security Dashboard" data-ko="📊 보안 대시보드">📊 Security Dashboard</h2>
+
+            <div class="security-score">
+                <div class="score-circle" style="--score: 87">
+                    <div class="score-inner">
+                        <div class="score-value">87</div>
+                        <div class="score-label" data-en="Security Score" data-ko="보안 점수">Security Score</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="shield-grid">
+                <div class="shield-card active">
+                    <div class="icon">🛡️</div>
+                    <div class="name">Cloak</div>
+                    <div class="status on" data-en="● Active" data-ko="● 활성">● Active</div>
+                </div>
+                <div class="shield-card active">
+                    <div class="icon">📡</div>
+                    <div class="name">Noise</div>
+                    <div class="status on" data-en="● Active" data-ko="● 활성">● Active</div>
+                </div>
+                <div class="shield-card active">
+                    <div class="icon">✅</div>
+                    <div class="name">Verify</div>
+                    <div class="status on" data-en="● Active" data-ko="● 활성">● Active</div>
+                </div>
+                <div class="shield-card active">
+                    <div class="icon">🚨</div>
+                    <div class="name">Alert</div>
+                    <div class="status on" data-en="● Active" data-ko="● 활성">● Active</div>
+                </div>
+            </div>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="value">24h</div>
+                    <div class="label" data-en="Uptime" data-ko="가동 시간">Uptime</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">47</div>
+                    <div class="label" data-en="Threats Blocked" data-ko="차단된 위협">Threats Blocked</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">3</div>
+                    <div class="label" data-en="Verified TX" data-ko="검증된 TX">Verified TX</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">2.1GB</div>
+                    <div class="label" data-en="Decoy Traffic" data-ko="디코이 트래픽">Decoy Traffic</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="refreshDashboard()" data-en="🔄 Refresh" data-ko="🔄 새로고침">🔄 Refresh</button>
+                <button class="btn btn-secondary" onclick="exportReport()" data-en="📄 Export Report" data-ko="📄 보고서 내보내기">📄 Export Report</button>
+            </div>
+            <div class="output" id="dashboardOutput"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA-AIR-SHIELD: Aunt protecting you in the invisible space" data-ko="WIA-AIR-SHIELD: 이모가 보이지 않는 공간에서 지켜줍니다">WIA-AIR-SHIELD: Aunt protecting you in the invisible space</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        function toggleCheck(el) {
+            el.classList.toggle('checked');
+            el.querySelector('input').checked = el.classList.contains('checked');
+        }
+
+        function generateId() {
+            return 'xxxx-xxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
+        }
+
+        // Cloak functions
+        function activateCloak() {
+            const options = [];
+            document.querySelectorAll('#cloakOptions .checkbox-item.checked span').forEach(el => {
+                options.push(el.textContent.trim());
+            });
+
+            document.getElementById('cloakOutput').textContent = JSON.stringify({
+                status: '✅ Cloak Shield Activated',
+                shieldId: 'CLK-' + generateId(),
+                message: currentLang === 'ko' ? '이모가 당신을 보이지 않게 만들었습니다 🛡️' : 'Aunt made you invisible 🛡️',
+                activeProtections: options,
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function deactivateCloak() {
+            document.getElementById('cloakOutput').textContent = JSON.stringify({
+                status: '⚠️ Cloak Shield Deactivated',
+                message: currentLang === 'ko' ? '주의: 은폐가 해제되었습니다' : 'Warning: You are now visible',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Noise functions
+        function activateNoise() {
+            const decoyLevel = document.getElementById('decoyLevel').value;
+            const timing = document.getElementById('timingRandom').value;
+            const scramble = document.getElementById('powerScramble').value;
+
+            document.getElementById('noiseOutput').textContent = JSON.stringify({
+                status: '✅ Noise Shield Activated',
+                shieldId: 'NSE-' + generateId(),
+                message: currentLang === 'ko' ? '이모가 공격자들을 혼란시키고 있습니다 📡' : 'Aunt is confusing the attackers 📡',
+                config: {
+                    decoyTraffic: decoyLevel,
+                    timingRandomization: timing,
+                    powerPatternScramble: scramble
+                },
+                decoyPacketsSent: Math.floor(Math.random() * 1000) + 500,
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Verify functions
+        function verifyTX(name) {
+            document.getElementById('verifyOutput').textContent = JSON.stringify({
+                status: '✅ Verification Complete',
+                target: name,
+                result: {
+                    authentic: true,
+                    certificateValid: true,
+                    signatureMatch: true,
+                    knownGoodList: true
+                },
+                message: currentLang === 'ko' ? '이 송신기는 안전합니다' : 'This transmitter is safe',
+                verifiedAt: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function scanAndVerify() {
+            document.getElementById('verifyOutput').textContent = JSON.stringify({
+                status: '✅ Scan Complete',
+                results: [
+                    { name: 'Home_WiFi_5G', type: 'WiFi', verified: true },
+                    { name: 'AirPower_TX_01', type: 'Power TX', verified: true },
+                    { name: 'Free_WiFi_Guest', type: 'WiFi', verified: false, warning: 'Unverified - potential Evil Twin' }
+                ],
+                recommendation: currentLang === 'ko' ? 'Free_WiFi_Guest 연결을 피하세요' : 'Avoid connecting to Free_WiFi_Guest',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Alert functions
+        function blockThreat(id) {
+            document.getElementById('alertOutput').textContent = JSON.stringify({
+                status: '✅ Threat Blocked',
+                threatId: id,
+                action: 'BLOCKED',
+                message: currentLang === 'ko' ? '이모가 위협을 차단했습니다 🛡️' : 'Aunt blocked the threat 🛡️',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function runThreatScan() {
+            document.getElementById('alertOutput').textContent = JSON.stringify({
+                status: '✅ Threat Scan Complete',
+                threatsFound: 1,
+                threatsBlocked: 47,
+                activeProtection: true,
+                details: [
+                    { type: 'Unknown AP', severity: 'MEDIUM', status: 'MONITORING' }
+                ],
+                message: currentLang === 'ko' ? '이모가 계속 지켜보고 있습니다' : 'Aunt is watching over you',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function panicMode() {
+            document.getElementById('alertOutput').textContent = JSON.stringify({
+                status: '🚨 PANIC MODE ACTIVATED',
+                actions: [
+                    currentLang === 'ko' ? '모든 무선 연결 차단' : 'All wireless connections blocked',
+                    currentLang === 'ko' ? '최대 은폐 활성화' : 'Maximum cloak activated',
+                    currentLang === 'ko' ? '모든 디코이 트래픽 생성' : 'All decoy traffic generated',
+                    currentLang === 'ko' ? '긴급 알림 전송' : 'Emergency alert sent'
+                ],
+                message: currentLang === 'ko' ? '🚨 이모가 모든 것을 막고 있습니다!' : '🚨 Aunt is blocking everything!',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        // Dashboard functions
+        function refreshDashboard() {
+            const score = Math.floor(Math.random() * 15) + 80;
+            document.querySelector('.score-value').textContent = score;
+            document.querySelector('.score-circle').style.setProperty('--score', score);
+            
+            document.getElementById('dashboardOutput').textContent = JSON.stringify({
+                status: '✅ Dashboard Refreshed',
+                securityScore: score,
+                allShieldsActive: true,
+                message: currentLang === 'ko' ? '모든 방패가 활성 상태입니다' : 'All shields are active',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        function exportReport() {
+            document.getElementById('dashboardOutput').textContent = JSON.stringify({
+                status: '✅ Report Generated',
+                reportId: 'RPT-' + generateId(),
+                summary: {
+                    securityScore: 87,
+                    uptime: '24 hours',
+                    threatsBlocked: 47,
+                    decoyTraffic: '2.1GB'
+                },
+                shields: {
+                    cloak: 'ACTIVE',
+                    noise: 'ACTIVE',
+                    verify: 'ACTIVE',
+                    alert: 'ACTIVE'
+                },
+                message: currentLang === 'ko' ? '이모의 보호 보고서가 생성되었습니다' : 'Aunt\'s protection report generated',
+                timestamp: new Date().toISOString()
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

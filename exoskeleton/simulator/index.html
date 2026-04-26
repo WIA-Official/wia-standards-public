@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Exoskeleton - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #F97316;
+            --primary-dark: #EA580C;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 1rem; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; font-size: 1rem; }
+
+        .joint-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .joint-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+        .joint-card h5 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .joint-slider { margin: 15px 0; }
+        .joint-slider label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem; }
+        .joint-slider input[type="range"] { width: 100%; }
+        .joint-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .joint-value { text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px; }
+        .joint-value .num { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+        .joint-value .unit { font-size: 0.7rem; color: var(--text-muted); }
+
+        .body-diagram { display: flex; justify-content: center; margin: 20px 0; }
+        .body-svg { width: 200px; height: 350px; }
+        .body-svg .joint-dot { fill: var(--primary); cursor: pointer; transition: all 0.2s; }
+        .body-svg .joint-dot:hover { r: 12; fill: var(--primary-dark); }
+        .body-svg .limb { stroke: var(--text-muted); stroke-width: 8; stroke-linecap: round; }
+
+        .assist-level { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+        .assist-btn { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg); color: var(--text); font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .assist-btn.active { background: var(--primary); border-color: var(--primary); }
+        .assist-btn:hover { border-color: var(--primary); }
+
+        .gait-patterns { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }
+        .gait-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .gait-card:hover { border-color: var(--primary); }
+        .gait-card.selected { border-color: var(--primary); background: rgba(249, 115, 22, 0.1); }
+        .gait-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .gait-card .name { font-weight: 600; }
+
+        .safety-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .safety-card { background: var(--bg); border: 2px solid var(--secondary); border-radius: 12px; padding: 25px; text-align: center; }
+        .safety-card.active { border-color: var(--secondary); background: rgba(16, 185, 129, 0.1); }
+        .safety-card.warning { border-color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+        .safety-card.danger { border-color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        .safety-card .icon { font-size: 2.5rem; margin-bottom: 15px; }
+        .safety-card .title { font-weight: 600; margin-bottom: 8px; }
+        .safety-card .status { font-size: 0.85rem; color: var(--text-muted); }
+
+        .estop-btn { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(145deg, #ef4444, #dc2626); border: 6px solid #991b1b; color: white; font-size: 1.3rem; font-weight: bold; cursor: pointer; margin: 20px auto; display: block; box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4); transition: all 0.2s; }
+        .estop-btn:hover { transform: scale(1.05); }
+        .estop-btn:active { transform: scale(0.95); }
+
+        .rehab-progress { margin: 20px 0; }
+        .progress-bar { height: 30px; background: var(--bg); border-radius: 15px; overflow: hidden; border: 1px solid var(--border); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.5s; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-item .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .stat-item .label { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .joint-grid { grid-template-columns: 1fr; }
+        }
+            .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <span class="current">Exoskeleton</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="🏆 Certification" data-ko="🏆 인증">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🦿 WIA Exoskeleton</div>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Rehabilitation Exoskeleton" data-ko="재활 외골격">Rehabilitation Exoskeleton</h1>
+            <p data-en="Powered mobility assistance and rehabilitation system" data-ko="동력 이동 보조 및 재활 시스템">Powered mobility assistance and rehabilitation</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🦿 Joints" data-ko="🦿 관절">🦿 Joints</div>
+            <div class="tab" onclick="showPanel(1)" data-en="💪 Assist" data-ko="💪 보조">💪 Assist</div>
+            <div class="tab" onclick="showPanel(2)" data-en="📊 Gait" data-ko="📊 보행">📊 Gait</div>
+            <div class="tab" onclick="showPanel(3)" data-en="🛡️ Safety" data-ko="🛡️ 안전">🛡️ Safety</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📈 Rehab" data-ko="📈 재활">📈 Rehab</div>
+        </div>
+
+        <!-- Panel 0: Joints -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🦿 Joint Control" data-ko="🦿 관절 제어">🦿 Joint Control</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Control all 6 joints of the exoskeleton" data-ko="외골격의 6개 관절을 모두 제어합니다">Control all 6 joints</p>
+
+            <div class="joint-grid">
+                <div class="joint-card">
+                    <h5>🦵 <span data-en="Left Hip" data-ko="왼쪽 고관절">Left Hip</span></h5>
+                    <div class="joint-slider">
+                        <label><span data-en="Angle" data-ko="각도">Angle</span><span id="lHipVal">0°</span></label>
+                        <input type="range" id="lHip" min="-30" max="120" value="0" oninput="updateJoint('lHip')">
+                    </div>
+                    <div class="joint-values">
+                        <div class="joint-value"><div class="num" id="lHipVel">0</div><div class="unit">deg/s</div></div>
+                        <div class="joint-value"><div class="num" id="lHipTorque">0</div><div class="unit">Nm</div></div>
+                        <div class="joint-value"><div class="num" id="lHipAssist">0</div><div class="unit">Nm assist</div></div>
+                    </div>
+                </div>
+
+                <div class="joint-card">
+                    <h5>🦵 <span data-en="Right Hip" data-ko="오른쪽 고관절">Right Hip</span></h5>
+                    <div class="joint-slider">
+                        <label><span data-en="Angle" data-ko="각도">Angle</span><span id="rHipVal">0°</span></label>
+                        <input type="range" id="rHip" min="-30" max="120" value="0" oninput="updateJoint('rHip')">
+                    </div>
+                    <div class="joint-values">
+                        <div class="joint-value"><div class="num" id="rHipVel">0</div><div class="unit">deg/s</div></div>
+                        <div class="joint-value"><div class="num" id="rHipTorque">0</div><div class="unit">Nm</div></div>
+                        <div class="joint-value"><div class="num" id="rHipAssist">0</div><div class="unit">Nm assist</div></div>
+                    </div>
+                </div>
+
+                <div class="joint-card">
+                    <h5>🦵 <span data-en="Left Knee" data-ko="왼쪽 슬관절">Left Knee</span></h5>
+                    <div class="joint-slider">
+                        <label><span data-en="Angle" data-ko="각도">Angle</span><span id="lKneeVal">0°</span></label>
+                        <input type="range" id="lKnee" min="0" max="135" value="0" oninput="updateJoint('lKnee')">
+                    </div>
+                    <div class="joint-values">
+                        <div class="joint-value"><div class="num" id="lKneeVel">0</div><div class="unit">deg/s</div></div>
+                        <div class="joint-value"><div class="num" id="lKneeTorque">0</div><div class="unit">Nm</div></div>
+                        <div class="joint-value"><div class="num" id="lKneeAssist">0</div><div class="unit">Nm assist</div></div>
+                    </div>
+                </div>
+
+                <div class="joint-card">
+                    <h5>🦵 <span data-en="Right Knee" data-ko="오른쪽 슬관절">Right Knee</span></h5>
+                    <div class="joint-slider">
+                        <label><span data-en="Angle" data-ko="각도">Angle</span><span id="rKneeVal">0°</span></label>
+                        <input type="range" id="rKnee" min="0" max="135" value="0" oninput="updateJoint('rKnee')">
+                    </div>
+                    <div class="joint-values">
+                        <div class="joint-value"><div class="num" id="rKneeVel">0</div><div class="unit">deg/s</div></div>
+                        <div class="joint-value"><div class="num" id="rKneeTorque">0</div><div class="unit">Nm</div></div>
+                        <div class="joint-value"><div class="num" id="rKneeAssist">0</div><div class="unit">Nm assist</div></div>
+                    </div>
+                </div>
+
+                <div class="joint-card">
+                    <h5>🦶 <span data-en="Left Ankle" data-ko="왼쪽 족관절">Left Ankle</span></h5>
+                    <div class="joint-slider">
+                        <label><span data-en="Angle" data-ko="각도">Angle</span><span id="lAnkleVal">0°</span></label>
+                        <input type="range" id="lAnkle" min="-50" max="20" value="0" oninput="updateJoint('lAnkle')">
+                    </div>
+                    <div class="joint-values">
+                        <div class="joint-value"><div class="num" id="lAnkleVel">0</div><div class="unit">deg/s</div></div>
+                        <div class="joint-value"><div class="num" id="lAnkleTorque">0</div><div class="unit">Nm</div></div>
+                        <div class="joint-value"><div class="num" id="lAnkleAssist">0</div><div class="unit">Nm assist</div></div>
+                    </div>
+                </div>
+
+                <div class="joint-card">
+                    <h5>🦶 <span data-en="Right Ankle" data-ko="오른쪽 족관절">Right Ankle</span></h5>
+                    <div class="joint-slider">
+                        <label><span data-en="Angle" data-ko="각도">Angle</span><span id="rAnkleVal">0°</span></label>
+                        <input type="range" id="rAnkle" min="-50" max="20" value="0" oninput="updateJoint('rAnkle')">
+                    </div>
+                    <div class="joint-values">
+                        <div class="joint-value"><div class="num" id="rAnkleVel">0</div><div class="unit">deg/s</div></div>
+                        <div class="joint-value"><div class="num" id="rAnkleTorque">0</div><div class="unit">Nm</div></div>
+                        <div class="joint-value"><div class="num" id="rAnkleAssist">0</div><div class="unit">Nm assist</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="exportJointData()" data-en="📤 Export Data" data-ko="📤 데이터 내보내기">📤 Export Data</button>
+            </div>
+            <div class="output" id="jointOutput"></div>
+        </div>
+
+        <!-- Panel 1: Assist -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="💪 Assistance Level" data-ko="💪 보조 레벨">💪 Assistance Level</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Adjust powered assistance for each movement" data-ko="각 동작에 대한 동력 보조 조절">Adjust powered assistance</p>
+
+            <div class="sub-section">
+                <h4 data-en="Global Assist Level (0-100%)" data-ko="전체 보조 레벨 (0-100%)">Global Assist Level</h4>
+                <div class="assist-level">
+                    <button class="assist-btn" onclick="setAssist(0)">0%</button>
+                    <button class="assist-btn" onclick="setAssist(25)">25%</button>
+                    <button class="assist-btn active" onclick="setAssist(50)">50%</button>
+                    <button class="assist-btn" onclick="setAssist(75)">75%</button>
+                    <button class="assist-btn" onclick="setAssist(100)">100%</button>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="assistLevel">50%</div>
+                    <div class="label" data-en="Assist Level" data-ko="보조 레벨">Assist Level</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="totalTorque">0</div>
+                    <div class="label" data-en="Total Torque (Nm)" data-ko="총 토크 (Nm)">Total Torque</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="powerDraw">45W</div>
+                    <div class="label" data-en="Power Draw" data-ko="소비 전력">Power Draw</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="batteryEst">3.2h</div>
+                    <div class="label" data-en="Battery Est." data-ko="예상 사용시간">Battery Est.</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="applyAssist()" data-en="✅ Apply Settings" data-ko="✅ 설정 적용">✅ Apply Settings</button>
+            </div>
+            <div class="output" id="assistOutput"></div>
+        </div>
+
+        <!-- Panel 2: Gait -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📊 Gait Patterns" data-ko="📊 보행 패턴">📊 Gait Patterns</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Select and configure movement patterns" data-ko="동작 패턴 선택 및 설정">Select movement patterns</p>
+
+            <div class="gait-patterns">
+                <div class="gait-card selected" onclick="selectGait(this, 'walk')">
+                    <div class="icon">🚶</div>
+                    <div class="name" data-en="Walk" data-ko="걷기">Walk</div>
+                </div>
+                <div class="gait-card" onclick="selectGait(this, 'stairs_up')">
+                    <div class="icon">🪜</div>
+                    <div class="name" data-en="Stairs Up" data-ko="계단 오르기">Stairs Up</div>
+                </div>
+                <div class="gait-card" onclick="selectGait(this, 'stairs_down')">
+                    <div class="icon">⬇️</div>
+                    <div class="name" data-en="Stairs Down" data-ko="계단 내려가기">Stairs Down</div>
+                </div>
+                <div class="gait-card" onclick="selectGait(this, 'sit')">
+                    <div class="icon">🪑</div>
+                    <div class="name" data-en="Sit/Stand" data-ko="앉기/서기">Sit/Stand</div>
+                </div>
+                <div class="gait-card" onclick="selectGait(this, 'slope')">
+                    <div class="icon">⛰️</div>
+                    <div class="name" data-en="Slope" data-ko="경사로">Slope</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="gaitSpeed">0.8</div>
+                    <div class="label" data-en="Speed (m/s)" data-ko="속도 (m/s)">Speed (m/s)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="cadence">90</div>
+                    <div class="label" data-en="Cadence (steps/min)" data-ko="보행 빈도">Cadence</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="strideLen">0.65</div>
+                    <div class="label" data-en="Stride (m)" data-ko="보폭 (m)">Stride (m)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="symmetry">95%</div>
+                    <div class="label" data-en="Symmetry" data-ko="대칭성">Symmetry</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startGait()" data-en="▶️ Start Pattern" data-ko="▶️ 패턴 시작">▶️ Start Pattern</button>
+                <button class="btn btn-secondary" onclick="stopGait()" data-en="⏹️ Stop" data-ko="⏹️ 정지">⏹️ Stop</button>
+            </div>
+            <div class="output" id="gaitOutput"></div>
+        </div>
+
+        <!-- Panel 3: Safety -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🛡️ Safety Systems" data-ko="🛡️ 안전 시스템">🛡️ Safety Systems</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Emergency stop and safety monitoring" data-ko="비상 정지 및 안전 모니터링">Emergency stop and monitoring</p>
+
+            <button class="estop-btn" onclick="emergencyStop()" data-en="E-STOP" data-ko="긴급정지">E-STOP</button>
+
+            <div class="safety-grid">
+                <div class="safety-card active" id="safetyJoint">
+                    <div class="icon">🦿</div>
+                    <div class="title" data-en="Joint Limits" data-ko="관절 한계">Joint Limits</div>
+                    <div class="status">✅ Within Range</div>
+                </div>
+                <div class="safety-card active" id="safetyOverload">
+                    <div class="icon">⚡</div>
+                    <div class="title" data-en="Overload Detection" data-ko="과부하 감지">Overload Detection</div>
+                    <div class="status">✅ Normal</div>
+                </div>
+                <div class="safety-card active" id="safetyBalance">
+                    <div class="icon">⚖️</div>
+                    <div class="title" data-en="Balance Monitor" data-ko="균형 모니터">Balance Monitor</div>
+                    <div class="status">✅ Stable</div>
+                </div>
+                <div class="safety-card active" id="safetyBattery">
+                    <div class="icon">🔋</div>
+                    <div class="title" data-en="Battery Status" data-ko="배터리 상태">Battery Status</div>
+                    <div class="status">✅ 78%</div>
+                </div>
+            </div>
+
+            <div class="output" id="safetyOutput"></div>
+        </div>
+
+        <!-- Panel 4: Rehab -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📈 Rehabilitation Session" data-ko="📈 재활 세션">📈 Rehabilitation Session</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Track rehabilitation progress and goals" data-ko="재활 진행 상황 및 목표 추적">Track rehabilitation progress</p>
+
+            <div class="sub-section">
+                <h4 data-en="Session Progress" data-ko="세션 진행률">Session Progress</h4>
+                <div class="rehab-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 65%;">65%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value" id="sessionTime">18:30</div>
+                    <div class="label" data-en="Session Time" data-ko="세션 시간">Session Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="steps">842</div>
+                    <div class="label" data-en="Steps" data-ko="걸음 수">Steps</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="distance">0.45</div>
+                    <div class="label" data-en="Distance (km)" data-ko="거리 (km)">Distance (km)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="calories">86</div>
+                    <div class="label" data-en="Calories" data-ko="칼로리">Calories</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="avgAssist">48%</div>
+                    <div class="label" data-en="Avg Assist" data-ko="평균 보조">Avg Assist</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="peakTorque">32</div>
+                    <div class="label" data-en="Peak Torque (Nm)" data-ko="최대 토크">Peak Torque</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="startSession()" data-en="▶️ Start Session" data-ko="▶️ 세션 시작">▶️ Start Session</button>
+                <button class="btn btn-secondary" onclick="endSession()" data-en="⏹️ End Session" data-ko="⏹️ 세션 종료">⏹️ End Session</button>
+            </div>
+            <div class="output" id="rehabOutput"></div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 · Benefit All Humanity" data-ko="弘益人間 · 널리 인간을 이롭게 하라">弘益人間 · Benefit All Humanity</p>
+            <p data-en="WIA Exoskeleton: Restoring mobility through technology" data-ko="WIA Exoskeleton: 기술을 통한 이동성 회복">WIA Exoskeleton: Restoring mobility</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="🏠 Home" data-ko="🏠 홈">🏠 Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="📋 All Standards" data-ko="📋 전체 표준">📋 All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="📚 Ebook" data-ko="📚 전자책">📚 Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let assistLevel = 50;
+        let selectedGait = 'walk';
+        let sessionRunning = false;
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+            });
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+        }
+
+        function updateJoint(id) {
+            const val = document.getElementById(id).value;
+            document.getElementById(id + 'Val').textContent = val + '°';
+            
+            // Simulate velocity and torque
+            const vel = (Math.random() * 50).toFixed(1);
+            const torque = (Math.random() * 20).toFixed(1);
+            const assist = (torque * assistLevel / 100).toFixed(1);
+            
+            document.getElementById(id + 'Vel').textContent = vel;
+            document.getElementById(id + 'Torque').textContent = torque;
+            document.getElementById(id + 'Assist').textContent = assist;
+        }
+
+        function exportJointData() {
+            const joints = ['lHip', 'rHip', 'lKnee', 'rKnee', 'lAnkle', 'rAnkle'];
+            const data = {};
+            joints.forEach(j => {
+                data[j] = {
+                    angle: document.getElementById(j).value + '°',
+                    velocity: document.getElementById(j + 'Vel').textContent + ' deg/s',
+                    torque: document.getElementById(j + 'Torque').textContent + ' Nm',
+                    assistTorque: document.getElementById(j + 'Assist').textContent + ' Nm'
+                };
+            });
+            
+            document.getElementById('jointOutput').textContent = JSON.stringify({
+                timestamp: Date.now(),
+                assistLevel: assistLevel + '%',
+                joints: data,
+                message: currentLang === 'ko' ? '관절 데이터 내보내기 완료' : 'Joint data exported'
+            }, null, 2);
+        }
+
+        function setAssist(level) {
+            assistLevel = level;
+            document.querySelectorAll('.assist-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === level + '%');
+            });
+            document.getElementById('assistLevel').textContent = level + '%';
+            
+            // Update power draw estimate
+            const power = Math.round(30 + level * 0.7);
+            const battery = (4 * (100 - level) / 100 + 1).toFixed(1);
+            document.getElementById('powerDraw').textContent = power + 'W';
+            document.getElementById('batteryEst').textContent = battery + 'h';
+        }
+
+        function applyAssist() {
+            document.getElementById('assistOutput').textContent = JSON.stringify({
+                status: '✅ Assist Settings Applied',
+                level: assistLevel + '%',
+                powerDraw: document.getElementById('powerDraw').textContent,
+                estimatedBattery: document.getElementById('batteryEst').textContent,
+                message: currentLang === 'ko' ? '보조 설정 적용됨' : 'Assist settings applied'
+            }, null, 2);
+        }
+
+        function selectGait(el, gait) {
+            document.querySelectorAll('.gait-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedGait = gait;
+            
+            // Update gait parameters
+            const params = {
+                walk: { speed: 0.8, cadence: 90, stride: 0.65 },
+                stairs_up: { speed: 0.3, cadence: 40, stride: 0.25 },
+                stairs_down: { speed: 0.25, cadence: 35, stride: 0.25 },
+                sit: { speed: 0, cadence: 0, stride: 0 },
+                slope: { speed: 0.6, cadence: 75, stride: 0.55 }
+            };
+            
+            const p = params[gait];
+            document.getElementById('gaitSpeed').textContent = p.speed;
+            document.getElementById('cadence').textContent = p.cadence;
+            document.getElementById('strideLen').textContent = p.stride;
+        }
+
+        function startGait() {
+            document.getElementById('gaitOutput').textContent = JSON.stringify({
+                status: '▶️ Gait Pattern Started',
+                pattern: selectedGait,
+                speed: document.getElementById('gaitSpeed').textContent + ' m/s',
+                assistLevel: assistLevel + '%',
+                message: currentLang === 'ko' ? '보행 패턴 시작' : 'Gait pattern started'
+            }, null, 2);
+        }
+
+        function stopGait() {
+            document.getElementById('gaitOutput').textContent = JSON.stringify({
+                status: '⏹️ Gait Pattern Stopped',
+                message: currentLang === 'ko' ? '보행 패턴 정지' : 'Gait pattern stopped'
+            }, null, 2);
+        }
+
+        function emergencyStop() {
+            document.getElementById('safetyOutput').textContent = JSON.stringify({
+                status: '🚨 EMERGENCY STOP ACTIVATED',
+                action: 'All motors disabled, brakes engaged',
+                timestamp: Date.now(),
+                message: currentLang === 'ko' ? '긴급 정지 활성화!' : 'Emergency stop activated!'
+            }, null, 2);
+            
+            // Reset all joints
+            ['lHip', 'rHip', 'lKnee', 'rKnee', 'lAnkle', 'rAnkle'].forEach(j => {
+                document.getElementById(j + 'Vel').textContent = '0';
+                document.getElementById(j + 'Torque').textContent = '0';
+                document.getElementById(j + 'Assist').textContent = '0';
+            });
+        }
+
+        function startSession() {
+            sessionRunning = true;
+            document.getElementById('rehabOutput').textContent = JSON.stringify({
+                status: '▶️ Rehabilitation Session Started',
+                goal: '30 minutes walking exercise',
+                assistLevel: assistLevel + '%',
+                message: currentLang === 'ko' ? '재활 세션 시작' : 'Rehab session started'
+            }, null, 2);
+        }
+
+        function endSession() {
+            sessionRunning = false;
+            document.getElementById('rehabOutput').textContent = JSON.stringify({
+                status: '✅ Session Complete',
+                summary: {
+                    duration: document.getElementById('sessionTime').textContent,
+                    steps: document.getElementById('steps').textContent,
+                    distance: document.getElementById('distance').textContent + ' km',
+                    calories: document.getElementById('calories').textContent,
+                    avgAssist: document.getElementById('avgAssist').textContent
+                },
+                message: currentLang === 'ko' ? '세션 완료' : 'Session completed'
+            }, null, 2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setLang('en');
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

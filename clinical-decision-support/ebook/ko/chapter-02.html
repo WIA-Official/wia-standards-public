@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제2장: CDS 시스템 아키텍처 - WIA-MED-015</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #a855f7;">제2장: CDS 시스템 아키텍처</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0;">
+<p style="color: #10b981; font-style: italic;">"좋은 아키텍처는 보이지 않습니다. CDSS는 의료진의 워크플로우에 자연스럽게 통합되어, 필요한 순간에 정확한 정보를 제공합니다."</p>
+<p style="color: #64748b; font-size: 0.9em; margin-top: 10px;">— 설계 철학</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">2.1 CDSS 아키텍처 개요</h2>
+
+<p>효과적인 CDSS는 다음 핵심 구성 요소들로 이루어집니다:</p>
+
+<h3 style="color: #a855f7;">🏗️ 핵심 구성 요소</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">구성 요소</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">역할</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>지식 베이스 (Knowledge Base)</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">임상 규칙, 가이드라인, 의학 지식 저장소</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>추론 엔진 (Inference Engine)</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">규칙 적용, 권장 사항 생성</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>데이터 통합 계층</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">EHR, 검사실, 약국 등 외부 시스템 연동</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>사용자 인터페이스</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">알림, 제안, 시각화 표시</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>워크플로우 엔진</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">진료 흐름 관리, 타이밍 제어</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">📊 시스템 다이어그램</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; color: #94a3b8; border: 1px solid #334155;">
+┌─────────────────────────────────────────────────────┐
+│              사용자 인터페이스 (UI)                    │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
+│  │  알림    │  │  제안    │  │ 시각화   │          │
+│  └──────────┘  └──────────┘  └──────────┘          │
+└─────────────────────────────────────────────────────┘
+                        ↕
+┌─────────────────────────────────────────────────────┐
+│              워크플로우 엔진                          │
+│  • 트리거 관리  • 우선순위 설정  • 타이밍 제어      │
+└─────────────────────────────────────────────────────┘
+                        ↕
+┌─────────────────────────────────────────────────────┐
+│              추론 엔진 (Inference Engine)            │
+│  ┌──────────────┐  ┌──────────────┐               │
+│  │  규칙 기반    │  │   ML 기반    │               │
+│  │  추론         │  │   예측       │               │
+│  └──────────────┘  └──────────────┘               │
+└─────────────────────────────────────────────────────┘
+                        ↕
+┌─────────────────────────────────────────────────────┐
+│              지식 베이스 (Knowledge Base)            │
+│  • 임상 가이드라인  • 약물 데이터베이스              │
+│  • 진단 규칙        • 치료 프로토콜                  │
+└─────────────────────────────────────────────────────┘
+                        ↕
+┌─────────────────────────────────────────────────────┐
+│              데이터 통합 계층                         │
+│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  │
+│  │  EHR   │  │ 검사실  │  │  약국  │  │ 영상   │  │
+│  └────────┘  └────────┘  └────────┘  └────────┘  │
+└─────────────────────────────────────────────────────┘
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">2.2 규칙 기반 vs 지식 기반 시스템</h2>
+
+<h3 style="color: #a855f7;">🔧 규칙 기반 시스템 (Rule-Based Systems)</h3>
+
+<p><strong>작동 방식:</strong> IF-THEN-ELSE 규칙을 사용하여 의사결정</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #06b6d4; margin: 15px 0;">
+<p style="color: #06b6d4; font-size: 0.95em;"><strong>예시 규칙:</strong></p>
+<pre style="background: #0f172a; padding: 15px; border-radius: 6px; color: #94a3b8; overflow-x: auto;">
+IF (환자.나이 >= 65) AND
+   (처방약 = "Warfarin") AND
+   (INR > 3.0)
+THEN
+   알림: "출혈 위험 증가 - INR 재검사 권장"
+   심각도: HIGH
+</pre>
+</blockquote>
+
+<p><strong style="color: #10b981;">장점:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>투명하고 설명 가능</li>
+    <li>임상의가 이해하기 쉬움</li>
+    <li>규칙 수정 및 업데이트 용이</li>
+    <li>결정론적 결과 (같은 입력 = 같은 출력)</li>
+</ul>
+
+<p><strong style="color: #ef4444;">단점:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>복잡한 패턴 표현 어려움</li>
+    <li>규칙 수 증가 시 유지보수 부담</li>
+    <li>예외 상황 처리 제한적</li>
+    <li>학습 능력 없음</li>
+</ul>
+
+<h3 style="color: #a855f7;">🤖 머신러닝 기반 시스템 (ML-Based Systems)</h3>
+
+<p><strong>작동 방식:</strong> 데이터에서 패턴을 학습하여 예측</p>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #8b5cf6; margin: 15px 0;">
+<p style="color: #8b5cf6; font-size: 0.95em;"><strong>예시 모델:</strong></p>
+<pre style="background: #0f172a; padding: 15px; border-radius: 6px; color: #94a3b8; overflow-x: auto;">
+입력: 환자 데이터 (100+ 특징)
+  - 인구통계: 나이, 성별, BMI
+  - 생체징후: 혈압, 맥박, 체온, SpO2
+  - 검사 결과: 혈액, 영상, 생화학
+  - 과거력: 진단, 약물, 알레르기
+
+모델: Random Forest / Neural Network
+
+출력: 패혈증 발생 확률 = 87%
+     권장: 즉시 감염내과 협진 요청
+</pre>
+</blockquote>
+
+<p><strong style="color: #10b981;">장점:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>복잡한 패턴 감지</li>
+    <li>데이터에서 자동 학습</li>
+    <li>높은 예측 정확도</li>
+    <li>미묘한 상관관계 발견</li>
+</ul>
+
+<p><strong style="color: #ef4444;">단점:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>"블랙박스" 특성 (설명 어려움)</li>
+    <li>대량의 훈련 데이터 필요</li>
+    <li>편향 위험</li>
+    <li>임상 검증 복잡</li>
+</ul>
+
+<h3 style="color: #a855f7;">⚖️ 하이브리드 접근법 (권장)</h3>
+
+<p>WIA-MED-015는 규칙 기반과 ML 기반의 <strong>하이브리드</strong> 시스템을 권장합니다:</p>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">사용 사례</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">권장 접근법</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">이유</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">약물 알레르기 경고</td>
+        <td style="border: 1px solid #475569; color: #10b981;">규칙 기반</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">명확한 규칙, 100% 정확도 필요</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">패혈증 조기 예측</td>
+        <td style="border: 1px solid #475569; color: #10b981;">ML 기반</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">복잡한 패턴, 미묘한 신호</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">진단 제안</td>
+        <td style="border: 1px solid #475569; color: #10b981;">하이브리드</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">규칙으로 필터링, ML로 순위 결정</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">약물 용량 계산</td>
+        <td style="border: 1px solid #475569; color: #10b981;">규칙 기반</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">수식 기반, 투명성 중요</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">재입원 위험 평가</td>
+        <td style="border: 1px solid #475569; color: #10b981;">ML 기반</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">다차원 요인, 예측 모델</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">2.3 EHR 통합 아키텍처</h2>
+
+<p>CDSS의 효과는 EHR과의 통합 품질에 크게 좌우됩니다.</p>
+
+<h3 style="color: #a855f7;">🔗 통합 레벨</h3>
+
+<p><strong style="color: #fbbf24;">레벨 1: 독립형 (Standalone)</strong></p>
+<ul style="color: #94a3b8;">
+    <li>별도의 애플리케이션으로 실행</li>
+    <li>수동 데이터 입력 필요</li>
+    <li>❌ 권장하지 않음 (워크플로우 방해)</li>
+</ul>
+
+<p><strong style="color: #fbbf24;">레벨 2: 느슨한 통합 (Loose Integration)</strong></p>
+<ul style="color: #94a3b8;">
+    <li>EHR에서 데이터 읽기</li>
+    <li>CDSS 결과를 별도 창에 표시</li>
+    <li>⚠️ 제한적 효과</li>
+</ul>
+
+<p><strong style="color: #fbbf24;">레벨 3: 긴밀한 통합 (Tight Integration) ✅</strong></p>
+<ul style="color: #94a3b8;">
+    <li>EHR 워크플로우에 완전 통합</li>
+    <li>실시간 데이터 교환</li>
+    <li>컨텍스트 인식 알림</li>
+    <li>🎯 WIA 권장 레벨</li>
+</ul>
+
+<p><strong style="color: #fbbf24;">레벨 4: 네이티브 (Native)</strong></p>
+<ul style="color: #94a3b8;">
+    <li>EHR의 일부로 구축</li>
+    <li>완전한 통합</li>
+    <li>🌟 최고 수준</li>
+</ul>
+
+<h3 style="color: #a855f7;">🔧 통합 기술</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">기술</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">설명</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">WIA 권장</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>HL7 v2</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">레거시 메시징 표준</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">⚠️ 레거시 시스템만</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>HL7 FHIR</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">현대적 RESTful API 표준</td>
+        <td style="border: 1px solid #475569; color: #10b981;">✅ 우선 권장</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>CDS Hooks</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">워크플로우 트리거 표준</td>
+        <td style="border: 1px solid #475569; color: #10b981;">✅ 강력 권장</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>SMART on FHIR</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">앱 통합 프레임워크</td>
+        <td style="border: 1px solid #475569; color: #10b981;">✅ 권장</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">⚡ CDS Hooks 예시</h3>
+
+<blockquote style="background: #1e293b; padding: 15px; border-left: 4px solid #10b981; margin: 15px 0;">
+<p style="color: #10b981; font-size: 0.95em;"><strong>CDS Hooks 흐름:</strong></p>
+<pre style="background: #0f172a; padding: 15px; border-radius: 6px; color: #94a3b8; overflow-x: auto;">
+1. EHR 이벤트 발생 (예: 약물 처방)
+   ↓
+2. EHR이 CDS 서비스로 Hook 요청 전송
+   Hook: "medication-prescribe"
+   Context: 환자 ID, 처방 약물, 진단 등
+   ↓
+3. CDS 서비스가 분석 수행
+   - 약물 상호작용 검사
+   - 알레르기 확인
+   - 용량 검증
+   ↓
+4. CDS 서비스가 카드(Cards) 반환
+   Card 1: ⚠️ "Warfarin-Aspirin 상호작용 경고"
+   Card 2: ℹ️ "신기능 기반 용량 조정 권장"
+   ↓
+5. EHR이 카드를 UI에 표시
+   의사가 검토 후 결정
+</pre>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">2.4 지식 베이스 관리</h2>
+
+<p>지식 베이스는 CDSS의 핵심입니다. 정확하고 최신 상태를 유지해야 합니다.</p>
+
+<h3 style="color: #a855f7;">📚 지식 소스</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">지식 유형</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">출처</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">업데이트 빈도</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>임상 가이드라인</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">AHA, ACC, NCCN 등</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">연 1-2회</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>약물 정보</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">FDA, Micromedex, Lexicomp</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">주간/월간</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>진단 규칙</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">의학 문헌, 전문가 합의</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">분기별</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>치료 프로토콜</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">병원 내부 프로토콜</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">연간</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🔄 지식 업데이트 프로세스</h3>
+
+<ol style="color: #94a3b8; line-height: 2;">
+    <li><strong style="color: #e2e8f0;">모니터링</strong> — 새로운 가이드라인, 약물 승인, 안전성 경고 추적</li>
+    <li><strong style="color: #e2e8f0;">검토</strong> — 임상 전문가 패널이 변경 사항 평가</li>
+    <li><strong style="color: #e2e8f0;">변환</strong> — 지식을 실행 가능한 규칙/모델로 인코딩</li>
+    <li><strong style="color: #e2e8f0;">검증</strong> — 테스트 케이스로 정확성 확인</li>
+    <li><strong style="color: #e2e8f0;">배포</strong> — 프로덕션 환경에 업데이트</li>
+    <li><strong style="color: #e2e8f0;">모니터링</strong> — 실제 환경에서 성능 추적</li>
+</ol>
+
+<h3 style="color: #a855f7;">🗃️ 지식 표현 언어</h3>
+
+<p>WIA-MED-015는 다음 표준을 지원합니다:</p>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">Arden Syntax</strong> — 의료 지식 표현 언어</li>
+    <li><strong style="color: #e2e8f0;">Clinical Quality Language (CQL)</strong> — HL7 표준</li>
+    <li><strong style="color: #e2e8f0;">FHIR Clinical Reasoning</strong> — 최신 표준</li>
+    <li><strong style="color: #e2e8f0;">Decision Table</strong> — 규칙 시각화</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">2.5 성능 및 확장성</h2>
+
+<p>CDSS는 실시간으로 작동해야 하며, 수천 명의 동시 사용자를 지원해야 합니다.</p>
+
+<h3 style="color: #a855f7;">⚡ 성능 요구사항</h3>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">지표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">목표</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">최대 허용</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>응답 시간</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">< 1초</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">< 3초</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>가용성</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">99.9%</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">99.5%</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>동시 사용자</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">10,000+</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">병원 규모에 따라</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>데이터 신선도</strong></td>
+        <td style="border: 1px solid #475569; color: #10b981;">실시간</td>
+        <td style="border: 1px solid #475569; color: #fbbf24;">< 5분</td>
+    </tr>
+</table>
+
+<h3 style="color: #a855f7;">🚀 확장성 전략</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">마이크로서비스 아키텍처</strong> — 독립적 확장 가능</li>
+    <li><strong style="color: #e2e8f0;">캐싱</strong> — 자주 사용되는 규칙/데이터 캐시</li>
+    <li><strong style="color: #e2e8f0;">비동기 처리</strong> — 복잡한 분석은 백그라운드 실행</li>
+    <li><strong style="color: #e2e8f0;">로드 밸런싱</strong> — 여러 서버에 부하 분산</li>
+    <li><strong style="color: #e2e8f0;">데이터베이스 최적화</strong> — 인덱싱, 파티셔닝</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">2.6 보안 및 개인정보 보호</h2>
+
+<p>CDSS는 민감한 의료 데이터를 처리하므로 강력한 보안이 필수입니다.</p>
+
+<h3 style="color: #a855f7;">🔒 보안 요구사항</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong style="color: #e2e8f0;">접근 제어</strong> — 역할 기반 접근 제어 (RBAC)</li>
+    <li><strong style="color: #e2e8f0;">암호화</strong> — 전송 중 (TLS) 및 저장 시 (AES-256)</li>
+    <li><strong style="color: #e2e8f0;">감사 로그</strong> — 모든 접근 및 변경 기록</li>
+    <li><strong style="color: #e2e8f0;">익명화</strong> — 분석 시 환자 식별 정보 제거</li>
+    <li><strong style="color: #e2e8f0;">규정 준수</strong> — HIPAA, GDPR, PIPL 준수</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #c4b5fd;">장 요약</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #a855f7;">핵심 포인트</th>
+        <th style="border: 1px solid #475569; color: #a855f7;">요약</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>핵심 구성요소</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">지식 베이스, 추론 엔진, 데이터 통합, UI</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>시스템 유형</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">규칙 기반, ML 기반, 하이브리드 (권장)</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>통합 기술</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HL7 FHIR, CDS Hooks, SMART on FHIR</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>성능 목표</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">응답 < 1초, 가용성 99.9%</td>
+    </tr>
+</table>
+
+<p style="text-align: center; color: #ffd700; margin-top: 40px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA - World Certification Industry Association</p>
+</body>
+</html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>7장: 구현 예제 - WIA-AIR-SHIELD</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="standard-badge">WIA-AIR-SHIELD v1.0</div>
+    <h1>7장</h1>
+    <p class="subtitle">구현 예제</p>
+    <p class="subtitle">무선 방패 코드</p>
+  </header>
+
+  <main>
+    <h2>7.1 Python 구현</h2>
+
+    <h3>7.1.1 기본 방패 설정</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+WIA-AIR-SHIELD Python 구현
+무선 통신 보호하기
+"""
+
+from wia_air_shield import AirShield, ProtectionMode
+from wia_air_shield.layers import CloakLayer, NoiseLayer, VerifyLayer, AlertLayer
+import asyncio
+
+async def basic_shield_example():
+    """기본 방패 보호 예제"""
+
+    # 방패 인스턴스 생성
+    shield = AirShield(
+        mode=ProtectionMode.BALANCED,
+        auto_detect=True
+    )
+
+    # 경보 콜백 설정
+    def on_threat(threat):
+        print(f"⚠️ 위협 감지: {threat.type}")
+        print(f"   심각도: {threat.severity}")
+        print(f"   권장사항: {threat.recommendation}")
+
+    shield.alert.on_threat(on_threat)
+
+    # 방패 활성화
+    await shield.activate()
+    print("✅ 방패 활성화됨")
+
+    # 상태 확인
+    status = shield.get_status()
+    print(f"보호 모드: {status.mode}")
+    print(f"위협 수준: {status.threat_level}")
+
+    # 위협 스캔
+    threats = await shield.scan()
+    print(f"감지된 위협: {len(threats)}")
+
+    return shield
+
+if __name__ == "__main__":
+    asyncio.run(basic_shield_example())</code></pre>
+
+    <h3>7.1.2 공용 WiFi 보호</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+자동 공용 WiFi 보호
+"""
+
+from wia_air_shield import AirShield, ProtectionMode
+from wia_air_shield.network import NetworkMonitor
+import asyncio
+
+class PublicWiFiProtector:
+    def __init__(self):
+        self.shield = AirShield(mode=ProtectionMode.AUTO)
+        self.monitor = NetworkMonitor()
+
+    async def protect_public_wifi(self):
+        """공용 WiFi에 있을 때 자동으로 보호"""
+
+        # 네트워크 변경 모니터링
+        self.monitor.on_network_change(self.handle_network_change)
+
+        # 방패 활성화
+        await self.shield.activate()
+        print("🛡️ 공용 WiFi 보호기 활성")
+
+        # 계속 실행
+        await self.monitor.start()
+
+    async def handle_network_change(self, network):
+        """네트워크 환경 변경 처리"""
+
+        print(f"\n📡 네트워크 변경: {network.ssid}")
+
+        # 신뢰 수준 평가
+        trust_level = await self.shield.assess_trust(network)
+        print(f"신뢰 수준: {trust_level}")
+
+        if trust_level == "untrusted" or network.type == "public_wifi":
+            await self.protect_untrusted_network(network)
+        elif trust_level == "trusted":
+            await self.optimize_for_performance()
+
+    async def protect_untrusted_network(self, network):
+        """신뢰할 수 없는 네트워크에 대한 최대 보호"""
+
+        print("⚠️ 신뢰할 수 없는 네트워크 감지 - 최대 보호 활성화")
+
+        # 요새 모드로 전환
+        await self.shield.set_mode(ProtectionMode.FORTRESS)
+
+        # 액세스 포인트 검증
+        verification = await self.shield.verify.verify_access_point(network.ap)
+
+        if not verification.authentic:
+            print("🚨 위험: 의심스러운 WiFi 네트워크!")
+            print(f"신뢰도: {verification.confidence}%")
+            print("권장사항: 연결하지 마세요")
+            return
+
+        # 모든 방패 활성화
+        await self.shield.cloak.set_level(5)
+        await self.shield.noise.set_intensity(80)
+        await self.shield.verify.set_strictness("paranoid")
+
+        # VPN 활성화
+        await self.shield.enable_vpn()
+
+        print("✅ 최대 보호 활성화됨")
+
+async def main():
+    protector = PublicWiFiProtector()
+    await protector.protect_public_wifi()
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+
+    <h3>7.1.3 영지식 인증</h3>
+
+    <pre><code>#!/usr/bin/env python3
+"""
+영지식 증명 구현
+신원을 공개하지 않고 증명하기
+"""
+
+from wia_air_shield import AirShield
+from wia_air_shield.zk import ZKProver, ZKVerifier
+import asyncio
+
+async def zero_knowledge_example():
+    """영지식 증명 시연"""
+
+    shield = AirShield()
+    await shield.activate()
+
+    # --- 증명자 측 ---
+
+    # 정확한 나이를 공개하지 않고 18세 이상임을 증명
+    my_age = 25  # 비밀
+
+    age_proof = await shield.zk.prover.create_attribute_proof(
+        attribute="age",
+        predicate={"greater_than": 18},
+        actual_value=my_age  # 공개되지 않음
+    )
+
+    print("✅ 증명 생성됨: 18세 이상 (나이 공개 없이)")
+
+    # 금액을 공개하지 않고 충분한 잔액 증명
+    my_balance = 1000.0  # 비밀
+    required_amount = 500.0
+
+    balance_proof = await shield.zk.prover.create_range_proof(
+        value=my_balance,  # 공개되지 않음
+        range=(required_amount, float('inf'))
+    )
+
+    print(f"✅ 증명 생성됨: 잔액 ≥ ₩{required_amount} (잔액 공개 없이)")
+
+    # --- 검증자 측 ---
+
+    # 나이 증명 검증
+    age_valid = await shield.zk.verifier.verify(age_proof)
+    print(f"나이 증명 유효: {age_valid}")
+    print(f"검증자가 알게 된 것: 사용자가 18세 이상")
+    print(f"검증자가 알지 못하는 것: 실제 나이")
+
+    # 잔액 증명 검증
+    balance_valid = await shield.zk.verifier.verify(balance_proof)
+    print(f"잔액 증명 유효: {balance_valid}")
+    print(f"검증자가 알게 된 것: 사용자가 충분한 잔액 보유")
+    print(f"검증자가 알지 못하는 것: 실제 잔액")
+
+if __name__ == "__main__":
+    asyncio.run(zero_knowledge_example())</code></pre>
+
+    <h2>7.2 TypeScript 구현</h2>
+
+    <h3>7.2.1 Node.js 서버 보호</h3>
+
+    <pre><code>/**
+ * WIA-AIR-SHIELD TypeScript 구현
+ * Node.js 서버 무선 통신 보호
+ */
+
+import { AirShield, ProtectionMode } from '@anthropic/wia-air-shield';
+import { createServer } from 'https';
+
+class SecureServer {
+  private shield: AirShield;
+
+  constructor() {
+    this.shield = new AirShield({
+      mode: ProtectionMode.FORTRESS,
+      autoDetect: true,
+      deviceProfile: 'server'
+    });
+  }
+
+  async start(): Promise&lt;void&gt; {
+    // 서버 시작 전 방패 활성화
+    await this.shield.activate();
+    console.log('🛡️ 방패 활성화됨');
+
+    // 서버별 보호 설정
+    await this.configureServerProtection();
+
+    // 방패 보호가 있는 HTTPS 서버 생성
+    const server = createServer(
+      {
+        minVersion: 'TLSv1.3',
+        ciphers: this.shield.getRecommendedCiphers(),
+        requestCert: true,
+        rejectUnauthorized: true
+      },
+      this.handleRequest.bind(this)
+    );
+
+    // 들어오는 연결 모니터링
+    server.on('connection', this.verifyConnection.bind(this));
+
+    server.listen(443, () => {
+      console.log('✅ 보안 서버가 포트 443에서 수신 중');
+    });
+  }
+
+  private async configureServerProtection(): Promise&lt;void&gt; {
+    // 모든 방패 활성화
+    await this.shield.cloak.enable();
+    await this.shield.noise.setIntensity(70);
+    await this.shield.verify.setStrictness('strict');
+
+    // 실시간 모니터링
+    this.shield.monitor.start({
+      interval: 5000,
+      deepScan: false
+    });
+
+    // 위협 시 경보
+    this.shield.alert.onThreat((threat) => {
+      console.error(`🚨 서버 위협: ${threat.type}`);
+
+      if (threat.severity === 'critical') {
+        // 사고 대응 활성화
+        this.handleSecurityIncident(threat);
+      }
+    });
+
+    // 사이드채널 보호
+    await this.shield.enableSideChannelProtection({
+      powerAnalysisDefense: true,
+      timingDefense: true
+    });
+  }
+
+  private handleRequest(req: any, res: any): void {
+    res.writeHead(200, {
+      'Content-Type': 'application/json'
+    });
+
+    res.end(JSON.stringify({
+      status: 'protected',
+      shield: 'active'
+    }));
+  }
+}
+
+// 보안 서버 시작
+const server = new SecureServer();
+server.start().catch(console.error);</code></pre>
+
+    <h2>7.3 Bash 스크립트 구현</h2>
+
+    <h3>7.3.1 WiFi 보안 검사기</h3>
+
+    <pre><code>#!/bin/bash
+#
+# WIA-AIR-SHIELD WiFi 보안 검사기
+# 현재 WiFi 네트워크가 안전한지 확인
+#
+
+set -euo pipefail
+
+# 출력 색상
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # 색상 없음
+
+# wia-air-shield 설치 확인
+if ! command -v wia-shield &gt;/dev/null 2&gt;&1; then
+    echo -e "${RED}오류: wia-air-shield가 설치되지 않았습니다${NC}"
+    echo "설치: npm install -g @anthropic/wia-air-shield-cli"
+    exit 1
+fi
+
+# 현재 네트워크 가져오기
+CURRENT_SSID=$(wia-shield network current --format ssid)
+CURRENT_BSSID=$(wia-shield network current --format bssid)
+
+echo "네트워크 확인 중: $CURRENT_SSID"
+echo "BSSID: $CURRENT_BSSID"
+echo ""
+
+# 방패 활성화
+echo "방패 활성화 중..."
+wia-shield activate --mode fortress
+
+# 위협 스캔
+echo "위협 스캔 중..."
+SCAN_RESULT=$(wia-shield scan --format json)
+
+# 결과 파싱
+THREAT_COUNT=$(echo "$SCAN_RESULT" | jq '.threats | length')
+THREAT_LEVEL=$(echo "$SCAN_RESULT" | jq -r '.threat_level')
+
+# 결과 보고
+echo ""
+echo "=== 스캔 결과 ==="
+echo "감지된 위협: $THREAT_COUNT"
+echo "위협 수준: $THREAT_LEVEL"
+echo ""
+
+# Evil Twin 확인
+EVIL_TWINS=$(echo "$SCAN_RESULT" | jq '[.threats[] | select(.type == "evil_twin")] | length')
+
+if [ "$EVIL_TWINS" -gt 0 ]; then
+    echo -e "${RED}⚠️ 경고: Evil Twin 액세스 포인트 감지!${NC}"
+    echo -e "${RED}민감한 활동에 이 네트워크를 사용하지 마세요${NC}"
+    echo ""
+fi
+
+# 액세스 포인트 검증
+echo "액세스 포인트 검증 중..."
+VERIFY_RESULT=$(wia-shield verify access-point \
+    --ssid "$CURRENT_SSID" \
+    --bssid "$CURRENT_BSSID" \
+    --format json)
+
+AUTHENTIC=$(echo "$VERIFY_RESULT" | jq -r '.authentic')
+CONFIDENCE=$(echo "$VERIFY_RESULT" | jq -r '.confidence')
+
+if [ "$AUTHENTIC" = "true" ]; then
+    echo -e "${GREEN}✅ 액세스 포인트 검증됨 (${CONFIDENCE}% 신뢰도)${NC}"
+else
+    echo -e "${RED}❌ 액세스 포인트 검증 실패${NC}"
+    echo -e "${RED}권장사항: 즉시 연결 해제${NC}"
+    exit 1
+fi
+
+# 전체 권장사항
+echo ""
+echo "=== 권장사항 ==="
+
+if [ "$THREAT_LEVEL" = "safe" ]; then
+    echo -e "${GREEN}✅ 네트워크가 안전해 보입니다${NC}"
+    echo "기본 예방 조치와 함께 이 네트워크를 사용할 수 있습니다"
+elif [ "$THREAT_LEVEL" = "low" ] || [ "$THREAT_LEVEL" = "medium" ]; then
+    echo -e "${YELLOW}⚠️ 주의 권장${NC}"
+    echo "VPN을 사용하고 민감한 거래를 피하세요"
+else
+    echo -e "${RED}🚨 위험: 높은 위협 환경${NC}"
+    echo "즉시 모바일 데이터 또는 신뢰할 수 있는 네트워크로 전환하세요"
+fi
+
+echo ""
+echo "방패는 지속적인 보호를 위해 활성 상태로 유지됩니다"</code></pre>
+
+    <h2>7.4 완전한 통합 예제</h2>
+
+    <h3>7.4.1 풀스택 보호 애플리케이션</h3>
+
+    <pre><code>/**
+ * 완전한 예제: WIA-AIR-SHIELD가 있는 풀스택 앱
+ * 백엔드 (Node.js) + 프론트엔드 (React)
+ */
+
+// ===== 백엔드 (server.ts) =====
+
+import { AirShield } from '@anthropic/wia-air-shield';
+
+class ProtectedServer {
+  private shield: AirShield;
+
+  constructor() {
+    this.shield = new AirShield({
+      mode: 'fortress',
+      deviceProfile: 'server'
+    });
+  }
+
+  async start() {
+    // 방패 활성화
+    await this.shield.activate();
+
+    // API 엔드포인트
+    app.post('/api/auth', async (req, res) => {
+      const { zkProof } = req.body;
+
+      // 영지식 증명 검증
+      const valid = await this.shield.zk.verifier.verify(zkProof);
+
+      if (valid) {
+        const token = generateToken();
+        res.json({ success: true, token });
+      } else {
+        res.status(401).json({ error: '인증 실패' });
+      }
+    });
+  }
+}
+
+// ===== 프론트엔드 (App.tsx) =====
+
+function App() {
+  useEffect(() => {
+    const initShield = async () => {
+      const shield = new AirShield({
+        mode: 'balanced'
+      });
+
+      await shield.activate();
+
+      // 인증을 위한 ZK 증명 생성
+      const zkProof = await shield.zk.prover.createIdentityProof(
+        userIdentity
+      );
+
+      // 서버로 전송
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ zkProof })
+      });
+    };
+
+    initShield();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;보호된 애플리케이션&lt;/h1&gt;
+      &lt;p&gt;모든 통신이 보호됩니다&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+    <div class="info-box">
+      <h4>구현 팁</h4>
+      <ul>
+        <li><strong>간단하게 시작:</strong> 기본 보호부터 시작하고 점진적으로 기능 추가</li>
+        <li><strong>철저히 테스트:</strong> 프로덕션 전에 안전한 환경에서 테스트</li>
+        <li><strong>로그 모니터링:</strong> 문제에 대한 방패 로그를 정기적으로 확인</li>
+        <li><strong>정기 업데이트:</strong> 방패 소프트웨어를 최신 상태로 유지</li>
+        <li><strong>오류 처리:</strong> 네트워크 문제에 대한 적절한 오류 처리 구현</li>
+        <li><strong>성능:</strong> 보안과 성능 요구 사항의 균형</li>
+        <li><strong>사용자 경험:</strong> 사용자에게 보안을 투명하게 만들기</li>
+      </ul>
+    </div>
+
+    <div class="example-box">
+      <h4>빠른 시작 템플릿</h4>
+      <pre><code>// 복사-붙여넣기 시작 템플릿
+import { AirShield } from '@anthropic/wia-air-shield';
+
+async function quickStart() {
+  // 1. 방패 생성
+  const shield = new AirShield({ mode: 'balanced' });
+
+  // 2. 경보 설정
+  shield.alert.onThreat(threat =&gt; {
+    console.warn('위협:', threat);
+  });
+
+  // 3. 활성화
+  await shield.activate();
+
+  // 4. 보호됨!
+  console.log('🛡️ 보호됨');
+
+  // 여기에 코드 작성...
+}
+
+quickStart();</code></pre>
+    </div>
+  </main>
+
+  <div class="navigation">
+    <a href="chapter6.html" class="nav-button prev">이전 장</a>
+    <a href="chapter8.html" class="nav-button next">다음 장</a>
+  </div>
+</body>
+</html>
