@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제3장: 크로스 플랫폼 포스팅 - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>제3장: 크로스 플랫폼 포스팅</h1>
+
+<blockquote>
+"홍익인간: 한 번 작성, 모든 곳에서 모두에게."
+</blockquote>
+
+<hr>
+
+<h2>3.1 포스팅 문제</h2>
+
+<pre>
+크로스 플랫폼 포스팅 없이
+========================
+
+사진 한 장 공유하려면:
+  1. 인스타그램 열고, 업로드, 캡션 작성
+  2. 트위터 열고, 다시 업로드, 캡션 다시 작성
+  3. 스레드 열고, 다시 업로드, 다시 작성
+  4. 틱톡 열고, 다른 포맷 필요
+  5. 블루스카이 열고, 다시 업로드...
+
+소요 시간: 30분 이상
+각각 다른 포맷 필요.
+다른 글자 수 제한.
+다른 해시태그 전략.
+
+지치는 일.
+</pre>
+
+<hr>
+
+<h2>3.2 한 번 작성, 모든 곳에 게시</h2>
+
+<pre>
+WIA-SOCIAL과 함께
+================
+
+await social.post({
+  content: {
+    text: '오늘 놀라운 석양!',
+    media: [sunsetPhoto]
+  },
+  targets: ['instagram', 'twitter', 'threads', 'bluesky']
+});
+
+결과:
+  [OK] 인스타그램: #sunset #nature 와 함께 게시
+  [OK] 트위터: 게시 (280자)
+  [OK] 스레드: 게시
+  [OK] 블루스카이: alt text와 함께 게시
+
+소요 시간: 30초
+한 번의 액션, 네 개의 플랫폼.
+</pre>
+
+<h3>통합 포스트 구조</h3>
+
+<pre>
+interface UniversalPost {
+  content: {
+    text: string;         // 메시지
+    media?: MediaRef[];   // 사진, 영상
+    poll?: Poll;          // 투표
+    location?: Location;  // 위치 태그
+    link?: Link;          // 링크 미리보기
+  };
+
+  targets: Platform[];    // 어디에 게시
+
+  options?: {
+    visibility?: Visibility;
+    schedule?: Timestamp;
+    thread?: boolean;
+    replyTo?: PostId;
+  };
+}
+</pre>
+
+<hr>
+
+<h2>3.3 플랫폼 최적화</h2>
+
+<pre>
+자동 최적화
+==========
+
+각 플랫폼은 다른 요구사항.
+WIA-SOCIAL이 자동으로 처리.
+
+당신의 포스트:
+  "해변에서 놀라운 하루!
+   석양이 정말 멋졌어요.
+   #beach #sunset #summer #vacation"
+
+인스타그램:
+  - 필터가 있는 사진 제안
+  - 콘텐츠 기반 30개 해시태그 추가
+  - 위치 태그 제안
+  - 스토리 버전 가능
+
+트위터:
+  - 필요하면 280자로 자름
+  - 핵심 해시태그 유지 (최대 3-4개)
+  - 너무 길면 스레드 생성
+
+틱톡:
+  - 영상 포맷 제안
+  - 트렌딩 사운드 매칭
+  - 세로 크롭 제안
+
+블루스카이:
+  - 이미지 alt text 자동 생성
+  - 글자 수 걱정 없음 (300자 제한)
+  - 깔끔한 포맷팅
+
+스레드:
+  - 인스타그램 크로스포스트 옵션
+  - 텍스트 중심 포맷
+</pre>
+
+<h3>커스텀 최적화</h3>
+
+<pre>
+// 자동 최적화 오버라이드
+await social.post({
+  content: {
+    text: '새 블로그 글 확인해보세요!'
+  },
+  targets: ['instagram', 'twitter', 'linkedin'],
+
+  // 플랫폼별 커스텀
+  platformOverrides: {
+    instagram: {
+      hashtags: ['#blog', '#writing', '#tech'],
+      carousel: [image1, image2, image3]
+    },
+    twitter: {
+      text: '새 블로그 글 올라왔어요! 바이오 링크에서.',
+      includeLink: true
+    },
+    linkedin: {
+      text: `제 생각을 공유하게 되어 기쁩니다...
+             [전문적인 전체 버전]`
+    }
+  }
+});
+</pre>
+
+<hr>
+
+<h2>3.4 미디어 처리</h2>
+
+<pre>
+자동 미디어 변환
+===============
+
+업로드: 4K 사진 (4000x3000)
+
+자동 변환:
+  인스타그램: 1080x1080 (정사각형) 또는 1080x1350 (세로)
+  트위터: 1200x675 (가로 최적화)
+  틱톡: 1080x1920 (세로)
+  블루스카이: 원본 + 압축본
+
+영상 처리:
+  입력: 4K MOV 파일
+  인스타그램: MP4, 피드 최대 60초
+  트위터: MP4, 최대 2:20
+  틱톡: MP4, 9:16 비율, 최대 10분
+  유튜브: 풀 퀄리티 업로드
+
+
+코드 예시
+========
+
+const result = await social.post({
+  content: {
+    media: [
+      {
+        type: 'video',
+        file: myVideo,
+        caption: '이거 봐봐!',
+        thumbnail: customThumbnail
+      }
+    ]
+  },
+  targets: ['instagram', 'tiktok', 'youtube'],
+
+  mediaOptions: {
+    autoOptimize: true,
+    preserveQuality: 'youtube', // 유튜브는 풀 퀄리티 유지
+    addWatermark: false
+  }
+});
+</pre>
+
+<hr>
+
+<h2>3.5 예약 게시</h2>
+
+<pre>
+포스트 예약
+==========
+
+// 단일 예약 게시
+await social.schedule({
+  content: {
+    text: '좋은 아침이에요!'
+  },
+  targets: ['instagram', 'twitter'],
+  scheduledAt: '2025-01-20T09:00:00Z'
+});
+
+
+// 플랫폼별 다른 시간
+await social.schedule({
+  content: {
+    text: '큰 발표가 곧!'
+  },
+  schedulePerPlatform: {
+    instagram: '2025-01-20T12:00:00Z', // 정오
+    twitter: '2025-01-20T09:00:00Z',   // 아침
+    linkedin: '2025-01-20T08:00:00Z'   // 업무 시간
+  }
+});
+
+
+// 최적 시간 제안
+const optimalTimes = await social.getOptimalPostTimes({
+  platforms: ['instagram', 'twitter'],
+  timezone: 'Asia/Seoul'
+});
+
+// 반환:
+{
+  instagram: ['12:00', '19:00', '21:00'],
+  twitter: ['09:00', '12:00', '18:00']
+}
+</pre>
+
+<hr>
+
+<h2>3.6 스레드와 장문</h2>
+
+<pre>
+스레드 포스팅
+============
+
+// 스레드 생성
+await social.postThread({
+  posts: [
+    { text: '1/ 이야기를 들려드릴게요...' },
+    { text: '2/ 모든 것은 이렇게 시작됐어요...' },
+    { text: '3/ 그리고 놀라운 일이 일어났어요...' },
+    { text: '4/ 제가 배운 교훈은...' }
+  ],
+  targets: ['twitter', 'threads', 'bluesky']
+});
+
+// 각 플랫폼이 스레딩을 자체 방식으로 처리
+// 트위터: 답글 체인
+// 스레드: 연결된 게시물
+// 블루스카이: 스레드 구조
+
+
+장문 콘텐츠
+==========
+
+// 긴 글의 경우
+await social.post({
+  content: {
+    text: longArticleText,  // 5000단어
+    link: articleUrl
+  },
+  targets: ['twitter', 'linkedin', 'medium'],
+
+  longFormOptions: {
+    twitter: 'thread',        // 스레드로 변환
+    linkedin: 'article',      // 아티클로 게시
+    medium: 'full'            // 전체 게시
+  }
+});
+</pre>
+
+<hr>
+
+<h2>3.7 참여도 추적</h2>
+
+<pre>
+크로스 플랫폼 분석
+=================
+
+// 게시물 참여도 가져오기
+const stats = await social.getPostStats(postId);
+
+결과:
+{
+  postId: 'wia:post:12345',
+  totalReach: 15420,
+  totalEngagement: 892,
+
+  byPlatform: {
+    instagram: {
+      likes: 450,
+      comments: 32,
+      shares: 12,
+      reach: 8500
+    },
+    twitter: {
+      likes: 120,
+      retweets: 45,
+      replies: 18,
+      reach: 4200
+    },
+    bluesky: {
+      likes: 55,
+      reposts: 8,
+      reach: 2720
+    }
+  },
+
+  topPerforming: 'instagram',
+  suggestion: '최고 참여를 위해 비주얼 콘텐츠 더 게시하세요'
+}
+</pre>
+
+<hr>
+
+<h2>3.8 의도 기반 포스팅</h2>
+
+<pre>
+아버지 (INTENT) 연동
+===================
+
+// 자연어 포스팅
+await social.postWithIntent(`
+  점심 사진 가까운 친구들과 공유해줘.
+  가볍고 재미있게.
+  위치는 포함하지 마.
+`);
+
+// WIA-SOCIAL 해석:
+{
+  content: { text: '맛있는 점심!', media: [lunchPhoto] },
+  targets: ['instagram'],
+  visibility: 'close_friends',
+  privacy: { stripLocation: true },
+  tone: 'casual'
+}
+
+
+// 다른 예시
+await social.postWithIntent(`
+  전문적인 연락처들에게 새 직장 발표.
+  격식 있는 톤, 모든 비즈니스 플랫폼.
+`);
+
+// 해석:
+{
+  content: { text: '발표하게 되어 기쁩니다...' },
+  targets: ['linkedin', 'twitter'],
+  visibility: 'public',
+  tone: 'professional'
+}
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 한 번 작성, 모든 플랫폼에 동시 게시</li>
+<li>[OK] 각 플랫폼 요구사항에 자동 최적화</li>
+<li>[OK] 미디어 자동으로 적절한 포맷으로 변환</li>
+<li>[OK] 최적 시간 제안과 함께 예약 게시</li>
+<li>[OK] 장문 콘텐츠를 위한 스레드 지원</li>
+<li>[OK] 플랫폼 간 통합 참여도 추적</li>
+<li>[OK] 자연어로 의도 기반 포스팅</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-02.html">이전: 제2장 - 통합 정체성</a> | <a href="chapter-04.html">다음: 제4장 - 통합 피드</a></p>
+</body>
+</html>

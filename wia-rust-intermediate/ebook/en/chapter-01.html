@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 1: Ownership Deep Dive & Lifetimes - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        .danger-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--red); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 1: Ownership Deep Dive & Lifetimes</h1>
+
+        <p>You've mastered the basics of ownership and borrowing in Rust. Now it's time to dive deep into the advanced patterns, edge cases, and lifetime mechanisms that make Rust's memory safety guarantees work. This chapter will transform your understanding from "I know the rules" to "I understand why these rules exist and how to use them effectively."</p>
+
+        <h2>1.1 Advanced Ownership Patterns</h2>
+
+        <p>Ownership isn't just about preventing bugs—it's about expressing intent and designing APIs that are impossible to misuse.</p>
+
+        <h3>The Builder Pattern with Ownership</h3>
+
+        <p>The builder pattern in Rust can leverage ownership to create type-safe, fluent APIs:</p>
+
+        <pre>pub struct RequestBuilder {
+    url: String,
+    method: String,
+    headers: Vec&lt;(String, String)&gt;,
+    body: Option&lt;String&gt;,
+}
+
+impl RequestBuilder {
+    pub fn new(url: impl Into&lt;String&gt;) -&gt; Self {
+        Self {
+            url: url.into(),
+            method: "GET".to_string(),
+            headers: Vec::new(),
+            body: None,
+        }
+    }
+
+    // Take ownership and return ownership (fluent API)
+    pub fn method(mut self, method: impl Into&lt;String&gt;) -&gt; Self {
+        self.method = method.into();
+        self
+    }
+
+    pub fn header(mut self, key: impl Into&lt;String&gt;, value: impl Into&lt;String&gt;) -&gt; Self {
+        self.headers.push((key.into(), value.into()));
+        self
+    }
+
+    pub fn body(mut self, body: impl Into&lt;String&gt;) -&gt; Self {
+        self.body = Some(body.into());
+        self
+    }
+
+    // Consume self to build the final Request
+    pub fn build(self) -&gt; Request {
+        Request {
+            url: self.url,
+            method: self.method,
+            headers: self.headers,
+            body: self.body,
+        }
+    }
+}
+
+// Usage:
+let request = RequestBuilder::new("https://api.example.com")
+    .method("POST")
+    .header("Content-Type", "application/json")
+    .body(r#"{"key": "value"}"#)
+    .build();</pre>
+
+        <div class="success-box">
+            <strong>Why This Works</strong>
+            <p style="margin-top: 10px;">Each method takes <code>self</code> by value and returns <code>Self</code>, ensuring the builder can only be used in a linear chain. You can't accidentally reuse the builder after calling <code>build()</code> because ownership has been transferred.</p>
+        </div>
+
+        <h3>Interior Mutability: Cell and RefCell</h3>
+
+        <p>Sometimes you need mutability even when you only have an immutable reference. Rust provides safe interior mutability through <code>Cell&lt;T&gt;</code> and <code>RefCell&lt;T&gt;</code>:</p>
+
+        <pre>use std::cell::{Cell, RefCell};
+
+struct Stats {
+    views: Cell&lt;u32&gt;,
+    cache: RefCell&lt;Vec&lt;String&gt;&gt;,
+}
+
+impl Stats {
+    fn new() -&gt; Self {
+        Self {
+            views: Cell::new(0),
+            cache: RefCell::new(Vec::new()),
+        }
+    }
+
+    // Can increment views even with &self
+    fn record_view(&self) {
+        let current = self.views.get();
+        self.views.set(current + 1);
+    }
+
+    // Can mutate cache even with &self
+    fn add_to_cache(&self, item: String) {
+        self.cache.borrow_mut().push(item);
+    }
+
+    fn get_cache(&self) -&gt; Vec&lt;String&gt; {
+        self.cache.borrow().clone()
+    }
+}</pre>
+
+        <div class="warning-box">
+            <strong>Cell vs RefCell</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li><code>Cell&lt;T&gt;</code>: For <code>Copy</code> types only, no runtime checks, zero overhead</li>
+                <li><code>RefCell&lt;T&gt;</code>: For any type, runtime borrow checking, will panic if rules are violated</li>
+            </ul>
+        </div>
+
+        <h2>1.2 Lifetime Fundamentals Revisited</h2>
+
+        <p>Lifetimes are Rust's way of ensuring that references are always valid. Let's explore the mechanics that make this work.</p>
+
+        <h3>Lifetime Elision Rules</h3>
+
+        <p>The compiler can infer lifetimes in many cases. Here are the three lifetime elision rules:</p>
+
+        <pre>// Rule 1: Each input reference gets its own lifetime
+fn print(s: &str) {
+    // Desugars to: fn print&lt;'a&gt;(s: &'a str)
+    println!("{}", s);
+}
+
+// Rule 2: If there's exactly one input lifetime,
+// it's assigned to all output lifetimes
+fn first_word(s: &str) -&gt; &str {
+    // Desugars to: fn first_word&lt;'a&gt;(s: &'a str) -&gt; &'a str
+    s.split_whitespace().next().unwrap_or("")
+}
+
+// Rule 3: If there's a &self or &mut self,
+// its lifetime is assigned to all output lifetimes
+impl MyStruct {
+    fn get_data(&self) -&gt; &String {
+        // Desugars to: fn get_data&lt;'a&gt;(&'a self) -&gt; &'a String
+        &self.data
+    }
+}</pre>
+
+        <h3>Multiple Lifetimes</h3>
+
+        <p>When you have multiple input references, you often need to specify their relationships explicitly:</p>
+
+        <pre>// Return the longest of two string slices
+fn longest&lt;'a&gt;(x: &'a str, y: &'a str) -&gt; &'a str {
+    if x.len() &gt; y.len() {
+        x
+    } else {
+        y
+    }
+}
+
+// This says: "The returned reference will live as long as
+// the shorter of the two input lifetimes"
+fn main() {
+    let string1 = String::from("long string");
+    let result;
+    {
+        let string2 = String::from("short");
+        result = longest(&string1, &string2);
+        println!("Longest: {}", result); // OK: result used here
+    }
+    // println!("{}", result); // ERROR: string2 dropped
+}</pre>
+
+        <h3>Lifetime Bounds</h3>
+
+        <p>You can specify that a type must outlive a certain lifetime:</p>
+
+        <pre>// T must contain only references that live at least as long as 'a
+struct ImportantExcerpt&lt;'a&gt; {
+    part: &'a str,
+}
+
+// The returned reference lives as long as self
+impl&lt;'a&gt; ImportantExcerpt&lt;'a&gt; {
+    fn level(&self) -&gt; i32 {
+        3
+    }
+
+    fn announce_and_return_part(&self, announcement: &str) -&gt; &str {
+        println!("Attention: {}", announcement);
+        self.part
+    }
+}
+
+// Generic type with lifetime bound
+fn print_ref&lt;'a, T&gt;(data: &'a T)
+where
+    T: std::fmt::Display + 'a,
+{
+    println!("{}", data);
+}</pre>
+
+        <h2>1.3 Advanced Lifetime Patterns</h2>
+
+        <h3>The 'static Lifetime</h3>
+
+        <p>The <code>'static</code> lifetime means data lives for the entire duration of the program:</p>
+
+        <pre>// String literals have 'static lifetime
+let s: &'static str = "I live forever";
+
+// Not the same as owned data!
+let owned = String::from("I'm owned");
+let slice: &'static str = "I'm static";
+
+// Thread spawning often requires 'static
+use std::thread;
+
+fn spawn_example() {
+    let data = "thread data".to_string();
+
+    // ERROR: data doesn't live long enough
+    // thread::spawn(|| {
+    //     println!("{}", data);
+    // });
+
+    // Solution: move ownership
+    thread::spawn(move || {
+        println!("{}", data);
+    });
+}</pre>
+
+        <div class="danger-box">
+            <strong>Common Misconception</strong>
+            <p style="margin-top: 10px;"><code>'static</code> doesn't mean "lives forever in memory" - it means "could theoretically live for the entire program." String literals are embedded in the binary, but a <code>Box&lt;T&gt;</code> with a <code>'static</code> bound will still be dropped normally.</p>
+        </div>
+
+        <h3>Higher-Ranked Trait Bounds (HRTB)</h3>
+
+        <p>Sometimes you need to express "for any lifetime." This is where HRTBs come in:</p>
+
+        <pre>// A closure that can work with references of any lifetime
+fn apply&lt;F&gt;(f: F, data: &str)
+where
+    F: for&lt;'a&gt; Fn(&'a str) -&gt; &'a str,
+{
+    println!("{}", f(data));
+}
+
+fn main() {
+    apply(|s| s, "hello");
+}
+
+// Common in trait definitions
+trait Processor {
+    fn process&lt;'a&gt;(&self, input: &'a str) -&gt; &'a str;
+}
+
+// HRTB version
+fn use_processor&lt;P&gt;(p: P, data: &str)
+where
+    P: for&lt;'a&gt; Fn(&'a str) -&gt; &'a str,
+{
+    println!("{}", p(data));
+}</pre>
+
+        <h3>Lifetime Subtyping and Variance</h3>
+
+        <p>Lifetimes have a subtyping relationship: a longer lifetime is a subtype of a shorter lifetime:</p>
+
+        <pre>// 'static is a subtype of any other lifetime
+fn coerce&lt;'a&gt;() {
+    let s: &'static str = "hello";
+    let t: &'a str = s; // OK: 'static outlives 'a
+}
+
+// Variance in action
+struct Container&lt;'a, T&gt; {
+    data: &'a T,
+}
+
+// Container is covariant over both 'a and T
+fn variance_example() {
+    let long_lived = String::from("long");
+    let container: Container&lt;'static, String&gt;;
+
+    {
+        let short_lived = String::from("short");
+        // Can use longer lifetime where shorter is expected
+        let _: Container&lt;'_, String&gt; = Container { data: &long_lived };
+    }
+}</pre>
+
+        <h2>1.4 Practical Lifetime Patterns</h2>
+
+        <h3>Struct with Multiple Lifetime Parameters</h3>
+
+        <pre>struct Context&lt;'s, 'c&gt; {
+    source: &'s str,
+    config: &'c Config,
+}
+
+struct Config {
+    max_len: usize,
+}
+
+impl&lt;'s, 'c&gt; Context&lt;'s, 'c&gt; {
+    fn process(&self) -&gt; Result&lt;String, String&gt; {
+        if self.source.len() &gt; self.config.max_len {
+            Err("Source too long".to_string())
+        } else {
+            Ok(self.source.to_uppercase())
+        }
+    }
+}
+
+fn main() {
+    let config = Config { max_len: 100 };
+    let source = "hello world";
+
+    let ctx = Context {
+        source: &source,
+        config: &config,
+    };
+
+    println!("{:?}", ctx.process());
+}</pre>
+
+        <h3>Self-Referential Structs (The Problem)</h3>
+
+        <p>One thing you <em>cannot</em> do in safe Rust is create truly self-referential structs:</p>
+
+        <pre>// This doesn't compile!
+// struct SelfRef&lt;'a&gt; {
+//     data: String,
+//     slice: &'a str,  // Can't reference data in same struct
+// }
+
+// Solution 1: Use indices instead of references
+struct SafeSelfRef {
+    data: String,
+    slice_start: usize,
+    slice_end: usize,
+}
+
+impl SafeSelfRef {
+    fn get_slice(&self) -&gt; &str {
+        &self.data[self.slice_start..self.slice_end]
+    }
+}
+
+// Solution 2: Use Pin and unsafe (advanced)
+use std::pin::Pin;
+
+// For complex cases, use the `pin-project` crate</pre>
+
+        <h2>1.5 Lifetime Optimization Techniques</h2>
+
+        <h3>Avoiding Lifetime Pollution</h3>
+
+        <p>Sometimes you can design APIs to avoid exposing lifetimes to callers:</p>
+
+        <pre>// Before: Lifetime leaks into public API
+pub struct Parser&lt;'a&gt; {
+    input: &'a str,
+    pos: usize,
+}
+
+impl&lt;'a&gt; Parser&lt;'a&gt; {
+    pub fn parse(&mut self) -&gt; Result&lt;&'a str, String&gt; {
+        // parsing logic
+        Ok(&self.input[self.pos..])
+    }
+}
+
+// After: Return owned data to avoid lifetime
+pub struct BetterParser {
+    input: String,
+    pos: usize,
+}
+
+impl BetterParser {
+    pub fn parse(&mut self) -&gt; Result&lt;String, String&gt; {
+        // Return owned String instead of reference
+        Ok(self.input[self.pos..].to_string())
+    }
+}
+
+// Or use Cow for best of both worlds
+use std::borrow::Cow;
+
+pub fn process(input: &str) -&gt; Cow&lt;str&gt; {
+    if input.contains("special") {
+        // Need to modify: return owned
+        Cow::Owned(input.replace("special", "SPECIAL"))
+    } else {
+        // No modification: return borrowed
+        Cow::Borrowed(input)
+    }
+}</pre>
+
+        <h2>1.6 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Advanced Ownership:</strong> Builder patterns, interior mutability with Cell/RefCell</li>
+                <li><strong>Lifetime Elision:</strong> Compiler infers lifetimes in many cases following three rules</li>
+                <li><strong>Multiple Lifetimes:</strong> Express relationships between different reference lifetimes</li>
+                <li><strong>'static Lifetime:</strong> Data that can live for entire program duration</li>
+                <li><strong>HRTBs:</strong> "For any lifetime" constraints using <code>for&lt;'a&gt;</code></li>
+                <li><strong>Self-Referential Structs:</strong> Not directly possible in safe Rust; use indices or Pin</li>
+                <li><strong>API Design:</strong> Minimize lifetime exposure to make APIs easier to use</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

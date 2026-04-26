@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 2: Advanced Type System - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 2: Advanced Type System</h1>
+
+        <p>Rust's type system is one of its most powerful features. This chapter explores advanced type system concepts that enable you to write safer, more expressive code while maintaining zero-cost abstractions.</p>
+
+        <h2>2.1 Associated Types</h2>
+
+        <p>Associated types let you define placeholder types in trait definitions. They're cleaner than generic type parameters when there's only one logical type for a given implementation.</p>
+
+        <h3>Associated Types vs Generic Type Parameters</h3>
+
+        <pre>// Using generic type parameters (verbose)
+trait Container&lt;T&gt; {
+    fn get(&self) -&gt; Option&lt;&T&gt;;
+}
+
+// Using associated types (cleaner)
+trait BetterContainer {
+    type Item;
+    fn get(&self) -&gt; Option&lt;&Self::Item&gt;;
+}
+
+// Implementation
+impl BetterContainer for Vec&lt;String&gt; {
+    type Item = String;
+
+    fn get(&self) -&gt; Option&lt;&Self::Item&gt; {
+        self.first().cloned()
+    }
+}
+
+fn use_container(c: &impl BetterContainer) {
+    if let Some(item) = c.get() {
+        // We can use item here
+    }
+}</pre>
+
+        <div class="success-box">
+            <strong>When to Use Associated Types</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>When there's only one logical type for a trait implementation</li>
+                <li>To reduce type parameter clutter in function signatures</li>
+                <li>Examples: Iterator::Item, Future::Output, Add::Output</li>
+            </ul>
+        </div>
+
+        <h3>Real-World Example: Custom Iterator</h3>
+
+        <pre>struct Counter {
+    count: u32,
+    max: u32,
+}
+
+impl Counter {
+    fn new(max: u32) -&gt; Self {
+        Self { count: 0, max }
+    }
+}
+
+impl Iterator for Counter {
+    type Item = u32;  // Associated type
+
+    fn next(&mut self) -&gt; Option&lt;Self::Item&gt; {
+        if self.count &lt; self.max {
+            self.count += 1;
+            Some(self.count)
+        } else {
+            None
+        }
+    }
+}
+
+fn main() {
+    let counter = Counter::new(5);
+    let sum: u32 = counter.sum();
+    println!("Sum: {}", sum); // 15
+}</pre>
+
+        <h2>2.2 Type Aliases</h2>
+
+        <p>Type aliases make complex types easier to work with and can improve code readability:</p>
+
+        <pre>// Simple type alias
+type Kilometers = i32;
+
+// Complex type alias
+type Result&lt;T&gt; = std::result::Result&lt;T, std::io::Error&gt;;
+
+// Makes function signatures much cleaner
+fn read_file(path: &str) -&gt; Result&lt;String&gt; {
+    std::fs::read_to_string(path)
+}
+
+// Generic type alias
+type NodeBox&lt;T&gt; = Box&lt;Node&lt;T&gt;&gt;;
+
+struct Node&lt;T&gt; {
+    value: T,
+    left: Option&lt;NodeBox&lt;T&gt;&gt;,
+    right: Option&lt;NodeBox&lt;T&gt;&gt;,
+}
+
+// Trait object alias
+type Handler = Box&lt;dyn Fn(Request) -&gt; Response + Send + Sync&gt;;
+
+struct Server {
+    handlers: Vec&lt;Handler&gt;,
+}</pre>
+
+        <h3>Associated Type Defaults</h3>
+
+        <pre>trait Graph {
+    type Node = String;  // Default associated type
+    type Edge = (String, String);
+
+    fn add_node(&mut self, node: Self::Node);
+    fn add_edge(&mut self, edge: Self::Edge);
+}
+
+// Can use default
+struct SimpleGraph {
+    nodes: Vec&lt;String&gt;,
+}
+
+impl Graph for SimpleGraph {
+    // Uses default Node = String
+    fn add_node(&mut self, node: Self::Node) {
+        self.nodes.push(node);
+    }
+
+    fn add_edge(&mut self, edge: Self::Edge) {
+        // implementation
+    }
+}
+
+// Or override the default
+struct CustomGraph;
+
+impl Graph for CustomGraph {
+    type Node = u32;  // Override default
+    type Edge = (u32, u32);
+
+    fn add_node(&mut self, _node: Self::Node) {}
+    fn add_edge(&mut self, _edge: Self::Edge) {}
+}</pre>
+
+        <h2>2.3 The Newtype Pattern</h2>
+
+        <p>The newtype pattern wraps existing types in a new type for type safety and to implement external traits:</p>
+
+        <h3>Type Safety with Newtypes</h3>
+
+        <pre>// Prevent mixing up different kinds of IDs
+struct UserId(u64);
+struct ProductId(u64);
+struct OrderId(u64);
+
+impl UserId {
+    fn new(id: u64) -&gt; Self {
+        UserId(id)
+    }
+
+    fn value(&self) -&gt; u64 {
+        self.0
+    }
+}
+
+// Now this won't compile:
+fn get_user(id: UserId) -&gt; User {
+    // ...
+}
+
+fn main() {
+    let user_id = UserId::new(42);
+    let product_id = ProductId(99);
+
+    get_user(user_id);  // OK
+    // get_user(product_id);  // ERROR: type mismatch!
+}</pre>
+
+        <h3>Implementing External Traits</h3>
+
+        <p>The orphan rule prevents implementing external traits on external types. Newtypes solve this:</p>
+
+        <pre>use std::fmt;
+
+// Can't do: impl fmt::Display for Vec&lt;i32&gt; (both external)
+
+// Solution: wrap in newtype
+struct PrettyVec(Vec&lt;i32&gt;);
+
+impl fmt::Display for PrettyVec {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, "[")?;
+        for (i, item) in self.0.iter().enumerate() {
+            if i &gt; 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", item)?;
+        }
+        write!(f, "]")
+    }
+}
+
+fn main() {
+    let v = PrettyVec(vec![1, 2, 3, 4, 5]);
+    println!("{}", v); // [1, 2, 3, 4, 5]
+}</pre>
+
+        <h3>Smart Newtype with Deref</h3>
+
+        <pre>use std::ops::Deref;
+
+struct Meters(f64);
+
+impl Deref for Meters {
+    type Target = f64;
+
+    fn deref(&self) -&gt; &Self::Target {
+        &self.0
+    }
+}
+
+impl Meters {
+    fn new(value: f64) -&gt; Self {
+        Meters(value)
+    }
+
+    fn to_feet(&self) -&gt; f64 {
+        self.0 * 3.28084
+    }
+}
+
+fn main() {
+    let distance = Meters::new(100.0);
+
+    // Deref coercion allows using as f64
+    let doubled = *distance * 2.0;
+
+    // But also has custom methods
+    println!("{} feet", distance.to_feet());
+}</pre>
+
+        <h2>2.4 Phantom Types</h2>
+
+        <p>Phantom types are type parameters that don't actually store data but encode information at compile time:</p>
+
+        <h3>Type-State Pattern</h3>
+
+        <pre>use std::marker::PhantomData;
+
+// States
+struct Locked;
+struct Unlocked;
+
+struct Door&lt;State&gt; {
+    _state: PhantomData&lt;State&gt;,
+}
+
+impl Door&lt;Locked&gt; {
+    fn new() -&gt; Self {
+        Door {
+            _state: PhantomData,
+        }
+    }
+
+    fn unlock(self, key: &str) -&gt; Option&lt;Door&lt;Unlocked&gt;&gt; {
+        if key == "correct_key" {
+            Some(Door {
+                _state: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl Door&lt;Unlocked&gt; {
+    fn open(self) {
+        println!("Door opened!");
+    }
+
+    fn lock(self) -&gt; Door&lt;Locked&gt; {
+        Door {
+            _state: PhantomData,
+        }
+    }
+}
+
+fn main() {
+    let door = Door::&lt;Locked&gt;::new();
+
+    // Can't open locked door - won't compile!
+    // door.open();
+
+    if let Some(unlocked) = door.unlock("correct_key") {
+        unlocked.open();  // This compiles!
+    }
+}</pre>
+
+        <div class="success-box">
+            <strong>Benefits of Type-State Pattern</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>Compile-time enforcement of state transitions</li>
+                <li>Zero runtime cost</li>
+                <li>Impossible to use API incorrectly</li>
+                <li>Self-documenting code</li>
+            </ul>
+        </div>
+
+        <h3>Builder Pattern with Type States</h3>
+
+        <pre>struct RequestBuilder&lt;State&gt; {
+    url: Option&lt;String&gt;,
+    method: Option&lt;String&gt;,
+    _state: PhantomData&lt;State&gt;,
+}
+
+struct NoUrl;
+struct HasUrl;
+
+impl RequestBuilder&lt;NoUrl&gt; {
+    fn new() -&gt; Self {
+        RequestBuilder {
+            url: None,
+            method: None,
+            _state: PhantomData,
+        }
+    }
+
+    fn url(self, url: String) -&gt; RequestBuilder&lt;HasUrl&gt; {
+        RequestBuilder {
+            url: Some(url),
+            method: self.method,
+            _state: PhantomData,
+        }
+    }
+}
+
+impl RequestBuilder&lt;HasUrl&gt; {
+    fn method(mut self, method: String) -&gt; Self {
+        self.method = Some(method);
+        self
+    }
+
+    // Can only build when URL is set!
+    fn build(self) -&gt; Request {
+        Request {
+            url: self.url.unwrap(),
+            method: self.method.unwrap_or_else(|| "GET".to_string()),
+        }
+    }
+}
+
+// Won't compile without URL:
+// let req = RequestBuilder::new().build();</pre>
+
+        <h2>2.5 Advanced Generics</h2>
+
+        <h3>Const Generics</h3>
+
+        <p>Const generics allow you to parameterize types over constant values:</p>
+
+        <pre>// Array with compile-time size checking
+struct FixedBuffer&lt;T, const N: usize&gt; {
+    data: [T; N],
+}
+
+impl&lt;T: Default + Copy, const N: usize&gt; FixedBuffer&lt;T, N&gt; {
+    fn new() -&gt; Self {
+        FixedBuffer {
+            data: [T::default(); N],
+        }
+    }
+
+    fn len(&self) -&gt; usize {
+        N
+    }
+}
+
+fn main() {
+    let buffer = FixedBuffer::&lt;i32, 10&gt;::new();
+    println!("Buffer size: {}", buffer.len());
+}
+
+// Matrix multiplication with compile-time dimension checking
+struct Matrix&lt;T, const ROWS: usize, const COLS: usize&gt; {
+    data: [[T; COLS]; ROWS],
+}
+
+impl&lt;T: Default + Copy, const ROWS: usize, const COLS: usize&gt; Matrix&lt;T, ROWS, COLS&gt; {
+    fn new() -&gt; Self {
+        Matrix {
+            data: [[T::default(); COLS]; ROWS],
+        }
+    }
+}
+
+// Multiply only works when dimensions match!
+impl&lt;T, const M: usize, const N: usize, const P: usize&gt; Matrix&lt;T, M, N&gt;
+where
+    T: Copy + Default + std::ops::Add&lt;Output = T&gt; + std::ops::Mul&lt;Output = T&gt;,
+{
+    fn multiply(&self, other: &Matrix&lt;T, N, P&gt;) -&gt; Matrix&lt;T, M, P&gt; {
+        // Implementation
+        Matrix::new()
+    }
+}</pre>
+
+        <h3>Generic Associated Types (GATs)</h3>
+
+        <pre>// Enable powerful patterns like lending iterators
+trait LendingIterator {
+    type Item&lt;'a&gt; where Self: 'a;
+
+    fn next(&mut self) -&gt; Option&lt;Self::Item&lt;'_&gt;&gt;;
+}
+
+// Example: iterator that lends out mutable references
+struct WindowsMut&lt;'data, T&gt; {
+    data: &'data mut [T],
+    window_size: usize,
+    position: usize,
+}
+
+impl&lt;'data, T&gt; LendingIterator for WindowsMut&lt;'data, T&gt; {
+    type Item&lt;'a&gt; = &'a mut [T] where Self: 'a;
+
+    fn next(&mut self) -&gt; Option&lt;Self::Item&lt;'_&gt;&gt; {
+        if self.position + self.window_size &gt; self.data.len() {
+            return None;
+        }
+
+        let start = self.position;
+        let end = start + self.window_size;
+        self.position += 1;
+
+        // SAFETY: We're careful to not overlap windows
+        unsafe {
+            let ptr = self.data.as_mut_ptr();
+            Some(std::slice::from_raw_parts_mut(
+                ptr.add(start),
+                self.window_size,
+            ))
+        }
+    }
+}</pre>
+
+        <h2>2.6 Type-Level Programming</h2>
+
+        <h3>Encoding Logic in Types</h3>
+
+        <pre>// Peano numbers at type level
+struct Zero;
+struct Succ&lt;N&gt;(PhantomData&lt;N&gt;);
+
+type One = Succ&lt;Zero&gt;;
+type Two = Succ&lt;One&gt;;
+type Three = Succ&lt;Two&gt;;
+
+// Type-level addition
+trait Add&lt;Rhs&gt; {
+    type Output;
+}
+
+impl&lt;N&gt; Add&lt;Zero&gt; for N {
+    type Output = N;
+}
+
+impl&lt;N, M&gt; Add&lt;Succ&lt;M&gt;&gt; for N
+where
+    N: Add&lt;M&gt;,
+{
+    type Output = Succ&lt;&lt;N as Add&lt;M&gt;&gt;::Output&gt;;
+}
+
+// Compile-time computation!
+type Five = &lt;Two as Add&lt;Three&gt;&gt;::Output;</pre>
+
+        <div class="warning-box">
+            <strong>When to Use Type-Level Programming</strong>
+            <p style="margin-top: 10px;">Type-level programming is powerful but can make code harder to understand. Use it when:</p>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>You need compile-time guarantees that can't be expressed otherwise</li>
+                <li>The complexity is hidden behind a clean API</li>
+                <li>Performance requires compile-time computation</li>
+            </ul>
+        </div>
+
+        <h2>2.7 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Associated Types:</strong> Cleaner than generics when there's one logical type per implementation</li>
+                <li><strong>Type Aliases:</strong> Simplify complex types and improve readability</li>
+                <li><strong>Newtype Pattern:</strong> Type safety and trait implementation for external types</li>
+                <li><strong>Phantom Types:</strong> Encode state in types with zero runtime cost</li>
+                <li><strong>Const Generics:</strong> Parameterize over constant values like array sizes</li>
+                <li><strong>GATs:</strong> Generic associated types enable lending iterators and more</li>
+                <li><strong>Type-Level Programming:</strong> Encode logic in the type system itself</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

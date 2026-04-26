@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 4: Async Deep Dive - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 4: Async Deep Dive</h1>
+
+        <p>Asynchronous programming is essential for high-performance I/O-bound applications. This chapter explores how Rust's async/await works under the hood and how to use it effectively.</p>
+
+        <h2>4.1 Understanding Futures</h2>
+
+        <p>At the core of async Rust is the Future trait. Let's understand what it really means:</p>
+
+        <pre>use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+// The actual Future trait (simplified)
+pub trait SimpleFuture {
+    type Output;
+
+    fn poll(self: Pin&lt;&mut Self&gt;, cx: &mut Context&lt;'_&gt;) -&gt; Poll&lt;Self::Output&gt;;
+}
+
+// Poll is an enum
+pub enum Poll&lt;T&gt; {
+    Ready(T),      // Future completed with value
+    Pending,       // Future not ready yet
+}</pre>
+
+        <h3>Creating a Simple Future</h3>
+
+        <pre>use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
+
+struct Delay {
+    when: Instant,
+}
+
+impl Delay {
+    fn new(duration: Duration) -&gt; Self {
+        Delay {
+            when: Instant::now() + duration,
+        }
+    }
+}
+
+impl Future for Delay {
+    type Output = ();
+
+    fn poll(self: Pin&lt;&mut Self&gt;, cx: &mut Context&lt;'_&gt;) -&gt; Poll&lt;Self::Output&gt; {
+        if Instant::now() &gt;= self.when {
+            Poll::Ready(())
+        } else {
+            // Tell the executor to poll again
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let delay = Delay::new(Duration::from_secs(1));
+    delay.await;
+    println!("Done!");
+}</pre>
+
+        <h2>4.2 Async/Await Syntax</h2>
+
+        <h3>Basic Async Functions</h3>
+
+        <pre>// Async function
+async fn fetch_data(url: &str) -&gt; Result&lt;String, String&gt; {
+    // Simulated async work
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    Ok(format!("Data from {}", url))
+}
+
+// Async block
+fn create_future() -&gt; impl Future&lt;Output = i32&gt; {
+    async {
+        42
+    }
+}
+
+// Using async/await
+#[tokio::main]
+async fn main() {
+    // Sequential
+    let data1 = fetch_data("api.example.com/1").await.unwrap();
+    let data2 = fetch_data("api.example.com/2").await.unwrap();
+
+    println!("{}\n{}", data1, data2);
+}</pre>
+
+        <h3>Concurrent Execution</h3>
+
+        <pre>use tokio::join;
+use tokio::time::{sleep, Duration};
+
+async fn task1() -&gt; String {
+    sleep(Duration::from_millis(100)).await;
+    "Task 1 done".to_string()
+}
+
+async fn task2() -&gt; String {
+    sleep(Duration::from_millis(100)).await;
+    "Task 2 done".to_string()
+}
+
+#[tokio::main]
+async fn main() {
+    // Run concurrently (not parallel - same thread!)
+    let (result1, result2) = join!(task1(), task2());
+
+    println!("{}", result1);
+    println!("{}", result2);
+}
+
+// For dynamic number of tasks
+async fn fetch_all(urls: Vec&lt;String&gt;) -&gt; Vec&lt;Result&lt;String, String&gt;&gt; {
+    let tasks: Vec&lt;_&gt; = urls
+        .into_iter()
+        .map(|url| tokio::spawn(async move {
+            fetch_data(&url).await
+        }))
+        .collect();
+
+    let mut results = Vec::new();
+    for task in tasks {
+        results.push(task.await.unwrap());
+    }
+    results
+}</pre>
+
+        <h2>4.3 Tokio Runtime Deep Dive</h2>
+
+        <h3>Runtime Configuration</h3>
+
+        <pre>use tokio::runtime::Runtime;
+
+fn main() {
+    // Multi-threaded runtime (default)
+    let runtime = Runtime::new().unwrap();
+
+    runtime.block_on(async {
+        println!("Running on multi-threaded runtime");
+    });
+
+    // Current thread runtime (single-threaded)
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        println!("Running on current thread");
+    });
+
+    // Custom configuration
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .thread_name("my-worker")
+        .thread_stack_size(3 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .unwrap();
+}</pre>
+
+        <h3>Spawning Tasks</h3>
+
+        <pre>use tokio::task;
+
+#[tokio::main]
+async fn main() {
+    // Spawn a task
+    let handle = task::spawn(async {
+        println!("Task running on tokio thread pool");
+        42
+    });
+
+    let result = handle.await.unwrap();
+    println!("Result: {}", result);
+
+    // Spawn blocking (for CPU-intensive work)
+    let handle = task::spawn_blocking(|| {
+        // This runs on a dedicated thread pool
+        println!("CPU-intensive work");
+        expensive_computation()
+    });
+
+    handle.await.unwrap();
+}
+
+fn expensive_computation() -&gt; u64 {
+    (0..1_000_000).sum()
+}</pre>
+
+        <h2>4.4 Channels and Message Passing</h2>
+
+        <h3>MPSC Channels</h3>
+
+        <pre>use tokio::sync::mpsc;
+
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel(32);
+
+    // Spawn sender task
+    tokio::spawn(async move {
+        for i in 0..10 {
+            tx.send(i).await.unwrap();
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+    });
+
+    // Receive in main task
+    while let Some(value) = rx.recv().await {
+        println!("Received: {}", value);
+    }
+}
+
+// Bounded vs Unbounded
+async fn channel_types() {
+    // Bounded: sender waits if full
+    let (tx, rx) = mpsc::channel::&lt;i32&gt;(100);
+
+    // Unbounded: never blocks (use carefully!)
+    let (tx_unbounded, rx_unbounded) = mpsc::unbounded_channel::&lt;i32&gt;();
+}</pre>
+
+        <h3>Broadcast and Watch Channels</h3>
+
+        <pre>use tokio::sync::{broadcast, watch};
+
+#[tokio::main]
+async fn main() {
+    // Broadcast: multiple receivers
+    let (tx, _rx) = broadcast::channel(16);
+
+    let mut rx1 = tx.subscribe();
+    let mut rx2 = tx.subscribe();
+
+    tokio::spawn(async move {
+        tx.send("Hello").unwrap();
+    });
+
+    println!("rx1: {}", rx1.recv().await.unwrap());
+    println!("rx2: {}", rx2.recv().await.unwrap());
+
+    // Watch: single-value state channel
+    let (tx, mut rx) = watch::channel("initial");
+
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tx.send("updated").unwrap();
+    });
+
+    rx.changed().await.unwrap();
+    println!("Value changed to: {}", *rx.borrow());
+}</pre>
+
+        <h2>4.5 Synchronization Primitives</h2>
+
+        <h3>Async Mutex</h3>
+
+        <pre>use tokio::sync::Mutex;
+use std::sync::Arc;
+
+#[tokio::main]
+async fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = tokio::spawn(async move {
+            let mut num = counter.lock().await;
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await.unwrap();
+    }
+
+    println!("Counter: {}", *counter.lock().await);
+}</pre>
+
+        <div class="warning-box">
+            <strong>Async vs Sync Mutex</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li><code>tokio::sync::Mutex</code>: For holding locks across await points</li>
+                <li><code>std::sync::Mutex</code>: For short, non-async critical sections (faster)</li>
+            </ul>
+        </div>
+
+        <h3>RwLock and Semaphore</h3>
+
+        <pre>use tokio::sync::{RwLock, Semaphore};
+
+#[tokio::main]
+async fn main() {
+    // RwLock: multiple readers or single writer
+    let lock = Arc::new(RwLock::new(5));
+
+    let read = lock.read().await;
+    println!("Value: {}", *read);
+    drop(read);
+
+    let mut write = lock.write().await;
+    *write += 1;
+
+    // Semaphore: limit concurrent access
+    let semaphore = Arc::new(Semaphore::new(3));
+
+    let mut handles = vec![];
+    for i in 0..10 {
+        let sem = semaphore.clone();
+        handles.push(tokio::spawn(async move {
+            let _permit = sem.acquire().await.unwrap();
+            println!("Task {} acquired permit", i);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }));
+    }
+
+    for handle in handles {
+        handle.await.unwrap();
+    }
+}</pre>
+
+        <h2>4.6 Select! Macro</h2>
+
+        <p>Race multiple futures and handle whichever completes first:</p>
+
+        <pre>use tokio::select;
+use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() {
+    let mut interval = tokio::time::interval(Duration::from_secs(1));
+
+    select! {
+        _ = sleep(Duration::from_secs(5)) =&gt; {
+            println!("5 second timeout");
+        }
+        _ = interval.tick() =&gt; {
+            println!("Interval fired");
+        }
+    }
+
+    // With cancellation
+    let operation = async {
+        sleep(Duration::from_secs(10)).await;
+        "Completed"
+    };
+
+    let timeout = sleep(Duration::from_secs(2));
+
+    select! {
+        result = operation =&gt; {
+            println!("Operation: {}", result);
+        }
+        _ = timeout =&gt; {
+            println!("Timed out!");
+        }
+    }
+}</pre>
+
+        <h2>4.7 Stream Processing</h2>
+
+        <pre>use tokio_stream::{self as stream, StreamExt};
+
+#[tokio::main]
+async fn main() {
+    // Create a stream
+    let mut stream = stream::iter(vec![1, 2, 3, 4, 5]);
+
+    // Process with combinator methods
+    while let Some(value) = stream.next().await {
+        println!("{}", value);
+    }
+
+    // Advanced stream processing
+    let stream = stream::iter(1..=10)
+        .filter(|x| x % 2 == 0)
+        .map(|x| x * 2);
+
+    let results: Vec&lt;_&gt; = stream.collect().await;
+    println!("{:?}", results);
+
+    // Merge multiple streams
+    let s1 = stream::iter(vec![1, 2, 3]);
+    let s2 = stream::iter(vec![4, 5, 6]);
+    let merged = stream::iter(vec![s1, s2]).flatten();
+}</pre>
+
+        <h2>4.8 Error Handling in Async</h2>
+
+        <pre>use tokio::try_join;
+
+async fn fallible_task1() -&gt; Result&lt;i32, String&gt; {
+    Ok(1)
+}
+
+async fn fallible_task2() -&gt; Result&lt;i32, String&gt; {
+    Err("Task 2 failed".to_string())
+}
+
+#[tokio::main]
+async fn main() {
+    // Early return on first error
+    match try_join!(fallible_task1(), fallible_task2()) {
+        Ok((r1, r2)) =&gt; println!("Both succeeded: {}, {}", r1, r2),
+        Err(e) =&gt; println!("Error: {}", e),
+    }
+}
+
+// Timeout pattern
+use tokio::time::{timeout, Duration};
+
+async fn with_timeout() -&gt; Result&lt;String, String&gt; {
+    match timeout(Duration::from_secs(5), slow_operation()).await {
+        Ok(result) =&gt; result,
+        Err(_) =&gt; Err("Timeout!".to_string()),
+    }
+}
+
+async fn slow_operation() -&gt; Result&lt;String, String&gt; {
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    Ok("Done".to_string())
+}</pre>
+
+        <h2>4.9 Async Best Practices</h2>
+
+        <div class="highlight">
+            <strong>Do's and Don'ts</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li><strong>✓ DO:</strong> Use async for I/O-bound operations</li>
+                <li><strong>✓ DO:</strong> Use spawn_blocking for CPU-intensive work</li>
+                <li><strong>✓ DO:</strong> Prefer bounded channels to prevent memory leaks</li>
+                <li><strong>✗ DON'T:</strong> Hold std::sync::Mutex across await points</li>
+                <li><strong>✗ DON'T:</strong> Use async for CPU-bound algorithms</li>
+                <li><strong>✗ DON'T:</strong> Create too many tasks (use worker pools)</li>
+            </ul>
+        </div>
+
+        <h2>4.10 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Futures:</strong> Lazy computations that yield Poll::Pending or Poll::Ready</li>
+                <li><strong>Async/Await:</strong> Syntax sugar for working with futures</li>
+                <li><strong>Tokio Runtime:</strong> Executor that polls futures to completion</li>
+                <li><strong>Channels:</strong> MPSC, broadcast, watch for async communication</li>
+                <li><strong>Sync Primitives:</strong> Async Mutex, RwLock, Semaphore</li>
+                <li><strong>Select:</strong> Race multiple futures</li>
+                <li><strong>Streams:</strong> Async iterators for processing sequences</li>
+                <li><strong>Best Practices:</strong> Use async for I/O, blocking for CPU work</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4장: 비동기 프로그래밍 심화 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>4장: 비동기 프로그래밍 심화</h1>
+
+        <h2>4.1 async/await의 이해</h2>
+        <p>Rust의 async/await는 제로 코스트 추상화입니다. 비동기 코드를 동기 코드처럼 작성할 수 있습니다.</p>
+
+        <h3>4.1.1 Future 트레이트</h3>
+        <pre>use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+// Future 트레이트의 정의
+pub trait Future {
+    type Output;
+    fn poll(self: Pin&lt;&mut Self&gt;, cx: &mut Context&lt;'_&gt;) -&gt; Poll&lt;Self::Output&gt;;
+}
+
+// 간단한 Future 구현
+struct TimerFuture {
+    completed: bool,
+}
+
+impl Future for TimerFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin&lt;&mut Self&gt;, cx: &mut Context&lt;'_&gt;) -&gt; Poll&lt;()&gt; {
+        if self.completed {
+            Poll::Ready(())
+        } else {
+            self.completed = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}</pre>
+
+        <h3>4.1.2 async 함수와 블록</h3>
+        <pre>// async 함수
+async fn fetch_data() -&gt; String {
+    // 비동기 작업 시뮬레이션
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    "Data fetched".to_string()
+}
+
+// async 블록
+async fn process() {
+    let result = async {
+        let data = fetch_data().await;
+        data.to_uppercase()
+    }.await;
+
+    println!("Result: {}", result);
+}
+
+// 여러 futures 동시 실행
+async fn concurrent_tasks() {
+    let (result1, result2, result3) = tokio::join!(
+        fetch_data(),
+        fetch_data(),
+        fetch_data()
+    );
+
+    println!("{}, {}, {}", result1, result2, result3);
+}</pre>
+
+        <h2>4.2 Tokio 런타임</h2>
+        <p>Tokio는 Rust의 사실상 표준 비동기 런타임입니다.</p>
+
+        <h3>4.2.1 기본 사용법</h3>
+        <pre>use tokio;
+
+#[tokio::main]
+async fn main() {
+    println!("Hello from Tokio!");
+
+    let handle = tokio::spawn(async {
+        println!("Spawned task");
+        42
+    });
+
+    let result = handle.await.unwrap();
+    println!("Result: {}", result);
+}
+
+// 멀티스레드 런타임
+#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+async fn main_multithread() {
+    // 4개의 워커 스레드로 실행
+}
+
+// 싱글스레드 런타임
+#[tokio::main(flavor = "current_thread")]
+async fn main_singlethread() {
+    // 현재 스레드에서만 실행
+}</pre>
+
+        <h3>4.2.2 타임아웃과 취소</h3>
+        <pre>use tokio::time::{timeout, Duration};
+
+async fn long_running_task() -&gt; String {
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    "Completed".to_string()
+}
+
+#[tokio::main]
+async fn main() {
+    // 타임아웃 설정
+    match timeout(Duration::from_secs(2), long_running_task()).await {
+        Ok(result) =&gt; println!("Success: {}", result),
+        Err(_) =&gt; println!("Timeout!"),
+    }
+
+    // select! 매크로로 먼저 완료된 것 선택
+    tokio::select! {
+        _ = tokio::time::sleep(Duration::from_secs(1)) =&gt; {
+            println!("Timeout first");
+        }
+        result = fetch_data() =&gt; {
+            println!("Data first: {}", result);
+        }
+    }
+}</pre>
+
+        <h2>4.3 비동기 스트림</h2>
+        <p>스트림은 비동기 버전의 이터레이터입니다.</p>
+
+        <pre>use tokio_stream::{Stream, StreamExt};
+use std::pin::Pin;
+
+// 스트림 생성
+fn number_stream() -&gt; impl Stream&lt;Item = i32&gt; {
+    tokio_stream::iter(1..=5)
+}
+
+// 스트림 처리
+#[tokio::main]
+async fn main() {
+    let mut stream = number_stream()
+        .map(|x| x * 2)
+        .filter(|x| x % 4 == 0);
+
+    while let Some(value) = stream.next().await {
+        println!("Value: {}", value);
+    }
+
+    // 비동기 생성
+    let stream = async_stream::stream! {
+        for i in 0..3 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            yield i;
+        }
+    };
+
+    tokio::pin!(stream);
+    while let Some(value) = stream.next().await {
+        println!("Generated: {}", value);
+    }
+}</pre>
+
+        <h2>4.4 Pin과 Unpin</h2>
+        <p>Pin은 메모리에서 값이 이동하지 못하게 고정합니다. 자체 참조 구조체에 필수적입니다.</p>
+
+        <pre>use std::pin::Pin;
+use std::marker::PhantomPinned;
+
+// 자체 참조 구조체
+struct SelfReferential {
+    value: String,
+    pointer: *const String, // value를 가리킴
+    _pin: PhantomPinned,
+}
+
+impl SelfReferential {
+    fn new(txt: &str) -&gt; Pin&lt;Box&lt;Self&gt;&gt; {
+        let mut boxed = Box::pin(SelfReferential {
+            value: txt.to_string(),
+            pointer: std::ptr::null(),
+            _pin: PhantomPinned,
+        });
+
+        let ptr = &boxed.value as *const String;
+        unsafe {
+            let mut_ref = Pin::as_mut(&mut boxed);
+            Pin::get_unchecked_mut(mut_ref).pointer = ptr;
+        }
+
+        boxed
+    }
+
+    fn print(self: Pin&lt;&Self&gt;) {
+        let value = unsafe { &*self.pointer };
+        println!("Value: {}", value);
+    }
+}
+
+fn main() {
+    let pinned = SelfReferential::new("Hello");
+    pinned.as_ref().print();
+}</pre>
+
+        <h2>4.5 채널과 동시성</h2>
+
+        <h3>4.5.1 mpsc 채널</h3>
+        <pre>use tokio::sync::mpsc;
+
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel(32);
+
+    // 여러 sender
+    for i in 0..5 {
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            tx.send(format!("Message {}", i)).await.unwrap();
+        });
+    }
+
+    drop(tx); // 모든 sender를 닫음
+
+    // receiver에서 수신
+    while let Some(msg) = rx.recv().await {
+        println!("Received: {}", msg);
+    }
+}</pre>
+
+        <h3>4.5.2 broadcast 채널</h3>
+        <pre>use tokio::sync::broadcast;
+
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx1) = broadcast::channel(16);
+    let mut rx2 = tx.subscribe();
+    let mut rx3 = tx.subscribe();
+
+    tokio::spawn(async move {
+        for i in 0..3 {
+            tx.send(format!("Broadcast {}", i)).unwrap();
+        }
+    });
+
+    // 모든 receiver가 메시지 수신
+    tokio::spawn(async move {
+        while let Ok(msg) = rx1.recv().await {
+            println!("RX1: {}", msg);
+        }
+    });
+
+    tokio::spawn(async move {
+        while let Ok(msg) = rx2.recv().await {
+            println!("RX2: {}", msg);
+        }
+    });
+
+    while let Ok(msg) = rx3.recv().await {
+        println!("RX3: {}", msg);
+    }
+}</pre>
+
+        <h2>4.6 실전 예제: 비동기 웹 크롤러</h2>
+        <pre>use tokio;
+use reqwest;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
+
+struct Crawler {
+    visited: Arc&lt;Mutex&lt;HashSet&lt;String&gt;&gt;&gt;,
+    client: reqwest::Client,
+}
+
+impl Crawler {
+    fn new() -&gt; Self {
+        Crawler {
+            visited: Arc::new(Mutex::new(HashSet::new())),
+            client: reqwest::Client::new(),
+        }
+    }
+
+    async fn fetch(&self, url: &str) -&gt; Result&lt;String, reqwest::Error&gt; {
+        let response = self.client.get(url).send().await?;
+        response.text().await
+    }
+
+    async fn crawl(&self, url: String, depth: usize) {
+        if depth == 0 {
+            return;
+        }
+
+        // 이미 방문했는지 확인
+        {
+            let mut visited = self.visited.lock().unwrap();
+            if visited.contains(&url) {
+                return;
+            }
+            visited.insert(url.clone());
+        }
+
+        println!("Crawling: {}", url);
+
+        // 페이지 가져오기
+        match self.fetch(&url).await {
+            Ok(content) =&gt; {
+                println!("Fetched {} bytes from {}", content.len(), url);
+
+                // 여기서 링크를 추출하고 재귀적으로 크롤링
+                // (간단한 예제를 위해 생략)
+            }
+            Err(e) =&gt; {
+                println!("Error fetching {}: {}", url, e);
+            }
+        }
+    }
+
+    async fn crawl_concurrent(&self, urls: Vec&lt;String&gt;, depth: usize) {
+        let mut tasks = vec![];
+
+        for url in urls {
+            let crawler = Crawler {
+                visited: Arc::clone(&self.visited),
+                client: self.client.clone(),
+            };
+
+            let task = tokio::spawn(async move {
+                crawler.crawl(url, depth).await;
+            });
+
+            tasks.push(task);
+        }
+
+        // 모든 태스크 완료 대기
+        for task in tasks {
+            let _ = task.await;
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let crawler = Crawler::new();
+
+    let urls = vec![
+        "https://example.com".to_string(),
+        "https://rust-lang.org".to_string(),
+        "https://github.com".to_string(),
+    ];
+
+    crawler.crawl_concurrent(urls, 2).await;
+
+    println!("Crawling complete!");
+    let visited = crawler.visited.lock().unwrap();
+    println!("Visited {} pages", visited.len());
+}</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>Future는 poll 기반의 상태 머신</li>
+                <li>async/await로 비동기 코드를 동기 코드처럼 작성</li>
+                <li>Tokio로 효율적인 비동기 런타임 구현</li>
+                <li>Pin으로 자체 참조 구조체 안전하게 관리</li>
+                <li>채널로 태스크 간 통신</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

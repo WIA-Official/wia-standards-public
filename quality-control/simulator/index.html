@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WIA Quality Control Simulator — WIA-IND-025</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+:root{--primary:#F59E0B;--primary-dark:#B45309;--bg:#0f172a;--bg-card:#1e293b;--text:#f8fafc;--text-muted:#94a3b8;--border:#334155;--success:#10b981;--danger:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:1rem}
+.container{max-width:1100px;margin:0 auto}
+.top-nav{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
+.top-nav a{color:var(--text);text-decoration:none}
+header{text-align:center;padding:30px 0}
+h1{font-size:2rem;color:var(--primary);margin-bottom:8px}
+.subtitle{color:var(--text-muted);font-size:1rem}
+.tabs{display:flex;gap:8px;margin:30px 0 20px;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:10px 18px;cursor:pointer;background:transparent;border:0;color:var(--text-muted);border-bottom:2px solid transparent;font-size:.95rem}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.panel{display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px}
+.panel.active{display:block}
+label{display:block;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}
+input,select,textarea{width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;margin-bottom:14px}
+button.action{padding:10px 18px;background:var(--primary);color:#0f172a;border:0;border-radius:6px;font-weight:600;cursor:pointer}
+.result{margin-top:18px;padding:14px;background:#0f172a;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:.9rem;white-space:pre-wrap}
+.metric{display:inline-block;padding:6px 14px;border-radius:14px;font-size:.9rem;margin-right:8px;margin-bottom:8px}
+.metric.ok{background:rgba(16,185,129,.18);color:var(--success);border:1px solid var(--success)}
+.metric.fail{background:rgba(239,68,68,.18);color:var(--danger);border:1px solid var(--danger)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.grid-2{grid-template-columns:1fr}}
+footer{text-align:center;padding:30px 0;color:var(--text-muted);border-top:1px solid var(--border);margin-top:30px}
+</style>
+</head>
+<body>
+<div class="container">
+  <nav class="top-nav">
+    <a href="../">← Back to WIA Quality Control</a>
+    <a href="https://wiastandards.com">🤟 WIA Standards</a>
+  </nav>
+  <header>
+    <h1>Quality Control Simulator</h1>
+    <p class="subtitle">WIA-IND-025 — Inspection · SPC · Defects · Calibration · NCR</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('inspection',event)">Inspection</button>
+    <button class="tab" onclick="showTab('spc',event)">SPC</button>
+    <button class="tab" onclick="showTab('defect',event)">Defect</button>
+    <button class="tab" onclick="showTab('calibration',event)">Calibration</button>
+    <button class="tab" onclick="showTab('ncr',event)">NCR/CAPA</button>
+  </div>
+
+  <div id="inspection" class="panel active">
+    <h2>Inspection Plan</h2>
+    <p style="color:var(--text-muted);margin:8px 0 18px;">Compose an inspection plan from a part number, sampling rule, and checkpoint list.</p>
+    <div class="grid-2">
+      <div><label>Part number</label><input id="ins-part" value="A-014" /></div>
+      <div><label>Sampling rule</label>
+        <select id="ins-rule"><option>AQL 1.0 / level II</option><option>AQL 2.5 / level II</option><option>100% inspection</option></select>
+      </div>
+    </div>
+    <label>Checkpoints (one per line)</label>
+    <textarea id="ins-cps" rows="4">Outer dimension within tolerance
+Surface finish within Ra spec
+Functional torque within range
+Marking presence</textarea>
+    <button class="action" onclick="planInspection()">Compose plan</button>
+    <div id="ins-out" class="result" style="display:none"></div>
+  </div>
+
+  <div id="spc" class="panel">
+    <h2>Process Capability (Cp / Cpk)</h2>
+    <div class="grid-2">
+      <div><label>USL</label><input id="spc-usl" type="number" value="10.05" step="0.01"/></div>
+      <div><label>LSL</label><input id="spc-lsl" type="number" value="9.95" step="0.01"/></div>
+      <div><label>Mean</label><input id="spc-mean" type="number" value="10.00" step="0.01"/></div>
+      <div><label>Stdev</label><input id="spc-sd" type="number" value="0.012" step="0.001"/></div>
+    </div>
+    <button class="action" onclick="calcSPC()">Compute</button>
+    <div id="spc-out" class="result" style="display:none"></div>
+  </div>
+
+  <div id="defect" class="panel">
+    <h2>Defect Classification</h2>
+    <div class="grid-2">
+      <div><label>Severity</label>
+        <select id="def-sev"><option>cosmetic</option><option>minor</option><option>major</option><option>critical</option></select>
+      </div>
+      <div><label>Frequency / 1000 units</label><input id="def-freq" type="number" value="3"/></div>
+    </div>
+    <button class="action" onclick="classifyDefect()">Classify</button>
+    <div id="def-out" class="result" style="display:none"></div>
+  </div>
+
+  <div id="calibration" class="panel">
+    <h2>Calibration Schedule</h2>
+    <div class="grid-2">
+      <div><label>Equipment ID</label><input id="cal-eq" value="MIC-CMM-007"/></div>
+      <div><label>Last calibrated (date)</label><input id="cal-date" type="date" value="2026-01-15"/></div>
+      <div><label>Interval (months)</label><input id="cal-int" type="number" value="6"/></div>
+    </div>
+    <button class="action" onclick="calcCal()">Compute next due</button>
+    <div id="cal-out" class="result" style="display:none"></div>
+  </div>
+
+  <div id="ncr" class="panel">
+    <h2>NCR / CAPA Workflow</h2>
+    <div class="grid-2">
+      <div><label>Detected at</label>
+        <select id="ncr-stage"><option>incoming</option><option>in-process</option><option>final</option><option>field</option></select>
+      </div>
+      <div><label>Severity</label>
+        <select id="ncr-sev"><option>minor</option><option>major</option><option>critical</option></select>
+      </div>
+    </div>
+    <label>Description</label>
+    <textarea id="ncr-desc" rows="3">Threading depth out of spec on lot L-2026-04-A</textarea>
+    <button class="action" onclick="openNCR()">Open NCR</button>
+    <div id="ncr-out" class="result" style="display:none"></div>
+  </div>
+
+  <footer>
+    弘益人間 · Benefit All Humanity · WIA-IND-025 v1.0.0
+  </footer>
+</div>
+
+<script>
+function showTab(id,ev){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  ev.target.classList.add('active');
+}
+function show(id,text){const el=document.getElementById(id);el.style.display='block';el.textContent=text}
+function planInspection(){
+  const p={part:document.getElementById('ins-part').value,
+           rule:document.getElementById('ins-rule').value,
+           checkpoints:document.getElementById('ins-cps').value.split('\n').filter(Boolean)};
+  show('ins-out',JSON.stringify({wia_quality_control_version:'1.0.0',type:'inspection_plan',plan_id:'plan_'+Date.now(),...p},null,2));
+}
+function calcSPC(){
+  const usl=+document.getElementById('spc-usl').value,
+        lsl=+document.getElementById('spc-lsl').value,
+        m  =+document.getElementById('spc-mean').value,
+        s  =+document.getElementById('spc-sd').value;
+  const cp=((usl-lsl)/(6*s)).toFixed(2),cpu=((usl-m)/(3*s)).toFixed(2),cpl=((m-lsl)/(3*s)).toFixed(2);
+  const cpk=Math.min(+cpu,+cpl).toFixed(2);
+  show('spc-out',`Cp = ${cp}\nCpu = ${cpu}\nCpl = ${cpl}\nCpk = ${cpk}\n\nVerdict: ${cpk>=1.33?'CAPABLE':'NOT CAPABLE — investigate'}`);
+}
+function classifyDefect(){
+  const sev=document.getElementById('def-sev').value,
+        fr =+document.getElementById('def-freq').value;
+  const ppm=fr*1000;
+  const action=sev==='critical'||fr>=10?'IMMEDIATE STOP — open NCR':sev==='major'?'Open NCR within 1 shift':'Log to defect tracker';
+  show('def-out',`Severity: ${sev}\nFrequency: ${fr}/1000 units (${ppm} PPM)\nRecommended action: ${action}`);
+}
+function calcCal(){
+  const d=new Date(document.getElementById('cal-date').value);
+  d.setMonth(d.getMonth()+(+document.getElementById('cal-int').value));
+  show('cal-out',`Equipment: ${document.getElementById('cal-eq').value}\nNext due: ${d.toISOString().slice(0,10)}\nStatus: ${d>new Date()?'OK':'OVERDUE — quarantine equipment'}`);
+}
+function openNCR(){
+  const id='NCR-'+Date.now();
+  show('ncr-out',JSON.stringify({wia_quality_control_version:'1.0.0',type:'ncr',ncr_id:id,
+    detected_at:document.getElementById('ncr-stage').value,
+    severity:document.getElementById('ncr-sev').value,
+    description:document.getElementById('ncr-desc').value,
+    opened_at:new Date().toISOString(),
+    capa_required:document.getElementById('ncr-sev').value!=='minor'},null,2));
+}
+</script>
+</body>
+</html>

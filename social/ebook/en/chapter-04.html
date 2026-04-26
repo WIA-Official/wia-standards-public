@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 4: Unified Feed - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>Chapter 4: Unified Feed</h1>
+
+<blockquote>
+"Hongik Ingan: All your connections, one stream."
+</blockquote>
+
+<hr>
+
+<h2>4.1 The Fragmented Feed Problem</h2>
+
+<pre>
+Current Reality
+===============
+
+Morning routine:
+  1. Open Instagram - scroll for 10 min
+  2. Open Twitter - scroll for 10 min
+  3. Open TikTok - scroll for 15 min
+  4. Open Threads - scroll for 5 min
+  5. Open Bluesky - scroll for 5 min
+
+Total: 45 minutes
+Missed posts: Many (algorithms decide)
+Context switching: Exhausting
+Important updates: Possibly missed
+
+The problem:
+  - Each app shows what IT wants you to see
+  - Friends' posts hidden by algorithms
+  - No chronological option on most platforms
+  - Duplicates across platforms
+</pre>
+
+<hr>
+
+<h2>4.2 One Feed, All Platforms</h2>
+
+<pre>
+WIA-SOCIAL Unified Feed
+=======================
+
+const feed = await social.getFeed({
+  sorting: 'chronological',
+  platforms: ['instagram', 'twitter', 'tiktok', 'bluesky']
+});
+
+Result:
++------------------------------------------+
+| UNIFIED FEED                             |
++------------------------------------------+
+| [Instagram] @friend1          2 min ago |
+| Beautiful sunset photo!                  |
++------------------------------------------+
+| [Twitter] @friend2            5 min ago |
+| Just shipped a new feature!             |
++------------------------------------------+
+| [Bluesky] @friend3.bsky       8 min ago |
+| Thoughts on decentralization...          |
++------------------------------------------+
+| [TikTok] @friend4            10 min ago |
+| [Video] Dance challenge                  |
++------------------------------------------+
+| [Twitter] @friend5           12 min ago |
+| Hot take: tabs vs spaces                 |
++------------------------------------------+
+
+All platforms, one stream.
+Chronological order.
+Nothing hidden.
+</pre>
+
+<h3>Feed Structure</h3>
+
+<pre>
+interface UnifiedFeed {
+  posts: UniversalPost[];
+
+  sources: {
+    platform: Platform;
+    connected: boolean;
+    lastSync: Timestamp;
+  }[];
+
+  pagination: {
+    hasMore: boolean;
+    nextCursor: string;
+  };
+
+  metadata: {
+    fetchedAt: Timestamp;
+    totalPosts: number;
+    platforms: number;
+  };
+}
+</pre>
+
+<hr>
+
+<h2>4.3 Sorting Options</h2>
+
+<pre>
+Chronological
+=============
+
+const feed = await social.getFeed({
+  sorting: 'chronological'
+});
+
+// Posts in exact time order
+// Newest first
+// No algorithm interference
+// See everything from everyone
+
+
+Algorithmic
+===========
+
+const feed = await social.getFeed({
+  sorting: 'algorithmic'
+});
+
+// Smart sorting based on:
+// - Your engagement history
+// - Relationship strength
+// - Content relevance
+// - Time decay
+
+// Unlike platform algorithms:
+// - Transparent ranking factors
+// - You control the weights
+// - No promoted content
+
+
+By Engagement
+=============
+
+const feed = await social.getFeed({
+  sorting: 'engagement'
+});
+
+// Sorted by total engagement:
+// - Likes + comments + shares
+// - Across all platforms
+// - See what's trending among friends
+</pre>
+
+<hr>
+
+<h2>4.4 Filtering</h2>
+
+<pre>
+Platform Filter
+===============
+
+// Only specific platforms
+const feed = await social.getFeed({
+  filters: {
+    platforms: ['instagram', 'bluesky']
+  }
+});
+
+
+Content Type Filter
+===================
+
+// Only photos
+const feed = await social.getFeed({
+  filters: {
+    contentTypes: ['image']
+  }
+});
+
+// Only videos
+const feed = await social.getFeed({
+  filters: {
+    contentTypes: ['video']
+  }
+});
+
+// Text only (no media)
+const feed = await social.getFeed({
+  filters: {
+    contentTypes: ['text']
+  }
+});
+
+
+Author Filter
+=============
+
+// Specific friends only
+const feed = await social.getFeed({
+  filters: {
+    authors: ['wia:kim.minsu.1234', 'wia:lee.jiyoung.5678']
+  }
+});
+
+
+Combined Filters
+================
+
+const feed = await social.getFeed({
+  sorting: 'chronological',
+  filters: {
+    platforms: ['instagram', 'twitter'],
+    contentTypes: ['image', 'video'],
+    dateRange: {
+      from: '2025-01-01',
+      to: '2025-01-15'
+    },
+    excludeReposts: true
+  }
+});
+</pre>
+
+<hr>
+
+<h2>4.5 Real-Time Updates</h2>
+
+<pre>
+Subscribe to Feed
+=================
+
+// Real-time new posts
+const unsubscribe = social.subscribeFeed((post) => {
+  console.log('New post from:', post.author.displayName);
+  console.log('Platform:', post.platform);
+  console.log('Content:', post.content.text);
+
+  // Update your UI
+  addToFeed(post);
+});
+
+// Later, stop subscription
+unsubscribe();
+
+
+Notifications
+=============
+
+// Get notified about specific events
+social.on('feed_updated', (event) => {
+  console.log('New posts:', event.data.count);
+});
+
+social.on('friend_posted', (event) => {
+  if (event.data.author.isMutual) {
+    showNotification(event.data);
+  }
+});
+</pre>
+
+<hr>
+
+<h2>4.6 Smart Features</h2>
+
+<pre>
+Duplicate Detection
+===================
+
+When you cross-post, friends might see:
+  - Your Instagram post
+  - Your Twitter post (same content)
+  - Your Threads post (same content)
+
+WIA-SOCIAL detects this:
+
+const feed = await social.getFeed({
+  deduplication: {
+    enabled: true,
+    strategy: 'keep_first', // or 'keep_best_engagement'
+    threshold: 0.9  // similarity threshold
+  }
+});
+
+Result: Only one version shown
+
+
+Highlight Important
+===================
+
+// Posts from close friends ranked higher
+await social.setFeedPreferences({
+  prioritize: {
+    closeFriends: true,
+    mutualFollows: true,
+    frequentInteractions: true
+  },
+  deprioritize: {
+    promotedContent: true,
+    lowEngagement: false
+  }
+});
+
+
+Save for Later
+==============
+
+// Bookmark across platforms
+await social.bookmark(postId);
+
+// Get all bookmarks
+const saved = await social.getBookmarks();
+// Unified bookmarks from all platforms
+</pre>
+
+<hr>
+
+<h2>4.7 Unified Interactions</h2>
+
+<pre>
+React to Posts
+==============
+
+// Like/favorite
+await social.react(postId, 'like');
+
+// The reaction goes to the original platform
+// Instagram: Like
+// Twitter: Like
+// Bluesky: Like
+
+
+Comment
+=======
+
+// Comment from unified feed
+await social.comment(postId, {
+  text: 'Great post!'
+});
+
+// Comment goes to original platform
+
+
+Share/Repost
+============
+
+// Repost to your connected platforms
+await social.repost(postId, {
+  targets: ['twitter', 'bluesky'],
+  comment: 'Check this out!'
+});
+
+
+View Unified Reactions
+======================
+
+const reactions = await social.getReactions(postId);
+
+Result:
+{
+  total: 150,
+  breakdown: {
+    instagram: { likes: 100 },
+    twitter: { likes: 30, retweets: 10 },
+    bluesky: { likes: 10 }
+  }
+}
+</pre>
+
+<hr>
+
+<h2>4.8 Feed Customization</h2>
+
+<pre>
+Create Custom Feeds
+===================
+
+// Tech news feed
+const techFeed = await social.createCustomFeed({
+  name: 'Tech News',
+  sources: {
+    platforms: ['twitter', 'bluesky'],
+    keywords: ['tech', 'AI', 'startup'],
+    authors: [techInfluencers]
+  }
+});
+
+// Close friends feed
+const closeFriendsFeed = await social.createCustomFeed({
+  name: 'Close Friends',
+  sources: {
+    lists: ['close_friends'],
+    excludeReposts: true
+  }
+});
+
+
+Lists
+=====
+
+// Create lists that work across platforms
+await social.createList({
+  name: 'Work Colleagues',
+  members: [
+    'wia:kim.minsu.1234',
+    'wia:lee.jiyoung.5678'
+  ]
+});
+
+// Feed from list
+const workFeed = await social.getFeed({
+  list: 'work_colleagues'
+});
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] One unified feed for all connected platforms</li>
+<li>[OK] Multiple sorting options including true chronological</li>
+<li>[OK] Rich filtering by platform, content type, author, date</li>
+<li>[OK] Real-time subscription for new posts</li>
+<li>[OK] Smart deduplication for cross-posted content</li>
+<li>[OK] Unified interactions (like, comment, share) across platforms</li>
+<li>[OK] Custom feeds and lists for personalized experience</li>
+</ul>
+</body>
+</html>

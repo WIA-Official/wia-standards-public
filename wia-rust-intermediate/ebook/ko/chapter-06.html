@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6장: 에러 처리 & 디자인 패턴 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>6장: 에러 처리 & 디자인 패턴</h1>
+
+        <h2>6.1 thiserror - 커스텀 에러 타입</h2>
+        <p>thiserror는 커스텀 에러 타입을 쉽게 만들 수 있게 해줍니다.</p>
+
+        <h3>6.1.1 기본 사용법</h3>
+        <pre>use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum DataStoreError {
+    #[error("데이터를 찾을 수 없습니다: {0}")]
+    NotFound(String),
+
+    #[error("접근 권한이 없습니다")]
+    PermissionDenied,
+
+    #[error("I/O 에러")]
+    Io(#[from] std::io::Error),
+
+    #[error("파싱 에러: {0}")]
+    Parse(#[from] std::num::ParseIntError),
+
+    #[error("알 수 없는 에러")]
+    Unknown,
+}
+
+fn read_user(id: &str) -&gt; Result&lt;String, DataStoreError&gt; {
+    if id.is_empty() {
+        return Err(DataStoreError::NotFound("빈 ID".to_string()));
+    }
+
+    // I/O 에러가 자동으로 변환됨
+    let content = std::fs::read_to_string(format!("users/{}.txt", id))?;
+
+    // Parse 에러가 자동으로 변환됨
+    let _age: u32 = content.trim().parse()?;
+
+    Ok(content)
+}
+
+fn main() {
+    match read_user("123") {
+        Ok(data) =&gt; println!("Data: {}", data),
+        Err(e) =&gt; eprintln!("Error: {}", e),
+    }
+}</pre>
+
+        <h2>6.2 anyhow - 애플리케이션 에러 처리</h2>
+        <p>anyhow는 애플리케이션에서 에러를 쉽게 전파하고 컨텍스트를 추가할 수 있게 해줍니다.</p>
+
+        <pre>use anyhow::{Context, Result, bail, ensure};
+
+fn process_config(path: &str) -&gt; Result&lt;String&gt; {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("설정 파일을 읽을 수 없습니다: {}", path))?;
+
+    ensure!(!content.is_empty(), "설정 파일이 비어있습니다");
+
+    if content.contains("invalid") {
+        bail!("유효하지 않은 설정입니다");
+    }
+
+    Ok(content)
+}
+
+fn main() -&gt; Result&lt;()&gt; {
+    let config = process_config("config.toml")?;
+    println!("Config loaded: {}", config);
+    Ok(())
+}</pre>
+
+        <h3>6.2.1 에러 체이닝</h3>
+        <pre>use anyhow::{Context, Result};
+
+fn read_file(path: &str) -&gt; Result&lt;String&gt; {
+    std::fs::read_to_string(path)
+        .context("파일 읽기 실패")
+}
+
+fn parse_number(s: &str) -&gt; Result&lt;i32&gt; {
+    s.parse::&lt;i32&gt;()
+        .context("숫자 파싱 실패")
+}
+
+fn process() -&gt; Result&lt;i32&gt; {
+    let content = read_file("number.txt")
+        .context("설정 로드 실패")?;
+
+    let number = parse_number(&content)
+        .context("설정 파싱 실패")?;
+
+    Ok(number * 2)
+}
+
+fn main() {
+    match process() {
+        Ok(result) =&gt; println!("Result: {}", result),
+        Err(e) =&gt; {
+            eprintln!("Error: {:?}", e);
+            // 에러 체인 출력
+            for cause in e.chain() {
+                eprintln!("  Caused by: {}", cause);
+            }
+        }
+    }
+}</pre>
+
+        <h2>6.3 Builder 패턴</h2>
+        <p>복잡한 객체를 단계적으로 생성합니다.</p>
+
+        <pre>// derive_builder 크레이트 사용
+use derive_builder::Builder;
+
+#[derive(Builder, Debug)]
+#[builder(setter(into))]
+struct Request {
+    url: String,
+
+    #[builder(default)]
+    method: String,
+
+    #[builder(default)]
+    headers: Vec&lt;(String, String)&gt;,
+
+    #[builder(default)]
+    body: Option&lt;String&gt;,
+
+    #[builder(default = "30")]
+    timeout: u64,
+}
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    let request = RequestBuilder::default()
+        .url("https://api.example.com/users")
+        .method("POST")
+        .headers(vec![
+            ("Content-Type".to_string(), "application/json".to_string()),
+            ("Authorization".to_string(), "Bearer token".to_string()),
+        ])
+        .body(r#"{"name": "Alice"}"#)
+        .timeout(60)
+        .build()?;
+
+    println!("{:?}", request);
+    Ok(())
+}</pre>
+
+        <h3>6.3.1 수동 Builder 구현</h3>
+        <pre>struct Database {
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    pool_size: usize,
+}
+
+struct DatabaseBuilder {
+    host: Option&lt;String&gt;,
+    port: Option&lt;u16&gt;,
+    username: Option&lt;String&gt;,
+    password: Option&lt;String&gt;,
+    pool_size: Option&lt;usize&gt;,
+}
+
+impl DatabaseBuilder {
+    fn new() -&gt; Self {
+        DatabaseBuilder {
+            host: None,
+            port: None,
+            username: None,
+            password: None,
+            pool_size: None,
+        }
+    }
+
+    fn host(mut self, host: impl Into&lt;String&gt;) -&gt; Self {
+        self.host = Some(host.into());
+        self
+    }
+
+    fn port(mut self, port: u16) -&gt; Self {
+        self.port = Some(port);
+        self
+    }
+
+    fn username(mut self, username: impl Into&lt;String&gt;) -&gt; Self {
+        self.username = Some(username.into());
+        self
+    }
+
+    fn password(mut self, password: impl Into&lt;String&gt;) -&gt; Self {
+        self.password = Some(password.into());
+        self
+    }
+
+    fn pool_size(mut self, size: usize) -&gt; Self {
+        self.pool_size = Some(size);
+        self
+    }
+
+    fn build(self) -&gt; Result&lt;Database, String&gt; {
+        Ok(Database {
+            host: self.host.ok_or("host is required")?,
+            port: self.port.unwrap_or(5432),
+            username: self.username.ok_or("username is required")?,
+            password: self.password.ok_or("password is required")?,
+            pool_size: self.pool_size.unwrap_or(10),
+        })
+    }
+}
+
+fn main() -&gt; Result&lt;(), String&gt; {
+    let db = DatabaseBuilder::new()
+        .host("localhost")
+        .username("admin")
+        .password("secret")
+        .build()?;
+
+    println!("Connected to {}:{}", db.host, db.port);
+    Ok(())
+}</pre>
+
+        <h2>6.4 Newtype 패턴</h2>
+        <p>타입 안전성을 높이고 의미를 명확히 합니다.</p>
+
+        <pre>// 이메일 검증
+use std::fmt;
+
+#[derive(Debug, Clone)]
+pub struct Email(String);
+
+impl Email {
+    pub fn new(email: impl Into&lt;String&gt;) -&gt; Result&lt;Self, String&gt; {
+        let email = email.into();
+
+        if email.contains('@') && email.contains('.') {
+            Ok(Email(email))
+        } else {
+            Err(format!("유효하지 않은 이메일: {}", email))
+        }
+    }
+
+    pub fn as_str(&self) -&gt; &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for Email {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+// 사용자 구조체
+struct User {
+    name: String,
+    email: Email, // String이 아닌 Email 타입!
+}
+
+fn send_email(to: &Email, message: &str) {
+    println!("Sending to {}: {}", to, message);
+}
+
+fn main() -&gt; Result&lt;(), String&gt; {
+    let email = Email::new("user@example.com")?;
+    let user = User {
+        name: "Alice".to_string(),
+        email: email.clone(),
+    };
+
+    send_email(&user.email, "Welcome!");
+
+    // 컴파일 에러!
+    // send_email("invalid", "Test");
+
+    Ok(())
+}</pre>
+
+        <h2>6.5 Visitor 패턴</h2>
+        <p>데이터 구조와 알고리즘을 분리합니다.</p>
+
+        <pre>// AST 노드
+enum Expr {
+    Number(i32),
+    Add(Box&lt;Expr&gt;, Box&lt;Expr&gt;),
+    Multiply(Box&lt;Expr&gt;, Box&lt;Expr&gt;),
+}
+
+// Visitor 트레이트
+trait ExprVisitor {
+    type Output;
+
+    fn visit_number(&mut self, n: i32) -&gt; Self::Output;
+    fn visit_add(&mut self, left: &Expr, right: &Expr) -&gt; Self::Output;
+    fn visit_multiply(&mut self, left: &Expr, right: &Expr) -&gt; Self::Output;
+}
+
+impl Expr {
+    fn accept&lt;V: ExprVisitor&gt;(&self, visitor: &mut V) -&gt; V::Output {
+        match self {
+            Expr::Number(n) =&gt; visitor.visit_number(*n),
+            Expr::Add(l, r) =&gt; visitor.visit_add(l, r),
+            Expr::Multiply(l, r) =&gt; visitor.visit_multiply(l, r),
+        }
+    }
+}
+
+// 평가 방문자
+struct Evaluator;
+
+impl ExprVisitor for Evaluator {
+    type Output = i32;
+
+    fn visit_number(&mut self, n: i32) -&gt; i32 {
+        n
+    }
+
+    fn visit_add(&mut self, left: &Expr, right: &Expr) -&gt; i32 {
+        left.accept(self) + right.accept(self)
+    }
+
+    fn visit_multiply(&mut self, left: &Expr, right: &Expr) -&gt; i32 {
+        left.accept(self) * right.accept(self)
+    }
+}
+
+// 출력 방문자
+struct Printer;
+
+impl ExprVisitor for Printer {
+    type Output = String;
+
+    fn visit_number(&mut self, n: i32) -&gt; String {
+        n.to_string()
+    }
+
+    fn visit_add(&mut self, left: &Expr, right: &Expr) -&gt; String {
+        format!("({} + {})", left.accept(self), right.accept(self))
+    }
+
+    fn visit_multiply(&mut self, left: &Expr, right: &Expr) -&gt; String {
+        format!("({} * {})", left.accept(self), right.accept(self))
+    }
+}
+
+fn main() {
+    // (2 + 3) * 4
+    let expr = Expr::Multiply(
+        Box::new(Expr::Add(
+            Box::new(Expr::Number(2)),
+            Box::new(Expr::Number(3)),
+        )),
+        Box::new(Expr::Number(4)),
+    );
+
+    let mut evaluator = Evaluator;
+    println!("Result: {}", expr.accept(&mut evaluator));
+
+    let mut printer = Printer;
+    println!("Expression: {}", expr.accept(&mut printer));
+}</pre>
+
+        <h2>6.6 Strategy 패턴</h2>
+        <pre>trait CompressionStrategy {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt;;
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt;;
+}
+
+struct GzipCompression;
+struct ZstdCompression;
+struct NoCompression;
+
+impl CompressionStrategy for GzipCompression {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Compressing with GZIP");
+        data.to_vec() // 실제로는 압축
+    }
+
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Decompressing with GZIP");
+        data.to_vec()
+    }
+}
+
+impl CompressionStrategy for ZstdCompression {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Compressing with Zstd");
+        data.to_vec()
+    }
+
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Decompressing with Zstd");
+        data.to_vec()
+    }
+}
+
+impl CompressionStrategy for NoCompression {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        data.to_vec()
+    }
+
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        data.to_vec()
+    }
+}
+
+struct FileManager {
+    strategy: Box&lt;dyn CompressionStrategy&gt;,
+}
+
+impl FileManager {
+    fn new(strategy: Box&lt;dyn CompressionStrategy&gt;) -&gt; Self {
+        FileManager { strategy }
+    }
+
+    fn set_strategy(&mut self, strategy: Box&lt;dyn CompressionStrategy&gt;) {
+        self.strategy = strategy;
+    }
+
+    fn save(&self, data: &[u8]) {
+        let compressed = self.strategy.compress(data);
+        println!("Saved {} bytes", compressed.len());
+    }
+
+    fn load(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        self.strategy.decompress(data)
+    }
+}
+
+fn main() {
+    let data = b"Hello, World!";
+
+    let mut manager = FileManager::new(Box::new(GzipCompression));
+    manager.save(data);
+
+    manager.set_strategy(Box::new(ZstdCompression));
+    manager.save(data);
+
+    manager.set_strategy(Box::new(NoCompression));
+    manager.save(data);
+}</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>thiserror로 라이브러리 에러 타입 정의</li>
+                <li>anyhow로 애플리케이션 에러 처리 간소화</li>
+                <li>Builder 패턴으로 복잡한 객체 생성</li>
+                <li>Newtype으로 타입 안전성 강화</li>
+                <li>Visitor 패턴으로 데이터와 알고리즘 분리</li>
+                <li>Strategy 패턴으로 알고리즘 교체 가능하게 설계</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

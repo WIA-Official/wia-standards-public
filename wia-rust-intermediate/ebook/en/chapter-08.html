@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 8: Real-World Projects - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        .project-box { background: linear-gradient(135deg, #2d1f3d 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--rust-purple); }
+        .project-box h3 { color: var(--rust-purple); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 8: Real-World Projects</h1>
+
+        <p>Time to put it all together! This chapter walks through building production-ready applications using the intermediate concepts you've learned.</p>
+
+        <h2>8.1 Project 1: High-Performance REST API</h2>
+
+        <h3>Architecture Overview</h3>
+
+        <pre>// Project structure
+project/
+├── Cargo.toml
+├── src/
+│   ├── main.rs
+│   ├── api/
+│   │   ├── mod.rs
+│   │   ├── handlers.rs
+│   │   └── middleware.rs
+│   ├── db/
+│   │   ├── mod.rs
+│   │   └── pool.rs
+│   ├── models/
+│   │   ├── mod.rs
+│   │   └── user.rs
+│   └── error.rs
+└── tests/
+    └── integration_test.rs</pre>
+
+        <h3>Error Types with thiserror</h3>
+
+        <pre>// src/error.rs
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ApiError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    #[error("Unauthorized")]
+    Unauthorized,
+}
+
+impl axum::response::IntoResponse for ApiError {
+    fn into_response(self) -&gt; axum::response::Response {
+        use axum::http::StatusCode;
+        use axum::Json;
+        use serde_json::json;
+
+        let (status, message) = match self {
+            ApiError::Database(_) =&gt; (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            ApiError::NotFound(_) =&gt; (StatusCode::NOT_FOUND, self.to_string()),
+            ApiError::Validation(_) =&gt; (StatusCode::BAD_REQUEST, self.to_string()),
+            ApiError::Unauthorized =&gt; (StatusCode::UNAUTHORIZED, self.to_string()),
+        };
+
+        (status, Json(json!({ "error": message }))).into_response()
+    }
+}</pre>
+
+        <h3>Database Layer with Connection Pool</h3>
+
+        <pre>// src/db/pool.rs
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use std::time::Duration;
+
+pub async fn create_pool(database_url: &str) -&gt; Result&lt;PgPool, sqlx::Error&gt; {
+    PgPoolOptions::new()
+        .max_connections(10)
+        .acquire_timeout(Duration::from_secs(3))
+        .connect(database_url)
+        .await
+}
+
+// src/models/user.rs
+use sqlx::FromRow;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: i64,
+    pub name: String,
+    pub email: String,
+    pub created_at: chrono::DateTime&lt;chrono::Utc&gt;,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateUser {
+    pub name: String,
+    pub email: String,
+}
+
+pub async fn create_user(pool: &PgPool, user: CreateUser) -&gt; Result&lt;User, sqlx::Error&gt; {
+    sqlx::query_as::&lt;_, User&gt;(
+        "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *"
+    )
+    .bind(&user.name)
+    .bind(&user.email)
+    .fetch_one(pool)
+    .await
+}
+
+pub async fn get_user(pool: &PgPool, id: i64) -&gt; Result&lt;User, sqlx::Error&gt; {
+    sqlx::query_as::&lt;_, User&gt;("SELECT * FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+}</pre>
+
+        <h3>API Handlers with Axum</h3>
+
+        <pre>// src/api/handlers.rs
+use axum::{
+    extract::{Path, State},
+    Json,
+};
+use std::sync::Arc;
+
+use crate::{error::ApiError, models::*};
+
+pub type AppState = Arc&lt;sqlx::PgPool&gt;;
+
+pub async fn create_user_handler(
+    State(pool): State&lt;AppState&gt;,
+    Json(payload): Json&lt;CreateUser&gt;,
+) -&gt; Result&lt;Json&lt;User&gt;, ApiError&gt; {
+    let user = create_user(&pool, payload).await?;
+    Ok(Json(user))
+}
+
+pub async fn get_user_handler(
+    State(pool): State&lt;AppState&gt;,
+    Path(id): Path&lt;i64&gt;,
+) -&gt; Result&lt;Json&lt;User&gt;, ApiError&gt; {
+    let user = get_user(&pool, id)
+        .await
+        .map_err(|_| ApiError::NotFound(format!("User {} not found", id)))?;
+    Ok(Json(user))
+}
+
+// src/main.rs
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use std::sync::Arc;
+
+#[tokio::main]
+async fn main() {
+    let pool = db::create_pool(&std::env::var("DATABASE_URL").unwrap())
+        .await
+        .unwrap();
+
+    let app_state = Arc::new(pool);
+
+    let app = Router::new()
+        .route("/users", post(api::create_user_handler))
+        .route("/users/:id", get(api::get_user_handler))
+        .with_state(app_state);
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .unwrap();
+
+    axum::serve(listener, app).await.unwrap();
+}</pre>
+
+        <h2>8.2 Project 2: CLI Tool with Rich Features</h2>
+
+        <h3>Project Setup</h3>
+
+        <pre>// Cargo.toml
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+colored = "2"
+
+// src/cli.rs
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(name = "mytool")]
+#[command(about = "A modern CLI tool", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+
+    #[arg(short, long, global = true)]
+    verbose: bool,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Initialize a new project
+    Init {
+        #[arg(short, long)]
+        name: String,
+
+        #[arg(short, long, default_value = ".")]
+        path: String,
+    },
+
+    /// Build the project
+    Build {
+        #[arg(short, long)]
+        release: bool,
+    },
+
+    /// Run tests
+    Test {
+        #[arg(short, long)]
+        coverage: bool,
+    },
+}</pre>
+
+        <h3>Colorful Output</h3>
+
+        <pre>use colored::*;
+
+fn print_success(msg: &str) {
+    println!("{} {}", "✓".green().bold(), msg);
+}
+
+fn print_error(msg: &str) {
+    eprintln!("{} {}", "✗".red().bold(), msg);
+}
+
+fn print_info(msg: &str) {
+    println!("{} {}", "ℹ".blue().bold(), msg);
+}
+
+async fn run_init(name: String, path: String) -&gt; anyhow::Result&lt;()&gt; {
+    print_info(&format!("Initializing project '{}'...", name));
+
+    tokio::fs::create_dir_all(&path).await?;
+    print_success(&format!("Created directory: {}", path));
+
+    let config = serde_json::json!({
+        "name": name,
+        "version": "0.1.0",
+    });
+
+    tokio::fs::write(
+        format!("{}/config.json", path),
+        serde_json::to_string_pretty(&config)?
+    ).await?;
+
+    print_success("Project initialized successfully!");
+    Ok(())
+}</pre>
+
+        <h2>8.3 Project 3: WebSocket Server</h2>
+
+        <pre>use axum::{
+    extract::ws::{WebSocket, WebSocketUpgrade},
+    response::Response,
+    routing::get,
+    Router,
+};
+use std::sync::Arc;
+use tokio::sync::broadcast;
+
+type Tx = broadcast::Sender&lt;String&gt;;
+type Rx = broadcast::Receiver&lt;String&gt;;
+
+#[derive(Clone)]
+struct AppState {
+    tx: Tx,
+}
+
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    axum::extract::State(state): axum::extract::State&lt;AppState&gt;,
+) -&gt; Response {
+    ws.on_upgrade(|socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(socket: WebSocket, state: AppState) {
+    let (mut sender, mut receiver) = socket.split();
+    let mut rx = state.tx.subscribe();
+
+    // Spawn task to forward broadcast messages to this client
+    let mut send_task = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if sender.send(msg.into()).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Receive messages from this client and broadcast
+    let tx = state.tx.clone();
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(Ok(msg)) = receiver.next().await {
+            if let axum::extract::ws::Message::Text(text) = msg {
+                let _ = tx.send(text);
+            }
+        }
+    });
+
+    // Wait for either task to finish
+    tokio::select! {
+        _ = (&mut send_task) =&gt; recv_task.abort(),
+        _ = (&mut recv_task) =&gt; send_task.abort(),
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let (tx, _rx) = broadcast::channel(100);
+
+    let state = AppState { tx };
+
+    let app = Router::new()
+        .route("/ws", get(ws_handler))
+        .with_state(state);
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .unwrap();
+
+    axum::serve(listener, app).await.unwrap();
+}</pre>
+
+        <h2>8.4 Project 4: Background Job Processor</h2>
+
+        <pre>use tokio::sync::mpsc;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+#[derive(Debug, Serialize, Deserialize)]
+enum Job {
+    SendEmail { to: String, subject: String, body: String },
+    GenerateReport { user_id: u64 },
+    ProcessImage { path: String },
+}
+
+struct Worker {
+    id: usize,
+    receiver: mpsc::Receiver&lt;Job&gt;,
+}
+
+impl Worker {
+    async fn run(mut self) {
+        while let Some(job) = self.receiver.recv().await {
+            println!("Worker {} processing job: {:?}", self.id, job);
+
+            match job {
+                Job::SendEmail { to, subject, body } =&gt; {
+                    self.send_email(&to, &subject, &body).await;
+                }
+                Job::GenerateReport { user_id } =&gt; {
+                    self.generate_report(user_id).await;
+                }
+                Job::ProcessImage { path } =&gt; {
+                    self.process_image(&path).await;
+                }
+            }
+        }
+    }
+
+    async fn send_email(&self, to: &str, subject: &str, body: &str) {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        println!("Email sent to {}", to);
+    }
+
+    async fn generate_report(&self, user_id: u64) {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        println!("Report generated for user {}", user_id);
+    }
+
+    async fn process_image(&self, path: &str) {
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        println!("Image processed: {}", path);
+    }
+}
+
+struct JobQueue {
+    sender: mpsc::Sender&lt;Job&gt;,
+}
+
+impl JobQueue {
+    fn new(num_workers: usize) -&gt; Self {
+        let (sender, receiver) = mpsc::channel(100);
+
+        // Create worker pool
+        for id in 0..num_workers {
+            let worker_receiver = receiver.resubscribe();
+            let worker = Worker {
+                id,
+                receiver: worker_receiver,
+            };
+
+            tokio::spawn(async move {
+                worker.run().await;
+            });
+        }
+
+        JobQueue { sender }
+    }
+
+    async fn enqueue(&self, job: Job) -&gt; Result&lt;(), String&gt; {
+        self.sender
+            .send(job)
+            .await
+            .map_err(|_| "Failed to enqueue job".to_string())
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let queue = JobQueue::new(4);
+
+    // Enqueue jobs
+    queue.enqueue(Job::SendEmail {
+        to: "user@example.com".to_string(),
+        subject: "Hello".to_string(),
+        body: "Test email".to_string(),
+    }).await.unwrap();
+
+    queue.enqueue(Job::GenerateReport { user_id: 123 }).await.unwrap();
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
+}</pre>
+
+        <h2>8.5 Best Practices Checklist</h2>
+
+        <div class="project-box">
+            <h3>Production-Ready Rust Projects</h3>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li><strong>Error Handling:</strong> Use thiserror for libraries, anyhow for apps</li>
+                <li><strong>Logging:</strong> Use tracing for structured logging</li>
+                <li><strong>Configuration:</strong> Use config crate or environment variables</li>
+                <li><strong>Testing:</strong> Unit tests, integration tests, benchmarks</li>
+                <li><strong>Documentation:</strong> Doc comments on public APIs</li>
+                <li><strong>CI/CD:</strong> GitHub Actions for testing and deployment</li>
+                <li><strong>Security:</strong> Run cargo audit regularly</li>
+                <li><strong>Performance:</strong> Profile with flamegraph, benchmark critical paths</li>
+                <li><strong>Dependencies:</strong> Keep updated, minimize bloat</li>
+                <li><strong>Versioning:</strong> Follow semantic versioning</li>
+            </ul>
+        </div>
+
+        <h2>8.6 Deployment Strategies</h2>
+
+        <h3>Docker Container</h3>
+
+        <pre># Dockerfile
+FROM rust:1.75 as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y libssl3 ca-certificates
+COPY --from=builder /app/target/release/myapp /usr/local/bin/myapp
+CMD ["myapp"]</pre>
+
+        <h3>GitHub Actions CI</h3>
+
+        <pre># .github/workflows/ci.yml
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run tests
+        run: cargo test --all-features
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+      - name: Check formatting
+        run: cargo fmt -- --check</pre>
+
+        <h2>8.7 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>REST API:</strong> Axum + SQLx for high-performance web services</li>
+                <li><strong>CLI Tools:</strong> Clap for argument parsing, colored output</li>
+                <li><strong>WebSocket:</strong> Real-time communication with broadcast channels</li>
+                <li><strong>Background Jobs:</strong> Worker pools with async channels</li>
+                <li><strong>Production Ready:</strong> Error handling, logging, testing, CI/CD</li>
+                <li><strong>Deployment:</strong> Docker containers, cloud platforms</li>
+                <li><strong>Best Practices:</strong> Security audits, performance profiling</li>
+                <li><strong>Real-World Skills:</strong> Apply intermediate concepts to production code</li>
+            </ul>
+        </div>
+
+        <h2>8.8 Next Steps</h2>
+
+        <div class="highlight">
+            <strong>Continue Your Rust Journey</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>Build your own projects using these patterns</li>
+                <li>Contribute to open-source Rust projects</li>
+                <li>Explore advanced topics: unsafe Rust, proc macros, embedded</li>
+                <li>Join the Rust community: Discord, Reddit, forums</li>
+                <li>Read "The Rustonomicon" for unsafe Rust</li>
+                <li>Study production codebases: tokio, serde, ripgrep</li>
+                <li>Consider WIA-RUST-ADVANCED for expert-level topics</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

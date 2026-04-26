@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 7: Advanced Testing - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 7: Advanced Testing</h1>
+
+        <p>Comprehensive testing is crucial for production code. This chapter covers advanced testing techniques including property testing, fuzzing, mocking, and more.</p>
+
+        <h2>7.1 Unit Testing Best Practices</h2>
+
+        <h3>Organizing Tests</h3>
+
+        <pre>// src/lib.rs
+pub fn add(a: i32, b: i32) -&gt; i32 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_positive() {
+        assert_eq!(add(2, 3), 5);
+    }
+
+    #[test]
+    fn test_add_negative() {
+        assert_eq!(add(-2, -3), -5);
+    }
+
+    #[test]
+    #[should_panic(expected = "overflow")]
+    fn test_add_overflow() {
+        add(i32::MAX, 1);
+    }
+
+    #[test]
+    #[ignore]
+    fn expensive_test() {
+        // This test is ignored by default
+        // Run with: cargo test -- --ignored
+    }
+}
+
+// tests/integration_test.rs
+#[test]
+fn integration_test() {
+    // Integration tests go in separate files
+}</pre>
+
+        <h3>Custom Test Assertions</h3>
+
+        <pre>macro_rules! assert_approx_eq {
+    ($a:expr, $b:expr, $epsilon:expr) =&gt; {
+        let diff = ($a - $b).abs();
+        assert!(
+            diff &lt; $epsilon,
+            "assertion failed: {} ≈ {} (diff: {})",
+            $a, $b, diff
+        );
+    };
+}
+
+#[test]
+fn test_floating_point() {
+    assert_approx_eq!(0.1 + 0.2, 0.3, 1e-10);
+}
+
+// Using more_asserts crate
+use more_asserts::{assert_gt, assert_le};
+
+#[test]
+fn test_ordering() {
+    assert_gt!(5, 3);
+    assert_le!(2, 5);
+}</pre>
+
+        <h2>7.2 Property-Based Testing</h2>
+
+        <p>Property-based testing generates random inputs to verify properties that should always hold:</p>
+
+        <pre>use proptest::prelude::*;
+
+fn reverse&lt;T: Clone&gt;(vec: &[T]) -&gt; Vec&lt;T&gt; {
+    vec.iter().rev().cloned().collect()
+}
+
+proptest! {
+    #[test]
+    fn test_reverse_twice_is_identity(vec in prop::collection::vec(any::&lt;i32&gt;(), 0..100)) {
+        let reversed_twice = reverse(&reverse(&vec));
+        prop_assert_eq!(vec, reversed_twice);
+    }
+
+    #[test]
+    fn test_reverse_length(vec in prop::collection::vec(any::&lt;i32&gt;(), 0..100)) {
+        let reversed = reverse(&vec);
+        prop_assert_eq!(vec.len(), reversed.len());
+    }
+
+    #[test]
+    fn test_addition_commutative(a in any::&lt;i32&gt;(), b in any::&lt;i32&gt;()) {
+        prop_assume!(a.checked_add(b).is_some()); // Avoid overflow
+        prop_assert_eq!(a + b, b + a);
+    }
+}</pre>
+
+        <h3>Custom Generators</h3>
+
+        <pre>use proptest::prelude::*;
+
+#[derive(Debug, Clone)]
+struct User {
+    name: String,
+    age: u8,
+    email: String,
+}
+
+fn user_strategy() -&gt; impl Strategy&lt;Value = User&gt; {
+    (
+        "[a-z]{3,10}",           // name: 3-10 lowercase letters
+        1u8..100,                // age: 1-99
+        "[a-z]{5,10}@[a-z]{3,7}\\.com",  // email
+    )
+        .prop_map(|(name, age, email)| User { name, age, email })
+}
+
+proptest! {
+    #[test]
+    fn test_user_age_valid(user in user_strategy()) {
+        prop_assert!(user.age &gt; 0 && user.age &lt; 100);
+    }
+
+    #[test]
+    fn test_user_email_format(user in user_strategy()) {
+        prop_assert!(user.email.contains('@'));
+        prop_assert!(user.email.ends_with(".com"));
+    }
+}</pre>
+
+        <h2>7.3 Fuzzing</h2>
+
+        <p>Fuzzing automatically generates inputs to find crashes and bugs:</p>
+
+        <pre>// Install: cargo install cargo-fuzz
+// Create fuzzer: cargo fuzz init
+
+// fuzz/fuzz_targets/fuzz_parser.rs
+#![no_main]
+use libfuzzer_sys::fuzz_target;
+
+fuzz_target!(|data: &[u8]| {
+    if let Ok(s) = std::str::from_utf8(data) {
+        // Fuzz your parser
+        let _ = my_parser::parse(s);
+    }
+});
+
+// Run: cargo fuzz run fuzz_parser
+
+// Structured fuzzing with arbitrary
+use arbitrary::Arbitrary;
+
+#[derive(Debug, Arbitrary)]
+struct FuzzInput {
+    action: Action,
+    value: i32,
+}
+
+#[derive(Debug, Arbitrary)]
+enum Action {
+    Add,
+    Subtract,
+    Multiply,
+}
+
+fuzz_target!(|input: FuzzInput| {
+    match input.action {
+        Action::Add =&gt; { /* test add */ }
+        Action::Subtract =&gt; { /* test subtract */ }
+        Action::Multiply =&gt; { /* test multiply */ }
+    }
+});</pre>
+
+        <h2>7.4 Mocking and Test Doubles</h2>
+
+        <h3>Manual Mocking</h3>
+
+        <pre>trait Database {
+    fn get_user(&self, id: u64) -&gt; Option&lt;String&gt;;
+    fn save_user(&mut self, id: u64, name: String) -&gt; Result&lt;(), String&gt;;
+}
+
+struct MockDatabase {
+    users: std::collections::HashMap&lt;u64, String&gt;,
+}
+
+impl Database for MockDatabase {
+    fn get_user(&self, id: u64) -&gt; Option&lt;String&gt; {
+        self.users.get(&id).cloned()
+    }
+
+    fn save_user(&mut self, id: u64, name: String) -&gt; Result&lt;(), String&gt; {
+        self.users.insert(id, name);
+        Ok(())
+    }
+}
+
+#[test]
+fn test_user_service() {
+    let mut db = MockDatabase {
+        users: std::collections::HashMap::new(),
+    };
+
+    db.save_user(1, "Alice".to_string()).unwrap();
+    assert_eq!(db.get_user(1), Some("Alice".to_string()));
+}</pre>
+
+        <h3>Using mockall</h3>
+
+        <pre>use mockall::*;
+
+#[automock]
+trait Repository {
+    fn find_by_id(&self, id: u64) -&gt; Option&lt;String&gt;;
+    fn save(&mut self, id: u64, data: String);
+}
+
+#[test]
+fn test_with_mock() {
+    let mut mock = MockRepository::new();
+
+    // Set expectations
+    mock.expect_find_by_id()
+        .with(eq(1))
+        .times(1)
+        .returning(|_| Some("Alice".to_string()));
+
+    mock.expect_save()
+        .with(eq(2), eq("Bob".to_string()))
+        .times(1)
+        .returning(|_, _| ());
+
+    // Use the mock
+    assert_eq!(mock.find_by_id(1), Some("Alice".to_string()));
+    mock.save(2, "Bob".to_string());
+}</pre>
+
+        <h2>7.5 Snapshot Testing</h2>
+
+        <pre>use insta::assert_snapshot;
+
+fn render_user(name: &str, age: u8) -&gt; String {
+    format!(
+        r#"
+        &lt;div class="user"&gt;
+            &lt;h1&gt;{}&lt;/h1&gt;
+            &lt;p&gt;Age: {}&lt;/p&gt;
+        &lt;/div&gt;
+        "#,
+        name, age
+    )
+}
+
+#[test]
+fn test_render_user() {
+    let output = render_user("Alice", 30);
+    assert_snapshot!(output);
+}
+
+// First run creates snapshot
+// Subsequent runs compare against it
+// Review changes: cargo insta review</pre>
+
+        <h2>7.6 Integration Testing</h2>
+
+        <h3>Testing HTTP APIs</h3>
+
+        <pre>// tests/api_test.rs
+use axum::{Router, routing::get};
+use tower::ServiceExt;
+use http::{Request, StatusCode};
+
+async fn hello() -&gt; &'static str {
+    "Hello, World!"
+}
+
+fn app() -&gt; Router {
+    Router::new().route("/", get(hello))
+}
+
+#[tokio::test]
+async fn test_hello_endpoint() {
+    let app = app();
+
+    let response = app
+        .oneshot(Request::builder().uri("/").body(()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = hyper::body::to_bytes(response.into_body())
+        .await
+        .unwrap();
+    assert_eq!(&body[..], b"Hello, World!");
+}</pre>
+
+        <h3>Database Testing</h3>
+
+        <pre>use sqlx::{PgPool, postgres::PgPoolOptions};
+
+async fn setup_test_db() -&gt; PgPool {
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect("postgres://localhost/test_db")
+        .await
+        .unwrap();
+
+    // Run migrations
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .unwrap();
+
+    pool
+}
+
+async fn cleanup_test_db(pool: &PgPool) {
+    sqlx::query("TRUNCATE TABLE users")
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_create_user() {
+    let pool = setup_test_db().await;
+
+    sqlx::query("INSERT INTO users (name, email) VALUES ($1, $2)")
+        .bind("Alice")
+        .bind("alice@example.com")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(count.0, 1);
+
+    cleanup_test_db(&pool).await;
+}</pre>
+
+        <h2>7.7 Performance Testing</h2>
+
+        <h3>Benchmarking with Criterion</h3>
+
+        <pre>use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+
+fn fibonacci(n: u64) -&gt; u64 {
+    match n {
+        0 | 1 =&gt; 1,
+        n =&gt; fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+fn criterion_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("fibonacci");
+
+    for i in [10u64, 15, 20].iter() {
+        group.bench_with_input(BenchmarkId::from_parameter(i), i, |b, &i| {
+            b.iter(|| fibonacci(black_box(i)));
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);</pre>
+
+        <h3>Load Testing</h3>
+
+        <pre>use tokio::time::{sleep, Duration};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+
+#[tokio::test]
+async fn load_test_api() {
+    let semaphore = Arc::new(Semaphore::new(100)); // Max 100 concurrent
+    let mut handles = vec![];
+
+    for i in 0..1000 {
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let handle = tokio::spawn(async move {
+            let _permit = permit; // Hold permit
+            // Make request
+            let response = make_api_request(i).await;
+            assert!(response.is_ok());
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await.unwrap();
+    }
+}
+
+async fn make_api_request(id: u64) -&gt; Result&lt;(), String&gt; {
+    sleep(Duration::from_millis(10)).await;
+    Ok(())
+}</pre>
+
+        <h2>7.8 Test Organization</h2>
+
+        <h3>Test Fixtures</h3>
+
+        <pre>struct TestContext {
+    db: MockDatabase,
+    config: Config,
+}
+
+impl TestContext {
+    fn new() -&gt; Self {
+        TestContext {
+            db: MockDatabase::new(),
+            config: Config::default(),
+        }
+    }
+
+    fn with_user(mut self, id: u64, name: &str) -&gt; Self {
+        self.db.users.insert(id, name.to_string());
+        self
+    }
+}
+
+#[test]
+fn test_with_fixture() {
+    let ctx = TestContext::new()
+        .with_user(1, "Alice")
+        .with_user(2, "Bob");
+
+    assert_eq!(ctx.db.get_user(1), Some("Alice".to_string()));
+}</pre>
+
+        <h3>Test Helpers</h3>
+
+        <pre>mod test_helpers {
+    pub fn create_test_user(name: &str) -&gt; User {
+        User {
+            id: 1,
+            name: name.to_string(),
+            email: format!("{}@example.com", name.to_lowercase()),
+        }
+    }
+
+    pub fn assert_user_eq(a: &User, b: &User) {
+        assert_eq!(a.id, b.id);
+        assert_eq!(a.name, b.name);
+        assert_eq!(a.email, b.email);
+    }
+}
+
+#[test]
+fn test_user_creation() {
+    let user = test_helpers::create_test_user("Alice");
+    assert_eq!(user.name, "Alice");
+}</pre>
+
+        <h2>7.9 Code Coverage</h2>
+
+        <pre>// Install tarpaulin
+// cargo install cargo-tarpaulin
+
+// Run coverage
+// cargo tarpaulin --out Html --output-dir coverage
+
+// Or use llvm-cov (built-in)
+// rustup component add llvm-tools-preview
+// cargo install cargo-llvm-cov
+
+// Run coverage
+// cargo llvm-cov --html
+
+// Example: achieving high coverage
+fn divide(a: i32, b: i32) -&gt; Result&lt;i32, String&gt; {
+    if b == 0 {
+        Err("Division by zero".to_string())
+    } else {
+        Ok(a / b)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_divide_success() {
+        assert_eq!(divide(10, 2), Ok(5));
+    }
+
+    #[test]
+    fn test_divide_by_zero() {
+        assert_eq!(divide(10, 0), Err("Division by zero".to_string()));
+    }
+
+    // 100% coverage achieved!
+}</pre>
+
+        <h2>7.10 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Unit Tests:</strong> Organize with #[cfg(test)] modules, use custom assertions</li>
+                <li><strong>Property Testing:</strong> Use proptest to verify properties with random inputs</li>
+                <li><strong>Fuzzing:</strong> Automatically find crashes with cargo-fuzz</li>
+                <li><strong>Mocking:</strong> Manual mocks or mockall for test doubles</li>
+                <li><strong>Snapshot Testing:</strong> Use insta for regression testing</li>
+                <li><strong>Integration Tests:</strong> Test HTTP APIs and databases</li>
+                <li><strong>Benchmarking:</strong> Use Criterion for performance testing</li>
+                <li><strong>Coverage:</strong> Track with tarpaulin or llvm-cov</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

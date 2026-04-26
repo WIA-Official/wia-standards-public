@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7장: 고급 테스팅 & 문서화 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>7장: 고급 테스팅 & 문서화</h1>
+
+        <h2>7.1 속성 기반 테스팅 (Property-based Testing)</h2>
+        <p>예제가 아닌 속성을 테스트합니다. proptest가 임의의 입력을 생성하여 속성을 검증합니다.</p>
+
+        <h3>7.1.1 proptest 기본</h3>
+        <pre>use proptest::prelude::*;
+
+// 테스트할 함수
+fn reverse&lt;T: Clone&gt;(xs: &[T]) -&gt; Vec&lt;T&gt; {
+    let mut rev = vec![];
+    for x in xs {
+        rev.insert(0, x.clone());
+    }
+    rev
+}
+
+// 속성 기반 테스트
+proptest! {
+    #[test]
+    fn test_reverse_twice_is_identity(ref vec in any::&lt;Vec&lt;i32&gt;&gt;()) {
+        let reversed = reverse(vec);
+        let double_reversed = reverse(&reversed);
+        prop_assert_eq!(vec, &double_reversed);
+    }
+
+    #[test]
+    fn test_reverse_length(ref vec in any::&lt;Vec&lt;i32&gt;&gt;()) {
+        let reversed = reverse(vec);
+        prop_assert_eq!(vec.len(), reversed.len());
+    }
+
+    #[test]
+    fn test_string_concatenation(s1 in ".*", s2 in ".*") {
+        let combined = format!("{}{}", s1, s2);
+        prop_assert_eq!(combined.len(), s1.len() + s2.len());
+    }
+}
+
+// 범위 지정
+proptest! {
+    #[test]
+    fn test_addition(a in 0..100i32, b in 0..100i32) {
+        let sum = a + b;
+        prop_assert!(sum &gt;= a);
+        prop_assert!(sum &gt;= b);
+    }
+}</pre>
+
+        <h3>7.1.2 커스텀 전략</h3>
+        <pre>use proptest::prelude::*;
+
+#[derive(Debug, Clone)]
+struct Email {
+    local: String,
+    domain: String,
+}
+
+impl Email {
+    fn to_string(&self) -&gt; String {
+        format!("{}@{}", self.local, self.domain)
+    }
+}
+
+// 이메일 생성 전략
+fn email_strategy() -&gt; impl Strategy&lt;Value = Email&gt; {
+    ("[a-z]{3,10}", "[a-z]{3,10}\\.[a-z]{2,3}")
+        .prop_map(|(local, domain)| Email { local, domain })
+}
+
+proptest! {
+    #[test]
+    fn test_email_format(email in email_strategy()) {
+        let email_str = email.to_string();
+        prop_assert!(email_str.contains('@'));
+        prop_assert!(email_str.contains('.'));
+    }
+}</pre>
+
+        <h2>7.2 Criterion - 성능 벤치마킹</h2>
+        <p>정확하고 재현 가능한 벤치마크를 작성합니다.</p>
+
+        <pre>// Cargo.toml
+// [dev-dependencies]
+// criterion = "0.5"
+
+// [[bench]]
+// name = "my_benchmark"
+// harness = false
+
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+
+fn fibonacci_recursive(n: u64) -&gt; u64 {
+    match n {
+        0 =&gt; 0,
+        1 =&gt; 1,
+        n =&gt; fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
+    }
+}
+
+fn fibonacci_iterative(n: u64) -&gt; u64 {
+    let mut a = 0;
+    let mut b = 1;
+    for _ in 0..n {
+        let temp = a;
+        a = b;
+        b = temp + b;
+    }
+    a
+}
+
+fn bench_fibonacci(c: &mut Criterion) {
+    let mut group = c.benchmark_group("fibonacci");
+
+    for i in [10u64, 15, 20].iter() {
+        group.bench_with_input(BenchmarkId::new("recursive", i), i, |b, i| {
+            b.iter(|| fibonacci_recursive(black_box(*i)));
+        });
+
+        group.bench_with_input(BenchmarkId::new("iterative", i), i, |b, i| {
+            b.iter(|| fibonacci_iterative(black_box(*i)));
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_fibonacci);
+criterion_main!(benches);</pre>
+
+        <h3>7.2.1 파라미터화된 벤치마크</h3>
+        <pre>use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+
+fn bench_vector_operations(c: &mut Criterion) {
+    let mut group = c.benchmark_group("vector_ops");
+
+    for size in [100, 1000, 10000].iter() {
+        group.bench_with_input(BenchmarkId::new("push", size), size, |b, &size| {
+            b.iter(|| {
+                let mut vec = Vec::new();
+                for i in 0..size {
+                    vec.push(black_box(i));
+                }
+                vec
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("with_capacity", size), size, |b, &size| {
+            b.iter(|| {
+                let mut vec = Vec::with_capacity(size);
+                for i in 0..size {
+                    vec.push(black_box(i));
+                }
+                vec
+            });
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_vector_operations);
+criterion_main!(benches);</pre>
+
+        <h2>7.3 통합 테스트</h2>
+
+        <h3>7.3.1 구조화된 통합 테스트</h3>
+        <pre>// tests/integration_test.rs
+
+// 공통 설정 모듈
+mod common;
+
+use mylib::Database;
+
+#[test]
+fn test_database_crud() {
+    let db = common::setup_database();
+
+    // Create
+    db.insert("key1", "value1").unwrap();
+
+    // Read
+    assert_eq!(db.get("key1").unwrap(), Some("value1"));
+
+    // Update
+    db.update("key1", "new_value").unwrap();
+    assert_eq!(db.get("key1").unwrap(), Some("new_value"));
+
+    // Delete
+    db.delete("key1").unwrap();
+    assert_eq!(db.get("key1").unwrap(), None);
+
+    common::teardown_database(db);
+}
+
+// tests/common/mod.rs
+use mylib::Database;
+
+pub fn setup_database() -&gt; Database {
+    Database::new_in_memory()
+}
+
+pub fn teardown_database(_db: Database) {
+    // 정리 작업
+}</pre>
+
+        <h3>7.3.2 테스트 픽스처</h3>
+        <pre>// tests/fixtures/mod.rs
+
+pub struct TestContext {
+    pub temp_dir: tempfile::TempDir,
+    pub config: Config,
+}
+
+impl TestContext {
+    pub fn new() -&gt; Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config = Config::default();
+
+        TestContext { temp_dir, config }
+    }
+
+    pub fn create_test_file(&self, name: &str, content: &str) -&gt; PathBuf {
+        let path = self.temp_dir.path().join(name);
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+}
+
+impl Drop for TestContext {
+    fn drop(&mut self) {
+        // 자동으로 임시 디렉토리 정리
+    }
+}
+
+// 사용
+#[test]
+fn test_with_fixture() {
+    let ctx = TestContext::new();
+    let file = ctx.create_test_file("test.txt", "Hello, World!");
+
+    // 테스트 수행
+    assert!(file.exists());
+}</pre>
+
+        <h2>7.4 목 객체 (Mocking)</h2>
+
+        <h3>7.4.1 mockall 사용</h3>
+        <pre>use mockall::*;
+
+#[automock]
+trait Database {
+    fn get(&self, key: &str) -&gt; Option&lt;String&gt;;
+    fn set(&mut self, key: &str, value: String) -&gt; Result&lt;(), String&gt;;
+}
+
+struct UserService&lt;D: Database&gt; {
+    db: D,
+}
+
+impl&lt;D: Database&gt; UserService&lt;D&gt; {
+    fn get_user(&self, id: &str) -&gt; Option&lt;String&gt; {
+        self.db.get(id)
+    }
+
+    fn create_user(&mut self, id: &str, name: String) -&gt; Result&lt;(), String&gt; {
+        self.db.set(id, name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_user() {
+        let mut mock_db = MockDatabase::new();
+        mock_db.expect_get()
+            .with(eq("user123"))
+            .times(1)
+            .returning(|_| Some("Alice".to_string()));
+
+        let service = UserService { db: mock_db };
+        assert_eq!(service.get_user("user123"), Some("Alice".to_string()));
+    }
+
+    #[test]
+    fn test_create_user() {
+        let mut mock_db = MockDatabase::new();
+        mock_db.expect_set()
+            .with(eq("user456"), eq("Bob".to_string()))
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let mut service = UserService { db: mock_db };
+        assert!(service.create_user("user456", "Bob".to_string()).is_ok());
+    }
+}</pre>
+
+        <h2>7.5 문서 테스트</h2>
+        <p>문서의 예제 코드가 실제로 작동하는지 검증합니다.</p>
+
+        <pre>/// 두 숫자를 더합니다.
+///
+/// # Examples
+///
+/// ```
+/// use mylib::add;
+///
+/// let result = add(2, 3);
+/// assert_eq!(result, 5);
+/// ```
+///
+/// # Panics
+///
+/// 오버플로우가 발생하면 패닉합니다.
+///
+/// ```should_panic
+/// use mylib::add;
+///
+/// let result = add(i32::MAX, 1);
+/// ```
+pub fn add(a: i32, b: i32) -&gt; i32 {
+    a.checked_add(b).expect("overflow")
+}
+
+/// 복잡한 예제
+///
+/// ```
+/// use mylib::Calculator;
+///
+/// let mut calc = Calculator::new();
+/// calc.add(5);
+/// calc.multiply(2);
+/// assert_eq!(calc.result(), 10);
+/// ```
+///
+/// # Hidden setup code
+///
+/// ```
+/// # use mylib::Calculator;
+/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+/// let calc = Calculator::new();
+/// println!("Calculator ready");
+/// # Ok(())
+/// # }
+/// ```
+pub struct Calculator {
+    value: i32,
+}</pre>
+
+        <h2>7.6 커버리지 측정</h2>
+
+        <h3>7.6.1 tarpaulin 사용</h3>
+        <pre>$ cargo install cargo-tarpaulin
+
+# 커버리지 측정
+$ cargo tarpaulin --out Html
+
+# 특정 패키지만
+$ cargo tarpaulin --packages mylib
+
+# 특정 테스트만
+$ cargo tarpaulin --test integration_tests</pre>
+
+        <h3>7.6.2 llvm-cov 사용</h3>
+        <pre>$ rustup component add llvm-tools-preview
+$ cargo install cargo-llvm-cov
+
+# 커버리지 측정
+$ cargo llvm-cov
+
+# HTML 리포트
+$ cargo llvm-cov --html
+
+# 특정 테스트만
+$ cargo llvm-cov --test integration_tests</pre>
+
+        <h2>7.7 실전 예제: 종합 테스트 스위트</h2>
+        <pre>// src/lib.rs
+pub struct Calculator {
+    value: i32,
+}
+
+impl Calculator {
+    pub fn new() -&gt; Self {
+        Calculator { value: 0 }
+    }
+
+    pub fn add(&mut self, n: i32) {
+        self.value += n;
+    }
+
+    pub fn multiply(&mut self, n: i32) {
+        self.value *= n;
+    }
+
+    pub fn result(&self) -&gt; i32 {
+        self.value
+    }
+}
+
+// tests/calculator_test.rs
+use mylib::Calculator;
+use proptest::prelude::*;
+
+#[test]
+fn test_basic_operations() {
+    let mut calc = Calculator::new();
+    calc.add(5);
+    assert_eq!(calc.result(), 5);
+
+    calc.multiply(2);
+    assert_eq!(calc.result(), 10);
+}
+
+proptest! {
+    #[test]
+    fn test_add_is_commutative(a in any::&lt;i16&gt;(), b in any::&lt;i16&gt;()) {
+        let mut calc1 = Calculator::new();
+        calc1.add(a as i32);
+        calc1.add(b as i32);
+
+        let mut calc2 = Calculator::new();
+        calc2.add(b as i32);
+        calc2.add(a as i32);
+
+        prop_assert_eq!(calc1.result(), calc2.result());
+    }
+}
+
+// benches/calculator_bench.rs
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use mylib::Calculator;
+
+fn bench_operations(c: &mut Criterion) {
+    c.bench_function("calculator_operations", |b| {
+        b.iter(|| {
+            let mut calc = Calculator::new();
+            calc.add(black_box(5));
+            calc.multiply(black_box(10));
+            calc.result()
+        });
+    });
+}
+
+criterion_group!(benches, bench_operations);
+criterion_main!(benches);</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>proptest로 속성 기반 테스팅 - 더 많은 엣지 케이스 발견</li>
+                <li>Criterion으로 정확한 성능 벤치마킹</li>
+                <li>통합 테스트로 전체 시스템 검증</li>
+                <li>mockall로 의존성 격리</li>
+                <li>문서 테스트로 예제 코드 검증</li>
+                <li>tarpaulin/llvm-cov로 코드 커버리지 측정</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

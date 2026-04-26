@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Rust Intermediate - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --rust-orange: #f74c00;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; gap: 15px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .lang-btn:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+        .hero .emoji { font-size: 3rem; margin-bottom: 15px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .code-block { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; overflow-x: auto; margin: 15px 0; }
+        .code-block .comment { color: #6b7280; }
+        .code-block .keyword { color: #f59e0b; }
+        .code-block .string { color: #34d399; }
+        .code-block .function { color: #60a5fa; }
+        .code-block .type { color: var(--primary); }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; }
+        input, select, textarea { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 12px 15px; border-radius: 8px; font-size: 1rem; width: 100%; font-family: 'Monaco', 'Menlo', monospace; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        textarea { min-height: 150px; resize: vertical; }
+
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+        .card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card h3 { color: var(--primary); margin-bottom: 15px; }
+        .card p { color: var(--text-muted); margin-bottom: 10px; }
+
+        .feature-card { background: linear-gradient(135deg, #1e3a5f, var(--bg)); border: 2px solid var(--primary); border-radius: 16px; padding: 25px; margin-bottom: 20px; cursor: pointer; transition: all 0.3s; }
+        .feature-card:hover { border-color: var(--rust-orange); transform: translateY(-2px); }
+        .feature-card.active { border-color: var(--rust-orange); background: linear-gradient(135deg, #2d4a6f, var(--bg-card)); }
+        .feature-card h3 { color: var(--primary); margin-bottom: 10px; }
+        .feature-card p { color: var(--text-muted); font-size: 0.95rem; }
+
+        .result-box { padding: 20px; border-radius: 12px; margin-top: 20px; border: 2px solid var(--primary); }
+        .result-success { background: rgba(16, 185, 129, 0.1); border-color: var(--success); }
+        .result-error { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); }
+        .result-warning { background: rgba(245, 158, 11, 0.1); border-color: var(--warning); }
+
+        .concept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
+        .concept-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 15px; cursor: pointer; transition: all 0.2s; }
+        .concept-item:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .concept-item.selected { border-color: var(--rust-orange); background: rgba(247, 76, 0, 0.1); }
+        .concept-item h4 { color: var(--primary); margin-bottom: 8px; font-size: 1rem; }
+        .concept-item p { color: var(--text-muted); font-size: 0.85rem; }
+
+        .example-section { margin-top: 25px; padding: 20px; background: var(--bg); border-radius: 10px; border: 1px solid var(--border); }
+        .example-section h4 { color: var(--primary); margin-bottom: 15px; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .nav-left { flex-direction: column; gap: 10px; }
+            .breadcrumb { display: none; }
+            .hero h1 { font-size: 1.8rem; }
+            .tabs { flex-direction: column; }
+            .tab { width: 100%; text-align: center; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">></span>
+                    <a href="https://wiastandards.com/rust-intermediate/" target="_blank">Rust Intermediate</a>
+                    <span class="sep">></span>
+                    <span class="current" data-en="Simulator" data-ko="시뮬레이터">Simulator</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank" data-en="Certification" data-ko="인증">Certification</a>
+                    <a href="https://wiabook.com" target="_blank" data-en="Ebook" data-ko="전자책">Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <section class="hero">
+            <div class="emoji">🦀</div>
+            <h1 data-en="WIA Rust Intermediate Standard" data-ko="WIA Rust 중급 표준">WIA Rust Intermediate Standard</h1>
+            <p data-en="Advanced Rust Programming Concepts & Patterns" data-ko="고급 Rust 프로그래밍 개념 및 패턴">Advanced Rust Programming Concepts & Patterns</p>
+            <p class="philosophy" data-en="弘益人間 - Benefit All Humanity" data-ko="弘益人間 - 널리 인간을 이롭게 하라">弘益人間 - Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="Trait System" data-ko="트레이트 시스템">Trait System</div>
+            <div class="tab" onclick="showPanel(1)" data-en="Error Handling" data-ko="에러 처리">Error Handling</div>
+            <div class="tab" onclick="showPanel(2)" data-en="Collections" data-ko="컬렉션">Collections</div>
+            <div class="tab" onclick="showPanel(3)" data-en="Pattern Matching" data-ko="패턴 매칭">Pattern Matching</div>
+            <div class="tab" onclick="showPanel(4)" data-en="Smart Pointers" data-ko="스마트 포인터">Smart Pointers</div>
+        </div>
+
+        <!-- Panel 0: Trait System -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="🔧 Trait System Explorer" data-ko="🔧 트레이트 시스템 탐색기">🔧 Trait System Explorer</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;" data-en="Explore Rust's powerful trait system: generics, trait bounds, and polymorphism" data-ko="Rust의 강력한 트레이트 시스템 탐색: 제네릭, 트레이트 바운드, 다형성">Explore Rust's powerful trait system: generics, trait bounds, and polymorphism</p>
+
+            <div class="concept-grid">
+                <div class="concept-item" onclick="selectTrait('basic')">
+                    <h4 data-en="Basic Traits" data-ko="기본 트레이트">Basic Traits</h4>
+                    <p data-en="Define behavior with trait methods" data-ko="트레이트 메서드로 동작 정의">Define behavior with trait methods</p>
+                </div>
+                <div class="concept-item" onclick="selectTrait('generics')">
+                    <h4 data-en="Generics" data-ko="제네릭">Generics</h4>
+                    <p data-en="Write flexible, reusable code" data-ko="유연하고 재사용 가능한 코드 작성">Write flexible, reusable code</p>
+                </div>
+                <div class="concept-item" onclick="selectTrait('bounds')">
+                    <h4 data-en="Trait Bounds" data-ko="트레이트 바운드">Trait Bounds</h4>
+                    <p data-en="Constrain generic types" data-ko="제네릭 타입 제약">Constrain generic types</p>
+                </div>
+                <div class="concept-item" onclick="selectTrait('associated')">
+                    <h4 data-en="Associated Types" data-ko="연관 타입">Associated Types</h4>
+                    <p data-en="Define type placeholders in traits" data-ko="트레이트에서 타입 플레이스홀더 정의">Define type placeholders in traits</p>
+                </div>
+            </div>
+
+            <div class="example-section">
+                <h4 data-en="Interactive Trait Example" data-ko="대화형 트레이트 예제">Interactive Trait Example</h4>
+                <div class="form-group">
+                    <label data-en="Trait Name" data-ko="트레이트 이름">Trait Name</label>
+                    <input type="text" id="traitName" placeholder="Drawable" value="Drawable">
+                </div>
+                <div class="form-group">
+                    <label data-en="Method Name" data-ko="메서드 이름">Method Name</label>
+                    <input type="text" id="methodName" placeholder="draw" value="draw">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="generateTrait()" data-en="Generate Trait" data-ko="트레이트 생성">Generate Trait</button>
+                    <button class="btn btn-secondary" onclick="runTraitExample()" data-en="Run Example" data-ko="예제 실행">Run Example</button>
+                </div>
+                <div class="output" id="traitOutput"></div>
+            </div>
+        </div>
+
+        <!-- Panel 1: Error Handling -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="⚠️ Error Handling Patterns" data-ko="⚠️ 에러 처리 패턴">⚠️ Error Handling Patterns</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;" data-en="Master Result<T, E>, Option<T>, and custom error types" data-ko="Result<T, E>, Option<T>, 커스텀 에러 타입 마스터하기">Master Result<T, E>, Option<T>, and custom error types</p>
+
+            <div class="grid-2">
+                <div class="feature-card" onclick="selectError('result')">
+                    <h3 data-en="Result<T, E>" data-ko="Result<T, E>">Result<T, E></h3>
+                    <p data-en="Recoverable errors with Ok/Err variants" data-ko="Ok/Err 변형으로 복구 가능한 에러">Recoverable errors with Ok/Err variants</p>
+                </div>
+                <div class="feature-card" onclick="selectError('option')">
+                    <h3 data-en="Option<T>" data-ko="Option<T>">Option<T></h3>
+                    <p data-en="Handle nullable values safely with Some/None" data-ko="Some/None으로 null 값 안전하게 처리">Handle nullable values safely with Some/None</p>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="feature-card" onclick="selectError('question')">
+                    <h3 data-en="? Operator" data-ko="? 연산자">? Operator</h3>
+                    <p data-en="Propagate errors elegantly" data-ko="에러를 우아하게 전파">Propagate errors elegantly</p>
+                </div>
+                <div class="feature-card" onclick="selectError('custom')">
+                    <h3 data-en="Custom Error Types" data-ko="커스텀 에러 타입">Custom Error Types</h3>
+                    <p data-en="Define domain-specific errors" data-ko="도메인별 에러 정의">Define domain-specific errors</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 data-en="Error Handling Simulator" data-ko="에러 처리 시뮬레이터">Error Handling Simulator</h3>
+                <div class="form-group">
+                    <label data-en="Error Type" data-ko="에러 유형">Error Type</label>
+                    <select id="errorType">
+                        <option value="io">IO Error</option>
+                        <option value="parse">Parse Error</option>
+                        <option value="network">Network Error</option>
+                        <option value="custom">Custom Error</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Input Data (may fail)" data-ko="입력 데이터 (실패 가능)">Input Data (may fail)</label>
+                    <input type="text" id="errorInput" placeholder="42" value="42">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="handleError()" data-en="Process & Handle Error" data-ko="처리 및 에러 핸들링">Process & Handle Error</button>
+                </div>
+                <div class="output" id="errorOutput"></div>
+            </div>
+        </div>
+
+        <!-- Panel 2: Collections -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="📦 Collections Masterclass" data-ko="📦 컬렉션 마스터클래스">📦 Collections Masterclass</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;" data-en="Work with Vec, HashMap, HashSet, and iterators" data-ko="Vec, HashMap, HashSet, 반복자 다루기">Work with Vec, HashMap, HashSet, and iterators</p>
+
+            <div class="concept-grid">
+                <div class="concept-item" onclick="selectCollection('vec')">
+                    <h4 data-en="Vec<T>" data-ko="Vec<T>">Vec<T></h4>
+                    <p data-en="Dynamic arrays with push, pop, iter" data-ko="push, pop, iter을 지원하는 동적 배열">Dynamic arrays with push, pop, iter</p>
+                </div>
+                <div class="concept-item" onclick="selectCollection('hashmap')">
+                    <h4 data-en="HashMap<K, V>" data-ko="HashMap<K, V>">HashMap<K, V></h4>
+                    <p data-en="Key-value store with O(1) lookup" data-ko="O(1) 조회의 키-값 저장소">Key-value store with O(1) lookup</p>
+                </div>
+                <div class="concept-item" onclick="selectCollection('hashset')">
+                    <h4 data-en="HashSet<T>" data-ko="HashSet<T>">HashSet<T></h4>
+                    <p data-en="Unique values collection" data-ko="고유 값 컬렉션">Unique values collection</p>
+                </div>
+                <div class="concept-item" onclick="selectCollection('iterators')">
+                    <h4 data-en="Iterators" data-ko="반복자">Iterators</h4>
+                    <p data-en="Lazy evaluation with map, filter, fold" data-ko="map, filter, fold를 통한 지연 평가">Lazy evaluation with map, filter, fold</p>
+                </div>
+            </div>
+
+            <div class="example-section">
+                <h4 data-en="Collection Operations" data-ko="컬렉션 연산">Collection Operations</h4>
+                <div class="form-group">
+                    <label data-en="Collection Type" data-ko="컬렉션 타입">Collection Type</label>
+                    <select id="collectionType">
+                        <option value="vec">Vec<i32></option>
+                        <option value="hashmap">HashMap<String, i32></option>
+                        <option value="hashset">HashSet<i32></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Operation" data-ko="연산">Operation</label>
+                    <select id="collectionOp">
+                        <option value="create">Create & Initialize</option>
+                        <option value="insert">Insert Elements</option>
+                        <option value="iterate">Iterate & Transform</option>
+                        <option value="filter">Filter & Collect</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Input Values (comma-separated)" data-ko="입력 값 (쉼표로 구분)">Input Values (comma-separated)</label>
+                    <input type="text" id="collectionInput" placeholder="1, 2, 3, 4, 5" value="1, 2, 3, 4, 5">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runCollection()" data-en="Execute Operation" data-ko="연산 실행">Execute Operation</button>
+                </div>
+                <div class="output" id="collectionOutput"></div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Pattern Matching -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="🎯 Pattern Matching Workshop" data-ko="🎯 패턴 매칭 워크샵">🎯 Pattern Matching Workshop</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;" data-en="Exhaustive pattern matching with match, if let, while let" data-ko="match, if let, while let을 사용한 철저한 패턴 매칭">Exhaustive pattern matching with match, if let, while let</p>
+
+            <div class="grid-2">
+                <div class="feature-card" onclick="selectPattern('match')">
+                    <h3 data-en="match Expression" data-ko="match 표현식">match Expression</h3>
+                    <p data-en="Exhaustive pattern matching for all cases" data-ko="모든 경우를 다루는 철저한 패턴 매칭">Exhaustive pattern matching for all cases</p>
+                </div>
+                <div class="feature-card" onclick="selectPattern('iflet')">
+                    <h3 data-en="if let" data-ko="if let">if let</h3>
+                    <p data-en="Concise pattern matching for single case" data-ko="단일 경우를 위한 간결한 패턴 매칭">Concise pattern matching for single case</p>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="feature-card" onclick="selectPattern('destructure')">
+                    <h3 data-en="Destructuring" data-ko="구조 분해">Destructuring</h3>
+                    <p data-en="Break apart structs, enums, tuples" data-ko="구조체, 열거형, 튜플 분해">Break apart structs, enums, tuples</p>
+                </div>
+                <div class="feature-card" onclick="selectPattern('guards')">
+                    <h3 data-en="Match Guards" data-ko="매치 가드">Match Guards</h3>
+                    <p data-en="Add conditional logic to patterns" data-ko="패턴에 조건부 로직 추가">Add conditional logic to patterns</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 data-en="Pattern Matching Simulator" data-ko="패턴 매칭 시뮬레이터">Pattern Matching Simulator</h3>
+                <div class="form-group">
+                    <label data-en="Data Type to Match" data-ko="매칭할 데이터 타입">Data Type to Match</label>
+                    <select id="patternType">
+                        <option value="enum">Enum (Result/Option)</option>
+                        <option value="tuple">Tuple</option>
+                        <option value="struct">Struct</option>
+                        <option value="range">Range</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Test Value" data-ko="테스트 값">Test Value</label>
+                    <input type="text" id="patternInput" placeholder="Ok(42)" value="Ok(42)">
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runPattern()" data-en="Match Pattern" data-ko="패턴 매칭">Match Pattern</button>
+                    <button class="btn btn-secondary" onclick="showPatternExample()" data-en="Show Example" data-ko="예제 보기">Show Example</button>
+                </div>
+                <div class="output" id="patternOutput"></div>
+            </div>
+        </div>
+
+        <!-- Panel 4: Smart Pointers -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="🔗 Smart Pointers Lab" data-ko="🔗 스마트 포인터 실습">🔗 Smart Pointers Lab</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;" data-en="Box<T>, Rc<T>, Arc<T>, RefCell<T> - memory management patterns" data-ko="Box<T>, Rc<T>, Arc<T>, RefCell<T> - 메모리 관리 패턴">Box<T>, Rc<T>, Arc<T>, RefCell<T> - memory management patterns</p>
+
+            <div class="concept-grid">
+                <div class="concept-item" onclick="selectPointer('box')">
+                    <h4 data-en="Box<T>" data-ko="Box<T>">Box<T></h4>
+                    <p data-en="Heap allocation for single ownership" data-ko="단일 소유권을 위한 힙 할당">Heap allocation for single ownership</p>
+                </div>
+                <div class="concept-item" onclick="selectPointer('rc')">
+                    <h4 data-en="Rc<T>" data-ko="Rc<T>">Rc<T></h4>
+                    <p data-en="Reference counting for shared ownership" data-ko="공유 소유권을 위한 참조 카운팅">Reference counting for shared ownership</p>
+                </div>
+                <div class="concept-item" onclick="selectPointer('arc')">
+                    <h4 data-en="Arc<T>" data-ko="Arc<T>">Arc<T></h4>
+                    <p data-en="Atomic Rc for thread-safe sharing" data-ko="스레드 안전 공유를 위한 원자적 Rc">Atomic Rc for thread-safe sharing</p>
+                </div>
+                <div class="concept-item" onclick="selectPointer('refcell')">
+                    <h4 data-en="RefCell<T>" data-ko="RefCell<T>">RefCell<T></h4>
+                    <p data-en="Interior mutability pattern" data-ko="내부 가변성 패턴">Interior mutability pattern</p>
+                </div>
+            </div>
+
+            <div class="example-section">
+                <h4 data-en="Smart Pointer Usage" data-ko="스마트 포인터 사용">Smart Pointer Usage</h4>
+                <div class="form-group">
+                    <label data-en="Pointer Type" data-ko="포인터 타입">Pointer Type</label>
+                    <select id="pointerType">
+                        <option value="box">Box<T> - Single Owner</option>
+                        <option value="rc">Rc<T> - Shared Owner</option>
+                        <option value="arc">Arc<T> - Thread-Safe</option>
+                        <option value="refcell">RefCell<T> - Interior Mutability</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Data Value" data-ko="데이터 값">Data Value</label>
+                    <input type="text" id="pointerValue" placeholder="42" value="42">
+                </div>
+                <div class="form-group">
+                    <label data-en="Operation" data-ko="연산">Operation</label>
+                    <select id="pointerOp">
+                        <option value="create">Create Pointer</option>
+                        <option value="clone">Clone Reference</option>
+                        <option value="deref">Dereference</option>
+                        <option value="drop">Drop & Count</option>
+                    </select>
+                </div>
+                <div class="btn-center">
+                    <button class="btn btn-primary" onclick="runPointer()" data-en="Execute Pointer Op" data-ko="포인터 연산 실행">Execute Pointer Op</button>
+                    <button class="btn btn-secondary" onclick="showPointerDiagram()" data-en="Show Memory Diagram" data-ko="메모리 다이어그램">Show Memory Diagram</button>
+                </div>
+                <div class="output" id="pointerOutput"></div>
+            </div>
+
+            <div class="card">
+                <h3 data-en="Memory Safety Rules" data-ko="메모리 안전 규칙">Memory Safety Rules</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+                        <strong style="color: var(--primary);">Box<T>:</strong>
+                        <span data-en="Single ownership, heap allocation, no overhead" data-ko="단일 소유권, 힙 할당, 오버헤드 없음">Single ownership, heap allocation, no overhead</span>
+                    </li>
+                    <li style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+                        <strong style="color: var(--primary);">Rc<T>:</strong>
+                        <span data-en="Multiple owners (single-threaded), reference counting" data-ko="다중 소유자 (단일 스레드), 참조 카운팅">Multiple owners (single-threaded), reference counting</span>
+                    </li>
+                    <li style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+                        <strong style="color: var(--primary);">Arc<T>:</strong>
+                        <span data-en="Thread-safe Rc, atomic reference counting" data-ko="스레드 안전 Rc, 원자적 참조 카운팅">Thread-safe Rc, atomic reference counting</span>
+                    </li>
+                    <li style="padding: 10px 0;">
+                        <strong style="color: var(--primary);">RefCell<T>:</strong>
+                        <span data-en="Runtime borrow checking, interior mutability" data-ko="런타임 빌림 검사, 내부 가변성">Runtime borrow checking, interior mutability</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy" data-en="弘益人間 - Benefit All Humanity" data-ko="弘益人間 - 널리 인간을 이롭게 하라">弘益人間 - Benefit All Humanity</p>
+            <p data-en="WIA Rust Intermediate: Building Safe, Concurrent Systems" data-ko="WIA Rust 중급: 안전하고 동시적인 시스템 구축">WIA Rust Intermediate: Building Safe, Concurrent Systems</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank" data-en="Home" data-ko="홈">Home</a>
+                <a href="https://wiastandards.com/#standards" target="_blank" data-en="All Standards" data-ko="전체 표준">All Standards</a>
+                <a href="https://wiabook.com" target="_blank" data-en="Ebook" data-ko="전자책">Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = localStorage.getItem('wiaLang') || 'en';
+        let selectedTrait = null;
+        let selectedError = null;
+        let selectedCollection = null;
+        let selectedPattern = null;
+        let selectedPointer = null;
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('wiaLang', lang);
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.toLowerCase() === lang));
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute('data-' + lang) || el.getAttribute('data-en');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = text;
+                else el.textContent = text;
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === index));
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === index));
+        }
+
+        // Trait System Functions
+        function selectTrait(type) {
+            selectedTrait = type;
+            document.querySelectorAll('#panel-0 .concept-item').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        function generateTrait() {
+            const traitName = document.getElementById('traitName').value || 'Drawable';
+            const methodName = document.getElementById('methodName').value || 'draw';
+
+            const code = `// Trait definition
+trait ${traitName} {
+    fn ${methodName}(&self);
+}
+
+// Implementation for a struct
+struct Circle {
+    radius: f64,
+}
+
+impl ${traitName} for Circle {
+    fn ${methodName}(&self) {
+        println!("Drawing circle with radius: {}", self.radius);
+    }
+}
+
+// Generic function using trait bound
+fn render<T: ${traitName}>(item: &T) {
+    item.${methodName}();
+}
+
+// Usage
+let circle = Circle { radius: 5.0 };
+render(&circle);`;
+
+            document.getElementById('traitOutput').textContent = code;
+        }
+
+        function runTraitExample() {
+            const output = `Compiling trait_example v1.0.0
+   Finished dev [unoptimized + debuginfo] target(s) in 0.52s
+    Running target/debug/trait_example
+
+Drawing circle with radius: 5
+
+✓ Trait successfully implemented
+✓ Generic function works with trait bound
+✓ Zero-cost abstraction verified`;
+
+            document.getElementById('traitOutput').textContent = output;
+        }
+
+        // Error Handling Functions
+        function selectError(type) {
+            selectedError = type;
+            document.querySelectorAll('#panel-1 .feature-card').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function handleError() {
+            const errorType = document.getElementById('errorType').value;
+            const input = document.getElementById('errorInput').value;
+
+            let code = '';
+            if (errorType === 'io') {
+                code = `use std::fs::File;
+use std::io::{self, Read};
+
+fn read_file(path: &str) -> Result<String, io::Error> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+
+// Using the function
+match read_file("${input}.txt") {
+    Ok(contents) => println!("File contents: {}", contents),
+    Err(e) => eprintln!("Error reading file: {}", e),
+}`;
+            } else if (errorType === 'parse') {
+                code = `fn parse_number(s: &str) -> Result<i32, std::num::ParseIntError> {
+    s.parse::<i32>()
+}
+
+// Input: "${input}"
+match parse_number("${input}") {
+    Ok(num) => println!("Parsed: {}", num),
+    Err(e) => eprintln!("Parse error: {}", e),
+}
+
+// Result: ${!isNaN(parseInt(input)) ? 'Ok(' + parseInt(input) + ')' : 'Err(ParseIntError)'}`;
+            } else {
+                code = `#[derive(Debug)]
+enum CustomError {
+    NotFound,
+    PermissionDenied,
+    InvalidData(String),
+}
+
+fn process_data(input: &str) -> Result<String, CustomError> {
+    if input.is_empty() {
+        return Err(CustomError::InvalidData("Empty input".to_string()));
+    }
+    Ok(format!("Processed: {}", input))
+}
+
+// Result: ${input ? 'Ok("Processed: ' + input + '")' : 'Err(CustomError::InvalidData)'}`;
+            }
+
+            document.getElementById('errorOutput').textContent = code;
+        }
+
+        // Collections Functions
+        function selectCollection(type) {
+            selectedCollection = type;
+            document.querySelectorAll('#panel-2 .concept-item').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        function runCollection() {
+            const collectionType = document.getElementById('collectionType').value;
+            const operation = document.getElementById('collectionOp').value;
+            const input = document.getElementById('collectionInput').value;
+
+            let code = '';
+
+            if (collectionType === 'vec') {
+                if (operation === 'create') {
+                    code = `// Creating a Vec<i32>
+let mut numbers = vec![${input}];
+println!("Vector: {:?}", numbers);
+println!("Length: {}", numbers.len());
+println!("Capacity: {}", numbers.capacity());
+
+// Output:
+// Vector: [${input}]
+// Length: ${input.split(',').length}`;
+                } else if (operation === 'iterate') {
+                    code = `let numbers = vec![${input}];
+
+// Iterator chain - map and collect
+let doubled: Vec<i32> = numbers
+    .iter()
+    .map(|&x| x * 2)
+    .collect();
+
+println!("Original: {:?}", numbers);
+println!("Doubled: {:?}", doubled);
+
+// Output:
+// Doubled: [${input.split(',').map(n => parseInt(n.trim()) * 2).join(', ')}]`;
+                } else if (operation === 'filter') {
+                    code = `let numbers = vec![${input}];
+
+// Filter even numbers
+let evens: Vec<i32> = numbers
+    .into_iter()
+    .filter(|&x| x % 2 == 0)
+    .collect();
+
+println!("Even numbers: {:?}", evens);
+
+// Output: [${input.split(',').map(n => parseInt(n.trim())).filter(n => n % 2 === 0).join(', ')}]`;
+                }
+            } else if (collectionType === 'hashmap') {
+                code = `use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+scores.insert("Team A".to_string(), 50);
+scores.insert("Team B".to_string(), 75);
+
+// Get value
+if let Some(score) = scores.get("Team A") {
+    println!("Team A score: {}", score);
+}
+
+// Iterate
+for (team, score) in &scores {
+    println!("{}: {}", team, score);
+}`;
+            } else {
+                code = `use std::collections::HashSet;
+
+let numbers: HashSet<i32> = [${input}].iter().cloned().collect();
+println!("Unique values: {:?}", numbers);
+println!("Count: {}", numbers.len());
+
+// Contains check
+println!("Contains 3? {}", numbers.contains(&3));`;
+            }
+
+            document.getElementById('collectionOutput').textContent = code;
+        }
+
+        // Pattern Matching Functions
+        function selectPattern(type) {
+            selectedPattern = type;
+            document.querySelectorAll('#panel-3 .feature-card').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function runPattern() {
+            const patternType = document.getElementById('patternType').value;
+            const input = document.getElementById('patternInput').value;
+
+            let code = '';
+
+            if (patternType === 'enum') {
+                code = `// Pattern matching on Result/Option
+let result: Result<i32, &str> = ${input};
+
+match result {
+    Ok(value) => println!("Success: {}", value),
+    Err(e) => eprintln!("Error: {}", e),
+}
+
+// if let syntax
+if let Ok(value) = result {
+    println!("Got value: {}", value);
+}
+
+// Matched: ${input.includes('Ok') ? 'Success branch' : 'Error branch'}`;
+            } else if (patternType === 'tuple') {
+                code = `let point = (${input});
+
+match point {
+    (0, 0) => println!("Origin"),
+    (x, 0) => println!("On x-axis at {}", x),
+    (0, y) => println!("On y-axis at {}", y),
+    (x, y) => println!("Point at ({}, {})", x, y),
+}`;
+            } else if (patternType === 'struct') {
+                code = `struct Point { x: i32, y: i32 }
+
+let p = Point { x: 0, y: 7 };
+
+match p {
+    Point { x: 0, y } => println!("On y-axis at {}", y),
+    Point { x, y: 0 } => println!("On x-axis at {}", x),
+    Point { x, y } => println!("Point at ({}, {})", x, y),
+}`;
+            } else {
+                code = `let number = ${input || 42};
+
+match number {
+    1..=10 => println!("Small number"),
+    11..=100 => println!("Medium number"),
+    101..=1000 => println!("Large number"),
+    _ => println!("Very large number"),
+}
+
+// Match guards
+match number {
+    x if x % 2 == 0 => println!("{} is even", x),
+    x => println!("{} is odd", x),
+}`;
+            }
+
+            document.getElementById('patternOutput').textContent = code;
+        }
+
+        function showPatternExample() {
+            const example = `// Advanced pattern matching examples
+
+// Enum destructuring
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+
+let msg = Message::ChangeColor(0, 160, 255);
+
+match msg {
+    Message::Quit => println!("Quit"),
+    Message::Move { x, y } => println!("Move to ({}, {})", x, y),
+    Message::Write(text) => println!("Text: {}", text),
+    Message::ChangeColor(r, g, b) => {
+        println!("RGB: ({}, {}, {})", r, g, b)
+    }
+}
+
+// @ bindings
+match 42 {
+    num @ 1..=50 => println!("Found {} in range", num),
+    _ => println!("Out of range"),
+}`;
+
+            document.getElementById('patternOutput').textContent = example;
+        }
+
+        // Smart Pointers Functions
+        function selectPointer(type) {
+            selectedPointer = type;
+            document.querySelectorAll('#panel-4 .concept-item').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        function runPointer() {
+            const pointerType = document.getElementById('pointerType').value;
+            const value = document.getElementById('pointerValue').value || '42';
+            const operation = document.getElementById('pointerOp').value;
+
+            let code = '';
+
+            if (pointerType === 'box') {
+                if (operation === 'create') {
+                    code = `// Box<T> - heap allocation
+let boxed = Box::new(${value});
+println!("Value on heap: {}", boxed);
+
+// Deref coercion
+let value: i32 = *boxed;
+println!("Dereferenced: {}", value);
+
+// Memory: Stack -> Heap
+// [ptr] -> [${value}]`;
+                } else if (operation === 'deref') {
+                    code = `let boxed = Box::new(${value});
+let dereferenced = *boxed;
+
+// Direct access to heap value
+println!("{}", dereferenced); // Output: ${value}`;
+                }
+            } else if (pointerType === 'rc') {
+                if (operation === 'create') {
+                    code = `use std::rc::Rc;
+
+let rc1 = Rc::new(${value});
+println!("Reference count: {}", Rc::strong_count(&rc1));
+// Count: 1`;
+                } else if (operation === 'clone') {
+                    code = `use std::rc::Rc;
+
+let rc1 = Rc::new(${value});
+let rc2 = Rc::clone(&rc1);
+let rc3 = Rc::clone(&rc1);
+
+println!("Reference count: {}", Rc::strong_count(&rc1));
+// Count: 3
+
+// All point to same heap data
+println!("rc1: {}, rc2: {}, rc3: {}", rc1, rc2, rc3);`;
+                } else if (operation === 'drop') {
+                    code = `use std::rc::Rc;
+
+let rc1 = Rc::new(${value});
+let rc2 = Rc::clone(&rc1);
+println!("Count: {}", Rc::strong_count(&rc1)); // 2
+
+drop(rc2);
+println!("Count: {}", Rc::strong_count(&rc1)); // 1
+
+// Memory freed when count reaches 0`;
+                }
+            } else if (pointerType === 'arc') {
+                code = `use std::sync::Arc;
+use std::thread;
+
+let data = Arc::new(${value});
+
+// Share across threads
+let handles: Vec<_> = (0..3)
+    .map(|i| {
+        let data = Arc::clone(&data);
+        thread::spawn(move || {
+            println!("Thread {}: {}", i, data);
+        })
+    })
+    .collect();
+
+for handle in handles {
+    handle.join().unwrap();
+}
+
+// Thread-safe reference counting`;
+            } else {
+                code = `use std::cell::RefCell;
+
+let value = RefCell::new(${value});
+
+// Interior mutability - borrow at runtime
+*value.borrow_mut() += 10;
+
+println!("New value: {}", value.borrow());
+// Output: ${parseInt(value) + 10}
+
+// Runtime borrow checking
+// Multiple immutable OR one mutable`;
+            }
+
+            document.getElementById('pointerOutput').textContent = code;
+        }
+
+        function showPointerDiagram() {
+            const diagram = `Memory Layout Diagrams:
+
+Box<T>:
+┌──────┐     ┌──────┐
+│ ptr  │────>│ data │ (heap)
+└──────┘     └──────┘
+ (stack)
+
+Rc<T>:
+┌──────┐     ┌──────────┐
+│ ptr1 │────>│ count: 3 │
+├──────┤     │ data     │ (heap)
+│ ptr2 │────>│          │
+├──────┤     └──────────┘
+│ ptr3 │────>
+└──────┘
+ (stack)
+
+Arc<T>: (same as Rc but atomic)
+Thread-safe reference counting
+
+RefCell<T>:
+┌──────┐     ┌──────────┐
+│ ptr  │────>│ borrow   │
+└──────┘     │ flag     │
+             │ data     │ (heap)
+             └──────────┘
+Runtime borrow checking`;
+
+            document.getElementById('pointerOutput').textContent = diagram;
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            setLang(currentLang);
+        });
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제6장: 개인정보 보호 - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>제6장: 개인정보 보호</h1>
+
+<blockquote>
+"홍익인간: 개인정보는 당신의 권리, 이모가 지켜줍니다."
+</blockquote>
+
+<hr>
+
+<h2>6.1 소셜 미디어 개인정보 위험</h2>
+
+<pre>
+일반적인 개인정보 노출
+====================
+
+자주 공유하는 것이 드러내는 것:
+  - 집 주소 (사진 배경)
+  - 일상 루틴 (게시 시간)
+  - 직장 (태그된 위치)
+  - 전화번호 (실수로 게시)
+  - 여행 계획 (실시간 업데이트)
+  - 다른 사람 얼굴 (동의 없이)
+
+사진 메타데이터가 드러내는 것:
+  - GPS 좌표
+  - 기기 정보
+  - 날짜와 시간
+  - 카메라 설정
+
+집계된 데이터가 드러내는 것:
+  - 정치적 견해
+  - 건강 상태
+  - 재정 상황
+  - 관계
+</pre>
+
+<hr>
+
+<h2>6.2 이모 (AIR-SHIELD) 연동</h2>
+
+<pre>
+WIA-SOCIAL 개인정보 보호
+=======================
+
+WIA-SOCIAL은 이모 (AIR-SHIELD)와 연동:
+
+import { WIASocial } from '@anthropic/wia-social';
+import { AirShield } from '@anthropic/wia-air-shield';
+
+const social = new WIASocial({
+  privacy: {
+    airShield: {
+      enabled: true,
+      mode: 'balanced'  // 'balanced' | 'fortress' | 'paranoid'
+    }
+  }
+});
+
+
+보호 모드
+========
+
+Balanced (균형):
+  - 명백한 위험 경고
+  - 기본적으로 메타데이터 제거
+  - 개인정보 개선 제안
+  - 비방해적
+
+Fortress (요새):
+  - 모든 게시 전 능동적 스캔
+  - 고위험 콘텐츠 차단
+  - 민감 데이터 확인 요구
+  - 개인정보 이슈 알림
+
+Paranoid (편집증):
+  - 최대 보호
+  - 기본적으로 모든 얼굴 블러
+  - 모든 위치 퍼징
+  - 종단간 암호화 필수
+  - 사용성에 영향 가능
+</pre>
+
+<hr>
+
+<h2>6.3 게시 전 개인정보 스캔</h2>
+
+<pre>
+자동 스캔
+========
+
+// 게시 전 위험 스캔
+const scan = await social.privacy.scanContent({
+  text: '새 집 보세요! 서울시 강남구 123번지!',
+  media: [housePhoto]
+});
+
+결과:
+{
+  safe: false,
+
+  risks: [
+    {
+      type: 'address_exposure',
+      severity: 'high',
+      detail: '물리적 주소 감지: 서울시 강남구 123번지',
+      recommendation: '주소 제거 또는 일반화'
+    },
+    {
+      type: 'location_in_media',
+      severity: 'medium',
+      detail: '사진 메타데이터에 GPS 좌표',
+      recommendation: '게시 전 메타데이터 제거'
+    },
+    {
+      type: 'identifiable_location',
+      severity: 'medium',
+      detail: '사진에 집 번호 보임',
+      recommendation: '블러 또는 크롭'
+    }
+  ],
+
+  autoFixes: {
+    stripMetadata: true,
+    addressRedacted: '[주소]'
+  }
+}
+
+
+자동 수정 옵션
+=============
+
+// 감지된 이슈 자동 수정
+await social.post({
+  content: myContent,
+  privacy: {
+    autoFix: true,  // 권장 수정 자동 적용
+    confirmHighRisk: true  // 고위험 콘텐츠 게시 전 확인
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.4 개인정보 레벨</h2>
+
+<pre>
+공개 설정
+========
+
+type PrivacyLevel =
+  | 'public'      // 모두에게 공개
+  | 'protected'   // 팔로워만
+  | 'private'     // 맞팔로우만
+  | 'secret'      // 특정인만
+  | 'anonymous';  // 익명
+
+
+기본 개인정보 설정
+================
+
+await social.setPrivacy({
+  defaultVisibility: 'protected',
+
+  // 플랫폼별 다른 기본값
+  platformDefaults: {
+    instagram: 'protected',
+    twitter: 'public',
+    linkedin: 'public'
+  },
+
+  // 콘텐츠 유형별 기본값
+  contentDefaults: {
+    text: 'public',
+    photos: 'protected',
+    location: 'private'
+  }
+});
+
+
+게시물별 개인정보
+================
+
+await social.post({
+  content: { text: '개인적인 업데이트...' },
+  privacy: {
+    visibility: 'private',
+    closeFriendsOnly: true
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.5 메타데이터 보호</h2>
+
+<pre>
+자동 메타데이터 제거
+==================
+
+// 게시 전 모든 메타데이터 제거
+const safeMedia = await social.privacy.stripMetadata(photo);
+
+제거되는 것:
+  [OK] GPS 좌표
+  [OK] 기기 정보
+  [OK] 촬영 날짜/시간
+  [OK] 카메라 시리얼 번호
+  [OK] 사용된 소프트웨어
+  [OK] 다른 데이터를 가진 썸네일
+  [OK] 파일의 사용자 코멘트/태그
+
+
+위치 퍼징
+========
+
+// 정확한 위치 대신 대략적으로
+const fuzzyLocation = social.privacy.fuzzyLocation(
+  exactLocation,
+  { radius: '5km' }  // 5km 내에서 무작위화
+);
+
+// "서울시 강남구 123번지 4층" 대신
+// "강남구" 표시
+
+
+선택적 제거
+==========
+
+await social.privacy.configure({
+  media: {
+    stripGPS: true,
+    stripDevice: true,
+    stripDate: false,  // 날짜 유지
+    stripAll: false
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.6 얼굴과 정체성 보호</h2>
+
+<pre>
+얼굴 감지
+========
+
+const scan = await social.privacy.detectFaces(photo);
+
+결과:
+{
+  faces: [
+    { id: 1, position: {...}, recognized: true, name: '김민수' },
+    { id: 2, position: {...}, recognized: false, name: null },
+    { id: 3, position: {...}, recognized: true, name: '이지영' }
+  ],
+  warning: '3명의 얼굴 감지됨. 게시 동의 받으셨나요?'
+}
+
+
+자동 얼굴 블러
+=============
+
+// 인식되지 않은 얼굴 블러
+const processed = await social.privacy.blurFaces(photo, {
+  blur: ['unrecognized'],  // 또는 ['all'] 또는 특정 ID
+  style: 'blur'  // 'blur' | 'pixelate' | 'emoji'
+});
+
+
+동의 관리
+========
+
+// 사진 속 얼굴 동의 추적
+await social.privacy.requestConsent({
+  photo: groupPhoto,
+  faces: [face1, face2],
+  message: '이 단체사진 올려도 될까요?'
+});
+</pre>
+
+<hr>
+
+<h2>6.7 암호화 메시징</h2>
+
+<pre>
+종단간 암호화 DM
+===============
+
+// 암호화 메시지 전송
+await social.messaging.sendEncrypted({
+  to: friendId,
+  content: '비밀 메시지...'
+});
+
+기능:
+  [OK] 종단간 암호화
+  [OK] 완벽한 순방향 비밀성
+  [OK] 자동 삭제 메시지
+  [OK] 스크린샷 감지
+  [OK] 읽음 확인 (선택)
+
+
+임시 콘텐츠
+==========
+
+// 자동 삭제 게시물
+await social.post({
+  content: { text: '임시 생각...' },
+  ephemeral: {
+    expiresIn: '24h',  // 또는 '1h', '7d' 등
+    noScreenshot: true,
+    notifyOnExpire: false
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.8 개인정보 모니터링</h2>
+
+<pre>
+실시간 알림
+==========
+
+social.on('privacy_alert', (event) => {
+  console.log('개인정보 이슈:', event.type);
+  console.log('상세:', event.details);
+  console.log('권장:', event.recommendation);
+});
+
+알림 유형:
+  - 누가 당신을 게시물에 태그
+  - 위치가 공유됨
+  - 새 앱이 데이터 접근 요청
+  - 의심스러운 로그인 시도
+  - 데이터 유출 알림
+
+
+개인정보 대시보드
+================
+
+const report = await social.privacy.getReport();
+
+결과:
+{
+  overallScore: 85,  // 100점 만점
+
+  exposures: {
+    location: 'low',
+    personal: 'medium',
+    photos: 'low'
+  },
+
+  recommendations: [
+    '지난달 태그된 사진 검토',
+    '트위터 위치 공유 설정 업데이트',
+    '공개 프로필에서 전화번호 제거'
+  ],
+
+  recentActivity: [
+    { type: 'metadata_stripped', count: 45 },
+    { type: 'location_fuzzed', count: 12 },
+    { type: 'risk_blocked', count: 3 }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>6.9 데이터 수집 제어</h2>
+
+<pre>
+플랫폼 수집 제어
+===============
+
+await social.privacy.setDataCollection({
+  // WIA-SOCIAL 데이터
+  analytics: false,  // 사용 추적 안 함
+  personalization: true,  // 추천은 OK
+
+  // 제3자
+  thirdPartySharing: false,
+  targetedAds: false,
+  crossPlatformTracking: false
+});
+
+
+데이터 요청
+==========
+
+// 각 플랫폼이 가진 것 보기
+const inventory = await social.privacy.getDataInventory();
+
+// 플랫폼별 분석
+{
+  instagram: {
+    posts: 1200,
+    messages: 5000,
+    searchHistory: 'enabled',
+    locationHistory: '2년'
+  },
+  ...
+}
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 종합적인 개인정보를 위한 이모 (AIR-SHIELD) 연동</li>
+<li>[OK] 게시 전 스캔이 개인정보 위험 감지 및 경고</li>
+<li>[OK] 공개부터 익명까지 다중 개인정보 레벨</li>
+<li>[OK] 자동 메타데이터 제거 및 위치 퍼징</li>
+<li>[OK] 동의 관리와 얼굴 감지</li>
+<li>[OK] 종단간 암호화 메시징</li>
+<li>[OK] 실시간 개인정보 모니터링 및 알림</li>
+<li>[OK] 데이터 수집 제어</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-05.html">이전: 제5장 - 소셜 그래프</a> | <a href="chapter-07.html">다음: 제7장 - 데이터 이동성</a></p>
+</body>
+</html>

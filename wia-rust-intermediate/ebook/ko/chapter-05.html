@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5장: 성능 최적화 & 메모리 관리 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5장: 성능 최적화 & 메모리 관리</h1>
+
+        <h2>5.1 벤치마킹</h2>
+        <p>성능을 측정하지 않으면 최적화할 수 없습니다. Criterion은 Rust의 표준 벤치마킹 도구입니다.</p>
+
+        <h3>5.1.1 Criterion 사용하기</h3>
+        <pre>// Cargo.toml
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
+
+// benches/my_benchmark.rs
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn fibonacci(n: u64) -&gt; u64 {
+    match n {
+        0 =&gt; 0,
+        1 =&gt; 1,
+        n =&gt; fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+fn fibonacci_iterative(n: u64) -&gt; u64 {
+    let mut a = 0;
+    let mut b = 1;
+    for _ in 0..n {
+        let temp = a;
+        a = b;
+        b = temp + b;
+    }
+    a
+}
+
+fn criterion_benchmark(c: &mut Criterion) {
+    c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
+    c.bench_function("fib_iter 20", |b| {
+        b.iter(|| fibonacci_iterative(black_box(20)))
+    });
+}
+
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);</pre>
+
+        <h3>5.1.2 실행하기</h3>
+        <pre>$ cargo bench
+
+# 특정 벤치마크만 실행
+$ cargo bench --bench my_benchmark
+
+# HTML 리포트 생성
+$ cargo bench
+$ open target/criterion/report/index.html</pre>
+
+        <h2>5.2 프로파일링</h2>
+        <p>코드의 어느 부분이 느린지 정확히 파악합니다.</p>
+
+        <h3>5.2.1 Flamegraph</h3>
+        <pre>$ cargo install flamegraph
+
+# 프로파일링 실행
+$ cargo flamegraph
+
+# 특정 벤치마크 프로파일링
+$ cargo flamegraph --bench my_benchmark</pre>
+
+        <h3>5.2.2 perf 사용하기 (Linux)</h3>
+        <pre>$ cargo build --release
+$ perf record --call-graph=dwarf ./target/release/myapp
+$ perf report</pre>
+
+        <h2>5.3 메모리 레이아웃 최적화</h2>
+
+        <h3>5.3.1 구조체 패딩</h3>
+        <pre>use std::mem;
+
+// 비효율적인 레이아웃
+#[derive(Debug)]
+struct Bad {
+    a: u8,   // 1 byte + 7 padding
+    b: u64,  // 8 bytes
+    c: u8,   // 1 byte + 7 padding
+    d: u64,  // 8 bytes
+}
+
+// 효율적인 레이아웃
+#[derive(Debug)]
+struct Good {
+    b: u64,  // 8 bytes
+    d: u64,  // 8 bytes
+    a: u8,   // 1 byte
+    c: u8,   // 1 byte + 6 padding
+}
+
+fn main() {
+    println!("Bad size: {}", mem::size_of::&lt;Bad&gt;());   // 32 bytes
+    println!("Good size: {}", mem::size_of::&lt;Good&gt;()); // 24 bytes
+
+    // 25% 메모리 절약!
+}
+
+// repr(C)로 C 호환 레이아웃
+#[repr(C)]
+struct FFI {
+    x: u32,
+    y: u32,
+}
+
+// repr(packed)로 패딩 제거 (주의해서 사용)
+#[repr(packed)]
+struct Packed {
+    a: u8,
+    b: u64,
+}</pre>
+
+        <h3>5.3.2 Cow (Clone on Write)</h3>
+        <pre>use std::borrow::Cow;
+
+fn process_text(text: Cow&lt;str&gt;) -&gt; Cow&lt;str&gt; {
+    if text.contains("Rust") {
+        // 이미 있으면 복사 안 함
+        text
+    } else {
+        // 필요할 때만 복사
+        Cow::Owned(format!("{} and Rust", text))
+    }
+}
+
+fn main() {
+    let owned = String::from("Hello Rust");
+    let borrowed = "Hello World";
+
+    // 빌림만 발생
+    let result1 = process_text(Cow::Borrowed(&owned));
+    println!("{}", result1);
+
+    // 복사 발생
+    let result2 = process_text(Cow::Borrowed(borrowed));
+    println!("{}", result2);
+}</pre>
+
+        <h2>5.4 이터레이터 최적화</h2>
+
+        <h3>5.4.1 제로 코스트 추상화</h3>
+        <pre>// 느림: 여러 번 할당
+fn slow_sum(numbers: &[i32]) -&gt; i32 {
+    let mut doubled = vec![];
+    for &n in numbers {
+        doubled.push(n * 2);
+    }
+
+    let mut filtered = vec![];
+    for &n in &doubled {
+        if n &gt; 10 {
+            filtered.push(n);
+        }
+    }
+
+    filtered.iter().sum()
+}
+
+// 빠름: 할당 없음, 한 번의 패스
+fn fast_sum(numbers: &[i32]) -&gt; i32 {
+    numbers
+        .iter()
+        .map(|&n| n * 2)
+        .filter(|&n| n &gt; 10)
+        .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_equivalence() {
+        let numbers = vec![1, 5, 10, 15, 20];
+        assert_eq!(slow_sum(&numbers), fast_sum(&numbers));
+    }
+}</pre>
+
+        <h3>5.4.2 collect 최적화</h3>
+        <pre>// 크기를 미리 알 때
+fn optimized_collect(size: usize) -&gt; Vec&lt;i32&gt; {
+    let mut vec = Vec::with_capacity(size);
+    for i in 0..size {
+        vec.push(i as i32);
+    }
+    vec
+}
+
+// 이터레이터로 더 간결하게
+fn iterator_collect(size: usize) -&gt; Vec&lt;i32&gt; {
+    (0..size).map(|i| i as i32).collect()
+}</pre>
+
+        <h2>5.5 SIMD (Single Instruction Multiple Data)</h2>
+        <p>하나의 명령어로 여러 데이터를 동시에 처리합니다.</p>
+
+        <pre>// portable_simd (nightly 필요)
+#![feature(portable_simd)]
+use std::simd::f32x4;
+
+fn dot_product_scalar(a: &[f32], b: &[f32]) -&gt; f32 {
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+}
+
+fn dot_product_simd(a: &[f32], b: &[f32]) -&gt; f32 {
+    assert_eq!(a.len(), b.len());
+    assert_eq!(a.len() % 4, 0);
+
+    let mut sum = f32x4::splat(0.0);
+
+    for i in (0..a.len()).step_by(4) {
+        let a_vec = f32x4::from_slice(&a[i..i + 4]);
+        let b_vec = f32x4::from_slice(&b[i..i + 4]);
+        sum += a_vec * b_vec;
+    }
+
+    sum.reduce_sum()
+}
+
+// 실제 사용 예
+fn main() {
+    let a = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let b = vec![8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0];
+
+    println!("Scalar: {}", dot_product_scalar(&a, &b));
+    println!("SIMD: {}", dot_product_simd(&a, &b));
+}</pre>
+
+        <h2>5.6 인라인 최적화</h2>
+        <pre>// 작은 함수는 자동으로 인라인되지만, 명시적으로 지정 가능
+
+#[inline]
+fn add(a: i32, b: i32) -&gt; i32 {
+    a + b
+}
+
+// 항상 인라인 (신중하게 사용)
+#[inline(always)]
+fn multiply(a: i32, b: i32) -&gt; i32 {
+    a * b
+}
+
+// 인라인 금지
+#[inline(never)]
+fn complex_function() {
+    // 큰 함수는 인라인하지 않는 게 좋을 수 있음
+}
+
+// 크로스 크레이트 인라인을 위해 제네릭 사용
+#[inline]
+pub fn generic_add&lt;T: std::ops::Add&lt;Output = T&gt;&gt;(a: T, b: T) -&gt; T {
+    a + b
+}</pre>
+
+        <h2>5.7 캐시 지역성</h2>
+        <pre>// 나쁜 예: 캐시 미스 많음
+fn bad_matrix_sum(matrix: &[[i32; 1000]; 1000]) -&gt; i32 {
+    let mut sum = 0;
+    for col in 0..1000 {
+        for row in 0..1000 {
+            sum += matrix[row][col]; // 열 우선 접근 (나쁨)
+        }
+    }
+    sum
+}
+
+// 좋은 예: 캐시 히트 높음
+fn good_matrix_sum(matrix: &[[i32; 1000]; 1000]) -&gt; i32 {
+    let mut sum = 0;
+    for row in 0..1000 {
+        for col in 0..1000 {
+            sum += matrix[row][col]; // 행 우선 접근 (좋음)
+        }
+    }
+    sum
+}
+
+// 더 좋은 예: 이터레이터 사용
+fn best_matrix_sum(matrix: &[[i32; 1000]; 1000]) -&gt; i32 {
+    matrix.iter().flat_map(|row| row.iter()).sum()
+}</pre>
+
+        <h2>5.8 실전 예제: 고성능 해시맵</h2>
+        <pre>use std::collections::HashMap;
+use std::hash::{Hash, BuildHasher};
+
+// FxHash는 std HashMap보다 빠름 (비암호화)
+use rustc_hash::FxHashMap;
+
+fn benchmark_hashmaps() {
+    use std::time::Instant;
+
+    // 표준 HashMap
+    let start = Instant::now();
+    let mut std_map: HashMap&lt;i32, i32&gt; = HashMap::new();
+    for i in 0..1_000_000 {
+        std_map.insert(i, i * 2);
+    }
+    println!("std HashMap: {:?}", start.elapsed());
+
+    // FxHashMap (더 빠름)
+    let start = Instant::now();
+    let mut fx_map: FxHashMap&lt;i32, i32&gt; = FxHashMap::default();
+    for i in 0..1_000_000 {
+        fx_map.insert(i, i * 2);
+    }
+    println!("FxHashMap: {:?}", start.elapsed());
+
+    // 용량 미리 할당 (더더 빠름)
+    let start = Instant::now();
+    let mut reserved_map: FxHashMap&lt;i32, i32&gt; =
+        FxHashMap::with_capacity_and_hasher(1_000_000, Default::default());
+    for i in 0..1_000_000 {
+        reserved_map.insert(i, i * 2);
+    }
+    println!("Reserved FxHashMap: {:?}", start.elapsed());
+}
+
+fn main() {
+    benchmark_hashmaps();
+}</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>Criterion으로 정확한 벤치마킹</li>
+                <li>Flamegraph로 병목 지점 발견</li>
+                <li>메모리 레이아웃 최적화로 캐시 효율 향상</li>
+                <li>이터레이터로 제로 코스트 추상화</li>
+                <li>SIMD로 데이터 병렬 처리</li>
+                <li>캐시 지역성을 고려한 데이터 접근</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

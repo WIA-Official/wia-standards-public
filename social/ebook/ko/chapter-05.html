@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제5장: 소셜 그래프 - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>제5장: 소셜 그래프</h1>
+
+<blockquote>
+"홍익인간: 친구는 흩어져 있지 않고, 통합되어 있다."
+</blockquote>
+
+<hr>
+
+<h2>5.1 흩어진 친구들 문제</h2>
+
+<pre>
+친구 김민수
+==========
+
+플랫폼 A: @kim_minsu (500 팔로워)
+플랫폼 B: @minsukim (200 팔로워)
+플랫폼 C: @minsu_dance (1000 팔로워)
+플랫폼 D: @kimminsu92 (50 팔로워)
+
+같은 사람.
+네 개의 다른 계정.
+일부만 팔로우.
+같은 사람인지 알 방법 없음.
+
+
+오늘의 소셜 네트워크
+==================
+
+인스타그램: 500 친구
+트위터: 800 친구
+틱톡: 200 친구
+블루스카이: 150 친구
+
+총 "친구": 1650
+실제 고유한 사람: 아마 600?
+
+중복 불명.
+연결 파편화.
+관계 불완전.
+</pre>
+
+<hr>
+
+<h2>5.2 통합 소셜 그래프</h2>
+
+<pre>
+WIA-SOCIAL이 네트워크 통합
+=========================
+
+통합 네트워크:
++------------------------------------------+
+|                                          |
+|   고유 연결: 623                          |
+|                                          |
+|   다중 플랫폼 친구:                        |
+|     2개 이상 플랫폼: 156                   |
+|     3개 이상 플랫폼: 42                    |
+|     모든 플랫폼: 8                         |
+|                                          |
+|   플랫폼별:                               |
+|     인스타그램: 500                        |
+|     트위터: 800                            |
+|     틱톡: 200                              |
+|     블루스카이: 150                        |
+|                                          |
+|   맞팔로우: 287                            |
+|                                          |
++------------------------------------------+
+
+
+친구 프로필 뷰
+=============
+
+김민수 (WIA ID: wia:kim.minsu.1234)
++------------------------------------------+
+|                                          |
+|   [사진] 김민수                           |
+|   "디지털 크리에이터"                      |
+|                                          |
+|   관계: 맞팔로우                          |
+|                                          |
+|   연결된 플랫폼:                          |
+|     [OK] 인스타그램: @kim_minsu           |
+|     [OK] 트위터: @minsukim                |
+|     [--] 틱톡: @minsu_dance (팔로우 안함)  |
+|     [OK] 블루스카이: @minsu.bsky.social   |
+|                                          |
++------------------------------------------+
+</pre>
+
+<hr>
+
+<h2>5.3 크로스 플랫폼 친구 찾기</h2>
+
+<pre>
+플랫폼 간 친구 찾기
+==================
+
+// 이름으로 검색
+const results = await social.findAcrossPlatforms('김민수');
+
+결과:
+{
+  found: true,
+  confidence: 0.95,  // 같은 사람 확신도
+  identity: {
+    wia_id: 'wia:kim.minsu.1234',
+    displayName: '김민수'
+  },
+  platforms: [
+    { platform: 'instagram', handle: '@kim_minsu', following: true },
+    { platform: 'twitter', handle: '@minsukim', following: true },
+    { platform: 'tiktok', handle: '@minsu_dance', following: false },
+    { platform: 'bluesky', handle: '@minsu.bsky.social', following: true }
+  ],
+  mutualFriends: 15
+}
+
+
+작동 방식
+========
+
+매칭 방법:
+  1. 계정에 연결된 같은 이메일
+  2. 같은 전화번호
+  3. 명시적 WIA-SOCIAL 링크
+  4. 바이오 링크 분석
+  5. 프로필 사진 매칭
+  6. 친구 네트워크 겹침
+  7. 아이디 유사도
+
+개인정보 존중:
+  - 공개 정보만 사용
+  - 무단 데이터 접근 없음
+  - 링크에 사용자 동의 필요
+</pre>
+
+<hr>
+
+<h2>5.4 모든 곳에서 팔로우</h2>
+
+<pre>
+한 번 클릭, 모든 플랫폼
+=====================
+
+// 가능한 모든 플랫폼에서 팔로우
+await social.followEverywhere(friendId);
+
+결과:
+{
+  success: [
+    { platform: 'instagram', status: 'following' },
+    { platform: 'twitter', status: 'following' },
+    { platform: 'bluesky', status: 'following' }
+  ],
+  skipped: [
+    { platform: 'tiktok', reason: 'already_following' }
+  ],
+  failed: []
+}
+
+
+선택적 팔로우
+============
+
+// 특정 플랫폼 선택
+await social.follow(friendId, {
+  platforms: ['instagram', 'twitter']
+});
+
+
+모든 곳에서 언팔로우
+==================
+
+await social.unfollowEverywhere(friendId);
+</pre>
+
+<hr>
+
+<h2>5.5 관계 관리</h2>
+
+<pre>
+관계 상태 확인
+=============
+
+const relationship = await social.getRelationship(friendId);
+
+결과:
+{
+  type: 'mutual',  // 'following' | 'follower' | 'mutual' | 'none'
+
+  byPlatform: {
+    instagram: { following: true, follower: true },
+    twitter: { following: true, follower: false },
+    bluesky: { following: true, follower: true }
+  },
+
+  interactions: {
+    lastInteraction: '2025-01-10',
+    frequency: 'weekly',
+    commonInterests: ['tech', 'photography']
+  }
+}
+
+
+가까운 친구
+==========
+
+// 가까운 친구로 표시
+await social.setCloseFriend(friendId, true);
+
+// 가까운 친구 혜택:
+// - 피드에서 우선 순위
+// - 즉시 알림
+// - 비공개 콘텐츠 접근
+
+
+모든 곳에서 차단
+===============
+
+// 모든 플랫폼에서 한 번에 차단
+await social.blockEverywhere(userId);
+
+// 차단 없이 뮤트
+await social.muteEverywhere(userId);
+</pre>
+
+<hr>
+
+<h2>5.6 네트워크 분석</h2>
+
+<pre>
+네트워크 통계
+============
+
+const stats = await social.getNetworkStats();
+
+결과:
+{
+  totalConnections: 623,
+  followers: {
+    total: 847,
+    byPlatform: {
+      instagram: 450,
+      twitter: 380,
+      tiktok: 120,
+      bluesky: 95
+    }
+  },
+  following: {
+    total: 520,
+    byPlatform: { ... }
+  },
+  mutuals: 287,
+
+  growth: {
+    last30Days: +45,
+    trend: 'growing'
+  },
+
+  engagement: {
+    mostInteractive: ['wia:kim.minsu.1234', ...],
+    topEngagers: ['wia:lee.jiyoung.5678', ...]
+  }
+}
+
+
+공통 친구 찾기
+=============
+
+const mutuals = await social.getMutualFriends(friendId);
+
+// 둘 다 팔로우하는 사람
+// 새 연결 찾기에 좋음
+</pre>
+
+<hr>
+
+<h2>5.7 친구 추천</h2>
+
+<pre>
+크로스 플랫폼 추천
+=================
+
+const suggestions = await social.getSuggestions();
+
+결과:
+[
+  {
+    identity: { displayName: '박지훈', ... },
+    reason: '12명의 친구가 팔로우',
+    platforms: ['twitter', 'bluesky'],
+    confidence: 0.85
+  },
+  {
+    identity: { displayName: '이소영', ... },
+    reason: '인스타에서 팔로우 중, 트위터에도 있음',
+    platforms: ['twitter'],
+    confidence: 0.92
+  },
+  ...
+]
+
+
+"알 수도 있는" 분석
+==================
+
+기반:
+  - 플랫폼 간 공통 친구
+  - 비슷한 관심사
+  - 같은 커뮤니티/그룹
+  - 직장 연결
+  - 지리적 근접성 (허용 시)
+</pre>
+
+<hr>
+
+<h2>5.8 리스트와 그룹</h2>
+
+<pre>
+크로스 플랫폼 리스트
+==================
+
+// 리스트 생성
+await social.createList({
+  name: '테크 친구들',
+  description: '테크에서 아는 사람들',
+  members: [
+    'wia:kim.minsu.1234',
+    'wia:lee.jiyoung.5678',
+    'wia:park.jihoon.9012'
+  ],
+  privacy: 'private'
+});
+
+// 리스트는 모든 플랫폼에서 작동
+// 콘텐츠 통합 보기
+const techFeed = await social.getFeed({ list: 'tech_friends' });
+
+
+그룹
+====
+
+// 메시징을 위한 크로스 플랫폼 그룹 생성
+const group = await social.createGroup({
+  name: '프로젝트 팀',
+  members: [member1, member2, member3],
+  platforms: ['auto']  // 최적 플랫폼 사용
+});
+
+// 전체 그룹에 메시지
+await social.messageGroup(group.id, '내일 3시 미팅');
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 통합 소셜 그래프가 진정한 네트워크 규모 표시</li>
+<li>[OK] 크로스 플랫폼 친구 찾기가 다른 플랫폼의 같은 사람 식별</li>
+<li>[OK] 한 번 클릭으로 모든 곳에서 팔로우</li>
+<li>[OK] 플랫폼 간 관계 관리</li>
+<li>[OK] 네트워크 분석 및 성장 추적</li>
+<li>[OK] 크로스 플랫폼 데이터 기반 스마트 친구 추천</li>
+<li>[OK] 정리를 위한 크로스 플랫폼 리스트와 그룹</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-04.html">이전: 제4장 - 통합 피드</a> | <a href="chapter-06.html">다음: 제6장 - 개인정보 보호</a></p>
+</body>
+</html>

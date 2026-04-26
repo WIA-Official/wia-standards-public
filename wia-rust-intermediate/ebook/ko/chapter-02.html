@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2장: 고급 타입 시스템 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .warning { background: #7f1d1d; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #dc2626; }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>2장: 고급 타입 시스템</h1>
+
+        <h2>2.1 Newtype 패턴</h2>
+        <p>Newtype 패턴은 기존 타입을 감싸서 새로운 타입을 만듭니다. 타입 안전성을 높이고 의미를 명확히 합니다.</p>
+
+        <h3>2.1.1 기본 Newtype</h3>
+        <pre>// 미터와 피트를 혼동하지 않도록!
+struct Meters(f64);
+struct Feet(f64);
+
+impl Meters {
+    fn to_feet(&self) -&gt; Feet {
+        Feet(self.0 * 3.28084)
+    }
+}
+
+impl Feet {
+    fn to_meters(&self) -&gt; Meters {
+        Meters(self.0 / 3.28084)
+    }
+}
+
+fn calculate_distance(m: Meters) -&gt; f64 {
+    m.0
+}
+
+fn main() {
+    let height = Meters(100.0);
+    let height_feet = height.to_feet();
+
+    // 타입 체크로 실수 방지!
+    // calculate_distance(height_feet); // 컴파일 에러!
+    calculate_distance(height); // OK
+}</pre>
+
+        <h3>2.1.2 트레이트 우회하기</h3>
+        <pre>use std::fmt;
+
+// Vec&lt;String&gt;에 Display 구현 불가 (orphan rule)
+// Newtype으로 해결!
+struct Wrapper(Vec&lt;String&gt;);
+
+impl fmt::Display for Wrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+
+fn main() {
+    let w = Wrapper(vec![
+        String::from("hello"),
+        String::from("world"),
+    ]);
+    println!("w = {}", w);
+}</pre>
+
+        <h2>2.2 타입 별칭 (Type Alias)</h2>
+        <p>복잡한 타입에 간단한 이름을 부여합니다.</p>
+
+        <pre>// 복잡한 타입 단순화
+type Kilometers = i32;
+type Thunk = Box&lt;dyn Fn() + Send + 'static&gt;;
+
+// Result 타입 특화
+type Result&lt;T&gt; = std::result::Result&lt;T, std::io::Error&gt;;
+
+fn read_file() -&gt; Result&lt;String&gt; {
+    std::fs::read_to_string("file.txt")
+}
+
+// 복잡한 함수 포인터
+type FnPointer = fn(i32) -&gt; i32;
+
+fn apply(f: FnPointer, x: i32) -&gt; i32 {
+    f(x)
+}
+
+fn main() {
+    let distance: Kilometers = 5;
+
+    let thunk: Thunk = Box::new(|| println!("Hello!"));
+    thunk();
+
+    let double: FnPointer = |x| x * 2;
+    println!("{}", apply(double, 5));
+}</pre>
+
+        <h2>2.3 PhantomData와 제로 코스트 추상화</h2>
+        <p>컴파일 타임에만 존재하고 런타임에는 사라지는 타입 마커입니다.</p>
+
+        <pre>use std::marker::PhantomData;
+
+// 타입 상태 패턴
+struct Locked;
+struct Unlocked;
+
+struct Door&lt;State&gt; {
+    id: u32,
+    _state: PhantomData&lt;State&gt;,
+}
+
+impl Door&lt;Locked&gt; {
+    fn new(id: u32) -&gt; Self {
+        Door {
+            id,
+            _state: PhantomData,
+        }
+    }
+
+    fn unlock(self) -&gt; Door&lt;Unlocked&gt; {
+        println!("Door {} unlocked", self.id);
+        Door {
+            id: self.id,
+            _state: PhantomData,
+        }
+    }
+}
+
+impl Door&lt;Unlocked&gt; {
+    fn open(&self) {
+        println!("Door {} opened", self.id);
+    }
+
+    fn lock(self) -&gt; Door&lt;Locked&gt; {
+        println!("Door {} locked", self.id);
+        Door {
+            id: self.id,
+            _state: PhantomData,
+        }
+    }
+}
+
+fn main() {
+    let door = Door::new(1);
+    // door.open(); // 컴파일 에러! Locked 상태에서는 불가능
+
+    let door = door.unlock();
+    door.open(); // OK!
+
+    let door = door.lock();
+    // door.open(); // 다시 컴파일 에러!
+}</pre>
+
+        <div class="highlight">
+            <strong>💡 타입 상태 패턴의 장점:</strong>
+            <ul style="margin-top: 10px;">
+                <li>불가능한 상태를 컴파일 타임에 방지</li>
+                <li>런타임 오버헤드 제로</li>
+                <li>API 오용 불가능</li>
+            </ul>
+        </div>
+
+        <h2>2.4 고급 제네릭</h2>
+
+        <h3>2.4.1 연관 상수</h3>
+        <pre>trait Container {
+    const MAX_SIZE: usize;
+    type Item;
+
+    fn add(&mut self, item: Self::Item);
+    fn is_full(&self) -&gt; bool;
+}
+
+struct Stack&lt;T&gt; {
+    items: Vec&lt;T&gt;,
+}
+
+impl&lt;T&gt; Container for Stack&lt;T&gt; {
+    const MAX_SIZE: usize = 100;
+    type Item = T;
+
+    fn add(&mut self, item: T) {
+        if !self.is_full() {
+            self.items.push(item);
+        }
+    }
+
+    fn is_full(&self) -&gt; bool {
+        self.items.len() &gt;= Self::MAX_SIZE
+    }
+}</pre>
+
+        <h3>2.4.2 제네릭 특화 (Specialization)</h3>
+        <pre>// nightly에서만 사용 가능
+#![feature(specialization)]
+
+trait Print {
+    fn print(&self);
+}
+
+impl&lt;T&gt; Print for T {
+    default fn print(&self) {
+        println!("Generic print");
+    }
+}
+
+impl Print for i32 {
+    fn print(&self) {
+        println!("i32: {}", self);
+    }
+}
+
+impl Print for String {
+    fn print(&self) {
+        println!("String: {}", self);
+    }
+}</pre>
+
+        <h2>2.5 고급 패턴 매칭</h2>
+
+        <h3>2.5.1 @ 바인딩</h3>
+        <pre>enum Message {
+    Hello { id: i32 },
+}
+
+fn main() {
+    let msg = Message::Hello { id: 5 };
+
+    match msg {
+        Message::Hello {
+            id: id_variable @ 3..=7,
+        } =&gt; println!("Found an id in range: {}", id_variable),
+        Message::Hello { id: 10..=12 } =&gt; {
+            println!("Found an id in another range")
+        }
+        Message::Hello { id } =&gt; println!("Found some other id: {}", id),
+    }
+}</pre>
+
+        <h3>2.5.2 매치 가드</h3>
+        <pre>fn main() {
+    let num = Some(4);
+    let split = 2;
+
+    match num {
+        Some(x) if x &lt; 5 =&gt; println!("less than five: {}", x),
+        Some(x) if x % split == 0 =&gt; println!("divisible by {}: {}", split, x),
+        Some(x) =&gt; println!("{}", x),
+        None =&gt; (),
+    }
+}</pre>
+
+        <h2>2.6 Never 타입 (!)</h2>
+        <p>절대 반환하지 않는 함수의 타입입니다.</p>
+
+        <pre>// 무한 루프
+fn infinite_loop() -&gt; ! {
+    loop {
+        println!("Forever!");
+    }
+}
+
+// panic!도 ! 타입을 반환
+fn divide(x: i32, y: i32) -&gt; i32 {
+    if y == 0 {
+        panic!("Division by zero");
+    }
+    x / y
+}
+
+// continue도 ! 타입
+fn process_numbers(numbers: Vec&lt;i32&gt;) {
+    for num in numbers {
+        let result = match num {
+            0 =&gt; continue, // ! 타입
+            n if n &lt; 0 =&gt; panic!("Negative!"), // ! 타입
+            n =&gt; n * 2,
+        };
+        println!("{}", result);
+    }
+}</pre>
+
+        <h2>2.7 실전 예제: 타입 안전한 빌더</h2>
+        <pre>use std::marker::PhantomData;
+
+// 빌더 상태
+struct No;
+struct Yes;
+
+struct UserBuilder&lt;HasName, HasEmail&gt; {
+    name: Option&lt;String&gt;,
+    email: Option&lt;String&gt;,
+    age: Option&lt;u32&gt;,
+    _has_name: PhantomData&lt;HasName&gt;,
+    _has_email: PhantomData&lt;HasEmail&gt;,
+}
+
+impl UserBuilder&lt;No, No&gt; {
+    fn new() -&gt; Self {
+        UserBuilder {
+            name: None,
+            email: None,
+            age: None,
+            _has_name: PhantomData,
+            _has_email: PhantomData,
+        }
+    }
+}
+
+impl&lt;E&gt; UserBuilder&lt;No, E&gt; {
+    fn name(self, name: String) -&gt; UserBuilder&lt;Yes, E&gt; {
+        UserBuilder {
+            name: Some(name),
+            email: self.email,
+            age: self.age,
+            _has_name: PhantomData,
+            _has_email: PhantomData,
+        }
+    }
+}
+
+impl&lt;N&gt; UserBuilder&lt;N, No&gt; {
+    fn email(self, email: String) -&gt; UserBuilder&lt;N, Yes&gt; {
+        UserBuilder {
+            name: self.name,
+            email: Some(email),
+            age: self.age,
+            _has_name: PhantomData,
+            _has_email: PhantomData,
+        }
+    }
+}
+
+impl&lt;N, E&gt; UserBuilder&lt;N, E&gt; {
+    fn age(mut self, age: u32) -&gt; Self {
+        self.age = Some(age);
+        self
+    }
+}
+
+// build는 필수 필드가 모두 설정된 경우에만 가능!
+impl UserBuilder&lt;Yes, Yes&gt; {
+    fn build(self) -&gt; User {
+        User {
+            name: self.name.unwrap(),
+            email: self.email.unwrap(),
+            age: self.age,
+        }
+    }
+}
+
+struct User {
+    name: String,
+    email: String,
+    age: Option&lt;u32&gt;,
+}
+
+fn main() {
+    let user = UserBuilder::new()
+        .name("Alice".to_string())
+        .email("alice@example.com".to_string())
+        .age(30)
+        .build(); // OK!
+
+    // 컴파일 에러 예제:
+    // let user = UserBuilder::new()
+    //     .name("Bob".to_string())
+    //     .build(); // 에러! email 필요
+}</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>Newtype으로 타입 안전성 강화</li>
+                <li>타입 별칭으로 복잡한 타입 단순화</li>
+                <li>PhantomData로 제로 코스트 타입 상태 패턴 구현</li>
+                <li>고급 제네릭으로 유연하고 안전한 API 설계</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3장: 고급 트레이트 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3장: 고급 트레이트</h1>
+
+        <h2>3.1 연관 타입 (Associated Types)</h2>
+        <p>연관 타입은 트레이트 내에서 타입 플레이스홀더를 정의합니다. 제네릭보다 간결하고 사용하기 쉽습니다.</p>
+
+        <h3>3.1.1 연관 타입 vs 제네릭</h3>
+        <pre>// 제네릭 방식 (덜 선호)
+trait Container&lt;T&gt; {
+    fn add(&mut self, item: T);
+}
+
+// 연관 타입 방식 (더 선호)
+trait Container {
+    type Item;
+    fn add(&mut self, item: Self::Item);
+}
+
+struct Stack&lt;T&gt; {
+    items: Vec&lt;T&gt;,
+}
+
+impl&lt;T&gt; Container for Stack&lt;T&gt; {
+    type Item = T;
+
+    fn add(&mut self, item: T) {
+        self.items.push(item);
+    }
+}
+
+fn main() {
+    let mut stack = Stack { items: vec![] };
+    stack.add(42);
+    stack.add(100);
+}</pre>
+
+        <h3>3.1.2 Iterator 트레이트</h3>
+        <pre>// 표준 라이브러리의 Iterator
+pub trait Iterator {
+    type Item;
+    fn next(&mut self) -&gt; Option&lt;Self::Item&gt;;
+}
+
+// 커스텀 이터레이터 구현
+struct Counter {
+    count: u32,
+}
+
+impl Counter {
+    fn new() -&gt; Counter {
+        Counter { count: 0 }
+    }
+}
+
+impl Iterator for Counter {
+    type Item = u32;
+
+    fn next(&mut self) -&gt; Option&lt;Self::Item&gt; {
+        if self.count &lt; 5 {
+            self.count += 1;
+            Some(self.count)
+        } else {
+            None
+        }
+    }
+}
+
+fn main() {
+    let counter = Counter::new();
+    for num in counter {
+        println!("{}", num); // 1, 2, 3, 4, 5
+    }
+}</pre>
+
+        <h2>3.2 트레이트 객체와 동적 디스패치</h2>
+        <p>트레이트 객체를 사용하면 다른 타입의 값을 동일하게 처리할 수 있습니다.</p>
+
+        <h3>3.2.1 정적 vs 동적 디스패치</h3>
+        <pre>trait Draw {
+    fn draw(&self);
+}
+
+struct Circle {
+    radius: f64,
+}
+
+struct Rectangle {
+    width: f64,
+    height: f64,
+}
+
+impl Draw for Circle {
+    fn draw(&self) {
+        println!("Drawing circle with radius {}", self.radius);
+    }
+}
+
+impl Draw for Rectangle {
+    fn draw(&self) {
+        println!("Drawing rectangle {}x{}", self.width, self.height);
+    }
+}
+
+// 정적 디스패치 (컴파일 타임, 더 빠름)
+fn draw_static&lt;T: Draw&gt;(shape: &T) {
+    shape.draw();
+}
+
+// 동적 디스패치 (런타임, 더 유연함)
+fn draw_dynamic(shape: &dyn Draw) {
+    shape.draw();
+}
+
+fn main() {
+    let circle = Circle { radius: 5.0 };
+    let rect = Rectangle { width: 10.0, height: 20.0 };
+
+    draw_static(&circle);
+    draw_static(&rect);
+
+    draw_dynamic(&circle);
+    draw_dynamic(&rect);
+
+    // 트레이트 객체 벡터
+    let shapes: Vec&lt;Box&lt;dyn Draw&gt;&gt; = vec![
+        Box::new(Circle { radius: 3.0 }),
+        Box::new(Rectangle { width: 5.0, height: 7.0 }),
+    ];
+
+    for shape in shapes.iter() {
+        shape.draw();
+    }
+}</pre>
+
+        <h3>3.2.2 객체 안전성 (Object Safety)</h3>
+        <pre>// 객체 안전한 트레이트
+trait Animal {
+    fn make_sound(&self);
+}
+
+// 객체 안전하지 않은 트레이트
+trait Cloneable {
+    fn clone(&self) -&gt; Self; // Self 반환 = 객체 안전하지 않음
+}
+
+// 수정된 객체 안전한 버전
+trait CloneBox {
+    fn clone_box(&self) -&gt; Box&lt;dyn CloneBox&gt;;
+}
+
+impl&lt;T: Clone + 'static&gt; CloneBox for T {
+    fn clone_box(&self) -&gt; Box&lt;dyn CloneBox&gt; {
+        Box::new(self.clone())
+    }
+}</pre>
+
+        <h2>3.3 고급 트레이트 바운드</h2>
+
+        <h3>3.3.1 where 절</h3>
+        <pre>use std::fmt::Display;
+
+// 복잡한 제네릭 함수
+fn complex_function&lt;T, U&gt;(t: &T, u: &U) -&gt; i32
+where
+    T: Display + Clone,
+    U: Clone + Debug,
+{
+    println!("t: {}", t);
+    println!("u: {:?}", u);
+    42
+}
+
+// 연관 타입 바운드
+fn print_items&lt;C&gt;(container: C)
+where
+    C: Iterator,
+    C::Item: Display,
+{
+    for item in container {
+        println!("{}", item);
+    }
+}</pre>
+
+        <h3>3.3.2 슈퍼트레이트 (Supertraits)</h3>
+        <pre>use std::fmt;
+
+// Display를 구현하려면 반드시 Debug도 구현해야 함
+trait OutlinePrint: fmt::Display {
+    fn outline_print(&self) {
+        let output = self.to_string();
+        let len = output.len();
+        println!("{}", "*".repeat(len + 4));
+        println!("*{}*", " ".repeat(len + 2));
+        println!("* {} *", output);
+        println!("*{}*", " ".repeat(len + 2));
+        println!("{}", "*".repeat(len + 4));
+    }
+}
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl OutlinePrint for Point {}
+
+fn main() {
+    let p = Point { x: 1, y: 3 };
+    p.outline_print();
+}</pre>
+
+        <h2>3.4 디폴트 제네릭 타입 매개변수</h2>
+        <pre>use std::ops::Add;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+// Add 트레이트의 디폴트 타입 매개변수
+impl Add for Point {
+    type Output = Point;
+
+    fn add(self, other: Point) -&gt; Point {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+// 다른 타입과의 덧셈
+struct Millimeters(u32);
+struct Meters(u32);
+
+impl Add&lt;Meters&gt; for Millimeters {
+    type Output = Millimeters;
+
+    fn add(self, other: Meters) -&gt; Millimeters {
+        Millimeters(self.0 + (other.0 * 1000))
+    }
+}
+
+fn main() {
+    assert_eq!(
+        Point { x: 1, y: 0 } + Point { x: 2, y: 3 },
+        Point { x: 3, y: 3 }
+    );
+
+    let mm = Millimeters(1000);
+    let m = Meters(1);
+    let total = mm + m;
+    println!("{}mm", total.0);
+}</pre>
+
+        <h2>3.5 완전 정규화 구문 (Fully Qualified Syntax)</h2>
+        <pre>trait Pilot {
+    fn fly(&self);
+}
+
+trait Wizard {
+    fn fly(&self);
+}
+
+struct Human;
+
+impl Pilot for Human {
+    fn fly(&self) {
+        println!("This is your captain speaking.");
+    }
+}
+
+impl Wizard for Human {
+    fn fly(&self) {
+        println!("Up!");
+    }
+}
+
+impl Human {
+    fn fly(&self) {
+        println!("*waving arms furiously*");
+    }
+}
+
+fn main() {
+    let person = Human;
+
+    person.fly(); // Human::fly 호출
+
+    // 명시적으로 호출
+    Pilot::fly(&person);
+    Wizard::fly(&person);
+    Human::fly(&person);
+
+    // 연관 함수의 경우
+    trait Animal {
+        fn baby_name() -&gt; String;
+    }
+
+    struct Dog;
+
+    impl Dog {
+        fn baby_name() -&gt; String {
+            String::from("Spot")
+        }
+    }
+
+    impl Animal for Dog {
+        fn baby_name() -&gt; String {
+            String::from("puppy")
+        }
+    }
+
+    println!("A baby dog is called a {}", Dog::baby_name());
+    // 완전 정규화 구문
+    println!("A baby dog is called a {}", &lt;Dog as Animal&gt;::baby_name());
+}</pre>
+
+        <h2>3.6 실전 예제: 플러그인 시스템</h2>
+        <pre>use std::collections::HashMap;
+
+// 플러그인 트레이트
+trait Plugin: Send + Sync {
+    fn name(&self) -&gt; &str;
+    fn execute(&self, args: &[&str]) -&gt; Result&lt;String, String&gt;;
+    fn help(&self) -&gt; &str;
+}
+
+// 구체적인 플러그인들
+struct EchoPlugin;
+
+impl Plugin for EchoPlugin {
+    fn name(&self) -&gt; &str {
+        "echo"
+    }
+
+    fn execute(&self, args: &[&str]) -&gt; Result&lt;String, String&gt; {
+        Ok(args.join(" "))
+    }
+
+    fn help(&self) -&gt; &str {
+        "Echo back the input arguments"
+    }
+}
+
+struct UpperPlugin;
+
+impl Plugin for UpperPlugin {
+    fn name(&self) -&gt; &str {
+        "upper"
+    }
+
+    fn execute(&self, args: &[&str]) -&gt; Result&lt;String, String&gt; {
+        Ok(args.join(" ").to_uppercase())
+    }
+
+    fn help(&self) -&gt; &str {
+        "Convert input to uppercase"
+    }
+}
+
+// 플러그인 매니저
+struct PluginManager {
+    plugins: HashMap&lt;String, Box&lt;dyn Plugin&gt;&gt;,
+}
+
+impl PluginManager {
+    fn new() -&gt; Self {
+        PluginManager {
+            plugins: HashMap::new(),
+        }
+    }
+
+    fn register(&mut self, plugin: Box&lt;dyn Plugin&gt;) {
+        let name = plugin.name().to_string();
+        self.plugins.insert(name, plugin);
+    }
+
+    fn execute(&self, name: &str, args: &[&str]) -&gt; Result&lt;String, String&gt; {
+        self.plugins
+            .get(name)
+            .ok_or_else(|| format!("Plugin '{}' not found", name))?
+            .execute(args)
+    }
+
+    fn list_plugins(&self) {
+        println!("Available plugins:");
+        for (name, plugin) in &self.plugins {
+            println!("  {}: {}", name, plugin.help());
+        }
+    }
+}
+
+fn main() {
+    let mut manager = PluginManager::new();
+
+    manager.register(Box::new(EchoPlugin));
+    manager.register(Box::new(UpperPlugin));
+
+    manager.list_plugins();
+
+    match manager.execute("echo", &["Hello", "World"]) {
+        Ok(result) =&gt; println!("Result: {}", result),
+        Err(e) =&gt; println!("Error: {}", e),
+    }
+
+    match manager.execute("upper", &["hello", "rust"]) {
+        Ok(result) =&gt; println!("Result: {}", result),
+        Err(e) =&gt; println!("Error: {}", e),
+    }
+}</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>연관 타입으로 트레이트를 더 깔끔하게 설계</li>
+                <li>트레이트 객체로 다형성 구현 (동적 디스패치)</li>
+                <li>객체 안전성 규칙 이해하기</li>
+                <li>완전 정규화 구문으로 모호성 해결</li>
+                <li>플러그인 시스템 등 확장 가능한 아키텍처 구현</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

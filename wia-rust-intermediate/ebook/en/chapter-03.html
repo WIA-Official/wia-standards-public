@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3: Advanced Traits - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 3: Advanced Traits</h1>
+
+        <p>Traits are Rust's superpower for abstraction. This chapter explores advanced trait patterns that enable powerful, flexible, and type-safe designs.</p>
+
+        <h2>3.1 Trait Objects and Dynamic Dispatch</h2>
+
+        <p>While generics use static dispatch (monomorphization), trait objects enable dynamic dispatch when you need runtime polymorphism:</p>
+
+        <h3>Creating Trait Objects</h3>
+
+        <pre>trait Drawable {
+    fn draw(&self);
+}
+
+struct Circle {
+    radius: f64,
+}
+
+struct Rectangle {
+    width: f64,
+    height: f64,
+}
+
+impl Drawable for Circle {
+    fn draw(&self) {
+        println!("Drawing circle with radius {}", self.radius);
+    }
+}
+
+impl Drawable for Rectangle {
+    fn draw(&self) {
+        println!("Drawing rectangle {}x{}", self.width, self.height);
+    }
+}
+
+// Static dispatch: monomorphized at compile time
+fn draw_static&lt;T: Drawable&gt;(item: &T) {
+    item.draw();
+}
+
+// Dynamic dispatch: runtime polymorphism
+fn draw_dynamic(item: &dyn Drawable) {
+    item.draw();
+}
+
+fn main() {
+    let shapes: Vec&lt;Box&lt;dyn Drawable&gt;&gt; = vec![
+        Box::new(Circle { radius: 5.0 }),
+        Box::new(Rectangle { width: 10.0, height: 20.0 }),
+    ];
+
+    for shape in shapes {
+        shape.draw();
+    }
+}</pre>
+
+        <div class="highlight">
+            <strong>Static vs Dynamic Dispatch</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li><strong>Static (<code>&lt;T: Trait&gt;</code>):</strong> Faster (inlined), larger binary, known at compile time</li>
+                <li><strong>Dynamic (<code>&dyn Trait</code>):</strong> Smaller binary, slight overhead, heterogeneous collections</li>
+            </ul>
+        </div>
+
+        <h3>Object Safety Rules</h3>
+
+        <p>Not all traits can be made into trait objects. A trait is object-safe if:</p>
+
+        <pre>// Object-safe trait
+trait Display {
+    fn display(&self);
+}
+
+// NOT object-safe: has generic method
+trait NotObjectSafe {
+    fn generic&lt;T&gt;(&self, value: T);  // ❌
+}
+
+// NOT object-safe: returns Self
+trait AlsoNotObjectSafe {
+    fn clone_self(&self) -&gt; Self;  // ❌
+}
+
+// Object-safe version
+trait ObjectSafeClone {
+    fn clone_box(&self) -&gt; Box&lt;dyn ObjectSafeClone&gt;;
+}
+
+impl&lt;T&gt; ObjectSafeClone for T
+where
+    T: Clone + 'static,
+{
+    fn clone_box(&self) -&gt; Box&lt;dyn ObjectSafeClone&gt; {
+        Box::new(self.clone())
+    }
+}</pre>
+
+        <h2>3.2 Advanced Trait Bounds</h2>
+
+        <h3>Multiple Bounds and Where Clauses</h3>
+
+        <pre>use std::fmt::{Debug, Display};
+
+// Multiple bounds inline
+fn print_info&lt;T: Debug + Display + Clone&gt;(item: T) {
+    println!("Debug: {:?}", item);
+    println!("Display: {}", item);
+    let copy = item.clone();
+}
+
+// Better: use where clause for readability
+fn better_print_info&lt;T&gt;(item: T)
+where
+    T: Debug + Display + Clone,
+{
+    println!("Debug: {:?}", item);
+    println!("Display: {}", item);
+}
+
+// Complex bounds with associated types
+fn process&lt;T, U&gt;(iter: T)
+where
+    T: Iterator&lt;Item = U&gt;,
+    U: Display + Clone,
+{
+    for item in iter {
+        println!("{}", item);
+    }
+}</pre>
+
+        <h3>Conditional Trait Implementation</h3>
+
+        <pre>use std::fmt;
+
+struct Pair&lt;T&gt; {
+    first: T,
+    second: T,
+}
+
+// Always implement this
+impl&lt;T&gt; Pair&lt;T&gt; {
+    fn new(first: T, second: T) -&gt; Self {
+        Pair { first, second }
+    }
+}
+
+// Only implement for types that support comparison
+impl&lt;T: PartialOrd&gt; Pair&lt;T&gt; {
+    fn largest(&self) -&gt; &T {
+        if self.first &gt;= self.second {
+            &self.first
+        } else {
+            &self.second
+        }
+    }
+}
+
+// Blanket implementation: implement for all T that implement Display
+impl&lt;T: fmt::Display&gt; fmt::Display for Pair&lt;T&gt; {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, "({}, {})", self.first, self.second)
+    }
+}</pre>
+
+        <h2>3.3 Operator Overloading</h2>
+
+        <p>Rust allows operator overloading through trait implementation:</p>
+
+        <pre>use std::ops::{Add, Mul, Neg};
+
+#[derive(Debug, Clone, Copy)]
+struct Vector2D {
+    x: f64,
+    y: f64,
+}
+
+impl Add for Vector2D {
+    type Output = Self;
+
+    fn add(self, other: Self) -&gt; Self {
+        Vector2D {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+impl Mul&lt;f64&gt; for Vector2D {
+    type Output = Self;
+
+    fn mul(self, scalar: f64) -&gt; Self {
+        Vector2D {
+            x: self.x * scalar,
+            y: self.y * scalar,
+        }
+    }
+}
+
+impl Neg for Vector2D {
+    type Output = Self;
+
+    fn neg(self) -&gt; Self {
+        Vector2D {
+            x: -self.x,
+            y: -self.y,
+        }
+    }
+}
+
+fn main() {
+    let v1 = Vector2D { x: 1.0, y: 2.0 };
+    let v2 = Vector2D { x: 3.0, y: 4.0 };
+
+    let v3 = v1 + v2;           // Add
+    let v4 = v1 * 2.0;          // Mul
+    let v5 = -v1;               // Neg
+
+    println!("{:?}", v3);
+}</pre>
+
+        <h3>Index and IndexMut</h3>
+
+        <pre>use std::ops::{Index, IndexMut};
+
+struct Grid&lt;T&gt; {
+    data: Vec&lt;T&gt;,
+    width: usize,
+    height: usize,
+}
+
+impl&lt;T&gt; Index&lt;(usize, usize)&gt; for Grid&lt;T&gt; {
+    type Output = T;
+
+    fn index(&self, (x, y): (usize, usize)) -&gt; &T {
+        &self.data[y * self.width + x]
+    }
+}
+
+impl&lt;T&gt; IndexMut&lt;(usize, usize)&gt; for Grid&lt;T&gt; {
+    fn index_mut(&mut self, (x, y): (usize, usize)) -&gt; &mut T {
+        &mut self.data[y * self.width + x]
+    }
+}
+
+fn main() {
+    let mut grid = Grid {
+        data: vec![0; 9],
+        width: 3,
+        height: 3,
+    };
+
+    grid[(1, 1)] = 5;
+    println!("{}", grid[(1, 1)]);
+}</pre>
+
+        <h2>3.4 Supertraits</h2>
+
+        <p>A trait can require implementors to also implement another trait:</p>
+
+        <pre>use std::fmt;
+
+// OutlinePrint requires Display
+trait OutlinePrint: fmt::Display {
+    fn outline_print(&self) {
+        let output = self.to_string();
+        let len = output.len();
+        println!("{}", "*".repeat(len + 4));
+        println!("*{}*", " ".repeat(len + 2));
+        println!("* {} *", output);
+        println!("*{}*", " ".repeat(len + 2));
+        println!("{}", "*".repeat(len + 4));
+    }
+}
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl OutlinePrint for Point {}
+
+fn main() {
+    let p = Point { x: 1, y: 2 };
+    p.outline_print();
+}</pre>
+
+        <h2>3.5 Default Trait Implementation</h2>
+
+        <pre>trait Summary {
+    fn summarize_author(&self) -&gt; String;
+
+    // Default implementation
+    fn summarize(&self) -&gt; String {
+        format!("(Read more from {}...)", self.summarize_author())
+    }
+}
+
+struct Tweet {
+    username: String,
+    content: String,
+}
+
+impl Summary for Tweet {
+    fn summarize_author(&self) -&gt; String {
+        format!("@{}", self.username)
+    }
+
+    // Can override default
+    fn summarize(&self) -&gt; String {
+        format!("{}: {}", self.username, self.content)
+    }
+}
+
+struct Article {
+    author: String,
+    headline: String,
+}
+
+impl Summary for Article {
+    fn summarize_author(&self) -&gt; String {
+        self.author.clone()
+    }
+
+    // Uses default implementation
+}</pre>
+
+        <h2>3.6 Extension Traits</h2>
+
+        <p>Add methods to existing types without modifying them:</p>
+
+        <pre>// Extend Iterator with custom methods
+trait IteratorExt: Iterator {
+    fn my_sum(self) -&gt; Self::Item
+    where
+        Self: Sized,
+        Self::Item: std::ops::Add&lt;Output = Self::Item&gt; + Default,
+    {
+        self.fold(Self::Item::default(), |acc, x| acc + x)
+    }
+
+    fn my_collect_vec(self) -&gt; Vec&lt;Self::Item&gt;
+    where
+        Self: Sized,
+    {
+        let mut vec = Vec::new();
+        for item in self {
+            vec.push(item);
+        }
+        vec
+    }
+}
+
+// Blanket implementation for all iterators
+impl&lt;T: Iterator&gt; IteratorExt for T {}
+
+fn main() {
+    let sum = (1..=5).my_sum();
+    println!("Sum: {}", sum);
+
+    let vec = (1..=5).my_collect_vec();
+    println!("{:?}", vec);
+}</pre>
+
+        <h2>3.7 Marker Traits</h2>
+
+        <p>Traits with no methods that mark types with special properties:</p>
+
+        <pre>// Define a marker trait
+trait Trusted {}
+
+struct SafeData;
+struct UntrustedData;
+
+impl Trusted for SafeData {}
+
+// Generic function that requires Trusted
+fn process_trusted&lt;T: Trusted&gt;(data: T) {
+    println!("Processing trusted data");
+}
+
+fn main() {
+    let safe = SafeData;
+    process_trusted(safe);  // OK
+
+    let unsafe_data = UntrustedData;
+    // process_trusted(unsafe_data);  // ERROR: not Trusted
+}
+
+// Standard library examples:
+// - Send: type can be transferred across thread boundaries
+// - Sync: type can be referenced from multiple threads
+// - Copy: bitwise copy is safe
+// - Sized: size known at compile time</pre>
+
+        <h2>3.8 Async Traits (Using async-trait)</h2>
+
+        <p>While async fn in traits is stabilizing, here's how to use them today:</p>
+
+        <pre>use async_trait::async_trait;
+
+#[async_trait]
+trait AsyncDatabase {
+    async fn query(&self, sql: &str) -&gt; Result&lt;Vec&lt;String&gt;, String&gt;;
+    async fn execute(&mut self, sql: &str) -&gt; Result&lt;(), String&gt;;
+}
+
+struct PostgresDB {
+    connection: String,
+}
+
+#[async_trait]
+impl AsyncDatabase for PostgresDB {
+    async fn query(&self, sql: &str) -&gt; Result&lt;Vec&lt;String&gt;, String&gt; {
+        // Simulate async query
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        Ok(vec![format!("Result from: {}", sql)])
+    }
+
+    async fn execute(&mut self, sql: &str) -&gt; Result&lt;(), String&gt; {
+        println!("Executing: {}", sql);
+        Ok(())
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let db = PostgresDB {
+        connection: "localhost".to_string(),
+    };
+
+    let results = db.query("SELECT * FROM users").await.unwrap();
+    println!("{:?}", results);
+}</pre>
+
+        <h2>3.9 Derive Macros</h2>
+
+        <p>Common traits can be automatically derived:</p>
+
+        <pre>#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct User {
+    id: u64,
+    name: String,
+    email: String,
+}
+
+// Custom derive with derive_more crate
+use derive_more::{Add, Display, From};
+
+#[derive(Debug, Add, Display, From)]
+struct Money(u64);
+
+fn main() {
+    let m1 = Money(100);
+    let m2 = Money(50);
+    let total = m1 + m2;
+
+    println!("{}", total);  // Display
+}</pre>
+
+        <h2>3.10 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Trait Objects:</strong> Enable dynamic dispatch with <code>dyn Trait</code></li>
+                <li><strong>Object Safety:</strong> Not all traits can be trait objects</li>
+                <li><strong>Advanced Bounds:</strong> Complex where clauses and conditional implementations</li>
+                <li><strong>Operator Overloading:</strong> Implement Add, Mul, Index, etc.</li>
+                <li><strong>Supertraits:</strong> Require implementors to implement multiple traits</li>
+                <li><strong>Extension Traits:</strong> Add methods to existing types</li>
+                <li><strong>Marker Traits:</strong> Zero-size traits for compile-time properties</li>
+                <li><strong>Async Traits:</strong> Use async-trait crate for async methods</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

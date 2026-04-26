@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 6: Privacy Protection - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>Chapter 6: Privacy Protection</h1>
+
+<blockquote>
+"Hongik Ingan: Your privacy is your right, Aunt protects you."
+</blockquote>
+
+<hr>
+
+<h2>6.1 Privacy Risks on Social Media</h2>
+
+<pre>
+Common Privacy Exposures
+========================
+
+What you share often reveals:
+  - Your home address (background in photos)
+  - Your daily routine (posting times)
+  - Your workplace (tagged locations)
+  - Your phone number (accidentally posted)
+  - Your travel plans (real-time updates)
+  - Faces of others (without consent)
+
+Photo metadata reveals:
+  - GPS coordinates
+  - Device information
+  - Date and time
+  - Camera settings
+
+Aggregated data reveals:
+  - Your political views
+  - Your health conditions
+  - Your financial status
+  - Your relationships
+</pre>
+
+<hr>
+
+<h2>6.2 Aunt (AIR-SHIELD) Integration</h2>
+
+<pre>
+WIA-SOCIAL Privacy Guard
+========================
+
+WIA-SOCIAL integrates with Aunt (AIR-SHIELD):
+
+import { WIASocial } from '@anthropic/wia-social';
+import { AirShield } from '@anthropic/wia-air-shield';
+
+const social = new WIASocial({
+  privacy: {
+    airShield: {
+      enabled: true,
+      mode: 'balanced'  // 'balanced' | 'fortress' | 'paranoid'
+    }
+  }
+});
+
+
+Protection Modes
+================
+
+Balanced:
+  - Warns about obvious risks
+  - Strips metadata by default
+  - Suggests privacy improvements
+  - Non-intrusive
+
+Fortress:
+  - Active scanning before every post
+  - Blocks high-risk content
+  - Requires confirmation for sensitive data
+  - Notifies about privacy issues
+
+Paranoid:
+  - Maximum protection
+  - All faces blurred by default
+  - All locations fuzzed
+  - End-to-end encryption required
+  - May affect usability
+</pre>
+
+<hr>
+
+<h2>6.3 Pre-Post Privacy Scan</h2>
+
+<pre>
+Automatic Scanning
+==================
+
+// Before posting, scan for risks
+const scan = await social.privacy.scanContent({
+  text: 'Check out my new house at 123 Main Street!',
+  media: [housePhoto]
+});
+
+Result:
+{
+  safe: false,
+
+  risks: [
+    {
+      type: 'address_exposure',
+      severity: 'high',
+      detail: 'Physical address detected: 123 Main Street',
+      recommendation: 'Remove or generalize address'
+    },
+    {
+      type: 'location_in_media',
+      severity: 'medium',
+      detail: 'GPS coordinates in photo metadata',
+      recommendation: 'Strip metadata before posting'
+    },
+    {
+      type: 'identifiable_location',
+      severity: 'medium',
+      detail: 'House number visible in photo',
+      recommendation: 'Blur or crop'
+    }
+  ],
+
+  autoFixes: {
+    stripMetadata: true,
+    addressRedacted: '[ADDRESS]'
+  }
+}
+
+
+Auto-Fix Option
+===============
+
+// Automatically fix detected issues
+await social.post({
+  content: myContent,
+  privacy: {
+    autoFix: true,  // Apply recommended fixes automatically
+    confirmHighRisk: true  // Confirm before posting high-risk content
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.4 Privacy Levels</h2>
+
+<pre>
+Visibility Settings
+===================
+
+type PrivacyLevel =
+  | 'public'      // Everyone can see
+  | 'protected'   // Followers only
+  | 'private'     // Mutual friends only
+  | 'secret'      // Specific people only
+  | 'anonymous';  // No identity attached
+
+
+Setting Default Privacy
+=======================
+
+await social.setPrivacy({
+  defaultVisibility: 'protected',
+
+  // Different defaults per platform
+  platformDefaults: {
+    instagram: 'protected',
+    twitter: 'public',
+    linkedin: 'public'
+  },
+
+  // Content type defaults
+  contentDefaults: {
+    text: 'public',
+    photos: 'protected',
+    location: 'private'
+  }
+});
+
+
+Per-Post Privacy
+================
+
+await social.post({
+  content: { text: 'Personal update...' },
+  privacy: {
+    visibility: 'private',
+    closeFriendsOnly: true
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.5 Metadata Protection</h2>
+
+<pre>
+Automatic Metadata Stripping
+============================
+
+// All metadata removed before posting
+const safeMedia = await social.privacy.stripMetadata(photo);
+
+Removes:
+  [OK] GPS coordinates
+  [OK] Device information
+  [OK] Capture date/time
+  [OK] Camera serial number
+  [OK] Software used
+  [OK] Thumbnail with different data
+  [OK] User comments/tags in file
+
+
+Location Fuzzing
+================
+
+// Make location approximate instead of exact
+const fuzzyLocation = social.privacy.fuzzyLocation(
+  exactLocation,
+  { radius: '5km' }  // Randomize within 5km
+);
+
+// Instead of "123 Main Street, Apt 4B"
+// Shows "Downtown Seoul"
+
+
+Selective Stripping
+===================
+
+await social.privacy.configure({
+  media: {
+    stripGPS: true,
+    stripDevice: true,
+    stripDate: false,  // Keep date
+    stripAll: false
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.6 Face and Identity Protection</h2>
+
+<pre>
+Face Detection
+==============
+
+const scan = await social.privacy.detectFaces(photo);
+
+Result:
+{
+  faces: [
+    { id: 1, position: {...}, recognized: true, name: 'Kim Minsu' },
+    { id: 2, position: {...}, recognized: false, name: null },
+    { id: 3, position: {...}, recognized: true, name: 'Lee Jiyoung' }
+  ],
+  warning: '3 faces detected. Do you have consent to post?'
+}
+
+
+Auto-Blur Faces
+===============
+
+// Blur unrecognized faces
+const processed = await social.privacy.blurFaces(photo, {
+  blur: ['unrecognized'],  // or ['all'] or specific IDs
+  style: 'blur'  // 'blur' | 'pixelate' | 'emoji'
+});
+
+
+Consent Management
+==================
+
+// Track consent for faces in photos
+await social.privacy.requestConsent({
+  photo: groupPhoto,
+  faces: [face1, face2],
+  message: 'Can I post this group photo?'
+});
+</pre>
+
+<hr>
+
+<h2>6.7 Encrypted Messaging</h2>
+
+<pre>
+End-to-End Encrypted DMs
+========================
+
+// Send encrypted message
+await social.messaging.sendEncrypted({
+  to: friendId,
+  content: 'Confidential message...'
+});
+
+Features:
+  [OK] End-to-end encryption
+  [OK] Perfect forward secrecy
+  [OK] Self-destructing messages
+  [OK] Screenshot detection
+  [OK] Read receipts (optional)
+
+
+Ephemeral Content
+=================
+
+// Self-destructing post
+await social.post({
+  content: { text: 'Temporary thought...' },
+  ephemeral: {
+    expiresIn: '24h',  // or '1h', '7d', etc.
+    noScreenshot: true,
+    notifyOnExpire: false
+  }
+});
+</pre>
+
+<hr>
+
+<h2>6.8 Privacy Monitoring</h2>
+
+<pre>
+Real-Time Alerts
+================
+
+social.on('privacy_alert', (event) => {
+  console.log('Privacy issue:', event.type);
+  console.log('Details:', event.details);
+  console.log('Recommendation:', event.recommendation);
+});
+
+Alert Types:
+  - Someone tagged you in a post
+  - Your location was shared
+  - New app requested data access
+  - Suspicious login attempt
+  - Data breach notification
+
+
+Privacy Dashboard
+=================
+
+const report = await social.privacy.getReport();
+
+Result:
+{
+  overallScore: 85,  // out of 100
+
+  exposures: {
+    location: 'low',
+    personal: 'medium',
+    photos: 'low'
+  },
+
+  recommendations: [
+    'Review tagged photos from last month',
+    'Update location sharing settings on Twitter',
+    'Remove phone number from public profile'
+  ],
+
+  recentActivity: [
+    { type: 'metadata_stripped', count: 45 },
+    { type: 'location_fuzzed', count: 12 },
+    { type: 'risk_blocked', count: 3 }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>6.9 Data Collection Control</h2>
+
+<pre>
+Control What Platforms Collect
+==============================
+
+await social.privacy.setDataCollection({
+  // WIA-SOCIAL data
+  analytics: false,  // Don't track my usage
+  personalization: true,  // OK for suggestions
+
+  // Third-party
+  thirdPartySharing: false,
+  targetedAds: false,
+  crossPlatformTracking: false
+});
+
+
+Request Your Data
+=================
+
+// See what each platform has
+const inventory = await social.privacy.getDataInventory();
+
+// Per-platform breakdown
+{
+  instagram: {
+    posts: 1200,
+    messages: 5000,
+    searchHistory: 'enabled',
+    locationHistory: '2 years'
+  },
+  ...
+}
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Aunt (AIR-SHIELD) integration for comprehensive privacy</li>
+<li>[OK] Pre-post scanning detects and warns about privacy risks</li>
+<li>[OK] Multiple privacy levels from public to anonymous</li>
+<li>[OK] Automatic metadata stripping and location fuzzing</li>
+<li>[OK] Face detection with consent management</li>
+<li>[OK] End-to-end encrypted messaging</li>
+<li>[OK] Real-time privacy monitoring and alerts</li>
+<li>[OK] Data collection controls</li>
+</ul>
+</body>
+</html>

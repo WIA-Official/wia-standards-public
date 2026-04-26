@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8장: 실전 프로젝트 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success { background: #065f46; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #10b981; }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>8장: 실전 프로젝트</h1>
+
+        <h2>8.1 프로젝트: REST API 서버</h2>
+        <p>Axum을 사용하여 완전한 기능의 REST API를 구축합니다.</p>
+
+        <h3>8.1.1 프로젝트 설정</h3>
+        <pre>$ cargo new api-server
+$ cd api-server
+
+# Cargo.toml
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "sqlite"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+thiserror = "1"
+anyhow = "1"</pre>
+
+        <h3>8.1.2 도메인 모델</h3>
+        <pre>// src/models.rs
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateUser {
+    pub username: String,
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateUser {
+    pub username: Option&lt;String&gt;,
+    pub email: Option&lt;String&gt;,
+}</pre>
+
+        <h3>8.1.3 데이터베이스 레이어</h3>
+        <pre>// src/db.rs
+use sqlx::{sqlite::SqlitePool, Error};
+use crate::models::{User, CreateUser, UpdateUser};
+
+pub struct Database {
+    pool: SqlitePool,
+}
+
+impl Database {
+    pub async fn new(database_url: &str) -&gt; Result&lt;Self, Error&gt; {
+        let pool = SqlitePool::connect(database_url).await?;
+
+        // 테이블 생성
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await?;
+
+        Ok(Database { pool })
+    }
+
+    pub async fn create_user(&self, user: CreateUser) -&gt; Result&lt;User, Error&gt; {
+        let user = sqlx::query_as::&lt;_, User&gt;(
+            r#"
+            INSERT INTO users (username, email)
+            VALUES (?, ?)
+            RETURNING id, username, email, created_at
+            "#,
+        )
+        .bind(&user.username)
+        .bind(&user.email)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(user)
+    }
+
+    pub async fn get_user(&self, id: i64) -&gt; Result&lt;Option&lt;User&gt;, Error&gt; {
+        let user = sqlx::query_as::&lt;_, User&gt;("SELECT * FROM users WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(user)
+    }
+
+    pub async fn list_users(&self) -&gt; Result&lt;Vec&lt;User&gt;, Error&gt; {
+        let users = sqlx::query_as::&lt;_, User&gt;("SELECT * FROM users ORDER BY id")
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(users)
+    }
+
+    pub async fn update_user(&self, id: i64, update: UpdateUser) -&gt; Result&lt;User, Error&gt; {
+        let mut query = String::from("UPDATE users SET ");
+        let mut updates = vec![];
+
+        if let Some(ref username) = update.username {
+            updates.push(format!("username = '{}'", username));
+        }
+        if let Some(ref email) = update.email {
+            updates.push(format!("email = '{}'", email));
+        }
+
+        query.push_str(&updates.join(", "));
+        query.push_str(&format!(" WHERE id = {} RETURNING *", id));
+
+        let user = sqlx::query_as::&lt;_, User&gt;(&query)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(user)
+    }
+
+    pub async fn delete_user(&self, id: i64) -&gt; Result&lt;(), Error&gt; {
+        sqlx::query("DELETE FROM users WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+}</pre>
+
+        <h3>8.1.4 에러 처리</h3>
+        <pre>// src/error.rs
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde_json::json;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ApiError {
+    #[error("데이터베이스 에러: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("찾을 수 없음: {0}")]
+    NotFound(String),
+
+    #[error("잘못된 요청: {0}")]
+    BadRequest(String),
+
+    #[error("내부 서버 에러")]
+    Internal,
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -&gt; Response {
+        let (status, error_message) = match self {
+            ApiError::Database(ref e) =&gt; (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            ApiError::NotFound(ref msg) =&gt; (StatusCode::NOT_FOUND, msg.clone()),
+            ApiError::BadRequest(ref msg) =&gt; (StatusCode::BAD_REQUEST, msg.clone()),
+            ApiError::Internal =&gt; (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+        }));
+
+        (status, body).into_response()
+    }
+}</pre>
+
+        <h3>8.1.5 핸들러</h3>
+        <pre>// src/handlers.rs
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
+use std::sync::Arc;
+
+use crate::{
+    db::Database,
+    error::ApiError,
+    models::{CreateUser, UpdateUser, User},
+};
+
+pub async fn create_user(
+    State(db): State&lt;Arc&lt;Database&gt;&gt;,
+    Json(payload): Json&lt;CreateUser&gt;,
+) -&gt; Result&lt;(StatusCode, Json&lt;User&gt;), ApiError&gt; {
+    let user = db.create_user(payload).await?;
+    Ok((StatusCode::CREATED, Json(user)))
+}
+
+pub async fn get_user(
+    State(db): State&lt;Arc&lt;Database&gt;&gt;,
+    Path(id): Path&lt;i64&gt;,
+) -&gt; Result&lt;Json&lt;User&gt;, ApiError&gt; {
+    let user = db
+        .get_user(id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("User {} not found", id)))?;
+
+    Ok(Json(user))
+}
+
+pub async fn list_users(
+    State(db): State&lt;Arc&lt;Database&gt;&gt;,
+) -&gt; Result&lt;Json&lt;Vec&lt;User&gt;&gt;, ApiError&gt; {
+    let users = db.list_users().await?;
+    Ok(Json(users))
+}
+
+pub async fn update_user(
+    State(db): State&lt;Arc&lt;Database&gt;&gt;,
+    Path(id): Path&lt;i64&gt;,
+    Json(payload): Json&lt;UpdateUser&gt;,
+) -&gt; Result&lt;Json&lt;User&gt;, ApiError&gt; {
+    let user = db.update_user(id, payload).await?;
+    Ok(Json(user))
+}
+
+pub async fn delete_user(
+    State(db): State&lt;Arc&lt;Database&gt;&gt;,
+    Path(id): Path&lt;i64&gt;,
+) -&gt; Result&lt;StatusCode, ApiError&gt; {
+    db.delete_user(id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn health_check() -&gt; &'static str {
+    "OK"
+}</pre>
+
+        <h3>8.1.6 라우팅</h3>
+        <pre>// src/main.rs
+mod db;
+mod error;
+mod handlers;
+mod models;
+
+use axum::{
+    routing::{get, post, put, delete},
+    Router,
+};
+use std::sync::Arc;
+use tower_http::cors::CorsLayer;
+use tracing_subscriber;
+
+#[tokio::main]
+async fn main() -&gt; anyhow::Result&lt;()&gt; {
+    // 로깅 초기화
+    tracing_subscriber::fmt::init();
+
+    // 데이터베이스 연결
+    let db = Arc::new(db::Database::new("sqlite::memory:").await?);
+
+    // 라우터 설정
+    let app = Router::new()
+        .route("/health", get(handlers::health_check))
+        .route("/users", get(handlers::list_users).post(handlers::create_user))
+        .route(
+            "/users/:id",
+            get(handlers::get_user)
+                .put(handlers::update_user)
+                .delete(handlers::delete_user),
+        )
+        .layer(CorsLayer::permissive())
+        .with_state(db);
+
+    // 서버 시작
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    println!("🚀 Server running on http://localhost:3000");
+
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}</pre>
+
+        <h2>8.2 WebAssembly 통합</h2>
+        <p>Rust 코드를 WebAssembly로 컴파일하여 브라우저에서 실행합니다.</p>
+
+        <h3>8.2.1 wasm-pack 프로젝트</h3>
+        <pre>$ cargo install wasm-pack
+$ wasm-pack new wasm-demo
+$ cd wasm-demo
+
+# Cargo.toml
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# src/lib.rs
+use wasm_bindgen::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[wasm_bindgen]
+pub fn greet(name: &str) -&gt; String {
+    format!("Hello, {}!", name)
+}
+
+#[wasm_bindgen]
+pub fn fibonacci(n: u32) -&gt; u32 {
+    match n {
+        0 =&gt; 0,
+        1 =&gt; 1,
+        _ =&gt; fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct User {
+    name: String,
+    age: u32,
+}
+
+#[wasm_bindgen]
+pub fn process_user(json: &str) -&gt; Result&lt;String, JsValue&gt; {
+    let user: User = serde_json::from_str(json)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let response = format!("{} is {} years old", user.name, user.age);
+    Ok(response)
+}</pre>
+
+        <h3>8.2.2 빌드 및 사용</h3>
+        <pre>$ wasm-pack build --target web
+
+# index.html
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;meta charset="utf-8"&gt;
+    &lt;title&gt;Rust WASM Demo&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Rust WebAssembly Demo&lt;/h1&gt;
+    &lt;div id="output"&gt;&lt;/div&gt;
+
+    &lt;script type="module"&gt;
+        import init, { greet, fibonacci, process_user } from './pkg/wasm_demo.js';
+
+        async function run() {
+            await init();
+
+            // greet 함수 호출
+            const greeting = greet('World');
+            console.log(greeting);
+
+            // fibonacci 계산
+            const fib = fibonacci(10);
+            console.log(`Fibonacci(10) = ${fib}`);
+
+            // JSON 처리
+            const user = JSON.stringify({ name: "Alice", age: 30 });
+            const result = process_user(user);
+            console.log(result);
+
+            document.getElementById('output').innerHTML = `
+                &lt;p&gt;${greeting}&lt;/p&gt;
+                &lt;p&gt;Fibonacci(10) = ${fib}&lt;/p&gt;
+                &lt;p&gt;${result}&lt;/p&gt;
+            `;
+        }
+
+        run();
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+        <h2>8.3 WIA 표준 통합</h2>
+        <p>WIA-INTENT와 WIA-OMNI-API를 사용하여 표준화된 인터페이스를 구현합니다.</p>
+
+        <h3>8.3.1 WIA-INTENT 구현</h3>
+        <pre>// src/wia/intent.rs
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Intent {
+    pub action: String,
+    pub params: serde_json::Value,
+    pub context: Option&lt;Context&gt;,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Context {
+    pub user_id: Option&lt;String&gt;,
+    pub session_id: Option&lt;String&gt;,
+    pub timestamp: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IntentResponse {
+    pub success: bool,
+    pub data: serde_json::Value,
+    pub error: Option&lt;String&gt;,
+}
+
+pub trait IntentHandler {
+    fn handle(&self, intent: Intent) -&gt; IntentResponse;
+}
+
+// 예제 핸들러
+pub struct UserIntentHandler;
+
+impl IntentHandler for UserIntentHandler {
+    fn handle(&self, intent: Intent) -&gt; IntentResponse {
+        match intent.action.as_str() {
+            "user.create" =&gt; {
+                // 사용자 생성 로직
+                IntentResponse {
+                    success: true,
+                    data: serde_json::json!({"id": 123, "created": true}),
+                    error: None,
+                }
+            }
+            "user.get" =&gt; {
+                // 사용자 조회 로직
+                IntentResponse {
+                    success: true,
+                    data: serde_json::json!({"id": 123, "name": "Alice"}),
+                    error: None,
+                }
+            }
+            _ =&gt; IntentResponse {
+                success: false,
+                data: serde_json::Value::Null,
+                error: Some(format!("Unknown action: {}", intent.action)),
+            },
+        }
+    }
+}</pre>
+
+        <h3>8.3.2 WIA-OMNI-API 통합</h3>
+        <pre>// src/wia/omni.rs
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OmniRequest {
+    pub endpoint: String,
+    pub method: String,
+    pub headers: std::collections::HashMap&lt;String, String&gt;,
+    pub body: Option&lt;serde_json::Value&gt;,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OmniResponse {
+    pub status: u16,
+    pub headers: std::collections::HashMap&lt;String, String&gt;,
+    pub body: serde_json::Value,
+}
+
+pub async fn call_omni_api(request: OmniRequest) -&gt; Result&lt;OmniResponse, anyhow::Error&gt; {
+    let client = reqwest::Client::new();
+
+    let mut req = match request.method.as_str() {
+        "GET" =&gt; client.get(&request.endpoint),
+        "POST" =&gt; client.post(&request.endpoint),
+        "PUT" =&gt; client.put(&request.endpoint),
+        "DELETE" =&gt; client.delete(&request.endpoint),
+        _ =&gt; return Err(anyhow::anyhow!("Unsupported method: {}", request.method)),
+    };
+
+    for (key, value) in request.headers {
+        req = req.header(&key, &value);
+    }
+
+    if let Some(body) = request.body {
+        req = req.json(&body);
+    }
+
+    let response = req.send().await?;
+    let status = response.status().as_u16();
+
+    let headers = response
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect();
+
+    let body = response.json().await?;
+
+    Ok(OmniResponse {
+        status,
+        headers,
+        body,
+    })
+}</pre>
+
+        <h2>8.4 배포</h2>
+
+        <h3>8.4.1 Dockerfile</h3>
+        <pre># Dockerfile
+FROM rust:1.75 as builder
+
+WORKDIR /app
+COPY . .
+
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/api-server /usr/local/bin/
+
+EXPOSE 3000
+
+CMD ["api-server"]</pre>
+
+        <h3>8.4.2 빌드 및 실행</h3>
+        <pre>$ docker build -t api-server .
+$ docker run -p 3000:3000 api-server
+
+# Docker Compose
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=sqlite:data.db
+    volumes:
+      - ./data:/data</pre>
+
+        <div class="success">
+            <strong>✅ 프로젝트 완료!</strong>
+            <p style="margin-top: 10px;">축하합니다! 다음을 구현했습니다:</p>
+            <ul style="margin-top: 10px;">
+                <li>완전한 REST API 서버 (Axum)</li>
+                <li>데이터베이스 통합 (SQLx)</li>
+                <li>적절한 에러 처리 (thiserror, anyhow)</li>
+                <li>WebAssembly 통합</li>
+                <li>WIA 표준 구현</li>
+                <li>Docker 배포</li>
+            </ul>
+        </div>
+
+        <h2>8.5 다음 단계</h2>
+
+        <div class="highlight">
+            <strong>계속 학습하기:</strong>
+            <ul style="margin-top: 10px;">
+                <li><strong>성능 최적화:</strong> 프로파일링, 벤치마킹, SIMD</li>
+                <li><strong>고급 비동기:</strong> 커스텀 Future, 런타임 구현</li>
+                <li><strong>unsafe Rust:</strong> FFI, 저수준 최적화</li>
+                <li><strong>매크로:</strong> 선언적 및 절차적 매크로</li>
+                <li><strong>임베디드:</strong> no_std, 하드웨어 제어</li>
+                <li><strong>커뮤니티:</strong> 오픈소스 기여, Rust 프로젝트 참여</li>
+            </ul>
+        </div>
+
+        <h2>8.6 추천 리소스</h2>
+        <ul>
+            <li><strong>공식 문서:</strong> https://doc.rust-lang.org/</li>
+            <li><strong>Rust by Example:</strong> https://doc.rust-lang.org/rust-by-example/</li>
+            <li><strong>Tokio 튜토리얼:</strong> https://tokio.rs/tokio/tutorial</li>
+            <li><strong>Axum 가이드:</strong> https://docs.rs/axum/</li>
+            <li><strong>WIA 표준:</strong> https://github.com/WIA-Official/wia-standards</li>
+        </ul>
+
+        <div class="highlight">
+            <strong>🎉 WIA-RUST-INTERMEDIATE 완료!</strong>
+            <p style="margin-top: 10px;">
+                중급 Rust 개발자로서 필요한 핵심 개념들을 모두 배웠습니다.
+                이제 실제 프로덕션 프로젝트를 만들 준비가 되었습니다.
+            </p>
+            <p style="margin-top: 10px;">
+                다음 단계는 WIA-RUST-ADVANCED입니다. 계속 도전하세요!
+            </p>
+        </div>
+
+        </div>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제4장: 통합 피드 - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>제4장: 통합 피드</h1>
+
+<blockquote>
+"홍익인간: 모든 연결, 하나의 스트림."
+</blockquote>
+
+<hr>
+
+<h2>4.1 파편화된 피드 문제</h2>
+
+<pre>
+현재 현실
+========
+
+아침 루틴:
+  1. 인스타그램 열기 - 10분 스크롤
+  2. 트위터 열기 - 10분 스크롤
+  3. 틱톡 열기 - 15분 스크롤
+  4. 스레드 열기 - 5분 스크롤
+  5. 블루스카이 열기 - 5분 스크롤
+
+합계: 45분
+놓친 게시물: 많음 (알고리즘이 결정)
+컨텍스트 전환: 피곤함
+중요한 업데이트: 아마 놓침
+
+문제:
+  - 각 앱이 보여주고 싶은 것만 보여줌
+  - 친구 게시물이 알고리즘에 숨겨짐
+  - 대부분 플랫폼에 시간순 옵션 없음
+  - 플랫폼 간 중복
+</pre>
+
+<hr>
+
+<h2>4.2 하나의 피드, 모든 플랫폼</h2>
+
+<pre>
+WIA-SOCIAL 통합 피드
+===================
+
+const feed = await social.getFeed({
+  sorting: 'chronological',
+  platforms: ['instagram', 'twitter', 'tiktok', 'bluesky']
+});
+
+결과:
++------------------------------------------+
+| 통합 피드                                 |
++------------------------------------------+
+| [인스타그램] @friend1        2분 전      |
+| 아름다운 석양 사진!                        |
++------------------------------------------+
+| [트위터] @friend2            5분 전      |
+| 새 기능 출시했어요!                        |
++------------------------------------------+
+| [블루스카이] @friend3.bsky   8분 전      |
+| 탈중앙화에 대한 생각...                    |
++------------------------------------------+
+| [틱톡] @friend4             10분 전      |
+| [영상] 댄스 챌린지                         |
++------------------------------------------+
+| [트위터] @friend5           12분 전      |
+| 핫테이크: 탭 vs 스페이스                   |
++------------------------------------------+
+
+모든 플랫폼, 하나의 스트림.
+시간순.
+숨김 없음.
+</pre>
+
+<hr>
+
+<h2>4.3 정렬 옵션</h2>
+
+<pre>
+시간순
+=====
+
+const feed = await social.getFeed({
+  sorting: 'chronological'
+});
+
+// 정확한 시간 순서로 게시물
+// 최신 먼저
+// 알고리즘 간섭 없음
+// 모두의 모든 것 보기
+
+
+알고리즘
+=======
+
+const feed = await social.getFeed({
+  sorting: 'algorithmic'
+});
+
+// 기반 스마트 정렬:
+// - 참여 히스토리
+// - 관계 강도
+// - 콘텐츠 관련성
+// - 시간 감소
+
+// 플랫폼 알고리즘과 달리:
+// - 투명한 랭킹 요소
+// - 가중치 제어 가능
+// - 광고 콘텐츠 없음
+
+
+참여도순
+=======
+
+const feed = await social.getFeed({
+  sorting: 'engagement'
+});
+
+// 총 참여도로 정렬:
+// - 좋아요 + 댓글 + 공유
+// - 모든 플랫폼에서
+// - 친구들 사이 트렌딩 보기
+</pre>
+
+<hr>
+
+<h2>4.4 필터링</h2>
+
+<pre>
+플랫폼 필터
+==========
+
+// 특정 플랫폼만
+const feed = await social.getFeed({
+  filters: {
+    platforms: ['instagram', 'bluesky']
+  }
+});
+
+
+콘텐츠 유형 필터
+===============
+
+// 사진만
+const feed = await social.getFeed({
+  filters: {
+    contentTypes: ['image']
+  }
+});
+
+// 영상만
+const feed = await social.getFeed({
+  filters: {
+    contentTypes: ['video']
+  }
+});
+
+
+작성자 필터
+==========
+
+// 특정 친구만
+const feed = await social.getFeed({
+  filters: {
+    authors: ['wia:kim.minsu.1234', 'wia:lee.jiyoung.5678']
+  }
+});
+
+
+복합 필터
+========
+
+const feed = await social.getFeed({
+  sorting: 'chronological',
+  filters: {
+    platforms: ['instagram', 'twitter'],
+    contentTypes: ['image', 'video'],
+    dateRange: {
+      from: '2025-01-01',
+      to: '2025-01-15'
+    },
+    excludeReposts: true
+  }
+});
+</pre>
+
+<hr>
+
+<h2>4.5 실시간 업데이트</h2>
+
+<pre>
+피드 구독
+========
+
+// 실시간 새 게시물
+const unsubscribe = social.subscribeFeed((post) => {
+  console.log('새 게시물:', post.author.displayName);
+  console.log('플랫폼:', post.platform);
+  console.log('내용:', post.content.text);
+
+  // UI 업데이트
+  addToFeed(post);
+});
+
+// 나중에 구독 해지
+unsubscribe();
+
+
+알림
+====
+
+// 특정 이벤트 알림
+social.on('feed_updated', (event) => {
+  console.log('새 게시물:', event.data.count);
+});
+
+social.on('friend_posted', (event) => {
+  if (event.data.author.isMutual) {
+    showNotification(event.data);
+  }
+});
+</pre>
+
+<hr>
+
+<h2>4.6 스마트 기능</h2>
+
+<pre>
+중복 감지
+========
+
+크로스포스트하면 친구가 볼 수 있음:
+  - 인스타그램 게시물
+  - 트위터 게시물 (같은 내용)
+  - 스레드 게시물 (같은 내용)
+
+WIA-SOCIAL이 감지:
+
+const feed = await social.getFeed({
+  deduplication: {
+    enabled: true,
+    strategy: 'keep_first', // 또는 'keep_best_engagement'
+    threshold: 0.9  // 유사도 임계값
+  }
+});
+
+결과: 한 버전만 표시
+
+
+중요한 것 하이라이트
+===================
+
+// 가까운 친구 게시물 우선
+await social.setFeedPreferences({
+  prioritize: {
+    closeFriends: true,
+    mutualFollows: true,
+    frequentInteractions: true
+  },
+  deprioritize: {
+    promotedContent: true,
+    lowEngagement: false
+  }
+});
+
+
+나중에 저장
+==========
+
+// 플랫폼 간 북마크
+await social.bookmark(postId);
+
+// 모든 북마크 가져오기
+const saved = await social.getBookmarks();
+// 모든 플랫폼의 통합 북마크
+</pre>
+
+<hr>
+
+<h2>4.7 통합 상호작용</h2>
+
+<pre>
+게시물 반응
+==========
+
+// 좋아요
+await social.react(postId, 'like');
+
+// 원본 플랫폼으로 반응 전달
+// 인스타그램: 좋아요
+// 트위터: 좋아요
+// 블루스카이: 좋아요
+
+
+댓글
+====
+
+// 통합 피드에서 댓글
+await social.comment(postId, {
+  text: '좋은 게시물!'
+});
+
+// 원본 플랫폼으로 댓글 전달
+
+
+공유/리포스트
+============
+
+// 연결된 플랫폼에 리포스트
+await social.repost(postId, {
+  targets: ['twitter', 'bluesky'],
+  comment: '이거 봐봐!'
+});
+
+
+통합 반응 보기
+=============
+
+const reactions = await social.getReactions(postId);
+
+결과:
+{
+  total: 150,
+  breakdown: {
+    instagram: { likes: 100 },
+    twitter: { likes: 30, retweets: 10 },
+    bluesky: { likes: 10 }
+  }
+}
+</pre>
+
+<hr>
+
+<h2>4.8 피드 커스터마이징</h2>
+
+<pre>
+커스텀 피드 생성
+===============
+
+// 테크 뉴스 피드
+const techFeed = await social.createCustomFeed({
+  name: '테크 뉴스',
+  sources: {
+    platforms: ['twitter', 'bluesky'],
+    keywords: ['tech', 'AI', 'startup'],
+    authors: [techInfluencers]
+  }
+});
+
+// 가까운 친구 피드
+const closeFriendsFeed = await social.createCustomFeed({
+  name: '가까운 친구',
+  sources: {
+    lists: ['close_friends'],
+    excludeReposts: true
+  }
+});
+
+
+리스트
+=====
+
+// 플랫폼 간 작동하는 리스트 생성
+await social.createList({
+  name: '직장 동료',
+  members: [
+    'wia:kim.minsu.1234',
+    'wia:lee.jiyoung.5678'
+  ]
+});
+
+// 리스트에서 피드
+const workFeed = await social.getFeed({
+  list: 'work_colleagues'
+});
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 모든 연결된 플랫폼의 하나의 통합 피드</li>
+<li>[OK] 진정한 시간순 포함 여러 정렬 옵션</li>
+<li>[OK] 플랫폼, 콘텐츠 유형, 작성자, 날짜로 풍부한 필터링</li>
+<li>[OK] 새 게시물 실시간 구독</li>
+<li>[OK] 크로스포스트 콘텐츠 스마트 중복 제거</li>
+<li>[OK] 플랫폼 간 통합 상호작용 (좋아요, 댓글, 공유)</li>
+<li>[OK] 개인화된 경험을 위한 커스텀 피드와 리스트</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-03.html">이전: 제3장 - 크로스 플랫폼 포스팅</a> | <a href="chapter-05.html">다음: 제5장 - 소셜 그래프</a></p>
+</body>
+</html>

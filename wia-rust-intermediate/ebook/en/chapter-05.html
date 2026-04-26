@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 5: Performance & Memory - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 5: Performance & Memory</h1>
+
+        <p>Understanding memory layout and optimization techniques is crucial for writing high-performance Rust code. This chapter explores how Rust manages memory and how to optimize your programs.</p>
+
+        <h2>5.1 Memory Layout Fundamentals</h2>
+
+        <h3>Stack vs Heap</h3>
+
+        <pre>fn memory_demo() {
+    // Stack allocation: fast, fixed size, automatic cleanup
+    let x = 42;                    // i32: 4 bytes on stack
+    let arr = [1, 2, 3, 4, 5];     // [i32; 5]: 20 bytes on stack
+
+    // Heap allocation: slower, dynamic size, manual management
+    let v = vec![1, 2, 3, 4, 5];   // Vec header on stack, data on heap
+    let s = String::from("hello"); // String header on stack, data on heap
+    let b = Box::new(100);         // Box pointer on stack, value on heap
+
+    println!("Stack value: {}", x);
+    println!("Heap value: {}", *b);
+}</pre>
+
+        <h3>Type Sizes and Alignment</h3>
+
+        <pre>use std::mem::{size_of, align_of};
+
+#[derive(Debug)]
+struct Point {
+    x: f64,  // 8 bytes
+    y: f64,  // 8 bytes
+}
+
+#[derive(Debug)]
+struct Data {
+    flag: bool,  // 1 byte
+    value: u64,  // 8 bytes
+    count: u32,  // 4 bytes
+}
+
+fn main() {
+    println!("Point: {} bytes, align {}", size_of::&lt;Point&gt;(), align_of::&lt;Point&gt;());
+    // Point: 16 bytes, align 8
+
+    println!("Data: {} bytes, align {}", size_of::&lt;Data&gt;(), align_of::&lt;Data&gt;());
+    // Data: 24 bytes, align 8 (padding added!)
+
+    // Optimized version
+    #[derive(Debug)]
+    struct OptimizedData {
+        value: u64,  // 8 bytes
+        count: u32,  // 4 bytes
+        flag: bool,  // 1 byte
+    }
+    println!("OptimizedData: {} bytes", size_of::&lt;OptimizedData&gt;());
+    // OptimizedData: 16 bytes (less padding)
+}</pre>
+
+        <div class="success-box">
+            <strong>Memory Layout Optimization</strong>
+            <p style="margin-top: 10px;">Order struct fields from largest to smallest to minimize padding:</p>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>u64/i64/f64 (8 bytes) first</li>
+                <li>u32/i32/f32 (4 bytes) next</li>
+                <li>u16/i16 (2 bytes) next</li>
+                <li>u8/i8/bool (1 byte) last</li>
+            </ul>
+        </div>
+
+        <h3>Understanding repr</h3>
+
+        <pre>// Default Rust layout (can be reordered)
+#[derive(Debug)]
+struct Default {
+    a: u8,
+    b: u32,
+    c: u8,
+}
+
+// C-compatible layout (no reordering)
+#[repr(C)]
+struct CCompat {
+    a: u8,
+    b: u32,
+    c: u8,
+}
+
+// Packed (no padding - careful with alignment!)
+#[repr(packed)]
+struct Packed {
+    a: u8,
+    b: u32,
+    c: u8,
+}
+
+fn main() {
+    println!("Default: {}", std::mem::size_of::&lt;Default&gt;());
+    println!("C-compat: {}", std::mem::size_of::&lt;CCompat&gt;());
+    println!("Packed: {}", std::mem::size_of::&lt;Packed&gt;());
+}</pre>
+
+        <h2>5.2 Smart Pointer Internals</h2>
+
+        <h3>Box, Rc, and Arc Memory Layout</h3>
+
+        <pre>use std::rc::Rc;
+use std::sync::Arc;
+
+fn pointer_sizes() {
+    println!("Box&lt;i32&gt;: {} bytes", size_of::&lt;Box&lt;i32&gt;&gt;());
+    // 8 bytes (just a pointer)
+
+    println!("Rc&lt;i32&gt;: {} bytes", size_of::&lt;Rc&lt;i32&gt;&gt;());
+    // 8 bytes (pointer to heap with refcount)
+
+    println!("Arc&lt;i32&gt;: {} bytes", size_of::&lt;Arc&lt;i32&gt;&gt;());
+    // 8 bytes (pointer to heap with atomic refcount)
+
+    // Actual heap allocation
+    let rc = Rc::new(42);
+    // Heap: [strong_count, weak_count, value]
+    //       [    4 bytes,     4 bytes, 4 bytes] + padding
+
+    println!("Rc strong count: {}", Rc::strong_count(&rc));
+}</pre>
+
+        <h3>Cow (Clone on Write)</h3>
+
+        <pre>use std::borrow::Cow;
+
+fn process_text(input: &str) -&gt; Cow&lt;str&gt; {
+    if input.contains("ERROR") {
+        // Need to modify: allocate
+        Cow::Owned(input.replace("ERROR", "WARNING"))
+    } else {
+        // No modification: borrow
+        Cow::Borrowed(input)
+    }
+}
+
+fn main() {
+    let text1 = "Everything is fine";
+    let result1 = process_text(text1);
+    // No allocation!
+
+    let text2 = "ERROR occurred";
+    let result2 = process_text(text2);
+    // Allocated new string
+
+    println!("{}", result1);
+    println!("{}", result2);
+}</pre>
+
+        <h2>5.3 Performance Profiling</h2>
+
+        <h3>Using Criterion for Benchmarking</h3>
+
+        <pre>// In Cargo.toml:
+// [dev-dependencies]
+// criterion = "0.5"
+//
+// [[bench]]
+// name = "my_benchmark"
+// harness = false
+
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn fibonacci(n: u64) -&gt; u64 {
+    match n {
+        0 =&gt; 1,
+        1 =&gt; 1,
+        n =&gt; fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+fn fibonacci_bench(c: &mut Criterion) {
+    c.bench_function("fib 20", |b| {
+        b.iter(|| fibonacci(black_box(20)))
+    });
+}
+
+criterion_group!(benches, fibonacci_bench);
+criterion_main!(benches);</pre>
+
+        <h3>Using perf and flamegraph</h3>
+
+        <pre>// Install tools:
+// cargo install flamegraph
+
+// Run with profiling:
+// cargo flamegraph --bin myapp
+
+// Example code to profile
+fn hot_path() {
+    let mut sum = 0u64;
+    for i in 0..1_000_000 {
+        sum = sum.wrapping_add(expensive_calculation(i));
+    }
+    println!("Sum: {}", sum);
+}
+
+fn expensive_calculation(n: u64) -&gt; u64 {
+    (0..n).sum()
+}</pre>
+
+        <h2>5.4 Optimization Techniques</h2>
+
+        <h3>Avoiding Allocations</h3>
+
+        <pre>// Bad: allocates every iteration
+fn process_bad(items: &[&str]) {
+    for item in items {
+        let uppercase = item.to_uppercase();  // Allocation!
+        println!("{}", uppercase);
+    }
+}
+
+// Better: reuse buffer
+fn process_better(items: &[&str]) {
+    let mut buffer = String::new();
+    for item in items {
+        buffer.clear();
+        buffer.push_str(item);
+        buffer.make_ascii_uppercase();
+        println!("{}", buffer);
+    }
+}
+
+// Best: avoid allocation entirely if possible
+fn process_best(items: &[&str]) {
+    for item in items {
+        print!("{}", item.to_uppercase());
+    }
+}</pre>
+
+        <h3>Using SmallVec</h3>
+
+        <pre>use smallvec::{SmallVec, smallvec};
+
+fn smallvec_demo() {
+    // Store up to 4 items inline, then spill to heap
+    let mut vec: SmallVec&lt;[i32; 4]&gt; = smallvec![1, 2, 3];
+
+    // Still on stack
+    vec.push(4);
+
+    // Now spills to heap
+    vec.push(5);
+
+    // Great for frequently-small collections
+    // Common pattern: SmallVec&lt;[T; 8]&gt;
+}</pre>
+
+        <h3>Iterator Optimization</h3>
+
+        <pre>// Slow: intermediate collections
+fn sum_squares_slow(nums: &[i32]) -&gt; i32 {
+    let filtered: Vec&lt;_&gt; = nums.iter().filter(|&&x| x &gt; 0).collect();
+    let mapped: Vec&lt;_&gt; = filtered.iter().map(|&&x| x * x).collect();
+    mapped.iter().sum()
+}
+
+// Fast: no intermediate allocations
+fn sum_squares_fast(nums: &[i32]) -&gt; i32 {
+    nums.iter()
+        .filter(|&&x| x &gt; 0)
+        .map(|&x| x * x)
+        .sum()
+}
+
+// Even faster: use fold directly
+fn sum_squares_fastest(nums: &[i32]) -&gt; i32 {
+    nums.iter()
+        .filter(|&&x| x &gt; 0)
+        .fold(0, |acc, &x| acc + x * x)
+}</pre>
+
+        <h2>5.5 SIMD and Vectorization</h2>
+
+        <pre>// Portable SIMD (nightly)
+#![feature(portable_simd)]
+use std::simd::{f32x4, SimdFloat};
+
+fn simd_sum(values: &[f32]) -&gt; f32 {
+    let mut sum = 0.0;
+
+    // Process 4 values at a time
+    let chunks = values.chunks_exact(4);
+    let remainder = chunks.remainder();
+
+    let mut vec_sum = f32x4::splat(0.0);
+    for chunk in chunks {
+        let vec = f32x4::from_slice(chunk);
+        vec_sum += vec;
+    }
+
+    sum += vec_sum.reduce_sum();
+
+    // Handle remainder
+    sum += remainder.iter().sum::&lt;f32&gt;();
+    sum
+}
+
+// Using packed_simd crate (stable)
+// [dependencies]
+// packed_simd = "0.3"</pre>
+
+        <h2>5.6 Memory Pool Pattern</h2>
+
+        <pre>use std::cell::RefCell;
+
+struct Pool&lt;T&gt; {
+    items: RefCell&lt;Vec&lt;T&gt;&gt;,
+}
+
+impl&lt;T&gt; Pool&lt;T&gt; {
+    fn new() -&gt; Self {
+        Pool {
+            items: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn acquire(&self) -&gt; Option&lt;T&gt; {
+        self.items.borrow_mut().pop()
+    }
+
+    fn release(&self, item: T) {
+        self.items.borrow_mut().push(item);
+    }
+}
+
+// Usage
+fn pool_example() {
+    let pool = Pool::&lt;Vec&lt;u8&gt;&gt;::new();
+
+    // Get a buffer (or allocate new)
+    let mut buf = pool.acquire().unwrap_or_else(Vec::new);
+
+    // Use it
+    buf.extend_from_slice(b"hello");
+
+    // Return it for reuse
+    buf.clear();
+    pool.release(buf);
+}</pre>
+
+        <h2>5.7 Cache-Friendly Data Structures</h2>
+
+        <h3>Structure of Arrays (SoA)</h3>
+
+        <pre>// Array of Structures (AoS) - cache unfriendly
+struct ParticleAoS {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+}
+
+fn update_aos(particles: &mut [ParticleAoS]) {
+    for p in particles {
+        p.x += p.vx;  // Jumps around in memory
+        p.y += p.vy;
+    }
+}
+
+// Structure of Arrays (SoA) - cache friendly
+struct ParticlesSoA {
+    x: Vec&lt;f32&gt;,
+    y: Vec&lt;f32&gt;,
+    vx: Vec&lt;f32&gt;,
+    vy: Vec&lt;f32&gt;,
+}
+
+fn update_soa(particles: &mut ParticlesSoA) {
+    // Better cache locality
+    for i in 0..particles.x.len() {
+        particles.x[i] += particles.vx[i];
+        particles.y[i] += particles.vy[i];
+    }
+}</pre>
+
+        <h2>5.8 Compile-Time Optimization</h2>
+
+        <h3>Profile-Guided Optimization</h3>
+
+        <pre># In Cargo.toml
+[profile.release]
+lto = true              # Link-time optimization
+codegen-units = 1       # Better optimization, slower compile
+opt-level = 3           # Maximum optimization
+strip = true            # Remove debug symbols
+
+# Profile-guided optimization
+# 1. Build instrumented binary
+# RUSTFLAGS="-Cprofile-generate=/tmp/pgo-data" cargo build --release
+#
+# 2. Run workload
+# ./target/release/myapp
+#
+# 3. Build optimized binary
+# RUSTFLAGS="-Cprofile-use=/tmp/pgo-data" cargo build --release</pre>
+
+        <h3>Const Evaluation</h3>
+
+        <pre>// Compute at compile time
+const fn factorial(n: u64) -&gt; u64 {
+    match n {
+        0 | 1 =&gt; 1,
+        _ =&gt; n * factorial(n - 1),
+    }
+}
+
+const FACT_10: u64 = factorial(10);  // Computed at compile time!
+
+fn main() {
+    println!("10! = {}", FACT_10);  // No runtime cost
+}
+
+// Const generic computation
+fn create_lookup_table&lt;const N: usize&gt;() -&gt; [u64; N] {
+    let mut table = [0; N];
+    let mut i = 0;
+    while i &lt; N {
+        table[i] = factorial(i as u64);
+        i += 1;
+    }
+    table
+}
+
+const FACTORIALS: [u64; 20] = create_lookup_table::&lt;20&gt;();</pre>
+
+        <h2>5.9 Unsafe for Performance</h2>
+
+        <pre>// Safe but bounds-checked every access
+fn sum_safe(data: &[i32]) -&gt; i32 {
+    let mut sum = 0;
+    for i in 0..data.len() {
+        sum += data[i];  // Bounds check on every access
+    }
+    sum
+}
+
+// Unsafe: skip bounds checks when we know it's safe
+fn sum_unsafe(data: &[i32]) -&gt; i32 {
+    let mut sum = 0;
+    for i in 0..data.len() {
+        unsafe {
+            sum += *data.get_unchecked(i);  // No bounds check
+        }
+    }
+    sum
+}
+
+// Best: use iterators (no bounds checks, same speed as unsafe)
+fn sum_iter(data: &[i32]) -&gt; i32 {
+    data.iter().sum()
+}</pre>
+
+        <div class="warning-box">
+            <strong>When to Use Unsafe</strong>
+            <p style="margin-top: 10px;">Only use unsafe when:</p>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>You've profiled and identified a real bottleneck</li>
+                <li>Safe Rust can't express the optimization</li>
+                <li>You've carefully verified safety invariants</li>
+                <li>You've benchmarked to confirm the performance gain</li>
+            </ul>
+        </div>
+
+        <h2>5.10 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Memory Layout:</strong> Understand stack vs heap, padding, and alignment</li>
+                <li><strong>Struct Ordering:</strong> Order fields by size to minimize padding</li>
+                <li><strong>Smart Pointers:</strong> Know the overhead of Box, Rc, Arc</li>
+                <li><strong>Benchmarking:</strong> Use Criterion and flamegraph for profiling</li>
+                <li><strong>Avoid Allocations:</strong> Reuse buffers, use iterators, consider SmallVec</li>
+                <li><strong>SIMD:</strong> Vectorize hot loops for massive speedups</li>
+                <li><strong>Cache Locality:</strong> SoA pattern for better cache usage</li>
+                <li><strong>Compile-Time:</strong> Use const fn and LTO for optimization</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

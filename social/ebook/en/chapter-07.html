@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 7: Data Portability - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>Chapter 7: Data Portability</h1>
+
+<blockquote>
+"Hongik Ingan: Your data is yours, take it anywhere."
+</blockquote>
+
+<hr>
+
+<h2>7.1 The Lock-In Problem</h2>
+
+<pre>
+Platform Lock-In Today
+======================
+
+Your 10 years on Instagram:
+  - 5,000 photos
+  - 10,000 comments
+  - 50,000 likes given
+  - 500 friendships built
+  - Countless memories
+
+Want to leave?
+  - Download a ZIP file (messy)
+  - Lose all your followers
+  - Lose all your comments
+  - Start from zero elsewhere
+  - 10 years gone
+
+This is digital hostage-taking.
+
+
+The Cost of Switching
+=====================
+
+Switch from Twitter to Bluesky:
+  - 0 followers on Bluesky
+  - 0 following on Bluesky
+  - 0 content history
+  - Years of building = lost
+  - Network effect = trap
+</pre>
+
+<hr>
+
+<h2>7.2 WIA-SOCIAL Data Portability</h2>
+
+<pre>
+Export Everything
+=================
+
+// Export all your data
+const backup = await social.exportAll();
+
+Result:
+{
+  format: 'wia-social-v1',
+  exportedAt: '2025-01-15T10:30:00Z',
+
+  identity: {
+    wia_id: 'wia:hong.gildong.1234',
+    displayName: 'Hong Gildong',
+    // ... full profile
+  },
+
+  content: {
+    posts: 5247,
+    comments: 12000,
+    messages: 8500,
+    media: '15.2 GB'
+  },
+
+  social: {
+    followers: 847,
+    following: 520,
+    connections: [/* full graph */]
+  },
+
+  file: 'wia-export-2025-01-15.zip'
+}
+
+
+Export Package Contents
+=======================
+
+wia-export-2025-01-15/
+  +-- identity.json        # Your profile
+  +-- posts/               # All posts with metadata
+  |   +-- index.json
+  |   +-- 2024/
+  |   +-- 2023/
+  |   +-- ...
+  +-- media/               # All photos, videos
+  +-- connections/         # Follower/following lists
+  +-- messages/            # DM history
+  +-- interactions/        # Likes, comments
+  +-- settings/            # Your preferences
+  +-- manifest.json        # Package info
+</pre>
+
+<hr>
+
+<h2>7.3 Platform-Specific Export</h2>
+
+<pre>
+Export Single Platform
+======================
+
+// Export just Twitter data
+const twitterData = await social.exportPlatform('twitter');
+
+// Export just Instagram
+const igData = await social.exportPlatform('instagram');
+
+
+Selective Export
+================
+
+// Export specific data types
+const partial = await social.export({
+  platforms: ['instagram', 'twitter'],
+  include: {
+    posts: true,
+    media: true,
+    followers: false,  // Don't need this
+    messages: false    // Private
+  },
+  dateRange: {
+    from: '2024-01-01',
+    to: '2024-12-31'
+  }
+});
+
+
+Standard Format
+===============
+
+All exports use WIA-SOCIAL-v1 format:
+  - JSON for structured data
+  - Original quality for media
+  - Universal post format
+  - Platform-agnostic
+
+Can be imported anywhere that supports WIA-SOCIAL.
+</pre>
+
+<hr>
+
+<h2>7.4 Platform Migration</h2>
+
+<pre>
+Move to a New Platform
+======================
+
+// Migrate from Twitter to Bluesky
+const migration = await social.migrate({
+  from: 'twitter',
+  to: 'bluesky',
+
+  include: {
+    posts: true,        // Move all posts
+    following: true,    // Move following list
+    profile: true       // Copy profile
+  },
+
+  options: {
+    preserveDates: true,    // Keep original post dates
+    findFriends: true,      // Find Twitter friends on Bluesky
+    postAnnouncement: true  // Tell followers you're moving
+  }
+});
+
+Result:
+{
+  status: 'completed',
+
+  migrated: {
+    posts: 3247,
+    following: 187,  // Found on Bluesky
+    profile: true
+  },
+
+  notFound: {
+    following: 333   // Not on Bluesky yet
+  },
+
+  announcement: {
+    posted: true,
+    text: 'Moving to Bluesky! Find me @hong.bsky.social'
+  }
+}
+
+
+Migration Helper
+================
+
+// Save "not found" friends for later
+const pending = migration.notFound.following;
+
+// When they join, notify you
+social.on('friend_joined_platform', (event) => {
+  if (pending.includes(event.friend) && event.platform === 'bluesky') {
+    console.log(`${event.friend.displayName} joined Bluesky!`);
+    // Auto-follow option
+  }
+});
+</pre>
+
+<hr>
+
+<h2>7.5 Import to New Platforms</h2>
+
+<pre>
+Import Your Data
+================
+
+// Import exported data to new platform
+const result = await social.importTo('mastodon', exportedData);
+
+Result:
+{
+  imported: {
+    posts: 2500,
+    media: 1800,
+    profile: true
+  },
+
+  skipped: {
+    posts: 747,  // Format incompatible
+    reason: 'video_format_unsupported'
+  },
+
+  following: {
+    found: 45,      // Matched on Mastodon
+    followed: 45,   // Auto-followed
+    notFound: 475   // Not on Mastodon
+  }
+}
+
+
+Format Conversion
+=================
+
+WIA-SOCIAL automatically converts:
+  - Post formats (threads, etc.)
+  - Media formats (video codecs)
+  - Mention formats (@user)
+  - Hashtag styles
+
+// Check compatibility before import
+const compatibility = await social.checkCompatibility(
+  exportedData,
+  'mastodon'
+);
+
+Result:
+{
+  compatible: 0.89,  // 89% compatible
+  issues: [
+    { type: 'video_codec', count: 47, solution: 'transcode' },
+    { type: 'poll_format', count: 12, solution: 'convert' }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>7.6 Right to Erasure</h2>
+
+<pre>
+Delete Your Data (GDPR Article 17)
+==================================
+
+// Request complete deletion from a platform
+const deletion = await social.deleteFromPlatform('facebook');
+
+Process:
+  1. Request submitted to Facebook
+  2. Verification required
+  3. 30-day processing period
+  4. Complete deletion
+  5. Confirmation sent
+
+Result:
+{
+  requestId: 'DEL-2025-78923',
+  platform: 'facebook',
+  status: 'processing',
+  estimatedCompletion: '2025-02-14',
+
+  toBeDeleted: {
+    profile: true,
+    posts: 3200,
+    photos: 1500,
+    messages: 8000,
+    reactions: 25000,
+    activityLog: true
+  },
+
+  canCancel: true,
+  cancelDeadline: '2025-01-22'
+}
+
+
+Verify Deletion
+===============
+
+// Check if deletion was completed
+const status = await social.getDeletionStatus('DEL-2025-78923');
+
+// Request deletion certificate
+const certificate = await social.getDeletionCertificate('DEL-2025-78923');
+</pre>
+
+<hr>
+
+<h2>7.7 Backup Strategies</h2>
+
+<pre>
+Automatic Backups
+=================
+
+// Set up automatic backups
+await social.backup.configure({
+  frequency: 'weekly',
+  storage: 'local',  // or 'cloud', 's3', etc.
+  path: '/backups/social/',
+
+  include: {
+    posts: true,
+    media: true,
+    messages: true
+  },
+
+  retention: {
+    keepLast: 12,  // Keep last 12 backups
+    compress: true
+  }
+});
+
+
+Incremental Backups
+===================
+
+// Only backup changes since last backup
+const incremental = await social.backup.createIncremental();
+
+Result:
+{
+  type: 'incremental',
+  since: '2025-01-08',
+  newItems: {
+    posts: 15,
+    media: 8,
+    messages: 45
+  },
+  size: '125 MB'  // Much smaller than full backup
+}
+
+
+Backup Verification
+===================
+
+// Verify backup integrity
+const verification = await social.backup.verify('/backups/latest.zip');
+
+Result:
+{
+  valid: true,
+  checksums: 'verified',
+  contents: {
+    posts: 5247,
+    media: 3200,
+    complete: true
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.8 Data Inventory</h2>
+
+<pre>
+See All Your Data
+=================
+
+const inventory = await social.getDataInventory();
+
+Result:
+{
+  overview: {
+    platforms: 5,
+    totalPosts: 12500,
+    totalMedia: '45 GB',
+    totalConnections: 847
+  },
+
+  byPlatform: {
+    instagram: {
+      posts: 5000,
+      stories: 2000,
+      reels: 150,
+      media: '25 GB',
+      followers: 450,
+      following: 320,
+      messages: 5000,
+      dataAge: 'Since 2015'
+    },
+    twitter: {
+      posts: 8000,
+      likes: 15000,
+      retweets: 2000,
+      followers: 380,
+      following: 250,
+      dataAge: 'Since 2012'
+    },
+    // ... other platforms
+  },
+
+  risks: [
+    {
+      platform: 'facebook',
+      issue: 'Location history enabled',
+      recommendation: 'Disable or clear'
+    }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Full data export in universal WIA-SOCIAL format</li>
+<li>[OK] Platform-specific and selective export options</li>
+<li>[OK] Seamless migration between platforms</li>
+<li>[OK] Import data to new platforms with format conversion</li>
+<li>[OK] Right to erasure (GDPR compliance)</li>
+<li>[OK] Automatic and incremental backup strategies</li>
+<li>[OK] Comprehensive data inventory across platforms</li>
+</ul>
+</body>
+</html>

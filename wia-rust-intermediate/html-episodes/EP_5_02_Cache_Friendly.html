@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 5-02: Cache-Friendly Data Structures | WIA-RUST-INTERMEDIATE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #9B59B6, #8E44AD);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #9B59B6;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #9B59B6;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #9B59B6, #E8DAEF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .text-content {
+            flex: 1;
+            font-size: 32px;
+            line-height: 1.8;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 24px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .type { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .number { color: #79c0ff; }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(155, 89, 182, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #9B59B6;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #9B59B6;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 5px solid #9B59B6;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+            font-size: 28px;
+        }
+
+        .cache-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            font-family: monospace;
+            font-size: 20px;
+        }
+
+        .cache-line {
+            display: flex;
+            gap: 10px;
+        }
+
+        .cache-box {
+            border: 2px solid #9B59B6;
+            padding: 15px 25px;
+            background: rgba(155, 89, 182, 0.2);
+            border-radius: 5px;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .cache-box.hit {
+            background: rgba(46, 204, 113, 0.3);
+            border-color: #2ecc71;
+        }
+
+        .cache-box.miss {
+            background: rgba(231, 76, 60, 0.3);
+            border-color: #e74c3c;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(155, 89, 182, 0.1);
+            border: 2px solid #9B59B6;
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .comparison-item h3 {
+            color: #9B59B6;
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .perf-indicator {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚡</div>
+            <h1 class="title">Cache-Friendly Data Structures</h1>
+            <p class="subtitle">
+                <span class="ko">캐시 친화적 데이터 구조</span>
+                <span class="en" style="display:none;">Optimizing for CPU Cache</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Cache Hierarchy -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">메모리 계층 구조</span>
+            <span class="en" style="display:none;">Memory Hierarchy</span>
+        </h1>
+        <div class="content">
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🎯 <strong>L1 Cache</strong> - ~1ns (가장 빠름)<br><br>
+                        ⚡ <strong>L2 Cache</strong> - ~3ns<br><br>
+                        💾 <strong>L3 Cache</strong> - ~10ns<br><br>
+                        🐌 <strong>RAM</strong> - ~100ns (느림)<br><br>
+                        💡 <strong>캐시 히트율</strong>이 성능의 핵심!
+                    </span>
+                    <span class="en" style="display:none;">
+                        🎯 <strong>L1 Cache</strong> - ~1ns (fastest)<br><br>
+                        ⚡ <strong>L2 Cache</strong> - ~3ns<br><br>
+                        💾 <strong>L3 Cache</strong> - ~10ns<br><br>
+                        🐌 <strong>RAM</strong> - ~100ns (slow)<br><br>
+                        💡 <strong>Cache hit rate</strong> is key!
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Array of Structs vs Struct of Arrays -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">AoS vs SoA</span>
+            <span class="en" style="display:none;">AoS vs SoA</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="comment">// ❌ Array of Structs (AoS) - 캐시 미스 많음</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Particle</span> {</div>
+                <div class="code-line">    x: <span class="type">f32</span>, y: <span class="type">f32</span>, z: <span class="type">f32</span>,</div>
+                <div class="code-line">    vx: <span class="type">f32</span>, vy: <span class="type">f32</span>, vz: <span class="type">f32</span>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"><span class="keyword">let</span> particles: <span class="type">Vec</span><<span class="type">Particle</span>> = <span class="function">vec!</span>[...];</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// ✅ Struct of Arrays (SoA) - 캐시 친화적</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Particles</span> {</div>
+                <div class="code-line">    x: <span class="type">Vec</span><<span class="type">f32</span>>, y: <span class="type">Vec</span><<span class="type">f32</span>>, z: <span class="type">Vec</span><<span class="type">f32</span>>,</div>
+                <div class="code-line">    vx: <span class="type">Vec</span><<span class="type">f32</span>>, vy: <span class="type">Vec</span><<span class="type">f32</span>>, vz: <span class="type">Vec</span><<span class="type">f32</span>>,</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Performance Comparison -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">성능 비교</span>
+            <span class="en" style="display:none;">Performance Comparison</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3>AoS (Array of Structs)</h3>
+                    <div class="code-block" style="width: 100%;">
+                        <div class="code-line"><span class="keyword">for</span> p <span class="keyword">in</span> &<span class="keyword">mut</span> particles {</div>
+                        <div class="code-line">    p.x += p.vx;</div>
+                        <div class="code-line">}</div>
+                    </div>
+                    <div class="perf-indicator">🐌 느림</div>
+                    <p class="ko" style="text-align: center; font-size: 22px;">
+                        각 입자마다 전체 구조체 로드<br>
+                        캐시 라인 낭비
+                    </p>
+                    <p class="en" style="display:none; text-align: center; font-size: 22px;">
+                        Loads entire struct per particle<br>
+                        Wastes cache lines
+                    </p>
+                </div>
+                <div class="comparison-item">
+                    <h3>SoA (Struct of Arrays)</h3>
+                    <div class="code-block" style="width: 100%;">
+                        <div class="code-line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="number">0</span>..n {</div>
+                        <div class="code-line">    particles.x[i] += particles.vx[i];</div>
+                        <div class="code-line">}</div>
+                    </div>
+                    <div class="perf-indicator">⚡ 빠름</div>
+                    <p class="ko" style="text-align: center; font-size: 22px;">
+                        연속된 데이터 접근<br>
+                        캐시 히트율 극대화
+                    </p>
+                    <p class="en" style="display:none; text-align: center; font-size: 22px;">
+                        Sequential data access<br>
+                        Maximizes cache hits
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Data Alignment -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">데이터 정렬</span>
+            <span class="en" style="display:none;">Data Alignment</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="comment">// 캐시 라인 크기에 맞춰 정렬 (보통 64 bytes)</span></div>
+                <div class="code-line"><span class="attribute">#[repr(align(64))]</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">CacheAligned</span> {</div>
+                <div class="code-line">    data: [<span class="type">u8</span>; <span class="number">64</span>],</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// False sharing 방지</span></div>
+                <div class="code-line"><span class="attribute">#[repr(align(64))]</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Counter</span> {</div>
+                <div class="code-line">    value: <span class="type">AtomicU64</span>,</div>
+                <div class="code-line">    _padding: [<span class="type">u8</span>; <span class="number">56</span>], <span class="comment">// 64 - 8</span></div>
+                <div class="code-line">}</div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        📏 <strong>align(64)</strong> - 캐시 라인 정렬<br><br>
+                        🚫 <strong>False Sharing 방지</strong><br>
+                        다른 스레드가 같은 캐시 라인 수정 시<br>
+                        성능 저하 발생<br><br>
+                        ✨ 패딩으로 해결
+                    </span>
+                    <span class="en" style="display:none;">
+                        📏 <strong>align(64)</strong> - Cache line aligned<br><br>
+                        🚫 <strong>Prevent False Sharing</strong><br>
+                        Performance degrades when<br>
+                        threads modify same cache line<br><br>
+                        ✨ Solve with padding
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Prefetching -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">프리페칭 활용</span>
+            <span class="en" style="display:none;">Utilizing Prefetching</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">use</span> std::intrinsics::prefetch_read_data;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">process_data</span>(data: &[<span class="type">u64</span>]) {</div>
+                <div class="code-line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="number">0</span>..data.<span class="function">len</span>() {</div>
+                <div class="code-line">        <span class="comment">// 다음 데이터를 미리 캐시에 로드</span></div>
+                <div class="code-line">        <span class="keyword">if</span> i + <span class="number">8</span> < data.<span class="function">len</span>() {</div>
+                <div class="code-line">            <span class="keyword">unsafe</span> {</div>
+                <div class="code-line">                <span class="function">prefetch_read_data</span>(</div>
+                <div class="code-line">                    &data[i + <span class="number">8</span>], <span class="number">3</span> <span class="comment">// locality</span></div>
+                <div class="code-line">                );</div>
+                <div class="code-line">            }</div>
+                <div class="code-line">        }</div>
+                <div class="code-line">        <span class="comment">// 현재 데이터 처리</span></div>
+                <div class="code-line">        <span class="function">process</span>(data[i]);</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Practical Tips -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">실전 팁</span>
+            <span class="en" style="display:none;">Practical Tips</span>
+        </h1>
+        <div class="center-content">
+            <div class="highlight-box" style="width: 80%;">
+                <span class="ko">
+                    <h3 style="color: #9B59B6; margin-bottom: 30px;">캐시 친화적 설계 원칙</h3>
+
+                    1️⃣ <strong>순차 접근</strong> - 배열은 Vec, 링크드 리스트 피하기<br><br>
+
+                    2️⃣ <strong>데이터 국소성</strong> - 자주 사용하는 데이터를 가까이<br><br>
+
+                    3️⃣ <strong>정렬 활용</strong> - 캐시 라인 크기(64B) 고려<br><br>
+
+                    4️⃣ <strong>False Sharing 방지</strong> - 스레드별 데이터 분리<br><br>
+
+                    5️⃣ <strong>벤치마크 필수</strong> - criterion으로 측정
+                </span>
+                <span class="en" style="display:none;">
+                    <h3 style="color: #9B59B6; margin-bottom: 30px;">Cache-Friendly Design Principles</h3>
+
+                    1️⃣ <strong>Sequential Access</strong> - Use Vec, avoid linked lists<br><br>
+
+                    2️⃣ <strong>Data Locality</strong> - Keep frequently used data close<br><br>
+
+                    3️⃣ <strong>Use Alignment</strong> - Consider cache line size (64B)<br><br>
+
+                    4️⃣ <strong>Prevent False Sharing</strong> - Separate thread data<br><br>
+
+                    5️⃣ <strong>Always Benchmark</strong> - Measure with criterion
+                </span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 5-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">⚡✨</div>
+            <div class="highlight-box" style="width: 80%; text-align: center;">
+                <span class="ko">
+                    "캐시는 현대 CPU 성능의 핵심"<br><br>
+                    SoA > AoS (순차 접근 시)<br>
+                    align(64) - False Sharing 방지<br>
+                    벤치마크로 검증하기
+                </span>
+                <span class="en" style="display:none;">
+                    "Cache is the key to modern CPU performance"<br><br>
+                    SoA > AoS (for sequential access)<br>
+                    align(64) - Prevent False Sharing<br>
+                    Always verify with benchmarks
+                </span>
+            </div>
+            <div style="margin-top: 50px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 30px;">
+                    <span class="ko">다음 에피소드: Arena 할당자와 메모리 풀</span>
+                    <span class="en" style="display:none;">Next Episode: Arena Allocators and Memory Pools</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">
+                    EP 5-03 →
+                </p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_5_03_Arenas.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 100);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

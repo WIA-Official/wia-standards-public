@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 0-01: Ownership Edge Cases | WIA-RUST-INTERMEDIATE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #9B59B6, #8E44AD);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #9B59B6;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #9B59B6;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #9B59B6, #E8DAEF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .text-content {
+            flex: 1;
+            font-size: 32px;
+            line-height: 1.8;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 24px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .macro { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .type { color: #ffa657; }
+        .error { color: #f85149; }
+
+        .comparison-box {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+
+        .code-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 30px;
+            width: 850px;
+        }
+
+        .code-card h3 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: #9B59B6;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(155, 89, 182, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #9B59B6;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #9B59B6;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .concept-box {
+            background: rgba(155, 89, 182, 0.1);
+            border: 2px solid #9B59B6;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+        }
+
+        .concept-box h3 {
+            font-size: 36px;
+            color: #9B59B6;
+            margin-bottom: 20px;
+        }
+
+        .highlight-box {
+            background: rgba(248, 81, 73, 0.1);
+            border-left: 5px solid #f85149;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .success-box {
+            background: rgba(56, 211, 159, 0.1);
+            border-left: 5px solid #38d39f;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        ul {
+            font-size: 28px;
+            line-height: 1.8;
+            margin-left: 40px;
+        }
+
+        ul li {
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🔍</div>
+            <h1 class="title">Ownership Edge Cases</h1>
+            <p class="subtitle">
+                <span class="ko">소유권 엣지케이스</span>
+                <span class="en" style="display:none;">Understanding Ownership Edge Cases</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Partial Moves -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">부분 이동 (Partial Moves)</span>
+            <span class="en" style="display:none;">Partial Moves</span>
+        </h1>
+        <div class="content">
+            <div class="code-card">
+                <h3 class="ko">❌ 잘못된 예제</h3>
+                <h3 class="en" style="display:none;">❌ Wrong Example</h3>
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">struct</span> <span class="type">Person</span> {</div>
+                    <div class="code-line">    name: <span class="type">String</span>,</div>
+                    <div class="code-line">    age: <span class="type">u32</span>,</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> person = <span class="type">Person</span> {</div>
+                    <div class="code-line">    name: <span class="string">"Alice"</span>.<span class="function">to_string</span>(),</div>
+                    <div class="code-line">    age: <span class="string">30</span>,</div>
+                    <div class="code-line">};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> name = person.name; <span class="comment">// name moved!</span></div>
+                    <div class="code-line"><span class="macro">println!</span>(<span class="string">"{:?}"</span>, person); <span class="error">// ❌ Error!</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Partial Move Solution -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">해결책: 참조 또는 Copy</span>
+            <span class="en" style="display:none;">Solution: Reference or Copy</span>
+        </h1>
+        <div class="content">
+            <div class="code-card">
+                <h3 class="ko">✅ 올바른 방법</h3>
+                <h3 class="en" style="display:none;">✅ Correct Way</h3>
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">// Solution 1: Use reference</span></div>
+                    <div class="code-line"><span class="keyword">let</span> name = &person.name;</div>
+                    <div class="code-line"><span class="macro">println!</span>(<span class="string">"{:?}"</span>, person); <span class="comment">// ✅ OK</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// Solution 2: Clone</span></div>
+                    <div class="code-line"><span class="keyword">let</span> name = person.name.<span class="function">clone</span>();</div>
+                    <div class="code-line"><span class="macro">println!</span>(<span class="string">"{:?}"</span>, person); <span class="comment">// ✅ OK</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// Solution 3: Access Copy fields freely</span></div>
+                    <div class="code-line"><span class="keyword">let</span> age = person.age; <span class="comment">// u32 is Copy</span></div>
+                    <div class="code-line"><span class="macro">println!</span>(<span class="string">"{:?}"</span>, person); <span class="comment">// ✅ OK</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Temporary Values -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">임시 값 (Temporary Values)</span>
+            <span class="en" style="display:none;">Temporary Values</span>
+        </h1>
+        <div class="content">
+            <div class="code-card">
+                <h3 class="ko">임시 값의 라이프타임</h3>
+                <h3 class="en" style="display:none;">Lifetime of Temporary Values</h3>
+                <div class="code-block">
+                    <div class="code-line"><span class="comment">// ❌ Temporary value dropped</span></div>
+                    <div class="code-line"><span class="keyword">let</span> s = &<span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>).<span class="function">as_str</span>();</div>
+                    <div class="code-line"><span class="error">// String dropped immediately!</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// ✅ Correct: Bind to variable first</span></div>
+                    <div class="code-line"><span class="keyword">let</span> temp = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);</div>
+                    <div class="code-line"><span class="keyword">let</span> s = temp.<span class="function">as_str</span>();</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// ✅ Or use lifetime extension</span></div>
+                    <div class="code-line"><span class="keyword">let</span> s = <span class="type">String</span>::<span class="function">from</span>(<span class="string">"hello"</span>);</div>
+                    <div class="code-line"><span class="keyword">let</span> r = &s;</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Move in Loop -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">루프 안에서의 이동</span>
+            <span class="en" style="display:none;">Move in Loop</span>
+        </h1>
+        <div class="content">
+            <div class="code-card">
+                <h3 class="ko">반복문에서 소유권 주의</h3>
+                <h3 class="en" style="display:none;">Ownership in Loops</h3>
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">let</span> <span class="keyword">mut</span> vec = <span class="macro">vec!</span>[<span class="string">1</span>, <span class="string">2</span>, <span class="string">3</span>];</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// ❌ Moves vec in first iteration</span></div>
+                    <div class="code-line"><span class="keyword">for</span> _ <span class="keyword">in</span> <span class="string">0</span>..<span class="string">3</span> {</div>
+                    <div class="code-line">    <span class="keyword">let</span> v = vec; <span class="error">// Error on 2nd iteration!</span></div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// ✅ Use reference</span></div>
+                    <div class="code-line"><span class="keyword">for</span> _ <span class="keyword">in</span> <span class="string">0</span>..<span class="string">3</span> {</div>
+                    <div class="code-line">    <span class="keyword">let</span> v = &vec; <span class="comment">// OK!</span></div>
+                    <div class="code-line">}</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Interior Mutability -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">내부 가변성 패턴</span>
+            <span class="en" style="display:none;">Interior Mutability Pattern</span>
+        </h1>
+        <div class="content">
+            <div class="code-card">
+                <h3 class="ko">Cell과 RefCell</h3>
+                <h3 class="en" style="display:none;">Cell and RefCell</h3>
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">use</span> std::cell::{<span class="type">Cell</span>, <span class="type">RefCell</span>};</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// Cell: Copy types only</span></div>
+                    <div class="code-line"><span class="keyword">let</span> x = <span class="type">Cell</span>::<span class="function">new</span>(<span class="string">42</span>);</div>
+                    <div class="code-line">x.<span class="function">set</span>(<span class="string">100</span>); <span class="comment">// Mutate through shared ref!</span></div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="comment">// RefCell: Runtime borrow checking</span></div>
+                    <div class="code-line"><span class="keyword">let</span> y = <span class="type">RefCell</span>::<span class="function">new</span>(<span class="string">"hello"</span>.<span class="function">to_string</span>());</div>
+                    <div class="code-line">*y.<span class="function">borrow_mut</span>() = <span class="string">"world"</span>.<span class="function">to_string</span>();</div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Drop Order -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Drop 순서</span>
+            <span class="en" style="display:none;">Drop Order</span>
+        </h1>
+        <div class="content">
+            <div class="code-card">
+                <h3 class="ko">값이 drop되는 순서</h3>
+                <h3 class="en" style="display:none;">Order of Dropping Values</h3>
+                <div class="code-block">
+                    <div class="code-line"><span class="keyword">struct</span> <span class="type">PrintDrop</span>(&<span class="keyword">'static</span> <span class="type">str</span>);</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">impl</span> <span class="type">Drop</span> <span class="keyword">for</span> <span class="type">PrintDrop</span> {</div>
+                    <div class="code-line">    <span class="keyword">fn</span> <span class="function">drop</span>(&<span class="keyword">mut</span> <span class="keyword">self</span>) {</div>
+                    <div class="code-line">        <span class="macro">println!</span>(<span class="string">"Dropping: {}"</span>, <span class="keyword">self</span>.<span class="string">0</span>);</div>
+                    <div class="code-line">    }</div>
+                    <div class="code-line">}</div>
+                    <div class="code-line"></div>
+                    <div class="code-line"><span class="keyword">let</span> _a = <span class="type">PrintDrop</span>(<span class="string">"a"</span>);</div>
+                    <div class="code-line"><span class="keyword">let</span> _b = <span class="type">PrintDrop</span>(<span class="string">"b"</span>);</div>
+                    <div class="code-line"><span class="comment">// Drops in reverse: b, then a</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 0-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🎯</div>
+            <div class="concept-box" style="width: 1200px;">
+                <h3 class="ko">핵심 정리</h3>
+                <h3 class="en" style="display:none;">Key Takeaways</h3>
+                <ul class="ko">
+                    <li>부분 이동 후에는 전체 구조체 사용 불가</li>
+                    <li>임시 값의 라이프타임에 주의</li>
+                    <li>루프에서 소유권 이동 조심</li>
+                    <li>내부 가변성으로 소유권 규칙 우회</li>
+                    <li>Drop 순서는 역순 (LIFO)</li>
+                </ul>
+                <ul class="en" style="display:none;">
+                    <li>Can't use struct after partial move</li>
+                    <li>Watch temporary value lifetimes</li>
+                    <li>Be careful with moves in loops</li>
+                    <li>Interior mutability bypasses ownership rules</li>
+                    <li>Drop order is reverse (LIFO)</li>
+                </ul>
+            </div>
+            <div style="margin-top: 50px; text-align: center;">
+                <p style="font-size: 28px; color: #888;">
+                    <span class="ko">다음: EP 0-02 - 라이프타임 심화</span>
+                    <span class="en" style="display:none;">Next: EP 0-02 - Lifetime Advanced</span>
+                </p>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_0_02_Lifetime_Advanced.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 100);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

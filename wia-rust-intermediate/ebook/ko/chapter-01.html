@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1장: 소유권 심화 & 라이프타임 - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 30px 0 15px; color: var(--text); }
+        h3 { font-size: 1.2rem; margin: 20px 0 10px; color: var(--text); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .warning { background: #7f1d1d; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #dc2626; }
+        ul { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>1장: 소유권 심화 & 라이프타임</h1>
+
+        <h2>1.1 라이프타임의 본질</h2>
+        <p>라이프타임은 Rust의 가장 독특한 특징입니다. 참조가 유효한 스코프를 표현하며, 컴파일러가 댕글링 참조를 방지할 수 있게 합니다.</p>
+
+        <div class="highlight">
+            <strong>핵심 원칙:</strong>
+            <p style="margin-top: 10px;">모든 참조는 라이프타임을 가집니다. 대부분의 경우 컴파일러가 추론하지만, 명시적으로 지정해야 할 때도 있습니다.</p>
+        </div>
+
+        <h3>1.1.1 명시적 라이프타임 표기</h3>
+        <pre>// 가장 긴 문자열을 반환하는 함수
+fn longest&lt;'a&gt;(x: &'a str, y: &'a str) -&gt; &'a str {
+    if x.len() &gt; y.len() {
+        x
+    } else {
+        y
+    }
+}
+
+fn main() {
+    let string1 = String::from("long string is long");
+    let result;
+    {
+        let string2 = String::from("xyz");
+        result = longest(string1.as_str(), string2.as_str());
+        println!("The longest string is {}", result);
+    }
+    // 여기서 result 사용하면 컴파일 에러!
+}</pre>
+
+        <h3>1.1.2 라이프타임 엘리전 규칙</h3>
+        <p>컴파일러는 3가지 규칙으로 라이프타임을 자동 추론합니다:</p>
+        <ul>
+            <li><strong>규칙 1:</strong> 각 참조 매개변수는 자신만의 라이프타임을 가집니다</li>
+            <li><strong>규칙 2:</strong> 입력 라이프타임이 정확히 하나면, 모든 출력에 할당됩니다</li>
+            <li><strong>규칙 3:</strong> 메서드에서 &self나 &mut self가 있으면, self의 라이프타임이 모든 출력에 할당됩니다</li>
+        </ul>
+
+        <pre>// 규칙 2가 적용되는 경우
+fn first_word(s: &str) -&gt; &str {
+    // 컴파일러가 다음처럼 추론:
+    // fn first_word&lt;'a&gt;(s: &'a str) -&gt; &'a str
+    let bytes = s.as_bytes();
+    for (i, &item) in bytes.iter().enumerate() {
+        if item == b' ' {
+            return &s[0..i];
+        }
+    }
+    &s[..]
+}</pre>
+
+        <h2>1.2 구조체와 라이프타임</h2>
+        <p>구조체가 참조를 포함할 때는 명시적 라이프타임이 필요합니다.</p>
+
+        <pre>// 텍스트의 일부를 참조하는 구조체
+struct Excerpt&lt;'a&gt; {
+    part: &'a str,
+}
+
+impl&lt;'a&gt; Excerpt&lt;'a&gt; {
+    fn level(&self) -&gt; i32 {
+        3
+    }
+
+    fn announce_and_return_part(&self, announcement: &str) -&gt; &str {
+        println!("Attention please: {}", announcement);
+        self.part
+    }
+}
+
+fn main() {
+    let novel = String::from("Call me Ishmael. Some years ago...");
+    let first_sentence = novel.split('.').next().expect("Could not find a '.'");
+    let i = Excerpt {
+        part: first_sentence,
+    };
+    println!("Excerpt: {}", i.part);
+}</pre>
+
+        <h2>1.3 고급 라이프타임 패턴</h2>
+
+        <h3>1.3.1 정적 라이프타임 ('static)</h3>
+        <pre>// 프로그램 전체 수명을 가지는 참조
+let s: &'static str = "I have a static lifetime.";
+
+// 정적 변수
+static GLOBAL: &str = "Global static string";
+
+// Leak을 사용한 동적 정적 참조
+fn leak_string() -&gt; &'static str {
+    let s = String::from("leaked");
+    Box::leak(s.into_boxed_str())
+}</pre>
+
+        <div class="warning">
+            <strong>⚠️ 주의:</strong> 'static을 남용하지 마세요. 대부분의 경우 필요하지 않으며, 메모리 누수의 원인이 될 수 있습니다.
+        </div>
+
+        <h3>1.3.2 다중 라이프타임 매개변수</h3>
+        <pre>struct Context&lt;'s, 'c&gt; {
+    search: &'s str,
+    content: &'c str,
+}
+
+impl&lt;'s, 'c&gt; Context&lt;'s, 'c&gt; {
+    fn find(&self) -&gt; Option&lt;&'c str&gt; {
+        self.content.find(self.search)
+            .map(|i| &self.content[i..])
+    }
+}
+
+fn main() {
+    let search_term = "Rust";
+    let content = String::from("Rust is awesome!");
+
+    let ctx = Context {
+        search: search_term,
+        content: &content,
+    };
+
+    if let Some(result) = ctx.find() {
+        println!("Found: {}", result);
+    }
+}</pre>
+
+        <h3>1.3.3 라이프타임 바운드</h3>
+        <pre>// 트레이트와 라이프타임 결합
+use std::fmt::Display;
+
+fn longest_with_announcement&lt;'a, T&gt;(
+    x: &'a str,
+    y: &'a str,
+    ann: T,
+) -&gt; &'a str
+where
+    T: Display,
+{
+    println!("Announcement! {}", ann);
+    if x.len() &gt; y.len() {
+        x
+    } else {
+        y
+    }
+}</pre>
+
+        <h2>1.4 고급 소유권 패턴</h2>
+
+        <h3>1.4.1 내부 가변성 (Interior Mutability)</h3>
+        <pre>use std::cell::RefCell;
+
+struct MockMessenger {
+    sent_messages: RefCell&lt;Vec&lt;String&gt;&gt;,
+}
+
+impl MockMessenger {
+    fn new() -&gt; MockMessenger {
+        MockMessenger {
+            sent_messages: RefCell::new(vec![]),
+        }
+    }
+
+    fn send(&self, message: &str) {
+        // 불변 참조로 가변 데이터 수정!
+        self.sent_messages.borrow_mut().push(String::from(message));
+    }
+}</pre>
+
+        <h3>1.4.2 참조 카운팅 (Rc와 Arc)</h3>
+        <pre>use std::rc::Rc;
+
+struct Node {
+    value: i32,
+    children: Vec&lt;Rc&lt;Node&gt;&gt;,
+}
+
+fn main() {
+    let leaf = Rc::new(Node {
+        value: 3,
+        children: vec![],
+    });
+
+    let branch = Node {
+        value: 5,
+        children: vec![Rc::clone(&leaf)],
+    };
+
+    println!("leaf strong count: {}", Rc::strong_count(&leaf)); // 2
+}</pre>
+
+        <h3>1.4.3 순환 참조 방지 (Weak)</h3>
+        <pre>use std::rc::{Rc, Weak};
+use std::cell::RefCell;
+
+struct Node {
+    value: i32,
+    parent: RefCell&lt;Weak&lt;Node&gt;&gt;,
+    children: RefCell&lt;Vec&lt;Rc&lt;Node&gt;&gt;&gt;,
+}
+
+fn main() {
+    let leaf = Rc::new(Node {
+        value: 3,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![]),
+    });
+
+    let branch = Rc::new(Node {
+        value: 5,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![Rc::clone(&leaf)]),
+    });
+
+    *leaf.parent.borrow_mut() = Rc::downgrade(&branch);
+
+    // 순환 참조 없이 양방향 관계 구현!
+}</pre>
+
+        <h2>1.5 실전 예제: 텍스트 파서</h2>
+        <pre>struct Parser&lt;'a&gt; {
+    content: &'a str,
+    pos: usize,
+}
+
+impl&lt;'a&gt; Parser&lt;'a&gt; {
+    fn new(content: &'a str) -&gt; Self {
+        Parser { content, pos: 0 }
+    }
+
+    fn parse_word(&mut self) -&gt; Option&lt;&'a str&gt; {
+        let start = self.pos;
+
+        while self.pos &lt; self.content.len() {
+            if self.content.as_bytes()[self.pos].is_ascii_whitespace() {
+                break;
+            }
+            self.pos += 1;
+        }
+
+        if start == self.pos {
+            None
+        } else {
+            let word = &self.content[start..self.pos];
+            self.pos += 1; // 공백 건너뛰기
+            Some(word)
+        }
+    }
+}
+
+fn main() {
+    let text = "Hello Rust World";
+    let mut parser = Parser::new(text);
+
+    while let Some(word) = parser.parse_word() {
+        println!("Word: {}", word);
+    }
+}</pre>
+
+        <div class="highlight">
+            <strong>🎯 핵심 요약:</strong>
+            <ul style="margin-top: 10px;">
+                <li>라이프타임은 참조의 유효 범위를 표현합니다</li>
+                <li>대부분 엘리전 규칙으로 자동 추론됩니다</li>
+                <li>RefCell과 Rc로 복잡한 소유권 패턴을 구현할 수 있습니다</li>
+                <li>Weak으로 순환 참조를 방지합니다</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

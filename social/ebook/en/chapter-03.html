@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 3: Cross-Platform Posting - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>Chapter 3: Cross-Platform Posting</h1>
+
+<blockquote>
+"Hongik Ingan: Write once, reach everyone, everywhere."
+</blockquote>
+
+<hr>
+
+<h2>3.1 The Posting Problem</h2>
+
+<pre>
+Without Cross-Platform Posting
+==============================
+
+To share a photo:
+  1. Open Instagram, upload, write caption
+  2. Open Twitter, upload again, rewrite caption
+  3. Open Threads, upload again, rewrite again
+  4. Open TikTok, different format needed
+  5. Open Bluesky, upload again...
+
+Time spent: 30+ minutes
+Different formats needed for each.
+Different character limits.
+Different hashtag strategies.
+
+This is exhausting.
+</pre>
+
+<hr>
+
+<h2>3.2 Write Once, Post Everywhere</h2>
+
+<pre>
+With WIA-SOCIAL
+===============
+
+await social.post({
+  content: {
+    text: 'Amazing sunset today!',
+    media: [sunsetPhoto]
+  },
+  targets: ['instagram', 'twitter', 'threads', 'bluesky']
+});
+
+Result:
+  [OK] Instagram: Posted with #sunset #nature
+  [OK] Twitter: Posted (280 chars)
+  [OK] Threads: Posted
+  [OK] Bluesky: Posted with alt text
+
+Time spent: 30 seconds
+One action, four platforms.
+</pre>
+
+<h3>Universal Post Structure</h3>
+
+<pre>
+interface UniversalPost {
+  content: {
+    text: string;         // Your message
+    media?: MediaRef[];   // Photos, videos
+    poll?: Poll;          // Polls
+    location?: Location;  // Location tag
+    link?: Link;          // Link preview
+  };
+
+  targets: Platform[];    // Where to post
+
+  options?: {
+    visibility?: Visibility;
+    schedule?: Timestamp;
+    thread?: boolean;
+    replyTo?: PostId;
+  };
+}
+</pre>
+
+<hr>
+
+<h2>3.3 Platform Optimization</h2>
+
+<pre>
+Automatic Optimization
+======================
+
+Each platform has different requirements.
+WIA-SOCIAL handles them automatically.
+
+Your post:
+  "Had an amazing day at the beach!
+   The sunset was incredible.
+   #beach #sunset #summer #vacation"
+
+Instagram:
+  - Photo with filters suggested
+  - 30 hashtags added based on content
+  - Location tag suggested
+  - Stories version available
+
+Twitter:
+  - Truncated to 280 characters if needed
+  - Key hashtags kept (max 3-4)
+  - Thread created if too long
+
+TikTok:
+  - Video format suggested
+  - Trending sounds matched
+  - Vertical crop suggested
+
+Bluesky:
+  - Alt text auto-generated for images
+  - No character worries (300 limit)
+  - Clean formatting
+
+Threads:
+  - Instagram cross-post option
+  - Text-first format
+</pre>
+
+<h3>Custom Optimization</h3>
+
+<pre>
+// Override auto-optimization
+await social.post({
+  content: {
+    text: 'Check out my new blog post!'
+  },
+  targets: ['instagram', 'twitter', 'linkedin'],
+
+  // Custom per-platform
+  platformOverrides: {
+    instagram: {
+      hashtags: ['#blog', '#writing', '#tech'],
+      carousel: [image1, image2, image3]
+    },
+    twitter: {
+      text: 'New blog post is live! Link in bio.',
+      includeLink: true
+    },
+    linkedin: {
+      text: `I'm excited to share my thoughts on...
+             [full professional version]`
+    }
+  }
+});
+</pre>
+
+<hr>
+
+<h2>3.4 Media Handling</h2>
+
+<pre>
+Automatic Media Conversion
+==========================
+
+You upload: 4K photo (4000x3000)
+
+Automatic conversions:
+  Instagram: 1080x1080 (square) or 1080x1350 (portrait)
+  Twitter: 1200x675 (landscape optimized)
+  TikTok: 1080x1920 (vertical)
+  Bluesky: Original + compressed
+
+Video handling:
+  Input: 4K MOV file
+  Instagram: MP4, max 60 sec for feed
+  Twitter: MP4, max 2:20
+  TikTok: MP4, 9:16 aspect, max 10 min
+  YouTube: Full quality upload
+
+
+Code Example
+============
+
+const result = await social.post({
+  content: {
+    media: [
+      {
+        type: 'video',
+        file: myVideo,
+        caption: 'Check this out!',
+        thumbnail: customThumbnail
+      }
+    ]
+  },
+  targets: ['instagram', 'tiktok', 'youtube'],
+
+  mediaOptions: {
+    autoOptimize: true,
+    preserveQuality: 'youtube', // keep full quality for YouTube
+    addWatermark: false
+  }
+});
+</pre>
+
+<hr>
+
+<h2>3.5 Scheduling</h2>
+
+<pre>
+Schedule Posts
+==============
+
+// Single scheduled post
+await social.schedule({
+  content: {
+    text: 'Good morning everyone!'
+  },
+  targets: ['instagram', 'twitter'],
+  scheduledAt: '2025-01-20T09:00:00Z'
+});
+
+
+// Different times per platform
+await social.schedule({
+  content: {
+    text: 'Big announcement coming!'
+  },
+  schedulePerPlatform: {
+    instagram: '2025-01-20T12:00:00Z', // Noon
+    twitter: '2025-01-20T09:00:00Z',   // Morning
+    linkedin: '2025-01-20T08:00:00Z'   // Business hours
+  }
+});
+
+
+// Optimal time suggestion
+const optimalTimes = await social.getOptimalPostTimes({
+  platforms: ['instagram', 'twitter'],
+  timezone: 'Asia/Seoul'
+});
+
+// Returns:
+{
+  instagram: ['12:00', '19:00', '21:00'],
+  twitter: ['09:00', '12:00', '18:00']
+}
+</pre>
+
+<hr>
+
+<h2>3.6 Threads and Long-Form</h2>
+
+<pre>
+Thread Posting
+==============
+
+// Create a thread
+await social.postThread({
+  posts: [
+    { text: '1/ Let me tell you a story...' },
+    { text: '2/ It all started when...' },
+    { text: '3/ And then something amazing happened...' },
+    { text: '4/ The lesson I learned was...' }
+  ],
+  targets: ['twitter', 'threads', 'bluesky']
+});
+
+// Each platform handles threading its own way
+// Twitter: Reply chain
+// Threads: Connected posts
+// Bluesky: Thread structure
+
+
+Long-Form Content
+=================
+
+// For long articles
+await social.post({
+  content: {
+    text: longArticleText,  // 5000 words
+    link: articleUrl
+  },
+  targets: ['twitter', 'linkedin', 'medium'],
+
+  longFormOptions: {
+    twitter: 'thread',        // Convert to thread
+    linkedin: 'article',      // Post as article
+    medium: 'full'            // Full post
+  }
+});
+</pre>
+
+<hr>
+
+<h2>3.7 Engagement Tracking</h2>
+
+<pre>
+Cross-Platform Analytics
+========================
+
+// Get engagement for a post
+const stats = await social.getPostStats(postId);
+
+Result:
+{
+  postId: 'wia:post:12345',
+  totalReach: 15420,
+  totalEngagement: 892,
+
+  byPlatform: {
+    instagram: {
+      likes: 450,
+      comments: 32,
+      shares: 12,
+      reach: 8500
+    },
+    twitter: {
+      likes: 120,
+      retweets: 45,
+      replies: 18,
+      reach: 4200
+    },
+    bluesky: {
+      likes: 55,
+      reposts: 8,
+      reach: 2720
+    }
+  },
+
+  topPerforming: 'instagram',
+  suggestion: 'Post more visual content for best engagement'
+}
+</pre>
+
+<hr>
+
+<h2>3.8 Intent-Based Posting</h2>
+
+<pre>
+Father (INTENT) Integration
+===========================
+
+// Natural language posting
+await social.postWithIntent(`
+  Share my lunch photo with close friends.
+  Something casual and fun.
+  Don't include my location.
+`);
+
+// WIA-SOCIAL interprets:
+{
+  content: { text: 'Yummy lunch!', media: [lunchPhoto] },
+  targets: ['instagram'],
+  visibility: 'close_friends',
+  privacy: { stripLocation: true },
+  tone: 'casual'
+}
+
+
+// Another example
+await social.postWithIntent(`
+  Announce my new job to professional contacts.
+  Formal tone, all business platforms.
+`);
+
+// Interprets as:
+{
+  content: { text: 'Excited to announce...' },
+  targets: ['linkedin', 'twitter'],
+  visibility: 'public',
+  tone: 'professional'
+}
+</pre>
+
+<hr>
+
+<h2>Chapter Summary</h2>
+
+<ul>
+<li>[OK] Write once, post to all platforms simultaneously</li>
+<li>[OK] Automatic optimization for each platform's requirements</li>
+<li>[OK] Media converted to appropriate formats automatically</li>
+<li>[OK] Scheduling with optimal time suggestions</li>
+<li>[OK] Thread support for long-form content</li>
+<li>[OK] Unified engagement tracking across platforms</li>
+<li>[OK] Intent-based posting with natural language</li>
+</ul>
+</body>
+</html>

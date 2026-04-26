@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 5-03: Arena Allocators | WIA-RUST-INTERMEDIATE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #9B59B6, #8E44AD);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #9B59B6;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #9B59B6;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #9B59B6, #E8DAEF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .text-content {
+            flex: 1;
+            font-size: 32px;
+            line-height: 1.8;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 24px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .type { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .number { color: #79c0ff; }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(155, 89, 182, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #9B59B6;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #9B59B6;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 5px solid #9B59B6;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+            font-size: 28px;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(155, 89, 182, 0.1);
+            border: 2px solid #9B59B6;
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .comparison-item h3 {
+            color: #9B59B6;
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🏟️</div>
+            <h1 class="title">Arena Allocators</h1>
+            <p class="subtitle">
+                <span class="ko">Arena 할당자와 메모리 풀</span>
+                <span class="en" style="display:none;">Arena Allocators and Memory Pools</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: What is Arena? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Arena란 무엇인가?</span>
+            <span class="en" style="display:none;">What is an Arena?</span>
+        </h1>
+        <div class="content">
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🎯 <strong>개념</strong><br>
+                        큰 메모리 블록을 미리 할당하고<br>
+                        그 안에서 작은 할당들을 수행<br><br>
+
+                        ⚡ <strong>장점</strong><br>
+                        • 개별 할당보다 빠름<br>
+                        • 메모리 파편화 감소<br>
+                        • 한 번에 모두 해제 가능<br><br>
+
+                        🎪 <strong>사용처</strong><br>
+                        컴파일러, 게임 엔진, 파서
+                    </span>
+                    <span class="en" style="display:none;">
+                        🎯 <strong>Concept</strong><br>
+                        Pre-allocate large memory block<br>
+                        and perform small allocations within<br><br>
+
+                        ⚡ <strong>Benefits</strong><br>
+                        • Faster than individual allocations<br>
+                        • Reduces memory fragmentation<br>
+                        • Bulk deallocation<br><br>
+
+                        🎪 <strong>Use Cases</strong><br>
+                        Compilers, game engines, parsers
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: Simple Arena Implementation -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">간단한 Arena 구현</span>
+            <span class="en" style="display:none;">Simple Arena Implementation</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">use</span> std::cell::<span class="type">Cell</span>;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Arena</span> {</div>
+                <div class="code-line">    buffer: <span class="type">Vec</span><<span class="type">u8</span>>,</div>
+                <div class="code-line">    offset: <span class="type">Cell</span><<span class="type">usize</span>>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">impl</span> <span class="type">Arena</span> {</div>
+                <div class="code-line">    <span class="keyword">fn</span> <span class="function">new</span>(capacity: <span class="type">usize</span>) -> <span class="keyword">Self</span> {</div>
+                <div class="code-line">        <span class="keyword">Self</span> {</div>
+                <div class="code-line">            buffer: <span class="type">Vec</span>::<span class="function">with_capacity</span>(capacity),</div>
+                <div class="code-line">            offset: <span class="type">Cell</span>::<span class="function">new</span>(<span class="number">0</span>),</div>
+                <div class="code-line">        }</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Using typed-arena -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">typed-arena 사용하기</span>
+            <span class="en" style="display:none;">Using typed-arena</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">use</span> typed_arena::<span class="type">Arena</span>;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Node</span><<span class="type">'a</span>> {</div>
+                <div class="code-line">    value: <span class="type">i32</span>,</div>
+                <div class="code-line">    children: <span class="type">Vec</span><&<span class="type">'a</span> <span class="type">Node</span><<span class="type">'a</span>>>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">build_tree</span>() {</div>
+                <div class="code-line">    <span class="keyword">let</span> arena = <span class="type">Arena</span>::<span class="function">new</span>();</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">let</span> node1 = arena.<span class="function">alloc</span>(<span class="type">Node</span> {</div>
+                <div class="code-line">        value: <span class="number">1</span>,</div>
+                <div class="code-line">        children: <span class="function">vec!</span>[],</div>
+                <div class="code-line">    });</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">let</span> node2 = arena.<span class="function">alloc</span>(<span class="type">Node</span> {</div>
+                <div class="code-line">        value: <span class="number">2</span>,</div>
+                <div class="code-line">        children: <span class="function">vec!</span>[node1],</div>
+                <div class="code-line">    });</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: bumpalo Crate -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">bumpalo - 빠른 Arena</span>
+            <span class="en" style="display:none;">bumpalo - Fast Arena</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">use</span> bumpalo::<span class="type">Bump</span>;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">use_bumpalo</span>() {</div>
+                <div class="code-line">    <span class="keyword">let</span> bump = <span class="type">Bump</span>::<span class="function">new</span>();</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// 단일 값 할당</span></div>
+                <div class="code-line">    <span class="keyword">let</span> x = bump.<span class="function">alloc</span>(<span class="number">42</span>);</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// 슬라이스 할당</span></div>
+                <div class="code-line">    <span class="keyword">let</span> arr = bump.<span class="function">alloc_slice_fill_with</span>(<span class="number">100</span>, |i| i);</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// String 할당</span></div>
+                <div class="code-line">    <span class="keyword">let</span> s = bump.<span class="function">alloc_str</span>(<span class="string">"Hello, Arena!"</span>);</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// 전체 리셋</span></div>
+                <div class="code-line">    bump.<span class="function">reset</span>();</div>
+                <div class="code-line">}</div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        ⚡ 매우 빠른 할당<br>
+                        🔄 reset()으로 재사용<br>
+                        📦 다양한 타입 지원<br>
+                        🎯 WebAssembly 최적화
+                    </span>
+                    <span class="en" style="display:none;">
+                        ⚡ Very fast allocation<br>
+                        🔄 Reuse with reset()<br>
+                        📦 Supports many types<br>
+                        🎯 WebAssembly optimized
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Memory Pools -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">메모리 풀 패턴</span>
+            <span class="en" style="display:none;">Memory Pool Pattern</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">ObjectPool</span><<span class="type">T</span>> {</div>
+                <div class="code-line">    objects: <span class="type">Vec</span><<span class="type">T</span>>,</div>
+                <div class="code-line">    available: <span class="type">Vec</span><<span class="type">usize</span>>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">impl</span><<span class="type">T</span>: <span class="type">Default</span>> <span class="type">ObjectPool</span><<span class="type">T</span>> {</div>
+                <div class="code-line">    <span class="keyword">fn</span> <span class="function">acquire</span>(&<span class="keyword">mut</span> <span class="keyword">self</span>) -> <span class="type">Option</span><<span class="type">usize</span>> {</div>
+                <div class="code-line">        <span class="keyword">self</span>.available.<span class="function">pop</span>()</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">fn</span> <span class="function">release</span>(&<span class="keyword">mut</span> <span class="keyword">self</span>, idx: <span class="type">usize</span>) {</div>
+                <div class="code-line">        <span class="keyword">self</span>.available.<span class="function">push</span>(idx);</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🔄 <strong>객체 재사용</strong><br>
+                        할당/해제 오버헤드 제거<br><br>
+
+                        🎮 <strong>게임 개발</strong><br>
+                        총알, 파티클 등<br><br>
+
+                        🌊 <strong>연결 풀</strong><br>
+                        DB 커넥션 재사용
+                    </span>
+                    <span class="en" style="display:none;">
+                        🔄 <strong>Object Reuse</strong><br>
+                        Remove alloc/dealloc overhead<br><br>
+
+                        🎮 <strong>Game Development</strong><br>
+                        Bullets, particles, etc.<br><br>
+
+                        🌊 <strong>Connection Pools</strong><br>
+                        Reuse DB connections
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Comparison -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Arena vs 기본 할당자</span>
+            <span class="en" style="display:none;">Arena vs Default Allocator</span>
+        </h1>
+        <div class="content">
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3 class="ko">기본 할당자 (Box, Vec)</h3>
+                    <h3 class="en" style="display:none;">Default Allocator (Box, Vec)</h3>
+                    <div class="highlight-box">
+                        <span class="ko">
+                            ✅ 개별 해제 가능<br>
+                            ✅ 유연한 메모리 관리<br>
+                            ❌ 할당 오버헤드<br>
+                            ❌ 메모리 파편화
+                        </span>
+                        <span class="en" style="display:none;">
+                            ✅ Individual deallocation<br>
+                            ✅ Flexible memory management<br>
+                            ❌ Allocation overhead<br>
+                            ❌ Memory fragmentation
+                        </span>
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <h3>Arena</h3>
+                    <div class="highlight-box">
+                        <span class="ko">
+                            ✅ 빠른 할당<br>
+                            ✅ 캐시 효율적<br>
+                            ✅ 일괄 해제<br>
+                            ❌ 개별 해제 불가
+                        </span>
+                        <span class="en" style="display:none;">
+                            ✅ Fast allocation<br>
+                            ✅ Cache efficient<br>
+                            ✅ Bulk deallocation<br>
+                            ❌ No individual deallocation
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 5-03</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🏟️✨</div>
+            <div class="highlight-box" style="width: 80%; text-align: center;">
+                <span class="ko">
+                    "Arena는 메모리 할당을 극적으로 빠르게"<br><br>
+                    typed-arena → 타입 안전<br>
+                    bumpalo → 최고 성능<br>
+                    메모리 풀 → 객체 재사용
+                </span>
+                <span class="en" style="display:none;">
+                    "Arena makes memory allocation dramatically faster"<br><br>
+                    typed-arena → Type safe<br>
+                    bumpalo → Best performance<br>
+                    Memory pools → Object reuse
+                </span>
+            </div>
+            <div style="margin-top: 50px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 30px;">
+                    <span class="ko">다음 에피소드: 커스텀 에러 타입 설계</span>
+                    <span class="en" style="display:none;">Next Episode: Custom Error Type Design</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">
+                    EP 6-01 →
+                </p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_6_01_Custom_Errors.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 100);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

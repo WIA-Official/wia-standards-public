@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제7장: 데이터 이동성 - WIA-SOCIAL</title>
+</head>
+<body>
+<h1>제7장: 데이터 이동성</h1>
+
+<blockquote>
+"홍익인간: 당신의 데이터는 당신 것, 어디든 가져가세요."
+</blockquote>
+
+<hr>
+
+<h2>7.1 락인 문제</h2>
+
+<pre>
+오늘날 플랫폼 락인
+=================
+
+인스타그램에서 보낸 10년:
+  - 5,000장의 사진
+  - 10,000개의 댓글
+  - 50,000개의 좋아요
+  - 500개의 친구 관계
+  - 셀 수 없는 추억
+
+떠나고 싶으면?
+  - ZIP 파일 다운로드 (지저분함)
+  - 모든 팔로워 잃음
+  - 모든 댓글 잃음
+  - 다른 곳에서 처음부터
+  - 10년이 사라짐
+
+디지털 인질극.
+
+
+플랫폼 전환 비용
+===============
+
+트위터에서 블루스카이로 전환:
+  - 블루스카이에서 팔로워 0
+  - 블루스카이에서 팔로잉 0
+  - 콘텐츠 히스토리 0
+  - 수년간의 구축 = 잃음
+  - 네트워크 효과 = 함정
+</pre>
+
+<hr>
+
+<h2>7.2 WIA-SOCIAL 데이터 이동성</h2>
+
+<pre>
+모든 것 내보내기
+===============
+
+// 모든 데이터 내보내기
+const backup = await social.exportAll();
+
+결과:
+{
+  format: 'wia-social-v1',
+  exportedAt: '2025-01-15T10:30:00Z',
+
+  identity: {
+    wia_id: 'wia:hong.gildong.1234',
+    displayName: '홍길동',
+    // ... 전체 프로필
+  },
+
+  content: {
+    posts: 5247,
+    comments: 12000,
+    messages: 8500,
+    media: '15.2 GB'
+  },
+
+  social: {
+    followers: 847,
+    following: 520,
+    connections: [/* 전체 그래프 */]
+  },
+
+  file: 'wia-export-2025-01-15.zip'
+}
+
+
+내보내기 패키지 내용
+==================
+
+wia-export-2025-01-15/
+  +-- identity.json        # 프로필
+  +-- posts/               # 메타데이터와 모든 게시물
+  |   +-- index.json
+  |   +-- 2024/
+  |   +-- 2023/
+  |   +-- ...
+  +-- media/               # 모든 사진, 영상
+  +-- connections/         # 팔로워/팔로잉 목록
+  +-- messages/            # DM 히스토리
+  +-- interactions/        # 좋아요, 댓글
+  +-- settings/            # 설정
+  +-- manifest.json        # 패키지 정보
+</pre>
+
+<hr>
+
+<h2>7.3 플랫폼별 내보내기</h2>
+
+<pre>
+단일 플랫폼 내보내기
+==================
+
+// 트위터 데이터만 내보내기
+const twitterData = await social.exportPlatform('twitter');
+
+// 인스타그램만 내보내기
+const igData = await social.exportPlatform('instagram');
+
+
+선택적 내보내기
+==============
+
+// 특정 데이터 유형 내보내기
+const partial = await social.export({
+  platforms: ['instagram', 'twitter'],
+  include: {
+    posts: true,
+    media: true,
+    followers: false,  // 필요 없음
+    messages: false    // 비공개
+  },
+  dateRange: {
+    from: '2024-01-01',
+    to: '2024-12-31'
+  }
+});
+
+
+표준 포맷
+========
+
+모든 내보내기는 WIA-SOCIAL-v1 포맷 사용:
+  - 구조화된 데이터는 JSON
+  - 미디어는 원본 품질
+  - 통합 게시물 포맷
+  - 플랫폼 독립적
+
+WIA-SOCIAL 지원하는 어디든 가져오기 가능.
+</pre>
+
+<hr>
+
+<h2>7.4 플랫폼 이주</h2>
+
+<pre>
+새 플랫폼으로 이동
+=================
+
+// 트위터에서 블루스카이로 이주
+const migration = await social.migrate({
+  from: 'twitter',
+  to: 'bluesky',
+
+  include: {
+    posts: true,        // 모든 게시물 이동
+    following: true,    // 팔로잉 목록 이동
+    profile: true       // 프로필 복사
+  },
+
+  options: {
+    preserveDates: true,    // 원래 게시 날짜 유지
+    findFriends: true,      // 블루스카이에서 트위터 친구 찾기
+    postAnnouncement: true  // 팔로워에게 이동 알림
+  }
+});
+
+결과:
+{
+  status: 'completed',
+
+  migrated: {
+    posts: 3247,
+    following: 187,  // 블루스카이에서 찾음
+    profile: true
+  },
+
+  notFound: {
+    following: 333   // 아직 블루스카이에 없음
+  },
+
+  announcement: {
+    posted: true,
+    text: '블루스카이로 이사합니다! @hong.bsky.social에서 만나요'
+  }
+}
+
+
+이주 도우미
+==========
+
+// "찾지 못함" 친구 나중을 위해 저장
+const pending = migration.notFound.following;
+
+// 가입하면 알림
+social.on('friend_joined_platform', (event) => {
+  if (pending.includes(event.friend) && event.platform === 'bluesky') {
+    console.log(`${event.friend.displayName}님이 블루스카이 가입!`);
+    // 자동 팔로우 옵션
+  }
+});
+</pre>
+
+<hr>
+
+<h2>7.5 새 플랫폼으로 가져오기</h2>
+
+<pre>
+데이터 가져오기
+==============
+
+// 내보낸 데이터를 새 플랫폼에 가져오기
+const result = await social.importTo('mastodon', exportedData);
+
+결과:
+{
+  imported: {
+    posts: 2500,
+    media: 1800,
+    profile: true
+  },
+
+  skipped: {
+    posts: 747,  // 포맷 호환 안 됨
+    reason: 'video_format_unsupported'
+  },
+
+  following: {
+    found: 45,      // 마스토돈에서 매칭됨
+    followed: 45,   // 자동 팔로우됨
+    notFound: 475   // 마스토돈에 없음
+  }
+}
+
+
+포맷 변환
+========
+
+WIA-SOCIAL이 자동 변환:
+  - 게시물 포맷 (스레드 등)
+  - 미디어 포맷 (비디오 코덱)
+  - 멘션 포맷 (@user)
+  - 해시태그 스타일
+
+// 가져오기 전 호환성 확인
+const compatibility = await social.checkCompatibility(
+  exportedData,
+  'mastodon'
+);
+
+결과:
+{
+  compatible: 0.89,  // 89% 호환
+  issues: [
+    { type: 'video_codec', count: 47, solution: 'transcode' },
+    { type: 'poll_format', count: 12, solution: 'convert' }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>7.6 삭제 권리</h2>
+
+<pre>
+데이터 삭제 (GDPR 17조)
+=====================
+
+// 플랫폼에서 완전 삭제 요청
+const deletion = await social.deleteFromPlatform('facebook');
+
+과정:
+  1. 페이스북에 요청 제출
+  2. 확인 필요
+  3. 30일 처리 기간
+  4. 완전 삭제
+  5. 확인 전송
+
+결과:
+{
+  requestId: 'DEL-2025-78923',
+  platform: 'facebook',
+  status: 'processing',
+  estimatedCompletion: '2025-02-14',
+
+  toBeDeleted: {
+    profile: true,
+    posts: 3200,
+    photos: 1500,
+    messages: 8000,
+    reactions: 25000,
+    activityLog: true
+  },
+
+  canCancel: true,
+  cancelDeadline: '2025-01-22'
+}
+
+
+삭제 확인
+========
+
+// 삭제 완료 확인
+const status = await social.getDeletionStatus('DEL-2025-78923');
+
+// 삭제 인증서 요청
+const certificate = await social.getDeletionCertificate('DEL-2025-78923');
+</pre>
+
+<hr>
+
+<h2>7.7 백업 전략</h2>
+
+<pre>
+자동 백업
+========
+
+// 자동 백업 설정
+await social.backup.configure({
+  frequency: 'weekly',
+  storage: 'local',  // 또는 'cloud', 's3' 등
+  path: '/backups/social/',
+
+  include: {
+    posts: true,
+    media: true,
+    messages: true
+  },
+
+  retention: {
+    keepLast: 12,  // 마지막 12개 백업 유지
+    compress: true
+  }
+});
+
+
+증분 백업
+========
+
+// 마지막 백업 이후 변경만 백업
+const incremental = await social.backup.createIncremental();
+
+결과:
+{
+  type: 'incremental',
+  since: '2025-01-08',
+  newItems: {
+    posts: 15,
+    media: 8,
+    messages: 45
+  },
+  size: '125 MB'  // 전체 백업보다 훨씬 작음
+}
+
+
+백업 확인
+========
+
+// 백업 무결성 확인
+const verification = await social.backup.verify('/backups/latest.zip');
+
+결과:
+{
+  valid: true,
+  checksums: 'verified',
+  contents: {
+    posts: 5247,
+    media: 3200,
+    complete: true
+  }
+}
+</pre>
+
+<hr>
+
+<h2>7.8 데이터 인벤토리</h2>
+
+<pre>
+모든 데이터 보기
+===============
+
+const inventory = await social.getDataInventory();
+
+결과:
+{
+  overview: {
+    platforms: 5,
+    totalPosts: 12500,
+    totalMedia: '45 GB',
+    totalConnections: 847
+  },
+
+  byPlatform: {
+    instagram: {
+      posts: 5000,
+      stories: 2000,
+      reels: 150,
+      media: '25 GB',
+      followers: 450,
+      following: 320,
+      messages: 5000,
+      dataAge: '2015년부터'
+    },
+    twitter: {
+      posts: 8000,
+      likes: 15000,
+      retweets: 2000,
+      followers: 380,
+      following: 250,
+      dataAge: '2012년부터'
+    },
+    // ... 다른 플랫폼
+  },
+
+  risks: [
+    {
+      platform: 'facebook',
+      issue: '위치 히스토리 활성화됨',
+      recommendation: '비활성화 또는 삭제'
+    }
+  ]
+}
+</pre>
+
+<hr>
+
+<h2>장 요약</h2>
+
+<ul>
+<li>[OK] 범용 WIA-SOCIAL 포맷으로 전체 데이터 내보내기</li>
+<li>[OK] 플랫폼별 및 선택적 내보내기 옵션</li>
+<li>[OK] 플랫폼 간 원활한 이주</li>
+<li>[OK] 포맷 변환으로 새 플랫폼에 데이터 가져오기</li>
+<li>[OK] 삭제 권리 (GDPR 준수)</li>
+<li>[OK] 자동 및 증분 백업 전략</li>
+<li>[OK] 플랫폼 간 종합적인 데이터 인벤토리</li>
+</ul>
+
+<hr>
+
+<p><a href="chapter-06.html">이전: 제6장 - 개인정보 보호</a> | <a href="chapter-08.html">다음: 제8장 - 구현</a></p>
+</body>
+</html>

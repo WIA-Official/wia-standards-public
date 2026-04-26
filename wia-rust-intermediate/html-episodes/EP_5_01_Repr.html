@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 5-01: Memory Representation | WIA-RUST-INTERMEDIATE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #9B59B6, #8E44AD);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #9B59B6;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #9B59B6;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #9B59B6, #E8DAEF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .text-content {
+            flex: 1;
+            font-size: 32px;
+            line-height: 1.8;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 26px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .type { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .number { color: #79c0ff; }
+        .attribute { color: #ffa657; }
+
+        .memory-diagram {
+            background: rgba(155, 89, 182, 0.1);
+            border: 2px solid #9B59B6;
+            border-radius: 15px;
+            padding: 40px;
+            font-family: monospace;
+            font-size: 24px;
+        }
+
+        .memory-box {
+            display: inline-block;
+            border: 2px solid #9B59B6;
+            padding: 20px 30px;
+            margin: 10px;
+            background: rgba(142, 68, 173, 0.2);
+            border-radius: 10px;
+        }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(155, 89, 182, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #9B59B6;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #9B59B6;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            width: 100%;
+        }
+
+        .comparison-item {
+            background: rgba(155, 89, 182, 0.1);
+            border: 2px solid #9B59B6;
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .comparison-item h3 {
+            color: #9B59B6;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .highlight-box {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 5px solid #9B59B6;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+            font-size: 28px;
+        }
+
+        ul {
+            font-size: 28px;
+            line-height: 1.8;
+            margin-left: 40px;
+        }
+
+        .table-layout {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 24px;
+        }
+
+        .table-layout th, .table-layout td {
+            border: 2px solid #9B59B6;
+            padding: 20px;
+            text-align: left;
+        }
+
+        .table-layout th {
+            background: rgba(155, 89, 182, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">📦</div>
+            <h1 class="title">Memory Representation</h1>
+            <p class="subtitle">
+                <span class="ko">메모리 레이아웃 제어하기</span>
+                <span class="en" style="display:none;">Controlling Memory Layout</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Why Repr Matters -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">왜 메모리 레이아웃이 중요한가?</span>
+            <span class="en" style="display:none;">Why Memory Layout Matters?</span>
+        </h1>
+        <div class="content">
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🎯 <strong>FFI 호출</strong> - C/C++ 라이브러리와 통신<br><br>
+                        ⚡ <strong>성능 최적화</strong> - 캐시 라인 정렬<br><br>
+                        💾 <strong>메모리 절약</strong> - 패딩 제거<br><br>
+                        🔒 <strong>안전한 전송</strong> - 타입 안전성 유지
+                    </span>
+                    <span class="en" style="display:none;">
+                        🎯 <strong>FFI Calls</strong> - Communicate with C/C++ libraries<br><br>
+                        ⚡ <strong>Performance</strong> - Cache line alignment<br><br>
+                        💾 <strong>Memory Saving</strong> - Remove padding<br><br>
+                        🔒 <strong>Safe Transfer</strong> - Maintain type safety
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: repr(Rust) - Default -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">repr(Rust) - 기본 레이아웃</span>
+            <span class="en" style="display:none;">repr(Rust) - Default Layout</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="comment">// 기본적으로 Rust는 필드 순서를 재배치할 수 있음</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Point</span> {</div>
+                <div class="code-line">    x: <span class="type">f64</span>,  <span class="comment">// 8 bytes</span></div>
+                <div class="code-line">    y: <span class="type">u8</span>,   <span class="comment">// 1 byte + 7 padding</span></div>
+                <div class="code-line">    z: <span class="type">f64</span>,  <span class="comment">// 8 bytes</span></div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// Rust는 메모리를 최적화하기 위해</span></div>
+                <div class="code-line"><span class="comment">// 필드 순서를 x, z, y로 재배치할 수 있음</span></div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        ✨ 컴파일러가 최적화<br>
+                        ✨ 필드 재배치 가능<br>
+                        ✨ 메모리 효율적<br>
+                        ⚠️ FFI에 사용 불가
+                    </span>
+                    <span class="en" style="display:none;">
+                        ✨ Compiler optimizes<br>
+                        ✨ Fields can be reordered<br>
+                        ✨ Memory efficient<br>
+                        ⚠️ Cannot use with FFI
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: repr(C) -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">repr(C) - C 호환 레이아웃</span>
+            <span class="en" style="display:none;">repr(C) - C-Compatible Layout</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="attribute">#[repr(C)]</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">CPoint</span> {</div>
+                <div class="code-line">    x: <span class="type">f64</span>,</div>
+                <div class="code-line">    y: <span class="type">u8</span>,</div>
+                <div class="code-line">    z: <span class="type">f64</span>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// FFI로 C 함수 호출</span></div>
+                <div class="code-line"><span class="keyword">extern</span> <span class="string">"C"</span> {</div>
+                <div class="code-line">    <span class="keyword">fn</span> <span class="function">process_point</span>(point: *<span class="keyword">const</span> <span class="type">CPoint</span>);</div>
+                <div class="code-line">}</div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🔗 C/C++와 호환<br>
+                        📌 필드 순서 보장<br>
+                        🎯 FFI에 필수<br>
+                        💡 예측 가능한 레이아웃
+                    </span>
+                    <span class="en" style="display:none;">
+                        🔗 C/C++ compatible<br>
+                        📌 Field order guaranteed<br>
+                        🎯 Required for FFI<br>
+                        💡 Predictable layout
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: repr(packed) -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">repr(packed) - 패딩 제거</span>
+            <span class="en" style="display:none;">repr(packed) - Remove Padding</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="attribute">#[repr(packed)]</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Packed</span> {</div>
+                <div class="code-line">    a: <span class="type">u8</span>,   <span class="comment">// 1 byte</span></div>
+                <div class="code-line">    b: <span class="type">u64</span>,  <span class="comment">// 8 bytes (no padding!)</span></div>
+                <div class="code-line">    c: <span class="type">u8</span>,   <span class="comment">// 1 byte</span></div>
+                <div class="code-line">}</div>
+                <div class="code-line"><span class="comment">// 총 10 bytes (패딩 없음)</span></div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Normal</span> {</div>
+                <div class="code-line">    a: <span class="type">u8</span>,   <span class="comment">// 1 byte + 7 padding</span></div>
+                <div class="code-line">    b: <span class="type">u64</span>,  <span class="comment">// 8 bytes</span></div>
+                <div class="code-line">    c: <span class="type">u8</span>,   <span class="comment">// 1 byte + 7 padding</span></div>
+                <div class="code-line">}</div>
+                <div class="code-line"><span class="comment">// 총 24 bytes</span></div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        💾 메모리 절약<br>
+                        📦 네트워크 프로토콜<br>
+                        ⚠️ 정렬 문제 주의<br>
+                        🐢 성능 저하 가능
+                    </span>
+                    <span class="en" style="display:none;">
+                        💾 Save memory<br>
+                        📦 Network protocols<br>
+                        ⚠️ Watch alignment<br>
+                        🐢 May slow down
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: repr(transparent) -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">repr(transparent) - 투명한 래퍼</span>
+            <span class="en" style="display:none;">repr(transparent) - Transparent Wrapper</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="attribute">#[repr(transparent)]</span></div>
+                <div class="code-line"><span class="keyword">struct</span> <span class="type">Wrapper</span>(<span class="type">u64</span>);</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// Wrapper는 u64와 동일한 메모리 레이아웃</span></div>
+                <div class="code-line"><span class="keyword">impl</span> <span class="type">Wrapper</span> {</div>
+                <div class="code-line">    <span class="keyword">fn</span> <span class="function">new</span>(value: <span class="type">u64</span>) -> <span class="keyword">Self</span> {</div>
+                <div class="code-line">        <span class="keyword">Self</span>(value)</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// FFI에서 안전하게 u64로 전달 가능</span></div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🎭 타입 안전성 추가<br>
+                        🔄 제로 코스트 변환<br>
+                        📦 단일 필드만 가능<br>
+                        🎯 Newtype 패턴에 최적
+                    </span>
+                    <span class="en" style="display:none;">
+                        🎭 Add type safety<br>
+                        🔄 Zero-cost conversion<br>
+                        📦 Single field only<br>
+                        🎯 Perfect for Newtype
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Comparison Table -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">repr 비교</span>
+            <span class="en" style="display:none;">repr Comparison</span>
+        </h1>
+        <div class="center-content">
+            <table class="table-layout">
+                <thead>
+                    <tr>
+                        <th>repr</th>
+                        <th class="ko">용도</th>
+                        <th class="en" style="display:none;">Use Case</th>
+                        <th class="ko">장점</th>
+                        <th class="en" style="display:none;">Pros</th>
+                        <th class="ko">단점</th>
+                        <th class="en" style="display:none;">Cons</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Rust (기본)</td>
+                        <td class="ko">일반적 사용</td>
+                        <td class="en" style="display:none;">General use</td>
+                        <td class="ko">최적화</td>
+                        <td class="en" style="display:none;">Optimized</td>
+                        <td class="ko">FFI 불가</td>
+                        <td class="en" style="display:none;">No FFI</td>
+                    </tr>
+                    <tr>
+                        <td>C</td>
+                        <td class="ko">FFI 호출</td>
+                        <td class="en" style="display:none;">FFI calls</td>
+                        <td class="ko">C 호환</td>
+                        <td class="en" style="display:none;">C compatible</td>
+                        <td class="ko">패딩 존재</td>
+                        <td class="en" style="display:none;">Has padding</td>
+                    </tr>
+                    <tr>
+                        <td>packed</td>
+                        <td class="ko">메모리 절약</td>
+                        <td class="en" style="display:none;">Save memory</td>
+                        <td class="ko">공간 효율</td>
+                        <td class="en" style="display:none;">Space efficient</td>
+                        <td class="ko">느린 접근</td>
+                        <td class="en" style="display:none;">Slow access</td>
+                    </tr>
+                    <tr>
+                        <td>transparent</td>
+                        <td class="ko">타입 래핑</td>
+                        <td class="en" style="display:none;">Type wrapping</td>
+                        <td class="ko">제로 코스트</td>
+                        <td class="en" style="display:none;">Zero cost</td>
+                        <td class="ko">단일 필드</td>
+                        <td class="en" style="display:none;">Single field</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 5-01</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">📦✨</div>
+            <div class="highlight-box" style="width: 80%; text-align: center;">
+                <span class="ko">
+                    "메모리 레이아웃은 성능과 호환성의 열쇠"<br><br>
+                    repr(C) → FFI 필수<br>
+                    repr(packed) → 메모리 절약<br>
+                    repr(transparent) → 타입 안전성
+                </span>
+                <span class="en" style="display:none;">
+                    "Memory layout is key to performance and compatibility"<br><br>
+                    repr(C) → Required for FFI<br>
+                    repr(packed) → Save memory<br>
+                    repr(transparent) → Type safety
+                </span>
+            </div>
+            <div style="margin-top: 50px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 30px;">
+                    <span class="ko">다음 에피소드: 캐시 친화적 데이터 구조</span>
+                    <span class="en" style="display:none;">Next Episode: Cache-Friendly Data Structures</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">
+                    EP 5-02 →
+                </p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_5_02_Cache_Friendly.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 100);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>

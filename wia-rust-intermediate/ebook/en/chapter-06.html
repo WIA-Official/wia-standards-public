@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 6: Error Handling & Design Patterns - WIA-RUST-INTERMEDIATE</title>
+    <style>
+        :root { --rust-purple: #9B59B6; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --green: #10b981; --blue: #0EA5E9; --yellow: #eab308; --red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .nav a { color: var(--rust-purple); text-decoration: none; }
+        h1 { font-size: 2rem; margin-bottom: 30px; color: var(--rust-purple); }
+        h2 { font-size: 1.5rem; margin: 40px 0 20px; color: var(--text); border-bottom: 2px solid var(--rust-purple); padding-bottom: 10px; }
+        h3 { font-size: 1.2rem; margin: 25px 0 15px; color: var(--green); }
+        p { margin-bottom: 15px; color: var(--text-muted); }
+        pre { background: #1e1e1e; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #d4d4d4; border-left: 4px solid var(--rust-purple); }
+        code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+        .highlight { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--rust-purple); }
+        .success-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--green); }
+        .warning-box { background: var(--bg-card); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid var(--yellow); }
+        ul, ol { padding-left: 25px; color: var(--text-muted); margin: 15px 0; }
+        li { margin-bottom: 10px; }
+        .summary-box { background: linear-gradient(135deg, #1a2f1a 0%, #1e293b 100%); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid var(--green); }
+        .summary-box h3 { color: var(--green); margin-top: 0; }
+        footer { margin-top: 60px; text-align: center; color: var(--text-muted); padding-top: 20px; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chapter 6: Error Handling & Design Patterns</h1>
+
+        <p>Robust error handling and well-designed patterns are essential for production Rust applications. This chapter covers advanced error handling techniques and common design patterns.</p>
+
+        <h2>6.1 Custom Error Types</h2>
+
+        <h3>Manual Error Implementation</h3>
+
+        <pre>use std::fmt;
+
+#[derive(Debug)]
+enum DatabaseError {
+    ConnectionFailed(String),
+    QueryFailed(String),
+    NotFound,
+}
+
+impl fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -&gt; fmt::Result {
+        match self {
+            DatabaseError::ConnectionFailed(msg) =&gt; {
+                write!(f, "Connection failed: {}", msg)
+            }
+            DatabaseError::QueryFailed(msg) =&gt; {
+                write!(f, "Query failed: {}", msg)
+            }
+            DatabaseError::NotFound =&gt; {
+                write!(f, "Record not found")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DatabaseError {}
+
+fn query_database(id: u64) -&gt; Result&lt;String, DatabaseError&gt; {
+    if id == 0 {
+        Err(DatabaseError::NotFound)
+    } else {
+        Ok(format!("User {}", id))
+    }
+}</pre>
+
+        <h3>Using thiserror</h3>
+
+        <pre>use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum AppError {
+    #[error("Database error: {0}")]
+    Database(#[from] DatabaseError),
+
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
+
+    #[error("Invalid configuration: {field}")]
+    InvalidConfig { field: String },
+
+    #[error("User {id} not found")]
+    UserNotFound { id: u64 },
+}
+
+fn load_user(id: u64) -&gt; Result&lt;String, AppError&gt; {
+    if id == 0 {
+        return Err(AppError::UserNotFound { id });
+    }
+    Ok(format!("User {}", id))
+}</pre>
+
+        <h2>6.2 Error Conversion and Propagation</h2>
+
+        <h3>Using anyhow for Applications</h3>
+
+        <pre>use anyhow::{Context, Result, bail};
+
+fn read_config(path: &str) -&gt; Result&lt;Config&gt; {
+    let content = std::fs::read_to_string(path)
+        .context("Failed to read config file")?;
+
+    let config: Config = serde_json::from_str(&content)
+        .context("Failed to parse config")?;
+
+    if config.port == 0 {
+        bail!("Invalid port number");
+    }
+
+    Ok(config)
+}
+
+#[derive(serde::Deserialize)]
+struct Config {
+    port: u16,
+    host: String,
+}</pre>
+
+        <div class="highlight">
+            <strong>thiserror vs anyhow</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li><strong>thiserror:</strong> For libraries - define custom error types</li>
+                <li><strong>anyhow:</strong> For applications - flexible error handling with context</li>
+            </ul>
+        </div>
+
+        <h3>Custom Error Context</h3>
+
+        <pre>trait ResultExt&lt;T&gt; {
+    fn with_context&lt;F, S&gt;(self, f: F) -&gt; Result&lt;T, String&gt;
+    where
+        F: FnOnce() -&gt; S,
+        S: Into&lt;String&gt;;
+}
+
+impl&lt;T, E: fmt::Display&gt; ResultExt&lt;T&gt; for Result&lt;T, E&gt; {
+    fn with_context&lt;F, S&gt;(self, f: F) -&gt; Result&lt;T, String&gt;
+    where
+        F: FnOnce() -&gt; S,
+        S: Into&lt;String&gt;,
+    {
+        self.map_err(|e| format!("{}: {}", f().into(), e))
+    }
+}
+
+fn example() -&gt; Result&lt;(), String&gt; {
+    let content = std::fs::read_to_string("config.json")
+        .with_context(|| "Failed to read config")?;
+    Ok(())
+}</pre>
+
+        <h2>6.3 Builder Pattern</h2>
+
+        <pre>struct HttpClient {
+    base_url: String,
+    timeout: std::time::Duration,
+    headers: Vec&lt;(String, String)&gt;,
+    retry_count: u32,
+}
+
+struct HttpClientBuilder {
+    base_url: Option&lt;String&gt;,
+    timeout: std::time::Duration,
+    headers: Vec&lt;(String, String)&gt;,
+    retry_count: u32,
+}
+
+impl HttpClientBuilder {
+    fn new() -&gt; Self {
+        Self {
+            base_url: None,
+            timeout: std::time::Duration::from_secs(30),
+            headers: Vec::new(),
+            retry_count: 3,
+        }
+    }
+
+    fn base_url(mut self, url: impl Into&lt;String&gt;) -&gt; Self {
+        self.base_url = Some(url.into());
+        self
+    }
+
+    fn timeout(mut self, duration: std::time::Duration) -&gt; Self {
+        self.timeout = duration;
+        self
+    }
+
+    fn header(mut self, key: impl Into&lt;String&gt;, value: impl Into&lt;String&gt;) -&gt; Self {
+        self.headers.push((key.into(), value.into()));
+        self
+    }
+
+    fn retry_count(mut self, count: u32) -&gt; Self {
+        self.retry_count = count;
+        self
+    }
+
+    fn build(self) -&gt; Result&lt;HttpClient, String&gt; {
+        Ok(HttpClient {
+            base_url: self.base_url.ok_or("base_url is required")?,
+            timeout: self.timeout,
+            headers: self.headers,
+            retry_count: self.retry_count,
+        })
+    }
+}
+
+fn main() {
+    let client = HttpClientBuilder::new()
+        .base_url("https://api.example.com")
+        .timeout(std::time::Duration::from_secs(10))
+        .header("User-Agent", "MyApp/1.0")
+        .retry_count(5)
+        .build()
+        .unwrap();
+}</pre>
+
+        <h2>6.4 Type State Pattern</h2>
+
+        <pre>use std::marker::PhantomData;
+
+// States
+struct Created;
+struct Connected;
+struct Authenticated;
+
+struct Database&lt;State = Created&gt; {
+    connection_string: String,
+    _state: PhantomData&lt;State&gt;,
+}
+
+impl Database&lt;Created&gt; {
+    fn new(connection_string: String) -&gt; Self {
+        Database {
+            connection_string,
+            _state: PhantomData,
+        }
+    }
+
+    fn connect(self) -&gt; Result&lt;Database&lt;Connected&gt;, String&gt; {
+        println!("Connecting to {}", self.connection_string);
+        Ok(Database {
+            connection_string: self.connection_string,
+            _state: PhantomData,
+        })
+    }
+}
+
+impl Database&lt;Connected&gt; {
+    fn authenticate(self, password: &str) -&gt; Result&lt;Database&lt;Authenticated&gt;, String&gt; {
+        if password == "secret" {
+            Ok(Database {
+                connection_string: self.connection_string,
+                _state: PhantomData,
+            })
+        } else {
+            Err("Authentication failed".to_string())
+        }
+    }
+}
+
+impl Database&lt;Authenticated&gt; {
+    fn query(&self, sql: &str) -&gt; Result&lt;Vec&lt;String&gt;, String&gt; {
+        println!("Executing: {}", sql);
+        Ok(vec!["result1".to_string(), "result2".to_string()])
+    }
+}
+
+fn main() {
+    let db = Database::new("localhost:5432".to_string())
+        .connect()
+        .unwrap()
+        .authenticate("secret")
+        .unwrap();
+
+    db.query("SELECT * FROM users").unwrap();
+
+    // Won't compile: can't query before authentication!
+    // let db = Database::new("localhost:5432".to_string());
+    // db.query("SELECT * FROM users");
+}</pre>
+
+        <h2>6.5 Strategy Pattern</h2>
+
+        <pre>trait CompressionStrategy {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt;;
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt;;
+}
+
+struct GzipCompression;
+struct ZstdCompression;
+
+impl CompressionStrategy for GzipCompression {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Compressing with gzip");
+        data.to_vec() // Simplified
+    }
+
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Decompressing with gzip");
+        data.to_vec()
+    }
+}
+
+impl CompressionStrategy for ZstdCompression {
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Compressing with zstd");
+        data.to_vec()
+    }
+
+    fn decompress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        println!("Decompressing with zstd");
+        data.to_vec()
+    }
+}
+
+struct Compressor {
+    strategy: Box&lt;dyn CompressionStrategy&gt;,
+}
+
+impl Compressor {
+    fn new(strategy: Box&lt;dyn CompressionStrategy&gt;) -&gt; Self {
+        Compressor { strategy }
+    }
+
+    fn compress(&self, data: &[u8]) -&gt; Vec&lt;u8&gt; {
+        self.strategy.compress(data)
+    }
+}
+
+fn main() {
+    let data = b"Hello, World!";
+
+    let compressor = Compressor::new(Box::new(GzipCompression));
+    compressor.compress(data);
+
+    let compressor = Compressor::new(Box::new(ZstdCompression));
+    compressor.compress(data);
+}</pre>
+
+        <h2>6.6 Command Pattern</h2>
+
+        <pre>trait Command {
+    fn execute(&mut self) -&gt; Result&lt;(), String&gt;;
+    fn undo(&mut self) -&gt; Result&lt;(), String&gt;;
+}
+
+struct Counter {
+    value: i32,
+}
+
+struct IncrementCommand {
+    counter: *mut Counter,
+    amount: i32,
+}
+
+impl Command for IncrementCommand {
+    fn execute(&mut self) -&gt; Result&lt;(), String&gt; {
+        unsafe {
+            (*self.counter).value += self.amount;
+        }
+        Ok(())
+    }
+
+    fn undo(&mut self) -&gt; Result&lt;(), String&gt; {
+        unsafe {
+            (*self.counter).value -= self.amount;
+        }
+        Ok(())
+    }
+}
+
+struct CommandHistory {
+    commands: Vec&lt;Box&lt;dyn Command&gt;&gt;,
+    position: usize,
+}
+
+impl CommandHistory {
+    fn new() -&gt; Self {
+        CommandHistory {
+            commands: Vec::new(),
+            position: 0,
+        }
+    }
+
+    fn execute(&mut self, mut command: Box&lt;dyn Command&gt;) -&gt; Result&lt;(), String&gt; {
+        command.execute()?;
+        self.commands.truncate(self.position);
+        self.commands.push(command);
+        self.position += 1;
+        Ok(())
+    }
+
+    fn undo(&mut self) -&gt; Result&lt;(), String&gt; {
+        if self.position == 0 {
+            return Err("Nothing to undo".to_string());
+        }
+        self.position -= 1;
+        self.commands[self.position].undo()
+    }
+}</pre>
+
+        <h2>6.7 Visitor Pattern</h2>
+
+        <pre>trait Visitor {
+    fn visit_file(&mut self, file: &File);
+    fn visit_directory(&mut self, dir: &Directory);
+}
+
+trait Visitable {
+    fn accept(&self, visitor: &mut dyn Visitor);
+}
+
+struct File {
+    name: String,
+    size: u64,
+}
+
+struct Directory {
+    name: String,
+    children: Vec&lt;Box&lt;dyn Visitable&gt;&gt;,
+}
+
+impl Visitable for File {
+    fn accept(&self, visitor: &mut dyn Visitor) {
+        visitor.visit_file(self);
+    }
+}
+
+impl Visitable for Directory {
+    fn accept(&self, visitor: &mut dyn Visitor) {
+        visitor.visit_directory(self);
+        for child in &self.children {
+            child.accept(visitor);
+        }
+    }
+}
+
+struct SizeCalculator {
+    total_size: u64,
+}
+
+impl Visitor for SizeCalculator {
+    fn visit_file(&mut self, file: &File) {
+        self.total_size += file.size;
+    }
+
+    fn visit_directory(&mut self, _dir: &Directory) {
+        // Directory itself has no size
+    }
+}</pre>
+
+        <h2>6.8 Dependency Injection</h2>
+
+        <pre>trait Logger {
+    fn log(&self, message: &str);
+}
+
+struct ConsoleLogger;
+struct FileLogger {
+    path: String,
+}
+
+impl Logger for ConsoleLogger {
+    fn log(&self, message: &str) {
+        println!("[LOG] {}", message);
+    }
+}
+
+impl Logger for FileLogger {
+    fn log(&self, message: &str) {
+        println!("[FILE] Writing to {}: {}", self.path, message);
+    }
+}
+
+struct UserService&lt;L: Logger&gt; {
+    logger: L,
+}
+
+impl&lt;L: Logger&gt; UserService&lt;L&gt; {
+    fn new(logger: L) -&gt; Self {
+        UserService { logger }
+    }
+
+    fn create_user(&self, name: &str) {
+        self.logger.log(&format!("Creating user: {}", name));
+        // Create user logic
+    }
+}
+
+fn main() {
+    let console_service = UserService::new(ConsoleLogger);
+    console_service.create_user("Alice");
+
+    let file_service = UserService::new(FileLogger {
+        path: "app.log".to_string(),
+    });
+    file_service.create_user("Bob");
+}</pre>
+
+        <h2>6.9 Option and Result Combinators</h2>
+
+        <pre>fn combinator_examples() {
+    // map: transform the value
+    let value = Some(5).map(|x| x * 2);  // Some(10)
+
+    // and_then: chain operations
+    let result = Some(5)
+        .and_then(|x| if x &gt; 0 { Some(x * 2) } else { None });
+
+    // or: provide alternative
+    let value = None.or(Some(42));  // Some(42)
+
+    // unwrap_or: default value
+    let value = None.unwrap_or(0);  // 0
+
+    // map_or: transform with default
+    let value = Some("hello").map_or(0, |s| s.len());  // 5
+
+    // ok_or: convert Option to Result
+    let result: Result&lt;i32, &str&gt; = Some(42).ok_or("not found");
+}
+
+fn result_combinators() -&gt; Result&lt;i32, String&gt; {
+    // Chaining with ?
+    let value = parse_number("42")?;
+    let doubled = multiply_by_two(value)?;
+    Ok(doubled)
+}
+
+fn parse_number(s: &str) -&gt; Result&lt;i32, String&gt; {
+    s.parse().map_err(|e| format!("Parse error: {}", e))
+}
+
+fn multiply_by_two(n: i32) -&gt; Result&lt;i32, String&gt; {
+    Ok(n * 2)
+}</pre>
+
+        <h2>6.10 Chapter Summary</h2>
+
+        <div class="summary-box">
+            <h3>Key Takeaways</h3>
+            <ul>
+                <li><strong>Custom Errors:</strong> Use thiserror for libraries, anyhow for applications</li>
+                <li><strong>Error Context:</strong> Add context to errors for better debugging</li>
+                <li><strong>Builder Pattern:</strong> Fluent API for complex object construction</li>
+                <li><strong>Type State:</strong> Encode state transitions in the type system</li>
+                <li><strong>Strategy Pattern:</strong> Swap algorithms at runtime</li>
+                <li><strong>Command Pattern:</strong> Encapsulate operations for undo/redo</li>
+                <li><strong>Visitor Pattern:</strong> Separate algorithms from data structures</li>
+                <li><strong>Dependency Injection:</strong> Make code testable and modular</li>
+            </ul>
+        </div>
+
+        </div>
+</body>
+</html>

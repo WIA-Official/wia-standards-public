@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>EP 6-02: Error Chaining | WIA-RUST-INTERMEDIATE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 60px;
+            position: relative;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .episode-badge {
+            background: linear-gradient(135deg, #9B59B6, #8E44AD);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .lang-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 10px 25px;
+            border: 2px solid #9B59B6;
+            background: transparent;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #9B59B6;
+        }
+
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #9B59B6, #E8DAEF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .text-content {
+            flex: 1;
+            font-size: 32px;
+            line-height: 1.8;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 15px;
+            padding: 30px;
+            font-family: 'Consolas', 'D2Coding', monospace;
+            font-size: 24px;
+            line-height: 1.6;
+            border: 2px solid #30363d;
+            width: 900px;
+        }
+
+        .code-line {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+
+        .code-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .string { color: #a5d6ff; }
+        .type { color: #79c0ff; }
+        .comment { color: #8b949e; }
+        .number { color: #79c0ff; }
+
+        .navigation {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(155, 89, 182, 0.8);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #9B59B6;
+            transform: scale(1.05);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 8px;
+            background: #9B59B6;
+            transition: width 0.5s;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 100px;
+            right: 60px;
+            font-size: 24px;
+            color: #888;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-emoji {
+            font-size: 150px;
+            margin-bottom: 30px;
+        }
+
+        .subtitle {
+            font-size: 36px;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .channel-info {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #FF0000;
+            border-radius: 20px;
+            padding: 30px 60px;
+            margin-top: 40px;
+            font-size: 32px;
+        }
+
+        .channel-info a {
+            color: #FF6B6B;
+            text-decoration: none;
+        }
+
+        .highlight-box {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 5px solid #9B59B6;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+            font-size: 28px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide1">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🔗</div>
+            <h1 class="title">Error Chaining & Context</h1>
+            <p class="subtitle">
+                <span class="ko">에러 체이닝과 컨텍스트</span>
+                <span class="en" style="display:none;">Error Chaining and Context</span>
+            </p>
+            <div class="channel-info">
+                📺 YouTube: <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="nextSlide()">
+                <span class="ko">시작하기 →</span>
+                <span class="en" style="display:none;">Start →</span>
+            </button>
+        </div>
+        <div class="slide-number">1 / 8</div>
+        <div class="progress-bar" style="width: 12.5%"></div>
+    </div>
+
+    <!-- Slide 2: Why Chain Errors? -->
+    <div class="slide" id="slide2">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">왜 에러를 체이닝하나?</span>
+            <span class="en" style="display:none;">Why Chain Errors?</span>
+        </h1>
+        <div class="content">
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        🔍 <strong>문제 추적</strong><br>
+                        에러가 발생한 전체 경로 파악<br><br>
+
+                        📚 <strong>컨텍스트 보존</strong><br>
+                        원인 에러 정보 유지<br><br>
+
+                        🛠️ <strong>디버깅 효율</strong><br>
+                        "왜 실패했는지" 명확히<br><br>
+
+                        💡 예: "파일 읽기 실패" → "설정 로드 실패" → "앱 시작 실패"
+                    </span>
+                    <span class="en" style="display:none;">
+                        🔍 <strong>Track Problems</strong><br>
+                        Understand full error path<br><br>
+
+                        📚 <strong>Preserve Context</strong><br>
+                        Keep underlying error info<br><br>
+
+                        🛠️ <strong>Debug Efficiency</strong><br>
+                        Clear "why it failed"<br><br>
+
+                        💡 Ex: "Read file failed" → "Load config failed" → "App start failed"
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">2 / 8</div>
+        <div class="progress-bar" style="width: 25%"></div>
+    </div>
+
+    <!-- Slide 3: anyhow for Applications -->
+    <div class="slide" id="slide3">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">anyhow - 애플리케이션용</span>
+            <span class="en" style="display:none;">anyhow - For Applications</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">use</span> anyhow::{<span class="type">Context</span>, <span class="type">Result</span>};</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">read_config</span>(path: &<span class="type">str</span>) -> <span class="type">Result</span><<span class="type">Config</span>> {</div>
+                <div class="code-line">    <span class="keyword">let</span> content = std::fs::<span class="function">read_to_string</span>(path)</div>
+                <div class="code-line">        .<span class="function">context</span>(<span class="function">format!</span>(<span class="string">"Failed to read {}"</span>, path))?;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="keyword">let</span> config: <span class="type">Config</span> = toml::<span class="function">from_str</span>(&content)</div>
+                <div class="code-line">        .<span class="function">context</span>(<span class="string">"Failed to parse config"</span>)?;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="type">Ok</span>(config)</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">Result</span><()> {</div>
+                <div class="code-line">    <span class="keyword">let</span> config = <span class="function">read_config</span>(<span class="string">"app.toml"</span>)</div>
+                <div class="code-line">        .<span class="function">context</span>(<span class="string">"Failed to initialize app"</span>)?;</div>
+                <div class="code-line">    <span class="type">Ok</span>(())</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">3 / 8</div>
+        <div class="progress-bar" style="width: 37.5%"></div>
+    </div>
+
+    <!-- Slide 4: Context Methods -->
+    <div class="slide" id="slide4">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">Context 메서드들</span>
+            <span class="en" style="display:none;">Context Methods</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="keyword">use</span> anyhow::{<span class="type">Context</span>, <span class="type">Result</span>, <span class="function">bail!</span>};</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">process_file</span>(path: &<span class="type">str</span>) -> <span class="type">Result</span><()> {</div>
+                <div class="code-line">    <span class="comment">// context() - 에러에 메시지 추가</span></div>
+                <div class="code-line">    <span class="keyword">let</span> data = std::fs::<span class="function">read</span>(path)</div>
+                <div class="code-line">        .<span class="function">context</span>(<span class="string">"Cannot read file"</span>)?;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// with_context() - 지연 평가</span></div>
+                <div class="code-line">    <span class="keyword">let</span> parsed = <span class="function">parse</span>(&data)</div>
+                <div class="code-line">        .<span class="function">with_context</span>(|| <span class="function">format!</span>(<span class="string">"Parse failed: {}"</span>, path))?;</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="comment">// bail! - 즉시 에러 반환</span></div>
+                <div class="code-line">    <span class="keyword">if</span> !parsed.<span class="function">is_valid</span>() {</div>
+                <div class="code-line">        <span class="function">bail!</span>(<span class="string">"Invalid data in {}"</span>, path);</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">    </div>
+                <div class="code-line">    <span class="type">Ok</span>(())</div>
+                <div class="code-line">}</div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">4 / 8</div>
+        <div class="progress-bar" style="width: 50%"></div>
+    </div>
+
+    <!-- Slide 5: Error Backtrace -->
+    <div class="slide" id="slide5">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">백트레이스로 추적</span>
+            <span class="en" style="display:none;">Track with Backtrace</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="comment">// RUST_BACKTRACE=1 환경변수 설정</span></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">Result</span><()> {</div>
+                <div class="code-line">    <span class="keyword">if</span> <span class="keyword">let</span> <span class="type">Err</span>(err) = <span class="function">run_app</span>() {</div>
+                <div class="code-line">        <span class="comment">// 에러 체인 출력</span></div>
+                <div class="code-line">        <span class="function">eprintln!</span>(<span class="string">"Error: {:?}"</span>, err);</div>
+                <div class="code-line">        </div>
+                <div class="code-line">        <span class="comment">// 원인 에러들 순회</span></div>
+                <div class="code-line">        <span class="keyword">for</span> cause <span class="keyword">in</span> err.<span class="function">chain</span>() {</div>
+                <div class="code-line">            <span class="function">eprintln!</span>(<span class="string">"  Caused by: {}"</span>, cause);</div>
+                <div class="code-line">        }</div>
+                <div class="code-line">        </div>
+                <div class="code-line">        std::process::<span class="function">exit</span>(<span class="number">1</span>);</div>
+                <div class="code-line">    }</div>
+                <div class="code-line">    <span class="type">Ok</span>(())</div>
+                <div class="code-line">}</div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        📍 <strong>chain()</strong><br>
+                        모든 원인 에러 순회<br><br>
+
+                        🔍 <strong>RUST_BACKTRACE</strong><br>
+                        스택 트레이스 활성화<br><br>
+
+                        💡 프로덕션에선<br>
+                        로그에만 기록
+                    </span>
+                    <span class="en" style="display:none;">
+                        📍 <strong>chain()</strong><br>
+                        Iterate all causes<br><br>
+
+                        🔍 <strong>RUST_BACKTRACE</strong><br>
+                        Enable stack trace<br><br>
+
+                        💡 In production<br>
+                        Log only
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">5 / 8</div>
+        <div class="progress-bar" style="width: 62.5%"></div>
+    </div>
+
+    <!-- Slide 6: Library vs Application -->
+    <div class="slide" id="slide6">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">라이브러리 vs 애플리케이션</span>
+            <span class="en" style="display:none;">Library vs Application</span>
+        </h1>
+        <div class="content">
+            <div class="code-block">
+                <div class="code-line"><span class="comment">// ✅ 라이브러리: thiserror 사용</span></div>
+                <div class="code-line"><span class="keyword">use</span> thiserror::<span class="type">Error</span>;</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="attribute">#[derive(Error, Debug)]</span></div>
+                <div class="code-line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="type">MyLibError</span> {</div>
+                <div class="code-line">    <span class="attribute">#[error("validation failed")]</span></div>
+                <div class="code-line">    <span class="type">ValidationError</span>,</div>
+                <div class="code-line">}</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="comment">// ✅ 애플리케이션: anyhow 사용</span></div>
+                <div class="code-line"><span class="keyword">use</span> anyhow::{<span class="type">Result</span>, <span class="type">Context</span>};</div>
+                <div class="code-line"></div>
+                <div class="code-line"><span class="keyword">fn</span> <span class="function">main</span>() -> <span class="type">Result</span><()> {</div>
+                <div class="code-line">    my_lib::<span class="function">validate</span>()</div>
+                <div class="code-line">        .<span class="function">context</span>(<span class="string">"App initialization failed"</span>)?;</div>
+                <div class="code-line">    <span class="type">Ok</span>(())</div>
+                <div class="code-line">}</div>
+            </div>
+            <div class="text-content">
+                <div class="highlight-box">
+                    <span class="ko">
+                        📚 <strong>라이브러리</strong><br>
+                        thiserror - 구체적 타입<br><br>
+
+                        🎯 <strong>애플리케이션</strong><br>
+                        anyhow - 유연한 처리<br><br>
+
+                        💡 함께 사용 가능!
+                    </span>
+                    <span class="en" style="display:none;">
+                        📚 <strong>Libraries</strong><br>
+                        thiserror - Concrete types<br><br>
+
+                        🎯 <strong>Applications</strong><br>
+                        anyhow - Flexible handling<br><br>
+
+                        💡 Can use together!
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">6 / 8</div>
+        <div class="progress-bar" style="width: 75%"></div>
+    </div>
+
+    <!-- Slide 7: Best Practices -->
+    <div class="slide" id="slide7">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <h1 class="title">
+            <span class="ko">에러 체이닝 원칙</span>
+            <span class="en" style="display:none;">Error Chaining Principles</span>
+        </h1>
+        <div class="center-content">
+            <div class="highlight-box" style="width: 80%;">
+                <span class="ko">
+                    1️⃣ <strong>컨텍스트 추가</strong> - 각 레이어에서 의미 있는 정보 추가<br><br>
+
+                    2️⃣ <strong>원인 보존</strong> - source()로 하위 에러 체인 유지<br><br>
+
+                    3️⃣ <strong>적절한 도구</strong> - 라이브러리는 thiserror, 앱은 anyhow<br><br>
+
+                    4️⃣ <strong>일관성</strong> - 프로젝트 전체에서 동일한 패턴 사용<br><br>
+
+                    5️⃣ <strong>로깅</strong> - 에러 체인을 로그에 기록<br><br>
+
+                    6️⃣ <strong>사용자 친화적</strong> - 최상위 메시지는 사용자가 이해 가능하게
+                </span>
+                <span class="en" style="display:none;">
+                    1️⃣ <strong>Add Context</strong> - Meaningful info at each layer<br><br>
+
+                    2️⃣ <strong>Preserve Cause</strong> - Keep error chain with source()<br><br>
+
+                    3️⃣ <strong>Right Tools</strong> - thiserror for libs, anyhow for apps<br><br>
+
+                    4️⃣ <strong>Consistency</strong> - Same pattern across project<br><br>
+
+                    5️⃣ <strong>Logging</strong> - Log error chain<br><br>
+
+                    6️⃣ <strong>User-Friendly</strong> - Top message understandable
+                </span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="nextSlide()">→</button>
+        </div>
+        <div class="slide-number">7 / 8</div>
+        <div class="progress-bar" style="width: 87.5%"></div>
+    </div>
+
+    <!-- Slide 8: Summary -->
+    <div class="slide" id="slide8">
+        <div class="header">
+            <div class="episode-badge">EP 6-02</div>
+            <div class="lang-toggle">
+                <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">English</button>
+            </div>
+        </div>
+        <div class="center-content">
+            <div class="big-emoji">🔗✨</div>
+            <div class="highlight-box" style="width: 80%; text-align: center;">
+                <span class="ko">
+                    "에러 체이닝으로 디버깅을 쉽게"<br><br>
+                    anyhow → 애플리케이션<br>
+                    context() → 정보 추가<br>
+                    chain() → 원인 추적
+                </span>
+                <span class="en" style="display:none;">
+                    "Make debugging easy with error chaining"<br><br>
+                    anyhow → Applications<br>
+                    context() → Add information<br>
+                    chain() → Track causes
+                </span>
+            </div>
+            <div style="margin-top: 50px; text-align: center;">
+                <p style="font-size: 36px; margin-bottom: 30px;">
+                    <span class="ko">다음 에피소드: Builder와 Newtype 패턴</span>
+                    <span class="en" style="display:none;">Next Episode: Builder and Newtype Patterns</span>
+                </p>
+                <p style="font-size: 28px; color: #888;">
+                    EP 7-01 →
+                </p>
+            </div>
+            <div class="channel-info">
+                📺 <a href="https://www.youtube.com/@yeonsamheum">@yeonsamheum</a> |
+                <span class="ko">弘益人間 - 널리 인간을 이롭게 하라</span>
+                <span class="en" style="display:none;">Benefit All Humanity</span>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="prevSlide()">←</button>
+            <button class="nav-btn" onclick="location.href='EP_7_01_Builder_Newtype.html'">
+                <span class="ko">다음 에피소드 →</span>
+                <span class="en" style="display:none;">Next Episode →</span>
+            </button>
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 100);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        </div>
+        <div class="slide-number">8 / 8</div>
+        <div class="progress-bar" style="width: 100%"></div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 8;
+        let currentLang = 'ko';
+
+        function showSlide(n) {
+            document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+            document.getElementById('slide' + n).classList.add('active');
+            currentSlide = n;
+            animateSlide(n);
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                if ((lang === 'ko' && btn.textContent === '한국어') ||
+                    (lang === 'en' && btn.textContent === 'English')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.ko').forEach(el => {
+                el.style.display = lang === 'ko' ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = lang === 'en' ? '' : 'none';
+            });
+        }
+
+        function animateSlide(n) {
+            setTimeout(() => {
+                const lines = document.querySelectorAll(`#slide${n} .code-line`);
+                lines.forEach((line, i) => {
+                    setTimeout(() => line.classList.add('show'), i * 100);
+                });
+            }, 100);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Initialize
+        animateSlide(1);
+    </script>
+</body>
+</html>
