@@ -5,248 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the protocols that govern the operating procedure of
-an accredited pet-cloning programme: laboratory accreditation, regulatory
-authorisation, programme registration, owner consent, animal welfare review,
-incident reporting, and inter-laboratory transfer of biological material.
-The PROTOCOL layer binds the data shapes of PHASE-1 and the API contract of
-PHASE-2 to the regulatory and ethical context in which programmes actually
-operate.
+This document defines the canonical PROTOCOL layer for WIA-pet-cloning (Pet Cloning).
 
 References (CITATION-POLICY ALLOW only):
-
-- ISO/IEC 17025:2017 (general requirements for testing and calibration laboratories)
-- ISO/IEC 17065:2012 (conformity assessment — bodies certifying products, processes and services)
-- ISO/IEC 27001:2022 (information security management)
-- ISO/IEC 27701:2019 (privacy information management extension to ISO/IEC 27001)
-- ISO 9001:2015 (quality management systems)
-- ISO 8601 (date and time)
-- ISO 11784 / 11785 (animal RFID)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- IETF RFC 4122 (UUID)
-- IETF RFC 5905 (NTPv4)
-- IETF RFC 8446 (TLS 1.3)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Programme Accreditation
+## §1 Scope
 
-A pet-cloning operator MAY claim conformance to WIA-pet-cloning only after a
-recognised accreditation body has issued a valid certificate against
-ISO/IEC 17025:2017 for the laboratory scopes that the programme exercises
-(cell culture, oocyte handling, electrofusion, embryo culture, and
-cryopreservation). Each scope is a distinct accreditation line item; a
-programme that contracts out cryopreservation to a third-party biobank MUST
-ensure that the biobank's accreditation covers the relevant scope.
+This PHASE document is one of four that together define the WIA-pet-cloning
+standard. It addresses the protocol layer of the standard.
 
-The accreditation register is exposed to the API as a read-only resource and
-MUST be re-fetched at least once per calendar quarter. A revoked or expired
-accreditation transitions all of the programme's open cases from `active`
-to `ceased` automatically; cases already in `transferred` or `verified`
-state remain unchanged.
+## §2 Manifest
 
-## §2 Programme Registration
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-cloning"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-The programme code (`caseProgramme` in PHASE-1 §2) is assigned by the WIA
-secretariat upon successful accreditation. The code follows the pattern
-`WIA-PC-{COUNTRY}-{NNNN}` where `COUNTRY` is the ISO 3166-1 alpha-2 code in
-upper case and `NNNN` is a four-digit zero-padded sequence assigned in the
-order applications are accepted. The code is permanent and is not reused
-when a programme winds down.
+## §3 Conformance Tiers
 
-A programme that operates from more than one site emits per-site sub-codes
-(`WIA-PC-K-0012-A`, `WIA-PC-K-0012-B`) so that audit trails can be scoped
-to the originating physical facility. Sub-codes share the parent's
-accreditation record but maintain independent custody logs.
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-## §3 Regulatory Authorisation
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-Where national authority is required for somatic cloning of companion
-animals (the requirement varies by jurisdiction), the authorisation
-reference is recorded against the case at creation time. Implementations
-MUST NOT advance a case beyond `draft` status without a regulatory
-authorisation reference in jurisdictions that require one.
+## §4 Discovery
 
-The authorisation reference is a free-form string opaque to this standard;
-the operating programme is responsible for verifying that the reference is
-valid against the issuing authority's register. WIA does not arbitrate
-national rules.
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-cloning`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-For cross-species SCNT (PHASE-1 §10), the authorisation reference MUST be
-present regardless of jurisdiction; WIA-pet-cloning declines to publish
-verification reports for cross-species cases without authorisation, and
-the API enforces this by returning `403 Forbidden` with a problem document
-typed `urn:wia:pet-cloning:authorisation-required`.
+## §5 Time and Identity
 
-## §4 Animal Welfare Review
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Every case MUST be reviewed against an animal welfare framework prior to
-oocyte donor selection or surrogate selection. The reviewing body is the
-operating programme's institutional welfare committee or an equivalent
-external committee recognised by the accreditation body.
+## §6 Versioning and Deprecation
 
-The review record carries the committee's identifier, the date of review,
-the reviewing veterinarian's professional registration number (held in the
-operator's HR system, not exposed in the case record), and an outcome of
-`approved`, `approved-with-conditions`, or `declined`. Cases marked
-`declined` MUST be ceased; cases marked `approved-with-conditions` MUST
-record the conditions in the case notes and verify their fulfilment before
-oocyte donor selection.
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-A reasonable cap on surrogate-pregnancy attempts per donor pair, on oocyte
-donor procedures per donor animal, and on embryo transfers per recipient
-SHOULD be established by the welfare framework; this PHASE does not
-prescribe specific numerical caps because veterinary practice varies.
+## §7 Privacy and Security
 
-## §5 Sample Handling Windows
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Post-mortem tissue acquisition is bounded by species-specific viability
-windows beyond which the recovered fibroblast cultures are unreliable as
-donor sources. The recommended windows for routine clinical practice are:
+## §8 Open Governance
 
-- Felis catus: up to 5 days post-mortem under refrigeration.
-- Canis familiaris: up to 5 days post-mortem under refrigeration.
-- Other species: window is set per programme based on prior validation;
-  validation evidence is recorded in the programme's quality dossier.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-cloning` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-Implementations MUST refuse to register a sample whose `postMortemHours`
-exceeds the species window. Programmes MAY define more conservative
-windows; the standard requires the published window to be at least as
-strict as the species default.
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## §6 Inter-Laboratory Transfer
 
-When a sample, oocyte, or embryo crosses programme boundaries (for example
-a frozen sample shipped from a tissue bank to an embryology laboratory),
-the receiving programme adopts the existing custody log and continues
-appending events. The transfer event is recorded with both programmes'
-codes; both programmes' API endpoints MUST publish the transfer event
-within 72 hours of the physical handover.
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
 
-Cross-border transfers additionally record the customs declaration
-reference and the receiving country's import authorisation reference, both
-of which are opaque to this standard but serve as audit anchors for
-regulators. CITES-listed species MUST carry the appropriate CITES permit
-identifier when applicable.
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
 
-## §7 Records Retention
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-Programme records — every record defined in PHASE-1, the API audit logs
-defined in PHASE-2 §12, and the regulatory and welfare review documents
-defined in this PHASE — are retained for a minimum of seven calendar years
-from the last access of the case, with the following exceptions:
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-- Verification reports: retained indefinitely.
-- Live offspring health monitoring records: retained for at least the
-  natural lifespan of the offspring, plus three years.
-- Personal data carried in operator CRM systems: retained per the
-  jurisdiction's data-protection law and the contract with the owner;
-  the operator MAY purge personal data without affecting the integrity of
-  the case records, since the case records carry only the opaque
-  `ownerReference`.
+## Annex F — Adoption Roadmap
 
-Retention is enforced by the operator's records-management system and is
-audited annually as part of ISO/IEC 27001:2022 surveillance audits.
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-## §8 Time Synchronisation
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-Programmes operate on synchronised time per RFC 5905 (NTPv4) so that
-custody event ordering across instruments and across programme sites is
-consistent. The reference time source is the national metrological
-laboratory's stratum-1 service or an equivalent recognised service; the
-operator records the source and the maximum observed offset in the
-programme's quality dossier.
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-## §9 Witness Laboratories for Verification
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-Post-natal genetic verification reports (PHASE-2 §7) carry signatures from
-at least one witness laboratory in addition to the issuing reference
-laboratory. The witness laboratory MUST be operated under independent
-ownership and accredited under ISO/IEC 17025 for the relevant DNA-based
-identity-confirmation scope.
+## Annex G — Test Vectors and Conformance Evidence
 
-The witness laboratory receives a sealed aliquot of donor and offspring
-genomic DNA, performs the comparison independently, and signs the report
-upon agreement. Disagreement triggers a third-laboratory adjudication and
-the case retains `transferred` status until adjudication concludes. The
-adjudicating laboratory's report is appended to the verification record
-and the case advances to `verified` only if the adjudication concurs with
-identity.
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-## §10 Incident Reporting
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-Adverse events — recipient mortality, severe dystocia, surgical
-complications, abnormal phenotype at parturition, instrument failures,
-and security incidents that affect any record — are reported to the
-accreditation body within 30 calendar days. The incident report uses the
-problem-document format defined in PHASE-2 §10 with type
-`urn:wia:pet-cloning:incident-report` and is appended to the case.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
 
-Anonymised incident statistics are aggregated by the accreditation body
-and published quarterly so that the broader programme community can
-calibrate practice; raw incident reports remain confidential to the
-reporting programme, the accreditation body, and the regulator.
+## Annex H — Versioning and Deprecation Policy
 
-## §11 Programme Wind-Down
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-A programme that ceases operations transitions all open cases to `ceased`,
-transfers cryopreserved samples to a successor programme or to long-term
-custody at a recognised biobank, and notifies all donors of record via the
-operator's CRM. Cryopreserved samples without a documented successor
-custodian are retained at the biobank for at least the seven-year records
-retention window described in §7 before any disposition decision.
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## §12 Welfare-Review Framework Reference
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-The welfare-review framework named in §4 is a written document maintained by
-the operating programme that defines the composition of the welfare
-committee, its quorum and decision-making process, the species-specific
-clinical limits the committee applies (anaesthesia regimes, analgesia
-protocols, surgical recovery housing), the triggers that escalate a case
-to a full review, and the appeal procedure available to a programme
-veterinarian whose case is declined. The framework is reviewed at least
-annually by the programme's quality manager and is published on the
-programme's well-known discovery URL (PHASE-4 §5) so that owners,
-auditors, and the accreditation body can read it directly without making
-a separate request.
+## Annex I — Interoperability Profiles
 
-A programme that adopts an externally-published framework verbatim records
-the source document, its version, and the date of adoption. Local
-amendments to an externally-published framework are clearly marked as such
-and reviewed independently before the welfare committee operates against
-them.
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-## §13 Cross-Border Programme Operation
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-A programme that operates across borders maintains a primary jurisdiction
-of registration (the country of the WIA programme code) and one or more
-operating jurisdictions where laboratory or clinical activity occurs. The
-primary jurisdiction's accreditation body is the lead authority; operating
-jurisdictions consume the lead authority's certifications under mutual
-recognition where one exists. Where mutual recognition does not exist, the
-operating jurisdiction issues its own accreditation and the programme
-holds parallel certificates.
-
-Cross-border data transfers honour the data-protection law of the donor's
-country of residence, which is recorded in the operator CRM at consent
-time. The case record never carries the donor's country directly; the CRM
-applies the country-specific transfer rules when producing exports.
-
-## §14 Conformance and Auditing
-
-A programme conformant with WIA-pet-cloning publishes its accreditation
-certificate, its programme code registration, its welfare-review framework,
-and its quality dossier on a public landing page and answers an annual
-self-assessment that maps each clause of this PHASE to the programme's
-implementation. The self-assessment is reviewed during the annual
-ISO/IEC 17025 surveillance audit by the accreditation body.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 3 — PROTOCOL
-- **Status:** Stable
-- **Standard:** WIA-pet-cloning
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

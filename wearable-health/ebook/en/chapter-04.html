@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Phase 1 — Data Format — WIA Wearable Health</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #10b981; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; font-size: 1.1em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[wearable-health] Standard Ebook</a> | Chapter 04 (of 8)</nav>
+
+<h1>Chapter 04: Phase 1 — Data Format</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies the JSON envelopes that every WIA-MED-020 conformant device, mobile app, hub, dashboard, or EHR bridge MUST be able to read and emit. The envelopes are designed to round-trip byte-identically through encode and decode so that signed payloads survive intermediate processing. JSON Schema 2020-12 documents are the source of truth, served from <code>https://wiastandards.com/wearable-health/schemas/</code>.</p>
+
+<h2>4.2 The device record</h2>
+<p>The device record is the registration envelope. It binds a device identifier to a patient, declares the device manufacturer / model / firmware, lists supported measurement types, and (for clinical-grade devices) carries the regulatory-clearance reference plus the calibration chain pointer.</p>
+
+<pre>
+{
+  "wia_wearable_health_version": "1.0.0",
+  "type": "device",
+  "device_id": "did:wia:device:apple-watch-S9-01HXY",
+  "patient_id": "did:wia:patient:01HXY",
+  "manufacturer": "Apple",
+  "model": "Watch Series 9",
+  "firmware_version": "watchOS 11.2",
+  "registered_at": "2026-04-27T10:00:00Z",
+  "clinical_grade": false,
+  "supported_measurements": ["heart_rate", "ecg", "spo2", "step_count", "sleep_stage"],
+  "signature": { "alg": "Ed25519", "value": "AY3o..." }
+}
+</pre>
+
+<h2>4.3 The measurement record</h2>
+<p>One measurement is one observation. Required fields: <code>measurement_type</code>, <code>device_id</code>, <code>patient_id</code>, <code>captured_at</code>, <code>value</code>, <code>unit</code>, <code>signature</code>. Reserved measurement types include <code>heart_rate</code>, <code>step_count</code>, <code>distance</code>, <code>calories</code>, <code>sleep_stage</code>, <code>spo2</code>, <code>ecg</code>, <code>glucose</code>, <code>sbp</code>, <code>dbp</code>, <code>temp</code>, <code>weight</code>.</p>
+
+<h2>4.4 The session record</h2>
+<p>A session bundles many measurements over a contiguous activity, sleep, workout, monitoring, fasting, or recovery period. The session carries a summary block whose shape varies per session kind — a sleep session summarises REM / deep / light / awake minutes, an activity session summarises distance and calories.</p>
+
+<h2>4.5 The alert record</h2>
+<p>An alert is a clinically meaningful event derived from measurements. The severity ladder is <code>info</code>, <code>warning</code>, <code>urgent</code>, <code>critical</code>; critical alerts MUST be pushed within 60 seconds of detection per the patient consent envelope. The alert carries an <code>evidence_measurement_ids</code> array linking to the underlying measurements that triggered the rule.</p>
+
+<h2>4.6 The calibration record</h2>
+<p>Clinical-grade devices MUST publish a calibration record at least monthly. The record ties the device to a national metrology institute reference (NIST, PTB, KRISS, NMIJ, NIM), records the as-found and as-left uncertainty, and chains to the previous calibration record. This creates an unbroken audit trail back to a national standard.</p>
+
+<h2>4.7 Encoding rules summary</h2>
+<ul>
+<li>UTF-8 JSON per IETF RFC 8259, snake_case keys.</li>
+<li>RFC 3339 timestamps in UTC with Z suffix; sub-second precision required for ≥ 1 Hz streams.</li>
+<li>UCUM unit codes (<code>/min</code>, <code>mg/dL</code>, <code>mm[Hg]</code>, etc.).</li>
+<li>DID-shaped patient identifiers (<code>did:wia:patient:...</code>).</li>
+<li>base64url for binary payloads with explicit integrity hash.</li>
+</ul>
+
+<h2>Chapter Cross-References</h2>
+<p>This chapter participates in the WIA-MED-020 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. The Phase numbering used throughout (Phase 1 / 2 / 3 / 4) refers to the four-document specification — Chapter 4 covers Phase 1, Chapter 5 covers Phase 2, Chapter 6 covers Phase 3, Chapter 7 covers Phase 4.</p>
+
+<h2>Where to look next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-wearable-health-conformance</code> is the single source of truth. When this book and the test suite disagree, the test suite wins.</li>
+<li><strong>Reference container</strong> — <code>wia/wearable-health-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/wearable-health.sh</code> ships sample envelope generators (validate, device, measurement, alert, consent, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+<li><strong>Companion standards</strong> — WIA-OMNI-API for credentials, WIA-AIR-SHIELD for transport hardening, WIA-INTENT for clinician intent lowering, WIA-ACCESSIBILITY for accommodations, WIA Vital Sign Streaming for high-rate continuous waveforms.</li>
+</ul>
+
+<h2>Patient-First Design</h2>
+<p>Every choice in this standard is filtered through the question: <em>"does this make wearable data more useful for the patient and their care team, or just easier for vendors to ship?"</em> When the two conflict, the patient and care team win. That is why the standard mandates explicit patient consent for cross-host data flow, refuses to accept clinical-grade claims without regulatory clearance, and requires implementations to surface calibration provenance so that clinicians can verify the source quality of every measurement they make decisions on.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-020 Wearable Health Standard v1.0.0</p></footer>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 07: Phase 4 — Integration — WIA Wearable Health</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #10b981; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; font-size: 1.1em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[wearable-health] Standard Ebook</a> | Chapter 07 (of 8)</nav>
+
+<h1>Chapter 07: Phase 4 — Integration</h1>
+
+<h2>7.1 Phase 4 in one paragraph</h2>
+<p>Phase 4 specifies how WIA-MED-020 integrates with three classes of existing system: vendor health platforms (Apple HealthKit, Google Fit, Samsung Health, Garmin, Fitbit), clinical interoperability standards (HL7 FHIR R5, IEEE 11073, IHE PCD-01), and the WIA family standards (WIA-OMNI-API, WIA-AIR-SHIELD, WIA-INTENT, WIA-ACCESSIBILITY, WIA Vital Sign Streaming). The aim is that one WIA-MED-020 host is the canonical record while every vendor / EHR / research system reads from or writes to it through bridges, never holding canonical state for the patients wearable data.</p>
+
+<h2>7.2 HL7 FHIR R5 bridge</h2>
+<p>Each WIA <code>measurement</code> envelope maps deterministically to an HL7 FHIR R5 <code>Observation</code> resource. The default LOINC mapping covers heart rate (8867-4), step count (55423-8), SpO2 (59408-5), glucose (2339-0), systolic and diastolic blood pressure (8480-6 / 8462-4), body temperature (8310-5), and body weight (29463-7). For ECG raw waveforms the bridge uses HL7 FHIR <code>MediaStream</code> with a <code>derivedFrom</code> link to a binary representation conforming to the WIA Vital Sign Streaming standard.</p>
+
+<h2>7.3 IEEE 11073 bridge</h2>
+<p>IEEE 11073-104xx defines per-device profiles for personal health device communication. The bridge subscribes to the devices IEEE 11073 measurement channel, translates each measurement into the WIA envelope, and preserves the IEEE 11073 device specialisation code in the WIA <code>device.metadata</code> field. The mapping covers thermometers (-10408), weighing scales (-10415), glucose meters (-10417), blood pressure monitors (-10421), and cardiovascular fitness devices (-10441).</p>
+
+<h2>7.4 Apple HealthKit bridge</h2>
+<p>The HealthKit bridge runs as part of an iOS companion app. It reads HealthKit data via <code>HKObjectTypeIdentifier</code> queries with the users explicit consent under iOSs per-type permission model, translates each sample into the WIA envelope, and writes WIA-host-derived measurements back to HealthKit under the apps own source identifier. Apple Health UI shows "WIA Wearable Health" as the data source.</p>
+
+<h2>7.5 Google Fit bridge</h2>
+<p>The Google Fit bridge runs as part of an Android companion app. It subscribes to <code>DataType</code> streams via the Fit REST API with the users OAuth consent, translates samples into the WIA envelope, and writes back via the bulk insert endpoint under the apps data source. The bridge shares its OAuth token storage with WIA-OMNI-API for centralised credential rotation.</p>
+
+<h2>7.6 WIA family integration</h2>
+<p>WIA-MED-020 composes with WIA-OMNI-API for credentials (patient identity, vendor account credentials, provider licence records, paediatric custodian relationships), WIA-AIR-SHIELD for transport hardening (peer reputation scoring), WIA-INTENT for clinician intent lowering (a "show me last week of glucose" intent lowers to a measurement query under the licence verification + consent verification + accessibility rendering pipeline), WIA-ACCESSIBILITY for patient and clinician accommodations, and WIA Vital Sign Streaming for high-rate continuous waveforms.</p>
+
+<h2>7.7 Compliance mappings</h2>
+<p>HIPAA Security Rule controls (administrative / physical / technical safeguards including audit controls and encryption at rest) apply to every WIA-MED-020 host carrying PHI. The patient consent envelope is the GDPR Article 7 consent record; the patients right to revocation (GDPR Article 7(3)) is implemented via the <code>revocable: true</code> field. For clinical-grade devices, the FDA 510(k) clearance number is the binding tie to regulatory approval; the bridge MAY pre-validate the number against the FDAs public databases before accepting the device record.</p>
+
+<h2>Chapter Cross-References</h2>
+<p>This chapter participates in the WIA-MED-020 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. The Phase numbering used throughout (Phase 1 / 2 / 3 / 4) refers to the four-document specification — Chapter 4 covers Phase 1, Chapter 5 covers Phase 2, Chapter 6 covers Phase 3, Chapter 7 covers Phase 4.</p>
+
+<h2>Where to look next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-wearable-health-conformance</code> is the single source of truth. When this book and the test suite disagree, the test suite wins.</li>
+<li><strong>Reference container</strong> — <code>wia/wearable-health-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/wearable-health.sh</code> ships sample envelope generators (validate, device, measurement, alert, consent, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+<li><strong>Companion standards</strong> — WIA-OMNI-API for credentials, WIA-AIR-SHIELD for transport hardening, WIA-INTENT for clinician intent lowering, WIA-ACCESSIBILITY for accommodations, WIA Vital Sign Streaming for high-rate continuous waveforms.</li>
+</ul>
+
+<h2>Patient-First Design</h2>
+<p>Every choice in this standard is filtered through the question: <em>"does this make wearable data more useful for the patient and their care team, or just easier for vendors to ship?"</em> When the two conflict, the patient and care team win. That is why the standard mandates explicit patient consent for cross-host data flow, refuses to accept clinical-grade claims without regulatory clearance, and requires implementations to surface calibration provenance so that clinicians can verify the source quality of every measurement they make decisions on.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-020 Wearable Health Standard v1.0.0</p></footer>
+</body>
+</html>

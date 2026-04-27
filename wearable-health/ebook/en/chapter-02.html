@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 02: Current Wearable Health Landscape — WIA Wearable Health</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #10b981; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; font-size: 1.1em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[wearable-health] Standard Ebook</a> | Chapter 02 (of 8)</nav>
+
+<h1>Chapter 02: Current Wearable Health Landscape</h1>
+
+<h2>2.1 The vendor-locked landscape today</h2>
+<p>The wearable health device market is dominated by a handful of vertically integrated platforms. Apple HealthKit, Google Fit, Samsung Health, Garmin Connect, and Fitbit Web API together cover the majority of consumer wearables. Each maintains its own data model, OAuth scopes, rate limits, and per-region availability rules.</p>
+
+<p>For a patient using devices from two or three of these vendors, the practical consequences are:</p>
+<ul>
+<li>Three separate apps, three separate dashboards, three separate consent flows.</li>
+<li>No way to view a continuous timeline of heart rate from the morning Apple Watch run, the lunchtime Fitbit walking metric, and the evening Withings blood-pressure reading.</li>
+<li>If the patient changes wearables, the historical data either does not move or moves only via a vendor-specific export tool that loses fidelity.</li>
+</ul>
+
+<h2>2.2 Why earlier standardisation attempts stalled</h2>
+<p>This is not the first attempt to unify wearable health data. IEEE 11073 (the personal health device family) is the most mature prior effort. Continua Design Guidelines and the HL7 Personal Health Monitoring Working Group both pursued the same goal in earlier decades.</p>
+
+<p>The recurring failure modes were:</p>
+<ul>
+<li><strong>Specification weight.</strong> The earlier efforts produced encyclopaedic standards that vendor implementers could not afford to fully implement. The result was partial implementations that did not fully interoperate.</li>
+<li><strong>Lack of streaming.</strong> The earlier efforts targeted episodic measurement (a single weigh-in, a single cuff inflation) rather than the continuous streaming of modern wearables.</li>
+<li><strong>No federation primitive.</strong> They assumed a single-vendor universe — a manager and an agent on the same local network — rather than addressing the cross-cloud reality of today.</li>
+<li><strong>Consent as an afterthought.</strong> Patient consent for cross-organisation data sharing was treated as an extension rather than a baked-in primitive.</li>
+</ul>
+
+<h2>2.3 What WIA-MED-020 does differently</h2>
+<p>WIA-MED-020 is positioned as a thin layer on top of existing transport protocols rather than a wholesale replacement. Vendor adapters keep their existing on-device firmware and gain WIA conformance through bridge software running on the vendor cloud or the patient phone. Specifically:</p>
+<ul>
+<li><strong>Streaming-native.</strong> Phase 1 envelopes accommodate continuous high-rate streams (ECG, full PPG, accelerometer waveform) via the <code>raw_payload_url</code> reference + WIA Vital Sign Streaming composition.</li>
+<li><strong>Federation-aware.</strong> Phase 3 specifies how multiple hosts hand off data ownership as a patient changes vendors or moves between care providers.</li>
+<li><strong>Consent-typed access controls.</strong> The patient consent envelope (Phase 3 §4) is the single gate controlling cross-host data flow; per-audience scopes (clinician, EHR bridge, research, emergency) make the boundaries explicit.</li>
+<li><strong>Open governance.</strong> The standard is published under MIT licence; conformance test suites are open-source; no vendor pays for the right to claim conformance.</li>
+</ul>
+
+<h2>2.4 What the standard is not</h2>
+<p>WIA-MED-020 is not a vendor product, not a hosted service, not a regulatory body, and not a database schema. It is a wire format and a protocol, with a reference container and conformance test suite as the practical artifacts. Vendors retain ownership of their device firmware, their cloud infrastructure, and their commercial relationships with users. The standard creates portability without dictating implementation.</p>
+
+<h2>2.5 The clinical-grade gap</h2>
+<p>One specific failure of today vendor stacks is that consumer wearables and clinical-grade devices share UX surfaces but not data semantics. A patient looking at their Apple Watch sees both fitness tracker resting heart rate and FDA-cleared ECG together with no visual distinction of regulatory grade. A clinician trying to interpret the data downstream cannot tell which signal is appropriate for clinical decisions.</p>
+
+<p>The standard addresses this with the <code>clinical_grade</code> boolean (Phase 1 §3.2) and the device-level calibration chain (Phase 1 §3.3 and §7). Together these create an explicit, signed evidence trail tying every measurement to its regulatory provenance.</p>
+
+<h2>Chapter Cross-References</h2>
+<p>This chapter participates in the WIA-MED-020 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. The Phase numbering used throughout (Phase 1 / 2 / 3 / 4) refers to the four-document specification — Chapter 4 covers Phase 1, Chapter 5 covers Phase 2, Chapter 6 covers Phase 3, Chapter 7 covers Phase 4.</p>
+
+<h2>Where to look next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-wearable-health-conformance</code> is the single source of truth. When this book and the test suite disagree, the test suite wins.</li>
+<li><strong>Reference container</strong> — <code>wia/wearable-health-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/wearable-health.sh</code> ships sample envelope generators (validate, device, measurement, alert, consent, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+<li><strong>Companion standards</strong> — WIA-OMNI-API for credentials, WIA-AIR-SHIELD for transport hardening, WIA-INTENT for clinician intent lowering, WIA-ACCESSIBILITY for accommodations, WIA Vital Sign Streaming for high-rate continuous waveforms.</li>
+</ul>
+
+<h2>Patient-First Design</h2>
+<p>Every choice in this standard is filtered through the question: <em>"does this make wearable data more useful for the patient and their care team, or just easier for vendors to ship?"</em> When the two conflict, the patient and care team win. That is why the standard mandates explicit patient consent for cross-host data flow, refuses to accept clinical-grade claims without regulatory clearance, and requires implementations to surface calibration provenance so that clinicians can verify the source quality of every measurement they make decisions on.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-020 Wearable Health Standard v1.0.0</p></footer>
+</body>
+</html>

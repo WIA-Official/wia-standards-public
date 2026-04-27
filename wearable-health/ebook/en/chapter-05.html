@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 05: Phase 2 — API Interface — WIA Wearable Health</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #10b981; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; font-size: 1.1em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[wearable-health] Standard Ebook</a> | Chapter 05 (of 8)</nav>
+
+<h1>Chapter 05: Phase 2 — API Interface</h1>
+
+<h2>5.1 Phase 2 in one paragraph</h2>
+<p>Phase 2 specifies the HTTPS surface that a wearable health host (typically a vendor cloud, a clinical RPM platform, or a hospital bridge) exposes for the data families defined in Phase 1. Transport is TLS 1.3 (IETF RFC 8446) only; HTTP/2 RECOMMENDED. The surface follows REST conventions with cursor-based pagination and Server-Sent Events for measurement streams.</p>
+
+<h2>5.2 Discovery</h2>
+<p>Every host publishes a discovery document at <code>/.well-known/wia-wearable-health</code> listing endpoints, supported signatures, supported measurement types, and rate limits. Discovery responses are cacheable for 300 seconds.</p>
+
+<h2>5.3 Device endpoints</h2>
+<pre>
+PUT    /wh/device/{device_id}         (signed)
+GET    /wh/device/{device_id}
+GET    /wh/device?patient_id={id}
+DELETE /wh/device/{device_id}         (signed; tombstone)
+</pre>
+
+<h2>5.4 Sync endpoint (bulk upload)</h2>
+<p>The sync endpoint accepts a bulk packet typical of periodic device sync operations. It honours <code>Idempotency-Key</code> per IETF draft <code>idempotency-key-header</code> so the device can safely retry on flaky network conditions.</p>
+
+<pre>
+POST /wh/sync
+Content-Type: application/json
+Idempotency-Key: 7e3a9b6c-...
+Authorization: WIA-Sig keyid="...",signature="..."
+</pre>
+
+<h2>5.5 Measurement query and stream</h2>
+<pre>
+GET /wh/measurement/{measurement_id}
+GET /wh/measurement?patient_id={id}&type={t}&from={ts}&to={ts}
+GET /wh/measurement/stream/{device_id}    (Server-Sent Events)
+</pre>
+
+<p>The stream variant is the primary path for live clinical dashboards. Reconnecting clients pass <code>Last-Event-Id</code> per WHATWG HTML §9.2 to recover missed events.</p>
+
+<h2>5.6 Session, alert, calibration endpoints</h2>
+<p>The remaining endpoint families follow the same shape: POST/GET/PATCH on <code>/wh/{family}/{id}</code>. PATCH on a session is permitted only within 24 hours of session end (for summary updates from late-arriving measurements). PATCH on a calibration is forbidden — corrections are appended as a new calibration referencing the prior via <code>previous_calibration_id</code>.</p>
+
+<h2>5.7 Authentication and errors</h2>
+<p>Writes require HTTP Message Signatures per IETF RFC 9421. Reads MAY be anonymous subject to the discovery rate limit; PHI-bearing reads MUST be authenticated. Errors follow IETF RFC 9457 problem details with type URIs under <code>https://wiastandards.com/wearable-health/errors/</code>.</p>
+
+<h2>5.8 Operational recommendations</h2>
+<ul>
+<li>Hosts MUST persist incoming writes durably before acknowledging.</li>
+<li>Hosts SHOULD provide a separate read-replica endpoint for high-rate measurement queries.</li>
+<li>Hosts SHOULD expose a <code>/wh/health</code> liveness probe outside the public rate-limit accounting.</li>
+<li>Hosts SHOULD retain problem-detail responses to identified peers for 30 days for cross-host debugging.</li>
+</ul>
+
+<h2>Chapter Cross-References</h2>
+<p>This chapter participates in the WIA-MED-020 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. The Phase numbering used throughout (Phase 1 / 2 / 3 / 4) refers to the four-document specification — Chapter 4 covers Phase 1, Chapter 5 covers Phase 2, Chapter 6 covers Phase 3, Chapter 7 covers Phase 4.</p>
+
+<h2>Where to look next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-wearable-health-conformance</code> is the single source of truth. When this book and the test suite disagree, the test suite wins.</li>
+<li><strong>Reference container</strong> — <code>wia/wearable-health-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/wearable-health.sh</code> ships sample envelope generators (validate, device, measurement, alert, consent, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+<li><strong>Companion standards</strong> — WIA-OMNI-API for credentials, WIA-AIR-SHIELD for transport hardening, WIA-INTENT for clinician intent lowering, WIA-ACCESSIBILITY for accommodations, WIA Vital Sign Streaming for high-rate continuous waveforms.</li>
+</ul>
+
+<h2>Patient-First Design</h2>
+<p>Every choice in this standard is filtered through the question: <em>"does this make wearable data more useful for the patient and their care team, or just easier for vendors to ship?"</em> When the two conflict, the patient and care team win. That is why the standard mandates explicit patient consent for cross-host data flow, refuses to accept clinical-grade claims without regulatory clearance, and requires implementations to surface calibration provenance so that clinicians can verify the source quality of every measurement they make decisions on.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-020 Wearable Health Standard v1.0.0</p></footer>
+</body>
+</html>

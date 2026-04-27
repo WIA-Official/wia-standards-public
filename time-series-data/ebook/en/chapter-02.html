@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 02: Time-Series Data Modeling — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 02 / 8</nav>
+
+<h1>Chapter 02: Time-Series Data Modeling</h1>
+
+<h2>2.1 Data Point Structure</h2>
+<p>A time-series data point in WIA-DATA-014 consists of a timestamp, a series identifier, a value, optional labels for filtering and grouping, and a signature.</p>
+
+<h2>2.2 Schema Design Principles</h2>
+<p>Three principles guide schema design in WIA-DATA-014: (1) the series identifier should be stable and human-readable so that operators can grep their dashboards for it; (2) labels should be low-cardinality (under 1000 distinct values per label) to avoid blowing out the index of the underlying time-series database; (3) high-cardinality dimensions (per-request trace IDs, per-user identifiers) should be carried in a separate event store rather than as labels on a metric.</p>
+
+<h2>2.3 Tags vs Fields</h2>
+<p>The standard does not distinguish "tags" from "fields" the way some vendor formats do (InfluxDB, for example, treats tags as indexed and fields as unindexed). WIA-DATA-014 has only labels (always indexed) and the point value itself; if you need an unindexed metadata payload you carry it as a separate annotation envelope keyed to the same series_id and timestamp.</p>
+
+<h2>2.4 Cardinality Management</h2>
+<p>Cardinality (the number of distinct (series_id, label set) combinations) is the dominant cost driver in any time-series system. The standard recommends a per-series cardinality budget published in the series envelope so that downstream consumers can plan their query optimisation around the budget. Hosts MAY refuse a write that would push a series past its declared budget, returning a problem document of type <code>.../cardinality-exceeded</code>.</p>
+
+<h2>2.5 Retention Policy</h2>
+<p>Every series declares a retention policy in its envelope: how long to keep raw points (1 Hz cadence), what cadence to downsample to after a given age, and what cadence to archive at long-term. Typical industrial deployment: 90 days raw, 1 year at 60s rollup, 5 years at 1h rollup, then archive to cold storage. The standard requires the policy to be explicit so that capacity planning is not magic.</p>
+
+<h2>2.6 Late-Arriving Points</h2>
+<p>Mobile-device sensors and edge gateways frequently emit measurements with timestamps in the past (the device buffered the measurement during a network outage, then flushed when it reconnected). The standard requires hosts to accept late points up to a configurable bound (default 24 hours) and to trigger a re-rollup of the affected window. Late points beyond the bound MAY be rejected with a problem document of type <code>.../point-too-late</code>; the bound MUST be advertised in the discovery document.</p>
+
+<h2>Summary</h2>
+<p>Proper data modeling is crucial for efficient storage and querying. The WIA-DATA-014 schema design principles (stable series IDs, low-cardinality labels, explicit retention policies, late-point handling) make implementations predictable across vendors.</p>
+
+<p><a href="chapter-03.html">Next: Chapter 3 →</a></p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

@@ -5,251 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines how an accredited pet-cloning programme integrates
-with the systems that surround it: veterinary clinics that manage donors,
-recipients, and live offspring; breed registries that record verified
-identity; insurance carriers that price coverage on cloned animals; the
-operator's customer-relationship system that mediates owner contact; and the
-regulators and accreditation bodies that read the evidence package. It also
-defines the evidence-package format that bundles a complete case for
-external publication and audit.
+This document defines the canonical INTEGRATION layer for WIA-pet-cloning (Pet Cloning).
 
 References (CITATION-POLICY ALLOW only):
-
-- IETF RFC 8259 (JSON)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- IETF RFC 8615 (well-known URIs)
-- IETF RFC 8288 (Web Linking)
-- IETF RFC 9421 (HTTP Message Signatures)
-- ISO/IEC 27001:2022 (information security management)
-- ISO/IEC 27701:2019 (privacy information management)
-- ISO/IEC 17025:2017 (testing and calibration laboratories)
-- ISO/IEC 17065:2012 (conformity-assessment bodies)
-- ISO 11784 / 11785 (animal RFID)
-- ISO 8601 (date and time)
-- W3C Verifiable Credentials Data Model 2.0 (the verification report MAY be
-  re-issued as a Verifiable Credential for downstream consumers; this is
-  optional)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Veterinary Clinic Integration
+## §1 Scope
 
-The clinical custody of the donor, recipient, and live offspring is held by
-veterinary clinics that may not be co-located with the programme's
-laboratory. Integration with clinic systems is achieved through a thin
-adapter that translates clinic-side encounter records into the recipient,
-pregnancy, and parturition shapes defined in PHASE-1 §8.
+This PHASE document is one of four that together define the WIA-pet-cloning
+standard. It addresses the integration layer of the standard.
 
-The adapter is owned by the operating programme. Clinic-side integrations
-SHOULD use the clinic's existing patient-management system as the system of
-record for clinical observations, with the programme's API as the system of
-record for cloning-specific records. Conflicts are resolved in favour of the
-clinic for clinical fields (e.g. body-condition score) and in favour of the
-programme for cloning-specific fields (e.g. embryo IDs); the adapter
-documents the resolution rules in the programme's integration dossier.
+## §2 Manifest
 
-Clinics that are not running a digital patient-management system MAY
-contribute records via a paper-form intake; the operator transcribes the
-record into the API. The transcription event is recorded with the
-transcribing staff member's identifier and the SHA-256 of the scanned form,
-held in the evidence storage described in §3.
+Implementations publish a signed manifest containing standardSlug
+(constant value: "pet-cloning"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 Breed Registry Integration
+## §3 Conformance Tiers
 
-A verified live offspring is registrable with the breed registry that holds
-the donor's pedigree. Integration with the registry is mediated by the
-verification report (PHASE-2 §7) and an optional Verifiable Credential
-re-issuance (W3C VC 2.0) that carries the same payload in a credential-
-format envelope. Registries that prefer a single signed report consume the
-JSON form; registries that have adopted Verifiable Credentials consume the
-VC form.
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-In either form, the report's authenticity is established by the issuing
-laboratory's signature and at least one witness signature; registries that
-require additional witnesses (some pedigree registries require two) consume
-multi-witness reports as defined in PHASE-3 §9.
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-A registry that issues a registration certificate for the offspring SHOULD
-back-link to the WIA verification report so that downstream consumers
-(buyers, insurers, dog-show secretariats) can resolve the chain of
-attestation back to the issuing laboratory.
+## §4 Discovery
 
-## §3 Evidence Package Format
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/pet-cloning`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-The evidence package is the externally-citable artefact for a case. It is
-produced by the API endpoint defined in PHASE-2 §8 and is a tarball with the
-following layout:
+## §5 Time and Identity
 
-```
-evidence/
-  manifest.json                — package manifest (signed, see §4)
-  case.json                    — case record (PHASE-1 §2)
-  donor.json                   — donor record (PHASE-1 §3)
-  samples/                     — per-sample records and custody logs
-  oocytes/                     — per-oocyte records and custody logs
-  reconstructions/             — per-SCNT records
-  embryos/                     — per-embryo records, including time-lapse
-                                 archive references
-  recipients/                  — per-recipient records, with pregnancy and
-                                 parturition updates
-  verification.json            — verification report (PHASE-2 §7)
-  welfare/                     — animal welfare review records (PHASE-3 §4)
-  regulatory/                  — regulatory authorisation references
-  audit/                       — API audit log excerpts
-  instruments/                 — instrument register entries (PHASE-1 §11)
-```
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-The package is content-addressable: the manifest carries the SHA-256 of
-each record file, and the manifest itself is signed.
+## §6 Versioning and Deprecation
 
-## §4 Manifest and Signatures
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-The manifest is a JSON document that lists every file in the package, its
-SHA-256 digest, its size in bytes, and its content-type. The manifest is
-signed by the operating programme's HTTP-message-signature key (RFC 9421)
-and counter-signed by the witness laboratory whose signature also appears
-on the verification report.
+## §7 Privacy and Security
 
-A consumer that receives a package verifies the signatures, recomputes the
-file digests, compares them to the manifest, and rejects the package on any
-mismatch. Verification tools that follow this PHASE emit Problem-Details
-(RFC 9457) responses on rejection, with a `type` of
-`urn:wia:pet-cloning:evidence-mismatch` and a `manifestDelta` extension that
-identifies the offending entries.
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-## §5 well-known URI Discovery
+## §8 Open Governance
 
-A conformant programme exposes a discovery document at
-`/.well-known/wia-pet-cloning` (RFC 8615) that links to the API root
-(PHASE-2 §2), the public accreditation certificate, the published
-welfare-review framework, the published quality dossier, and the
-programme's incident-statistics summary (PHASE-3 §10).
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `pet-cloning` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-The discovery document carries a freshness header indicating the last
-update; consumers SHOULD refresh the document at least once per day during
-active integrations.
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## §6 Owner Identity Mediation
 
-Owner identity is held in the operating programme's CRM, never in the API
-data store. The CRM mediates between owners and the integrating systems by
-issuing the opaque `ownerReference` token used in PHASE-1 §3 and by
-translating consumer requests (e.g. an owner asking for a copy of their
-case file) into authenticated API calls.
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
 
-Owner-facing exports of case material are produced by the CRM from the
-evidence package: the CRM strips audit-only sections and adds a
-human-readable summary written in the owner's preferred language. The
-machine-readable evidence package itself is not delivered to owners
-directly; it is intended for laboratories, registries, and regulators.
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
 
-A subject-access request from an owner returns the human-readable summary
-plus the verification report (PHASE-2 §7). The CRM logs the access event
-under ISO/IEC 27701:2019 §B.8.5.7 expectations.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## §7 Insurance Carrier Integration
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-Insurance carriers that price coverage on cloned animals consume the
-verification report and selected sections of the evidence package
-(notably the parturition record, the offspring's neonatal health
-observations, and the welfare review). Carriers do not consume owner
-identity; the binding from the verified offspring back to the policy-
-holder is held in the carrier's policy administration system.
+## Annex F — Adoption Roadmap
 
-Programmes SHOULD publish a profile of which evidence sections they are
-willing to share with carriers under a standard data-sharing agreement,
-and carriers SHOULD limit their requests to that profile. Out-of-profile
-requests return `403 Forbidden` from the API with a problem document of
-type `urn:wia:pet-cloning:evidence-profile`.
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-## §8 Regulator and Accreditation Body Access
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-Regulators and accreditation bodies access the API via dedicated client
-certificates issued by the certifying body. Access scopes for these
-clients include the full case record set, including welfare-review records
-and incident reports; consumer-facing scopes (insurer, registry) are
-narrower and are documented in the API's OpenAPI document.
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-## §9 Time-of-Cite Evidence Pinning
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-When a case's verification report is cited externally (in a peer-reviewed
-publication, a registry catalogue, an insurer policy attachment), the
-citing party retrieves the evidence package once and pins the package
-content-address (its manifest SHA-256) in the citation. Subsequent
-consumers verify the citation by re-fetching the package and comparing
-content-addresses; programmes MUST keep evidence packages addressable by
-their pinned manifest digests for at least seven years from the citation
-event.
+## Annex G — Test Vectors and Conformance Evidence
 
-## §10 Migration from Pre-Standard Records
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-Programmes that operated before WIA-pet-cloning reached version 1.0 MAY
-migrate historical cases by emitting a synthetic case record that carries
-the original case's identifying information plus a `legacyImport` flag.
-Synthetic cases are accepted by the registry and insurer profiles but are
-not eligible for verification reports; programmes MUST attach a
-contemporaneous re-verification (a fresh genetic comparison) to convert a
-synthetic case into a fully-verified case.
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-The migration tooling is published by the operating programme and is
-audited as part of the annual ISO/IEC 17025 surveillance audit.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
 
-## §11 Public Catalogue and Aggregator Feeds
+## Annex H — Versioning and Deprecation Policy
 
-Programmes that elect to publish a public catalogue of verified cases
-(some breed-specific registries do, others do not) emit an Atom or JSON
-Feed listing the verification reports. The feed entries link back to the
-content-addressed evidence packages and SHOULD NOT carry owner identity
-or unredacted clinical detail; the feed is intended as a discovery
-mechanism, not a primary record.
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-## §12 Worked Example: Producing and Pinning an Evidence Package
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-The following sequence shows how a registry, an insurer, and a regulator
-each consume a single evidence package without re-querying the live API.
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-1. The operating programme, on completing the verification report, posts
-   `POST /v1/cases/{caseId}/evidence` and receives a `202 Accepted` with
-   a `Location` header pointing at the package resource.
-2. The package transitions through `pending` → `building` → `ready`. On
-   `ready`, the manifest carries the SHA-256 of every file and is signed
-   per §4. The package URL is content-addressed by the manifest digest.
-3. The breed registry retrieves the package, verifies the signatures and
-   digests, and ingests the verification record. The registry records the
-   manifest digest in its registration entry so that downstream consumers
-   can audit the registration's provenance.
-4. The insurance carrier requests the same package URL but uses an
-   evidence-profile scope (§7) that delivers only the parturition,
-   neonatal, and welfare sections. The carrier records the same manifest
-   digest in the policy attachment.
-5. The accreditation body consumes the full package via its dedicated
-   client certificate (§8) and uses the included audit-log excerpts to
-   verify that custody chains are complete.
+## Annex I — Interoperability Profiles
 
-Each consumer holds the manifest digest as the citation anchor; the
-operating programme keeps the package addressable for at least seven
-years from the citation event per §9.
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-## §13 Conformance and Sunset
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-A programme conformant with PHASE-4 has integrated successfully with at
-least one veterinary clinic, at least one breed registry that recognises
-the verification report, and at least one accreditation body that consumes
-the evidence package. The programme's integration dossier records the
-list of integrations and the test runs that confirmed each.
-
-Sunsetting an integration (a registry deprecates a profile, a clinic
-changes vendor) is announced via the well-known discovery document at
-least 90 calendar days before the integration is removed; in-flight cases
-that depend on the sunsetting integration are migrated before removal.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 4 — INTEGRATION
-- **Status:** Stable
-- **Standard:** WIA-pet-cloning
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

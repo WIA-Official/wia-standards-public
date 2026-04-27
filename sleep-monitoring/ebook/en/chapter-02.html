@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 02: Sleep Stages and PSG Fundamentals — WIA-MED-021 Sleep Monitoring</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #a855f7; }
+h1 { border-bottom: 2px solid #a855f7; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #a855f7; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[sleep-monitoring] Standard Ebook</a> | Chapter 02 (of 8)</nav>
+
+<h1>Chapter 02: Sleep Stages and PSG Fundamentals</h1>
+
+<h2>2.1 Sleep Stages per AASM</h2>
+<p>The AASM Manual defines five sleep stages: <code>wake</code>, <code>n1</code> (light sleep), <code>n2</code> (deeper light sleep with sleep spindles and K-complexes), <code>n3</code> (slow wave sleep / deep sleep), and <code>rem</code> (rapid eye movement sleep). Stages are typically scored at 30-second epoch granularity from EEG, EOG, and chin EMG signals. WIA-MED-021 carries each epoch as a separate <code>sleep_stage</code> envelope so downstream consumers can render hypnograms and compute stage-percentage statistics without re-deriving them.</p>
+
+<h2>2.2 Polysomnography (PSG) signals</h2>
+<p>A full clinical PSG records many channels simultaneously: EEG (typically 6 channels covering frontal, central, and occipital regions), EOG (left and right eye), chin EMG, ECG, airflow (nasal pressure transducer + thermistor), chest and abdomen respiratory effort belts, pulse oximetry (SpO2), leg EMG (anterior tibialis), and snore microphone. The raw signals ride in a single EDF / EDF+ file referenced from the WIA session record.</p>
+
+<h2>2.3 Home sleep apnoea testing (HSAT)</h2>
+<p>HSAT devices are simpler: typically airflow + SpO2 + heart rate + respiratory effort, without EEG. They cannot score sleep stages directly but can detect respiratory events. WIA-MED-021 supports HSAT via <code>session_kind: home_sleep_apnoea_test</code>; the scoring metadata typically uses an algorithm that estimates total sleep time from movement / heart rate variability.</p>
+
+<h2>2.4 Consumer wearables</h2>
+<p>Consumer wearables (Apple Watch, Fitbit, Oura Ring, Whoop) estimate sleep stages from heart rate and accelerometer signals at 5-minute or 30-second epochs. WIA-MED-021 supports them via <code>session_kind: consumer_wearable</code> with <code>aasm_compliance_level: consumer_estimate</code>. The data is useful for population-level studies and for individual sleep tracking, but it should not be used for clinical apnoea diagnosis.</p>
+
+<h2>2.5 Respiratory events</h2>
+<p>The AASM defines respiratory events that the standard preserves: obstructive apnoea (10+ second airflow cessation with continued effort), central apnoea (10+ second cessation with no effort), mixed apnoea (combination), hypopnoea (30%+ airflow reduction with 3%+ desaturation or arousal), and RERA (Respiratory Effort Related Arousal). The Apnoea-Hypopnoea Index (AHI) summarises these per hour of sleep.</p>
+
+<h2>2.6 Arousals</h2>
+<p>Arousals are EEG-based or movement-based interruptions of sleep continuity. AASM scoring requires arousals to be at least 3 seconds in duration; the standard refuses sub-3-second arousal submissions to prevent vendors from generating spurious "fragmentation" metrics from sub-threshold events.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA-MED-021 8-chapter survey. Each chapter is intended to be readable standalone but together they map the full surface of the standard. Chapter 1 sets context; Chapter 2 covers AASM sleep medicine fundamentals; Chapter 3 introduces the standard at a glance; Chapters 4-7 walk the four-Phase specification; Chapter 8 closes with conformance, AASM compliance, and roadmap.</p>
+
+<p>The conformance test suite at <code>https://github.com/WIA-Official/wia-sleep-monitoring-conformance</code> is the source of truth for what an implementation needs to pass. The reference container <code>wia/sleep-monitoring-host:1.0.0</code> implements every Phase 2 endpoint with mock data. The companion CLI at <code>cli/sleep-monitoring.sh</code> ships sample envelope generators (validate, session, event, score, consent, info subcommands).</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1-DATA-FORMAT.md</code> — the JSON envelope shapes for sessions, sleep stages, respiratory events, arousals, and scoring metadata.</li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2-API-INTERFACE.md</code> — the HTTP surface for ingest, query, and re-scoring.</li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3-PROTOCOL.md</code> — federation handshake, replay defence, patient consent, audience controls.</li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4-INTEGRATION.md</code> — AASM, EDF/EDF+, HL7 FHIR R5, vendor wearable bridges, WIA family composition.</li>
+<li><strong>AASM Manual for the Scoring of Sleep and Associated Events</strong> — the authoritative clinical reference for sleep stage scoring rules. WIA-MED-021 carries data shapes; AASM defines the scoring rules themselves.</li>
+<li><strong>European Data Format (EDF / EDF+)</strong> — the de-facto raw biosignal format that WIA-MED-021 references rather than re-encoding.</li>
+<li><strong>HL7 FHIR R5 Procedure / Observation resources</strong> — the EHR integration target for sleep-clinic results.</li>
+</ul>
+
+<h2>Patient and Clinician Considerations</h2>
+<p>Sleep data is biometric and high-stakes. Phase 1 carries a <code>clinical_grade</code> flag and per-channel signal quality metrics so consumer wearable estimates do not get conflated with clinical PSG measurements. Phase 3 enforces patient consent before any cross-host data flow, with explicit per-audience scopes (clinical_dashboard, ehr_export, research_de_identified). Phase 4 maps to the AASM compliance level so downstream consumers can filter by appropriateness for their clinical context.</p>
+
+<p>The standard's default audience controls are intentionally restrictive: even the patient's own family / caregiver receives only stage histograms by default, not the raw event stream. Operators MAY relax these defaults per local policy, but the standard's baseline assumes minimum disclosure unless explicitly elevated by consent.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-021 Sleep Monitoring Standard v1.0.0</p></footer>
+</body>
+</html>

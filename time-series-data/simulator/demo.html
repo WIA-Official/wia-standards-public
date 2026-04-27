@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo - Time-Series Data Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --secondary: #3B82F6;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 30px;
+            line-height: 1.6;
+        }
+        h1 { color: var(--primary); margin-bottom: 20px; }
+        h2 { color: var(--primary); margin: 25px 0 15px; }
+        .controls {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+        }
+        .control-group {
+            margin: 15px 0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        label { color: var(--text-muted); min-width: 120px; }
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .chart-container {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+            min-height: 400px;
+        }
+        #chart {
+            width: 100%;
+            height: 350px;
+            background: var(--bg);
+            border-radius: 6px;
+            position: relative;
+        }
+        .data-point {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        .data-point:hover {
+            width: 8px;
+            height: 8px;
+            background: var(--secondary);
+        }
+        .axis {
+            position: absolute;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { color: var(--text-muted); font-size: 0.85rem; margin-top: 5px; }
+        .output {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: var(--primary);
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+        .anomaly { color: var(--danger); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Time-Series Data Simulator</h1>
+
+    <div class="controls">
+        <h2>Configuration</h2>
+        <div class="control-group">
+            <label>Metric Type:</label>
+            <select id="metricType">
+                <option value="temperature">Temperature (°C)</option>
+                <option value="cpu">CPU Usage (%)</option>
+                <option value="memory">Memory (MB)</option>
+                <option value="network">Network Traffic (Mbps)</option>
+                <option value="sensor">IoT Sensor</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Time Interval:</label>
+            <select id="interval">
+                <option value="1000">1 second</option>
+                <option value="5000">5 seconds</option>
+                <option value="10000">10 seconds</option>
+                <option value="60000">1 minute</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Data Points:</label>
+            <input type="number" id="dataPoints" value="50" min="10" max="200">
+        </div>
+        <div class="control-group">
+            <label>Anomaly Rate:</label>
+            <input type="range" id="anomalyRate" min="0" max="20" value="5">
+            <span id="anomalyValue">5%</span>
+        </div>
+        <div class="control-group">
+            <button class="btn-primary" onclick="startSimulation()">▶️ Start</button>
+            <button class="btn-secondary" onclick="pauseSimulation()">⏸️ Pause</button>
+            <button class="btn-danger" onclick="clearData()">🗑️ Clear</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value" id="totalPoints">0</div>
+            <div class="stat-label">Total Points</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="avgValue">0</div>
+            <div class="stat-label">Average</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="minValue">-</div>
+            <div class="stat-label">Min</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="maxValue">-</div>
+            <div class="stat-label">Max</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="anomalyCount">0</div>
+            <div class="stat-label">Anomalies</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h2>Real-Time Chart</h2>
+        <div id="chart"></div>
+    </div>
+
+    <div class="controls">
+        <h2>Live Data Stream</h2>
+        <div class="output" id="dataOutput">Waiting to start simulation...</div>
+    </div>
+
+    <script>
+        let dataPoints = [];
+        let interval = null;
+        let isRunning = false;
+        let anomalyThreshold = 0.05;
+
+        document.getElementById('anomalyRate').addEventListener('input', (e) => {
+            anomalyThreshold = e.target.value / 100;
+            document.getElementById('anomalyValue').textContent = e.target.value + '%';
+        });
+
+        function getMetricConfig() {
+            const type = document.getElementById('metricType').value;
+            const configs = {
+                temperature: { min: 15, max: 30, unit: '°C', baseline: 22 },
+                cpu: { min: 0, max: 100, unit: '%', baseline: 45 },
+                memory: { min: 100, max: 8000, unit: 'MB', baseline: 2048 },
+                network: { min: 0, max: 1000, unit: 'Mbps', baseline: 150 },
+                sensor: { min: 0, max: 255, unit: '', baseline: 128 }
+            };
+            return configs[type];
+        }
+
+        function generateDataPoint(isAnomaly = false) {
+            const config = getMetricConfig();
+            const timestamp = new Date();
+            let value;
+
+            if (isAnomaly) {
+                value = Math.random() > 0.5
+                    ? config.max + Math.random() * 50
+                    : config.min - Math.random() * 50;
+            } else {
+                const variation = (Math.random() - 0.5) * (config.max - config.min) * 0.2;
+                value = config.baseline + variation;
+            }
+
+            value = Math.max(config.min, Math.min(config.max, value));
+
+            return {
+                timestamp,
+                value: parseFloat(value.toFixed(2)),
+                isAnomaly
+            };
+        }
+
+        function startSimulation() {
+            if (isRunning) return;
+            isRunning = true;
+
+            const intervalMs = parseInt(document.getElementById('interval').value);
+            const maxPoints = parseInt(document.getElementById('dataPoints').value);
+
+            interval = setInterval(() => {
+                const isAnomaly = Math.random() < anomalyThreshold;
+                const point = generateDataPoint(isAnomaly);
+
+                dataPoints.push(point);
+                if (dataPoints.length > maxPoints) {
+                    dataPoints.shift();
+                }
+
+                updateDisplay();
+            }, intervalMs);
+        }
+
+        function pauseSimulation() {
+            isRunning = false;
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        }
+
+        function clearData() {
+            pauseSimulation();
+            dataPoints = [];
+            updateDisplay();
+            document.getElementById('dataOutput').innerHTML = 'Data cleared. Ready to start...';
+        }
+
+        function updateDisplay() {
+            if (dataPoints.length === 0) return;
+
+            // Update stats
+            const values = dataPoints.map(d => d.value);
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const anomalies = dataPoints.filter(d => d.isAnomaly).length;
+
+            document.getElementById('totalPoints').textContent = dataPoints.length;
+            document.getElementById('avgValue').textContent = avg.toFixed(2);
+            document.getElementById('minValue').textContent = min.toFixed(2);
+            document.getElementById('maxValue').textContent = max.toFixed(2);
+            document.getElementById('anomalyCount').textContent = anomalies;
+
+            // Update chart
+            renderChart();
+
+            // Update output
+            const config = getMetricConfig();
+            const latest = dataPoints[dataPoints.length - 1];
+            const output = document.getElementById('dataOutput');
+            const line = `<div${latest.isAnomaly ? ' class="anomaly"' : ''}>
+                ${latest.timestamp.toISOString()} | ${config.unit ? document.getElementById('metricType').value : 'value'}=${latest.value}${config.unit}${latest.isAnomaly ? ' [ANOMALY]' : ''}
+            </div>`;
+            output.innerHTML = line + output.innerHTML;
+
+            // Limit output lines
+            const lines = output.children;
+            while (lines.length > 50) {
+                output.removeChild(lines[lines.length - 1]);
+            }
+        }
+
+        function renderChart() {
+            const chart = document.getElementById('chart');
+            const width = chart.offsetWidth;
+            const height = chart.offsetHeight;
+
+            const values = dataPoints.map(d => d.value);
+            const minVal = Math.min(...values);
+            const maxVal = Math.max(...values);
+            const range = maxVal - minVal || 1;
+
+            chart.innerHTML = '';
+
+            dataPoints.forEach((point, i) => {
+                const x = (i / (dataPoints.length - 1 || 1)) * (width - 20) + 10;
+                const y = height - 40 - ((point.value - minVal) / range) * (height - 60);
+
+                const dot = document.createElement('div');
+                dot.className = 'data-point';
+                dot.style.left = x + 'px';
+                dot.style.top = y + 'px';
+                if (point.isAnomaly) {
+                    dot.style.background = '#ef4444';
+                    dot.style.width = '6px';
+                    dot.style.height = '6px';
+                }
+                dot.title = `${point.timestamp.toLocaleTimeString()}: ${point.value}`;
+                chart.appendChild(dot);
+
+                // Draw line to previous point
+                if (i > 0) {
+                    const prevX = ((i - 1) / (dataPoints.length - 1 || 1)) * (width - 20) + 10;
+                    const prevY = height - 40 - ((dataPoints[i - 1].value - minVal) / range) * (height - 60);
+
+                    const line = document.createElement('div');
+                    const length = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+                    const angle = Math.atan2(y - prevY, x - prevX) * 180 / Math.PI;
+
+                    line.style.position = 'absolute';
+                    line.style.width = length + 'px';
+                    line.style.height = '1px';
+                    line.style.background = point.isAnomaly ? '#ef4444' : '#10B981';
+                    line.style.left = prevX + 'px';
+                    line.style.top = prevY + 'px';
+                    line.style.transform = `rotate(${angle}deg)`;
+                    line.style.transformOrigin = '0 0';
+                    chart.appendChild(line);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

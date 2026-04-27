@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 08: Conformance, Roadmap, Closing Notes — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 08 / 8</nav>
+
+<h1>Chapter 08: Conformance, Roadmap, Closing Notes</h1>
+
+<h2>8.1 Conformance Test Suite</h2>
+<p>A black-box conformance test suite is published at <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> and walks through discovery document round-trip, write with idempotency-key collision, query with all aggregation types, stream subscribe / reconnect with Last-Event-Id, rollup request, federation handshake against a mock peer, replay-defence bounds, audience-control enforcement, late-arriving points re-rollup, rate-limit headers and exhaustion behaviour. Hosts publishing <code>bridge_profile=Full</code> SHOULD additionally pass the suite\x27s extension tests for at least one supported third-party time-series database.</p>
+
+<h2>8.2 Reference Container</h2>
+<p>The <code>wia/time-series-data-host:1.0.0</code> container image implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production. The container ships with a SQLite-backed store suitable for small-to-medium scale (up to 10 million points per series); production deployments typically swap in a purpose-built time-series database (InfluxDB, TimescaleDB, VictoriaMetrics, Apache IoTDB) via the WIA-supplied schema.</p>
+
+<h2>8.3 Roadmap</h2>
+<table border="1" cellpadding="6" style="border-collapse:collapse;">
+<tr><th>Version</th><th>Focus</th></tr>
+<tr><td>1.0.0</td><td>Initial publication: Phases 1–4 stable, conformance suite v1, reference container</td></tr>
+<tr><td>1.1.x</td><td>Additive: more bridges (TimescaleDB native, ClickHouse, QuestDB), additional aggregations (percentiles, histograms), optional WIA-AIR-SHIELD scoring</td></tr>
+<tr><td>1.2.x</td><td>Additive: federated query (a query against multiple hosts that returns a unified result)</td></tr>
+<tr><td>2.0.0 (no earlier than 2028)</td><td>Possible breaking change: post-quantum signature suite migration following the parent WIA family roadmap</td></tr>
+</table>
+
+<h2>8.4 Backwards-Compatibility Promise</h2>
+<p>Within the 1.x line every Phase 2 endpoint MUST remain reachable and MUST continue to honour the documented status codes and content shapes. Hosts MAY add optional query parameters, response fields, new endpoints, or media types. Hosts MUST NOT remove or repurpose existing ones. Breaking changes ride a major version bump and MUST be preceded by a 12-month deprecation window per IETF RFC 8594 and RFC 9745.</p>
+
+<h2>8.5 Governance</h2>
+<p>The standard is maintained by the WIA Standards Committee. Change proposals follow the WIA RFC process: anyone may submit a proposal; the Committee reviews quarterly; accepted proposals enter an open comment period before being merged into a minor-version release. Breaking changes require a two-thirds Committee vote.</p>
+
+<h2>8.6 Closing Note</h2>
+<p>Time-series data is the connective tissue of operations: every modern infrastructure system, IoT deployment, financial market platform, and scientific instrument generates time-series data. The dominant pattern today is per-vendor silos that prevent a unified operational view. WIA-DATA-014 exists to close that gap with an open, federation-aware, audit-logged standard that lets operators and consumers share data on terms each can verify.</p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

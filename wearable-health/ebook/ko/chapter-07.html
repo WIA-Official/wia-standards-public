@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제7장: HealthKit/Google Fit - WIA MED-019</title>
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.8;">
+
+<h1 style="color: #10b981;">제7장: HealthKit/Google Fit - 플랫폼 통합과 데이터 상호운용성</h1>
+
+<blockquote style="background: #1e293b; padding: 20px; border-left: 4px solid #fbbf24; margin: 20px 0;">
+<p style="color: #fbbf24; font-style: italic;">"건강 데이터의 진정한 가치는 통합에서 나옵니다. 한 곳에 모여 있을 때 비로소 전체 그림을 볼 수 있습니다."</p>
+<p style="color: #64748b; font-size: 0.9em; margin-top: 10px;">— 팀 쿡, Apple CEO</p>
+</blockquote>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.1 건강 데이터 플랫폼의 필요성</h2>
+
+<p>현대인은 평균 3-5개의 건강 앱과 2-3개의 웨어러블 기기를 사용합니다. 이들이 만들어내는 데이터는 각각 고립되어 있습니다.</p>
+
+<h3 style="color: #10b981;">🔍 문제점</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>데이터 사일로:</strong> Fitbit, Apple Watch, Strava, MyFitnessPal 각각 저장</li>
+    <li><strong>중복 입력:</strong> 같은 운동을 여러 앱에 수동 기록</li>
+    <li><strong>불완전한 그림:</strong> 의사에게 일부 데이터만 공유</li>
+    <li><strong>전환 비용:</strong> 기기 바꾸면 모든 히스토리 손실</li>
+</ul>
+
+<h3 style="color: #10b981;">✅ 해결책: 건강 데이터 허브</h3>
+
+<p><strong>중앙 집중식 플랫폼:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>모든 건강 앱/기기가 한 곳에 데이터 저장</li>
+    <li>사용자가 데이터 소유 및 제어</li>
+    <li>의사, 가족과 선택적 공유</li>
+    <li>앱 간 자동 동기화</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.2 Apple HealthKit</h2>
+
+<p>2014년 iOS 8과 함께 출시된 HealthKit은 Apple 생태계의 건강 데이터 중앙 저장소입니다.</p>
+
+<h3 style="color: #10b981;">📦 아키텍처</h3>
+
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155;">
+<code style="color: #10b981;">
+┌─────────────────────────────────────────────┐
+│            사용자 제어                       │
+│         (건강 앱 대시보드)                   │
+└─────────────────────────────────────────────┘
+                    ▲
+                    │
+┌─────────────────────────────────────────────┐
+│          HealthKit Store                     │
+│     (암호화된 on-device 저장소)              │
+└─────────────────────────────────────────────┘
+        ▲           ▲           ▲
+        │           │           │
+   ┌────┴───┐  ┌───┴───┐  ┌───┴────┐
+   │ Watch  │  │ Fitbit│  │ Strava │
+   │  App   │  │  App  │  │  App   │
+   └────────┘  └───────┘  └────────┘
+</code>
+</pre>
+
+<h3 style="color: #10b981;">🗂️ 데이터 타입</h3>
+
+<p><strong>카테고리별 분류:</strong></p>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10b981;">카테고리</th>
+        <th style="border: 1px solid #475569; color: #10b981;">데이터 타입 예시</th>
+        <th style="border: 1px solid #475569; color: #10b981;">개수</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Activity</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">걸음 수, 칼로리, 거리, 계단</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">15+</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Body Measurements</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">체중, 체지방률, BMI, 키</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">14+</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Heart</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">심박수, HRV, ECG, 혈압</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">10+</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Nutrition</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">칼로리, 단백질, 비타민, 수분</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">50+</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Sleep</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">수면 시간, 단계, 호흡률</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">8+</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Vital Signs</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">체온, SpO2, 호흡률</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">8+</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Reproductive Health</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">생리, 배란, 성관계</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">12+</td>
+    </tr>
+</table>
+
+<p><strong>총 150+ 데이터 타입</strong> (iOS 17 기준)</p>
+
+<h3 style="color: #10b981;">🔐 보안 및 프라이버시</h3>
+
+<p><strong>핵심 원칙:</strong></p>
+<ul style="color: #94a3b8;">
+    <li><strong>사용자 제어:</strong> 각 앱마다 읽기/쓰기 권한 세밀 설정</li>
+    <li><strong>On-Device:</strong> 데이터는 기기에만 저장 (iCloud 선택적)</li>
+    <li><strong>암호화:</strong> AES-256, 암호 잠금 시 접근 불가</li>
+    <li><strong>투명성:</strong> 어떤 앱이 어떤 데이터를 읽었는지 로그</li>
+</ul>
+
+<p><strong>앱 권한 예시:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>MyFitnessPal → ✅ 칼로리 읽기, ❌ 심박수 읽기</li>
+    <li>Strava → ✅ 운동 데이터 읽기/쓰기, ❌ 체중 읽기</li>
+    <li>의료 앱 → ✅ 모든 데이터 읽기</li>
+</ul>
+
+<h3 style="color: #10b981;">💻 개발자 API</h3>
+
+<p><strong>주요 클래스:</strong></p>
+<ul style="color: #94a3b8;">
+    <li><strong>HKHealthStore:</strong> 데이터 읽기/쓰기 중앙 인터페이스</li>
+    <li><strong>HKQuantityType:</strong> 측정 가능 데이터 (걸음 수, 심박수 등)</li>
+    <li><strong>HKCategoryType:</strong> 이산 데이터 (수면, 성관계 등)</li>
+    <li><strong>HKWorkout:</strong> 운동 세션 전체 정보</li>
+    <li><strong>HKQuery:</strong> 데이터 조회 (통계, 시계열 등)</li>
+</ul>
+
+<p><strong>코드 예시 (Swift):</strong></p>
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155; color: #94a3b8;">
+<code>// 걸음 수 읽기 권한 요청
+let stepType = HKQuantityType.quantityType(
+    forIdentifier: .stepCount
+)!
+
+healthStore.requestAuthorization(
+    toShare: [],
+    read: [stepType]
+) { success, error in
+    if success {
+        // 오늘 걸음 수 조회
+        queryStepsToday()
+    }
+}
+</code>
+</pre>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.3 Google Fit</h2>
+
+<p>2014년 출시된 Google Fit은 Android 생태계의 건강 데이터 플랫폼입니다.</p>
+
+<h3 style="color: #10b981;">🏗️ 아키텍처</h3>
+
+<p><strong>클라우드 기반:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>데이터는 Google 클라우드에 저장 (HealthKit은 on-device)</li>
+    <li>모든 기기에서 동기화 (Android, iOS, 웹)</li>
+    <li>Google 계정으로 관리</li>
+</ul>
+
+<h3 style="color: #10b981;">📊 데이터 모델</h3>
+
+<p><strong>핵심 개념:</strong></p>
+
+<p><strong style="color: #10b981;">1. Data Types</strong></p>
+<ul style="color: #94a3b8;">
+    <li><strong>Activity:</strong> 걸음 수, 이동 거리, 칼로리</li>
+    <li><strong>Location:</strong> GPS 경로</li>
+    <li><strong>Nutrition:</strong> 칼로리, 영양소</li>
+    <li><strong>Body:</strong> 체중, 체지방률</li>
+    <li><strong>Heart:</strong> 심박수, BPM</li>
+</ul>
+
+<p><strong style="color: #10b981;">2. Data Sources</strong></p>
+<ul style="color: #94a3b8;">
+    <li>각 앱/기기는 고유 Data Source ID</li>
+    <li>동일 데이터 타입의 중복 값 처리</li>
+    <li>우선순위 설정 (예: Garmin > Mi Band)</li>
+</ul>
+
+<p><strong style="color: #10b981;">3. Sessions</strong></p>
+<ul style="color: #94a3b8;">
+    <li>운동 세션 (시작/종료 시간)</li>
+    <li>Activity Type: 달리기, 사이클, 수영 등 120+ 종류</li>
+</ul>
+
+<h3 style="color: #10b981;">♥️ Heart Points (심장 점수)</h3>
+
+<p>Google Fit의 독특한 활동 지표:</p>
+<ul style="color: #94a3b8;">
+    <li><strong>1 Heart Point:</strong> 중강도 활동 1분</li>
+    <li><strong>2 Heart Points:</strong> 고강도 활동 1분</li>
+    <li><strong>권장 목표:</strong> 주당 150 Heart Points (WHO 기준)</li>
+    <li><strong>예시:</strong> 빠르게 걷기 30분 = 30 Points</li>
+</ul>
+
+<h3 style="color: #10b981;">🔌 REST API</h3>
+
+<p><strong>주요 엔드포인트:</strong></p>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10b981;">API</th>
+        <th style="border: 1px solid #475569; color: #10b981;">기능</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>DataSources</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">데이터 소스 등록/조회</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Datasets</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">시계열 데이터 읽기/쓰기</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Sessions</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">운동 세션 관리</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Aggregate</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">통계 데이터 (일/주/월)</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.4 HealthKit vs Google Fit 비교</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10b981;">특성</th>
+        <th style="border: 1px solid #475569; color: #10b981;">Apple HealthKit</th>
+        <th style="border: 1px solid #475569; color: #10b981;">Google Fit</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>플랫폼</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">iOS, watchOS만</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Android, iOS, 웹</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>저장 위치</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">On-device (암호화)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Google 클라우드</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>데이터 타입</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">150+ (매우 상세)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">50+ (기본적)</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>의료 데이터</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">처방전, 알레르기, 혈액형</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">제한적</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>ECG/AFib</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">✅ 저장 및 공유</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">❌ 미지원</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>API</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">Native (Swift/Obj-C)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">REST API (범용)</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>기기 동기화</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">iCloud (선택)</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">자동 (모든 기기)</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>프라이버시</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">⭐⭐⭐⭐⭐</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">⭐⭐⭐</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.5 기타 건강 데이터 플랫폼</h2>
+
+<h3 style="color: #10b981;">Samsung Health</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>플랫폼:</strong> Android, Tizen (Galaxy Watch)</li>
+    <li><strong>강점:</strong> 체성분 분석 (BIA), 수면 코칭</li>
+    <li><strong>연동:</strong> Google Fit과 양방향 동기화</li>
+    <li><strong>독점 데이터:</strong> BIA는 Samsung Health에만</li>
+</ul>
+
+<h3 style="color: #10b981;">Garmin Connect</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>대상:</strong> 운동선수, 아웃도어</li>
+    <li><strong>강점:</strong> 상세한 운동 분석, Training Load</li>
+    <li><strong>데이터 수출:</strong> FIT, TCX, GPX 형식</li>
+    <li><strong>연동:</strong> Strava, TrainingPeaks, MyFitnessPal</li>
+</ul>
+
+<h3 style="color: #10b981;">Fitbit (Google)</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>상태:</strong> Google 인수 후 Google Fit 통합 중</li>
+    <li><strong>강점:</strong> 수면 분석, 커뮤니티</li>
+    <li><strong>Premium:</strong> 월 $9.99 (고급 인사이트)</li>
+</ul>
+
+<h3 style="color: #10b981;">Strava</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>전문:</strong> 러닝, 사이클링</li>
+    <li><strong>소셜:</strong> 운동 기록 공유, 세그먼트 경쟁</li>
+    <li><strong>연동:</strong> 100+ 앱/기기 (Garmin, Wahoo, Zwift 등)</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.6 데이터 상호운용성 표준</h2>
+
+<h3 style="color: #10b981;">🔗 FHIR (Fast Healthcare Interoperability Resources)</h3>
+
+<p><strong>HL7 표준:</strong></p>
+<ul style="color: #94a3b8;">
+    <li><strong>목적:</strong> 의료 데이터 교환 표준</li>
+    <li><strong>형식:</strong> JSON, XML</li>
+    <li><strong>리소스:</strong> Patient, Observation, Condition 등</li>
+</ul>
+
+<p><strong>Apple Health Records:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>미국 800+ 병원 연동</li>
+    <li>FHIR로 의료 기록 다운로드</li>
+    <li>처방전, 알레르기, 검사 결과 통합</li>
+</ul>
+
+<p><strong>FHIR Observation 예시:</strong></p>
+<pre style="background: #1e293b; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #334155; color: #94a3b8;">
+<code>{
+  "resourceType": "Observation",
+  "status": "final",
+  "code": {
+    "coding": [{
+      "system": "http://loinc.org",
+      "code": "8867-4",
+      "display": "Heart rate"
+    }]
+  },
+  "valueQuantity": {
+    "value": 72,
+    "unit": "beats/min"
+  }
+}
+</code>
+</pre>
+
+<h3 style="color: #10b981;">📁 FIT (Flexible and Interoperable Data Transfer)</h3>
+
+<p><strong>Garmin 개발:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>피트니스 데이터 교환 표준</li>
+    <li>바이너리 형식 (효율적)</li>
+    <li>GPS, 심박수, 파워, 케이던스 등</li>
+    <li>Strava, TrainingPeaks 등 지원</li>
+</ul>
+
+<h3 style="color: #10b981;">🗺️ GPX/TCX</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>GPX:</strong> GPS 경로 (XML)</li>
+    <li><strong>TCX:</strong> Training Center XML (심박수 포함)</li>
+    <li><strong>범용성:</strong> 거의 모든 앱 지원</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">7.7 WIA MED-019 통합 표준</h2>
+
+<h3 style="color: #10b981;">📋 필수 상호운용성</h3>
+
+<p><strong>플랫폼 지원:</strong></p>
+<ul style="color: #94a3b8;">
+    <li>✅ Apple HealthKit 연동</li>
+    <li>✅ Google Fit 연동</li>
+    <li>✅ FHIR R4 지원</li>
+</ul>
+
+<p><strong>데이터 매핑:</strong></p>
+<table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10b981;">WIA 표준</th>
+        <th style="border: 1px solid #475569; color: #10b981;">HealthKit</th>
+        <th style="border: 1px solid #475569; color: #10b981;">Google Fit</th>
+        <th style="border: 1px solid #475569; color: #10b981;">FHIR</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;">heart_rate</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HKQuantityType.heartRate</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">DataType.TYPE_HEART_RATE_BPM</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">LOINC 8867-4</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;">steps</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">HKQuantityType.stepCount</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">DataType.TYPE_STEP_COUNT_DELTA</td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">LOINC 41950-7</td>
+    </tr>
+</table>
+
+<h3 style="color: #10b981;">🔐 보안 요구사항</h3>
+
+<ul style="color: #94a3b8;">
+    <li><strong>OAuth 2.0:</strong> API 인증</li>
+    <li><strong>명시적 동의:</strong> 각 데이터 타입마다</li>
+    <li><strong>최소 권한:</strong> 필요한 데이터만 요청</li>
+    <li><strong>감사 로그:</strong> 접근 기록 유지</li>
+</ul>
+
+<hr style="border-color: #334155;">
+
+<h2 style="color: #34d399;">장 요약</h2>
+
+<table border="1" cellpadding="12" style="border-collapse: collapse; width: 100%; background: #1e293b; margin: 20px 0;">
+    <tr style="background: #334155;">
+        <th style="border: 1px solid #475569; color: #10b981;">핵심 포인트</th>
+        <th style="border: 1px solid #475569; color: #10b981;">요약</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>HealthKit</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">iOS, on-device, 150+ 타입, 프라이버시 강력</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>Google Fit</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">멀티플랫폼, 클라우드, Heart Points</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>차이점</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">저장 위치, 프라이버시, 데이터 범위</td>
+    </tr>
+    <tr style="background: #334155;">
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>상호운용성</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">FHIR, FIT, GPX/TCX 표준</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #475569; color: #e2e8f0;"><strong>WIA 요구사항</strong></td>
+        <td style="border: 1px solid #475569; color: #94a3b8;">양대 플랫폼 연동, FHIR 지원 필수</td>
+    </tr>
+</table>
+
+<hr style="border-color: #334155;">
+
+<p style="text-align: center; color: #fbbf24; margin-top: 40px;">弘益人間 · 널리 인간을 이롭게 하라</p>
+<p style="text-align: center; color: #64748b;">© 2025 WIA - World Certification Industry Association</p>
+</body>
+</html>

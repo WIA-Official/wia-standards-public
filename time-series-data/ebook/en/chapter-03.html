@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 03: Storage Engines and Compression — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 03 / 8</nav>
+
+<h1>Chapter 03: Storage Engines and Compression</h1>
+
+<h2>3.1 Storage Engines</h2>
+<p>WIA-DATA-014 does not mandate a particular storage engine. Reference deployments commonly use one of: InfluxDB (the canonical industrial-IoT engine), Prometheus (operationally focused, pull model), TimescaleDB (Postgres-based, full SQL), VictoriaMetrics (Prometheus-compatible with better cardinality handling), Apache IoTDB (designed for Apache Hadoop integration). The standard\x27s wire format maps cleanly to all five.</p>
+
+<h2>3.2 Compression Trade-offs</h2>
+<p>The dominant compression algorithms in time-series databases are Gorilla (Facebook\x27s float compression with delta-of-delta on timestamps) and various delta-encoding schemes for integer points. WIA-DATA-014 does not require a specific algorithm; the host advertises supported compression formats in the discovery document and the client negotiates via Accept-Encoding.</p>
+
+<h2>3.3 Index Design</h2>
+<p>Indexes are the difference between a query taking 50 milliseconds and 50 minutes. Two indexing strategies dominate: (1) per-series time-sorted (each series_id has its own time-sorted block, ideal when most queries scope to a single series); (2) per-label inverted (each label value points to the list of series carrying it, ideal when queries filter by label). Production hosts often build both.</p>
+
+<h2>3.4 Sharding</h2>
+<p>Beyond a few terabytes per node, sharding is unavoidable. Two common strategies: (1) shard by series_id hash (predictable distribution, but range queries fan out across shards); (2) shard by time window (range queries stay local, but series with very different cadences create hot shards). The standard does not pick a winner; the host\x27s operator picks based on the query mix.</p>
+
+<h2>3.5 Cold Storage</h2>
+<p>Long-tail data (5+ years old) typically migrates to cold storage (S3, GCS, Azure Blob) with an index that the live host queries on demand. The standard\x27s archive endpoint (Phase 2 §archive) supports this pattern by emitting Parquet files with deterministic naming so that any cold-storage backend can host them without WIA-specific code.</p>
+
+<h2>Summary</h2>
+<p>Storage engine choice is operator-dependent; the standard\x27s wire format is engine-agnostic. The implementer\x27s job is to map the WIA envelope to the chosen engine\x27s native format and to manage cardinality, retention, and sharding within the operational budget.</p>
+
+<p><a href="chapter-04.html">Next: Chapter 4 →</a></p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

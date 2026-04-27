@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Phase 1 — Data Format — WIA-MED-021 Sleep Monitoring</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #a855f7; }
+h1 { border-bottom: 2px solid #a855f7; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #a855f7; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[sleep-monitoring] Standard Ebook</a> | Chapter 04 (of 8)</nav>
+
+<h1>Chapter 04: Phase 1 — Data Format</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies the JSON envelopes that every WIA-MED-021 conformant device, sleep lab system, EHR bridge, or research aggregator must read and emit. The envelopes are signed with Ed25519 (IETF RFC 8032) and round-trip byte-identically through encode and decode.</p>
+
+<h2>4.2 Session record</h2>
+<p>The session record is the registration envelope. It declares the session kind (PSG, HSAT, consumer wearable, nap), the start and end time, the recording devices, the clinical-grade flag, and the EDF reference for clinical-grade sessions.</p>
+
+<pre>{
+  "wia_sleep_monitoring_version": "1.0.0",
+  "type": "session",
+  "session_id": "ses_01HXY",
+  "patient_id": "did:wia:patient:01HXY",
+  "session_kind": "polysomnography",
+  "started_at": "2026-04-26T22:30:00Z",
+  "ended_at":   "2026-04-27T07:00:00Z",
+  "device_ids": ["did:wia:device:psg-vendor-A"],
+  "clinical_grade": true,
+  "edf_url": "https://recordings.example/sessions/ses_01HXY.edf",
+  "edf_sha256": "7d8f2c..."
+}</pre>
+
+<h2>4.3 Sleep stage record</h2>
+<p>Each epoch is one envelope. Required fields: session_id, epoch_index, epoch_start, epoch_duration_seconds, stage, scoring_algorithm. Stages are AASM tokens (wake, n1, n2, n3, rem, unscored).</p>
+
+<h2>4.4 Respiratory event record</h2>
+<p>Apnoea / hypopnoea / RERA / oxygen desaturation events. Each carries the start time, duration, associated desaturation percentage, associated arousal flag, and the scoring algorithm. Downstream AHI / RDI computation reads the event stream.</p>
+
+<h2>4.5 Arousal record</h2>
+<p>EEG or movement-based arousals. Minimum 3-second duration per AASM. The standard refuses sub-3-second arousals at the API layer.</p>
+
+<h2>4.6 Scoring metadata record</h2>
+<p>Ties a session to its scoring algorithm and scorer (technician). Carries the summary statistics: total_sleep_minutes, REM minutes, N3 minutes, AHI, minimum SpO2. Downstream consumers MUST trust the published summary rather than recomputing from individual events (because consumer wearables sometimes derive AHI from non-AASM-equivalent inputs).</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA-MED-021 8-chapter survey. Each chapter is intended to be readable standalone but together they map the full surface of the standard. Chapter 1 sets context; Chapter 2 covers AASM sleep medicine fundamentals; Chapter 3 introduces the standard at a glance; Chapters 4-7 walk the four-Phase specification; Chapter 8 closes with conformance, AASM compliance, and roadmap.</p>
+
+<p>The conformance test suite at <code>https://github.com/WIA-Official/wia-sleep-monitoring-conformance</code> is the source of truth for what an implementation needs to pass. The reference container <code>wia/sleep-monitoring-host:1.0.0</code> implements every Phase 2 endpoint with mock data. The companion CLI at <code>cli/sleep-monitoring.sh</code> ships sample envelope generators (validate, session, event, score, consent, info subcommands).</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1-DATA-FORMAT.md</code> — the JSON envelope shapes for sessions, sleep stages, respiratory events, arousals, and scoring metadata.</li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2-API-INTERFACE.md</code> — the HTTP surface for ingest, query, and re-scoring.</li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3-PROTOCOL.md</code> — federation handshake, replay defence, patient consent, audience controls.</li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4-INTEGRATION.md</code> — AASM, EDF/EDF+, HL7 FHIR R5, vendor wearable bridges, WIA family composition.</li>
+<li><strong>AASM Manual for the Scoring of Sleep and Associated Events</strong> — the authoritative clinical reference for sleep stage scoring rules. WIA-MED-021 carries data shapes; AASM defines the scoring rules themselves.</li>
+<li><strong>European Data Format (EDF / EDF+)</strong> — the de-facto raw biosignal format that WIA-MED-021 references rather than re-encoding.</li>
+<li><strong>HL7 FHIR R5 Procedure / Observation resources</strong> — the EHR integration target for sleep-clinic results.</li>
+</ul>
+
+<h2>Patient and Clinician Considerations</h2>
+<p>Sleep data is biometric and high-stakes. Phase 1 carries a <code>clinical_grade</code> flag and per-channel signal quality metrics so consumer wearable estimates do not get conflated with clinical PSG measurements. Phase 3 enforces patient consent before any cross-host data flow, with explicit per-audience scopes (clinical_dashboard, ehr_export, research_de_identified). Phase 4 maps to the AASM compliance level so downstream consumers can filter by appropriateness for their clinical context.</p>
+
+<p>The standard's default audience controls are intentionally restrictive: even the patient's own family / caregiver receives only stage histograms by default, not the raw event stream. Operators MAY relax these defaults per local policy, but the standard's baseline assumes minimum disclosure unless explicitly elevated by consent.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-021 Sleep Monitoring Standard v1.0.0</p></footer>
+</body>
+</html>

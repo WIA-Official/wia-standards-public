@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 06: Phase 3 — Federation Protocol — WIA-MED-021 Sleep Monitoring</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #a855f7; }
+h1 { border-bottom: 2px solid #a855f7; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #a855f7; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[sleep-monitoring] Standard Ebook</a> | Chapter 06 (of 8)</nav>
+
+<h1>Chapter 06: Phase 3 — Federation Protocol</h1>
+
+<h2>6.1 Phase 3 in one paragraph</h2>
+<p>Phase 3 specifies how independent sleep monitoring hosts build trust over time, exchange session data without merging databases, defend against replay, and enforce the patient-consent boundary that sleep data necessarily crosses on its way from a sensor to a clinical chart or a research dataset.</p>
+
+<h2>6.2 Roles</h2>
+<p>Recording host, scoring service, clinical host, research aggregator, custodian. A single legal entity MAY play multiple roles; trust is established by federation handshake and recorded in signed receipts.</p>
+
+<h2>6.3 Federation handshake</h2>
+<p>The handshake reuses the WIA-SOCIAL Phase 3 §5 receipt shape so vendor implementations can share their federation library across multiple WIA family standards. State machine: IDLE → PENDING (origin verifies signature) → ACCEPTED (origin issues receipt) → optional REVOKED. Receipts persist for at least 25 years per typical clinical sleep record retention norms.</p>
+
+<h2>6.4 Patient consent envelope</h2>
+<p>The patient consent envelope is the gating control on cross-host data flow. It declares the audiences (clinical hosts, research aggregators) authorised to read patient data, the scopes (clinical_dashboard, ehr_export, research_de_identified) of each authorisation, the validity window, and whether the consent is revocable. For paediatric patients, the custodian is the legal guardian; the custodian MUST be cleared via the WIA-OMNI-API guardian-link flow.</p>
+
+<h2>6.5 Replay defence</h2>
+<p>Each signed envelope (session, stage batch, event, scoring, consent) carries a 96-bit nonce and an RFC 3339 timestamp. Receivers MUST reject envelopes with skew greater than ±300 seconds, reject envelopes whose (signer, nonce) tuple has been seen within the last 600 seconds, and maintain the seen-nonce cache for at least 600 seconds.</p>
+
+<h2>6.6 Cross-host scoring re-computation</h2>
+<p>When AASM publishes a Manual update, every session may need re-scoring under the new rules. The standard supports this without forcing physical data re-transfer: a scoring service federates with the recording host, fetches the EDF, scores under the new algorithm, and POSTs a new scoring_metadata back with supersedes referencing the prior. Both scoring_metadata records are preserved so downstream consumers can choose which to trust.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA-MED-021 8-chapter survey. Each chapter is intended to be readable standalone but together they map the full surface of the standard. Chapter 1 sets context; Chapter 2 covers AASM sleep medicine fundamentals; Chapter 3 introduces the standard at a glance; Chapters 4-7 walk the four-Phase specification; Chapter 8 closes with conformance, AASM compliance, and roadmap.</p>
+
+<p>The conformance test suite at <code>https://github.com/WIA-Official/wia-sleep-monitoring-conformance</code> is the source of truth for what an implementation needs to pass. The reference container <code>wia/sleep-monitoring-host:1.0.0</code> implements every Phase 2 endpoint with mock data. The companion CLI at <code>cli/sleep-monitoring.sh</code> ships sample envelope generators (validate, session, event, score, consent, info subcommands).</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1-DATA-FORMAT.md</code> — the JSON envelope shapes for sessions, sleep stages, respiratory events, arousals, and scoring metadata.</li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2-API-INTERFACE.md</code> — the HTTP surface for ingest, query, and re-scoring.</li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3-PROTOCOL.md</code> — federation handshake, replay defence, patient consent, audience controls.</li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4-INTEGRATION.md</code> — AASM, EDF/EDF+, HL7 FHIR R5, vendor wearable bridges, WIA family composition.</li>
+<li><strong>AASM Manual for the Scoring of Sleep and Associated Events</strong> — the authoritative clinical reference for sleep stage scoring rules. WIA-MED-021 carries data shapes; AASM defines the scoring rules themselves.</li>
+<li><strong>European Data Format (EDF / EDF+)</strong> — the de-facto raw biosignal format that WIA-MED-021 references rather than re-encoding.</li>
+<li><strong>HL7 FHIR R5 Procedure / Observation resources</strong> — the EHR integration target for sleep-clinic results.</li>
+</ul>
+
+<h2>Patient and Clinician Considerations</h2>
+<p>Sleep data is biometric and high-stakes. Phase 1 carries a <code>clinical_grade</code> flag and per-channel signal quality metrics so consumer wearable estimates do not get conflated with clinical PSG measurements. Phase 3 enforces patient consent before any cross-host data flow, with explicit per-audience scopes (clinical_dashboard, ehr_export, research_de_identified). Phase 4 maps to the AASM compliance level so downstream consumers can filter by appropriateness for their clinical context.</p>
+
+<p>The standard's default audience controls are intentionally restrictive: even the patient's own family / caregiver receives only stage histograms by default, not the raw event stream. Operators MAY relax these defaults per local policy, but the standard's baseline assumes minimum disclosure unless explicitly elevated by consent.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-021 Sleep Monitoring Standard v1.0.0</p></footer>
+</body>
+</html>

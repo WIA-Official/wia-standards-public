@@ -5,259 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines how an accredited metamaterial programme integrates
-with the systems that surround it: solver toolchains for simulation;
-electronic design automation pipelines for hardware integration;
-fabrication-vendor systems that consume design files and emit fabrication
-certificates; measurement-laboratory systems that emit measurement
-records; publication and citation tools that resolve externally cited
-designs to their underlying evidence; and the regulators and accreditation
-bodies that read the evidence package. It also defines the
-evidence-package format that bundles a complete design for external
-publication and audit.
+This document defines the canonical INTEGRATION layer for WIA-metamaterial (Metamaterial).
 
 References (CITATION-POLICY ALLOW only):
-
-- IETF RFC 8259 (JSON)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- IETF RFC 8615 (well-known URIs)
-- IETF RFC 8288 (Web Linking)
-- IETF RFC 9421 (HTTP Message Signatures)
-- ISO/IEC 27001:2022 (information security management)
-- ISO/IEC 17025:2017 (testing and calibration laboratories)
-- ISO/IEC 17065:2012 (conformity-assessment bodies)
-- ISO 8601 (date and time)
-- ISO 10110 (optical drawings)
-- W3C Verifiable Credentials Data Model 2.0 (the verification report MAY
-  be re-issued as a Verifiable Credential for downstream consumers; this
-  is optional)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Solver Toolchain Integration
+## §1 Scope
 
-Simulation tools that consume metamaterial designs vary in solver family,
-input file format, and licensing model. Integration with a solver
-toolchain is achieved through an adapter that translates between the
-PHASE-1 unit-cell record and the solver's input language and that
-translates the solver's output back into the PHASE-1 S-parameter,
-dispersion, and field records.
+This PHASE document is one of four that together define the WIA-metamaterial
+standard. It addresses the integration layer of the standard.
 
-The adapter is owned by the programme operating the toolchain. Adapters
-SHOULD be open-source so that downstream consumers can reproduce
-simulations on alternate solvers; closed-source adapters are permitted but
-the resulting simulations are flagged in the public catalogue as
-`closed-toolchain`, with the implication that reproducibility depends on
-re-executing under the same toolchain version.
+## §2 Manifest
 
-## §2 EDA Pipeline Integration
+Implementations publish a signed manifest containing standardSlug
+(constant value: "metamaterial"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-Designs intended for integration into a larger printed-circuit-board or
-photonic-integrated-circuit design pass through an EDA pipeline that
-consumes the unit-cell geometry and the tolerance budget. The EDA tooling
-emits manufacturing artefacts (Gerber files for PCBs, GDSII files for
-photonics, similar artefacts for other fabrication processes) which are
-the inputs to the fabrication vendor.
+## §3 Conformance Tiers
 
-The pipeline records the manufacturing-artefact content-addresses against
-the design so that downstream consumers can audit the chain from unit-cell
-descriptor to fabricated artefact.
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-## §3 Evidence Package Format
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-The evidence package is the externally citable artefact for a design. It is
-produced by the API endpoint defined in PHASE-2 §8 and is a tarball with
-the following layout:
+## §4 Discovery
 
-```
-evidence/
-  manifest.json                     — package manifest (signed, see §4)
-  design.json                       — design record (PHASE-1 §2)
-  unit-cells/                       — unit-cell records and inclusion CAD
-  simulations/                      — simulation records and convergence
-                                     traces
-  s-parameters/                     — frequency-sampled S-parameter data
-  dispersion/                       — band-structure data
-  retrievals/                       — effective-parameter retrieval results
-  tolerances/                       — fabrication-tolerance budgets and
-                                     yield estimates
-  measurements/                     — measurement records, raw archives,
-                                     and uncertainty budgets
-  certificates/                     — fabrication certificates from vendors
-  audit/                            — API audit log excerpts
-```
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/metamaterial`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-The package is content-addressable: the manifest carries the SHA-256 of
-each record file, and the manifest itself is signed.
+## §5 Time and Identity
 
-## §4 Manifest and Signatures
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-The manifest is a JSON document that lists every file in the package, its
-SHA-256 digest, its size in bytes, and its content-type. The manifest is
-signed by the operating programme's HTTP-message-signature key (RFC 9421)
-and counter-signed by the measurement laboratory whose record appears in
-the package.
+## §6 Versioning and Deprecation
 
-A consumer that receives a package verifies the signatures, recomputes
-the file digests, compares them to the manifest, and rejects the package
-on any mismatch. Verification tools that follow this PHASE emit
-Problem-Details (RFC 9457) responses on rejection, with a `type` of
-`urn:wia:metamaterial:evidence-mismatch`.
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-## §5 well-known URI Discovery
+## §7 Privacy and Security
 
-A conformant programme exposes a discovery document at
-`/.well-known/wia-metamaterial` (RFC 8615) that links to the API root
-(PHASE-2 §2), the public accreditation certificate, the published quality
-dossier, the catalogue of published designs, and the round-robin
-participation history.
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-## §6 Publication and Citation
+## §8 Open Governance
 
-When a metamaterial result is cited externally — in a peer-reviewed
-publication, a patent, a regulatory submission, an engineering data sheet
-— the citing party retrieves the evidence package once and pins the
-package's manifest digest in the citation. Subsequent consumers verify
-the citation by re-fetching the package and comparing content-addresses;
-programmes MUST keep evidence packages addressable by their pinned
-manifest digests for at least seven years from the citation event.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `metamaterial` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-A citation tool that adopts this PHASE emits citations in a machine-
-readable form (JSON-LD or BibTeX with WIA-specific extensions) so that
-downstream consumers can resolve a paper's reference to a metamaterial
-design back to the design's evidence package without manual look-up.
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## §7 Fabrication-Vendor Integration
 
-Fabrication vendors that work with a metamaterial programme integrate
-through a vendor-side API that consumes the design's manufacturing
-artefacts and emits a fabrication certificate (PHASE-3 §4). The
-integration record carries the vendor's identifier, the agreed scope of
-work, the metrology used to verify the realised geometry, and the
-content-address of the standing agreement.
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
 
-Programmes SHOULD publish a list of vendor integrations so that
-collaborators can identify suitable vendors for a given fabrication
-process and operating frequency band.
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
 
-## §8 Measurement Laboratory Integration
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-Measurement laboratories deliver measurement records via the API endpoint
-defined in PHASE-2 §7. The integration record carries the laboratory's
-ISO/IEC 17025 accreditation reference and the scopes for which it is
-accredited; the operating programme MUST refuse to accept a measurement
-that falls outside the laboratory's accredited scopes.
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-## §9 Regulator and Accreditation Body Access
+## Annex F — Adoption Roadmap
 
-Regulators and accreditation bodies access the API via dedicated client
-certificates issued by the certifying body. Access scopes for these
-clients include the full design record set; consumer-facing scopes
-(collaborator, vendor, citation tool) are narrower and are documented in
-the API's OpenAPI document.
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-## §10 Migration from Pre-Standard Records
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-Programmes that operated before WIA-metamaterial reached version 1.0 MAY
-migrate historical designs by emitting a synthetic design record that
-carries the original design's identifying information plus a
-`legacyImport` flag. Synthetic designs are accepted by the public
-catalogue but are not eligible for new measurement records without a
-contemporaneous re-measurement.
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-## §11 Public Catalogue and Aggregator Feeds
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-Programmes that publish a public catalogue of designs emit an Atom or
-JSON Feed listing the published designs with their evidence-package
-manifest digests. Feed entries carry the design's operating band, the
-domain (electromagnetic, acoustic, etc.), the programme's identifier, and
-the date of the most recent measurement. The feed is a discovery
-mechanism and is not a primary record.
+## Annex G — Test Vectors and Conformance Evidence
 
-## §12 Worked Example: Citation Resolution
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-A reader encounters a peer-reviewed paper that cites a metamaterial design
-with the WIA citation extension. The reader's tooling resolves the
-citation as follows:
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-1. Parse the citation to extract the design ID and the manifest digest.
-2. Fetch the discovery document for the issuing programme.
-3. Resolve the manifest URL via the discovery document and retrieve the
-   manifest.
-4. Verify the manifest signatures against the programme and laboratory
-   keys advertised in the discovery document.
-5. Recompute the manifest digest and compare to the pinned digest in the
-   citation; abort on mismatch with a Problem-Details response of type
-   `urn:wia:metamaterial:evidence-mismatch`.
-6. Retrieve the package, recompute the per-file digests, and surface the
-   resolved evidence (S-parameters, retrieved parameters, measurement
-   uncertainty) to the reader.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
 
-A conformant tool completes this flow without further input from the
-reader.
+## Annex H — Versioning and Deprecation Policy
 
-## §13 Long-Term Archive Integration
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-Every programme that publishes externally citable designs designates a
-long-term archive that will hold its evidence packages beyond programme
-wind-down. The archive is operated by an institution recognised by the
-certifying body (typically a national library, a national metrological
-laboratory, or a community-operated archive with a stable funding
-commitment). The archive integration is exercised by depositing a copy of
-each newly published evidence package on a cadence agreed with the
-archive (commonly quarterly), and by verifying on each deposit that the
-content-addresses round-trip without corruption.
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-When a programme winds down, its remaining evidence packages are
-transferred to the long-term archive with their content-addresses
-preserved; externally pinned citations resolve to the archive without the
-citing party needing to update the citation.
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-## §14 Verifiable-Credential Re-Issuance (optional)
+## Annex I — Interoperability Profiles
 
-A programme that wishes to expose its verification reports to consumers
-of W3C Verifiable Credentials MAY re-issue the verification report as a
-Verifiable Credential under the Data Model 2.0 specification. The
-credential carries the same payload as the JSON verification report and
-is signed under the same programme key.
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-Verifiable Credentials are a presentation format only; the canonical
-record remains the JSON evidence-package manifest. Programmes that
-re-issue MUST NOT diverge the two presentations of the same record.
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-## §15 Cross-Standard Linkage
-
-A metamaterial design that supports another WIA standard (a phononic
-isolator that ships under WIA-acoustic-engineering, an antenna lens that
-ships under WIA-radio-front-end) carries a cross-standard linkage record
-in its evidence package. The record names the consuming standard, the
-version under which the linkage is claimed, and the assertion that the
-metamaterial design satisfies the consuming standard's interface
-requirements.
-
-Cross-standard linkages are not transitive: a consumer of the
-metamaterial design that wishes to invoke the consuming standard's
-guarantees MUST verify the consuming standard's evidence directly. The
-linkage record is a navigation aid, not a substitute attestation.
-
-## §16 Conformance and Sunset
-
-A programme conformant with PHASE-4 has integrated successfully with at
-least one solver toolchain, at least one fabrication vendor, and at least
-one accredited measurement laboratory, and has published at least one
-externally citable design through the catalogue. The integration dossier
-records the integrations and the test runs that confirmed each.
-
-Sunsetting an integration is announced via the well-known discovery
-document at least 90 calendar days before removal; in-flight designs that
-depend on the sunsetting integration are migrated before removal.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 4 — INTEGRATION
-- **Status:** Stable
-- **Standard:** WIA-metamaterial
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

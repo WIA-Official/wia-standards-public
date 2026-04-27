@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 05: Phase 2 API Walk-Through — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 05 / 8</nav>
+
+<h1>Chapter 05: Phase 2 API Walk-Through</h1>
+
+<h2>5.1 Phase 2 in one paragraph</h2>
+<p>Phase 2 specifies the HTTPS surface for time-series data: write, query, stream, and rollup endpoints. Transport is TLS 1.3 (IETF RFC 8446) only; HTTP/2 RECOMMENDED for multiplexing the high request volumes typical of IoT ingest.</p>
+
+<h2>5.2 Discovery</h2>
+<p>Every host publishes a discovery document at <code>/.well-known/wia-time-series-data</code> listing endpoints, supported signatures, supported aggregations, and rate limits. Discovery responses are cacheable for 300 seconds.</p>
+
+<h2>5.3 Write Endpoint</h2>
+<pre><code>POST /tsd/write
+Content-Type: application/json
+Idempotency-Key: ...
+Authorization: WIA-Sig keyid="...",signature="..."</code></pre>
+
+<p>The write endpoint accepts batched points (typically 1000 points per request to amortise the network round trip). Hosts MUST honour Idempotency-Key per IETF draft idempotency-key-header so devices can safely retry on flaky networks.</p>
+
+<h2>5.4 Query Endpoint</h2>
+<pre><code>POST /tsd/query
+Content-Type: application/json</code></pre>
+
+<p>The query endpoint accepts a query envelope (Chapter 4 §4.4) and returns either a stream of points or a single aggregate. For interactive dashboard queries that need sub-second response, hosts SHOULD pre-aggregate via downsampling (Chapter 2 §2.5) so that queries hit pre-computed rollups rather than raw points.</p>
+
+<h2>5.5 Stream Endpoint</h2>
+<pre><code>GET /tsd/stream/{series_id}
+Accept: text/event-stream</code></pre>
+
+<p>Server-Sent Events for real-time subscription. Reconnecting clients pass Last-Event-Id per WHATWG HTML §9.2 to resume from the last received event.</p>
+
+<h2>5.6 Rollup Endpoint</h2>
+<pre><code>POST /tsd/rollup</code></pre>
+
+<p>Triggers an explicit rollup as described in Chapter 4 §4.5. Useful when an operator changes a downsampling policy retroactively and needs to backfill rollups for older data.</p>
+
+<h2>Summary</h2>
+<p>Phase 2 is REST conventions plus SSE for streams. The conformance test suite walks every endpoint with mock data so an integrator can verify their implementation before going to production.</p>
+
+<p><a href="chapter-06.html">Next: Chapter 6 →</a></p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

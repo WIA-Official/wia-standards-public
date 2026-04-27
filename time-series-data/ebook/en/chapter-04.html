@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 04: Phase 1 Data Format Walk-Through — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 04 / 8</nav>
+
+<h1>Chapter 04: Phase 1 Data Format Walk-Through</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies the JSON envelopes for time-series data: series definitions, individual points, query envelopes, and rollup requests. Every envelope is signed with Ed25519 (IETF RFC 8032) so that signed payloads survive intermediate processing.</p>
+
+<h2>4.2 Series Envelope</h2>
+<p>The series envelope is the registration record. It declares the series name, unit (UCUM code), label set, retention policy, and downsampling rules. Hosts use the envelope to provision storage with the right retention bounds before any points arrive.</p>
+
+<pre><code>{
+  "wia_time_series_data_version": "1.0.0",
+  "type": "series",
+  "series_id": "ts_temperature_kitchen_sensor_A",
+  "unit": "Cel",
+  "labels": { "env": "production", "region": "us-east-1" },
+  "retention_seconds": 2592000,
+  "downsampling_policy": [
+    { "from_resolution_seconds": 1, "after_seconds": 3600,
+      "to_resolution_seconds": 60 },
+    { "from_resolution_seconds": 60, "after_seconds": 604800,
+      "to_resolution_seconds": 3600 }
+  ],
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+
+<h2>4.3 Point Envelope</h2>
+<p>One observation. Required fields: series_id, captured_at, value, value_type. The captured_at timestamp is RFC 3339 UTC with millisecond precision (sub-second precision required for streams at &ge; 1 Hz).</p>
+
+<h2>4.4 Query Envelope</h2>
+<p>A query envelope expresses a structured request: which series, which time window, which aggregation, which resolution. Hosts execute the query against their internal index; the response is a stream of points or a single aggregate value depending on the requested resolution.</p>
+
+<h2>4.5 Rollup Request Envelope</h2>
+<p>Operators trigger explicit rollups via the rollup request envelope. The host computes the rollup over the requested time window and stores the result at the target resolution. Rollups are idempotent at the host level — re-running the same rollup yields the same result, allowing operators to safely retry.</p>
+
+<h2>Summary</h2>
+<p>Phase 1 envelopes are the source of truth for the wire format. JSON Schema 2020-12 documents at <code>/spec/schemas/</code> are the authoritative validation reference.</p>
+
+<p><a href="chapter-05.html">Next: Chapter 5 →</a></p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

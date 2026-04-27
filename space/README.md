@@ -17,7 +17,7 @@
 
 ---
 
-**弘益人間** - *Benefit All Humanity*
+**홍익인간 (弘益人間)** - *Benefit All Humanity*
 
 </div>
 
@@ -197,7 +197,7 @@ MIT License - This standard belongs to humanity.
 
 <div align="center">
 
-🤟 **弘益人間** - Benefit All Humanity
+🤟 **홍익인간 (弘益人間)** - Benefit All Humanity
 
 © 2025 SmileStory Inc. / WIA
 

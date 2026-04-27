@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 07: Phase 4 Integration with Existing Systems — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 07 / 8</nav>
+
+<h1>Chapter 07: Phase 4 Integration with Existing Systems</h1>
+
+<h2>7.1 Phase 4 in one paragraph</h2>
+<p>Phase 4 specifies how WIA-DATA-014 integrates with existing time-series tooling: OpenMetrics / Prometheus exposition format, InfluxDB line protocol, OpenTelemetry metric SDK, Apache Kafka for event streaming, S3 / GCS / Azure Blob for cold archive.</p>
+
+<h2>7.2 OpenMetrics / Prometheus Bridge</h2>
+<p>OpenMetrics 1.0 is the industry standard for operational metrics exposition. The bridge translates each Prometheus metric exposition into a WIA-DATA-014 series envelope (one-time on first scrape) plus a stream of point envelopes. Counters become monotonic series; gauges become point-in-time series; histograms become composite series with per-bucket points.</p>
+
+<h2>7.3 InfluxDB Line Protocol Bridge</h2>
+<p>InfluxDB line protocol is the de-facto IoT ingest format. The bridge accepts line-protocol payloads at <code>/tsd/influx</code> and translates each measurement to the WIA point envelope. The bridge preserves InfluxDB tags as WIA labels and InfluxDB fields as WIA point values; multi-field InfluxDB measurements become multiple WIA points sharing the same captured_at.</p>
+
+<h2>7.4 OpenTelemetry Metric Bridge</h2>
+<p>OpenTelemetry metrics are emitted as OTLP (gRPC or HTTP) by instrumented application code. The bridge subscribes to OTLP endpoints, translates each metric into the WIA envelope, and forwards. The bridge preserves the OpenTelemetry resource attributes as WIA labels with a <code>otel.</code> prefix.</p>
+
+<h2>7.5 Apache Kafka Bridge</h2>
+<p>For very high-volume ingest (millions of points per second), a Kafka bridge separates ingest from query: producers publish WIA envelopes to a Kafka topic, the WIA host consumes from the topic and writes to its time-series store. Kafka\x27s replay semantics let operators rewind on failure without contacting individual producers.</p>
+
+<h2>7.6 Cold Archive Bridge</h2>
+<p>The cold archive bridge writes Parquet files to S3 / GCS / Azure Blob with deterministic per-day naming. The WIA host indexes the archive on demand: a query for old data triggers a list-and-fetch from cold storage rather than a query of the live store.</p>
+
+<h2>Summary</h2>
+<p>Phase 4 keeps WIA-DATA-014 from being yet another silo. The standard is positioned as a thin layer that bridges to the existing tooling rather than replacing it.</p>
+
+<p><a href="chapter-08.html">Next: Chapter 8 →</a></p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chapter 06: Phase 3 Federation Protocol — WIA-DATA-014</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+table { border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #f0f0f0; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html">⏱️ WIA-DATA-014 Time-Series Data Standard Ebook</a> | Chapter 06 / 8</nav>
+
+<h1>Chapter 06: Phase 3 Federation Protocol</h1>
+
+<h2>6.1 Phase 3 in one paragraph</h2>
+<p>Phase 3 specifies how independent hosts federate: a vendor cloud emitting data, a downstream aggregator subscribing to many vendor clouds, a regulator subscribing to a small number of clouds for compliance reasons. The handshake state machine, replay defence bounds, and audience controls make multi-host operation safe.</p>
+
+<h2>6.2 Federation Handshake</h2>
+<p>The handshake reuses the WIA-SOCIAL Phase 3 §5 receipt shape so vendor implementations can share their federation library across multiple WIA family standards. State machine: IDLE → PENDING (origin verifies signature) → ACCEPTED (origin issues receipt) → optional REVOKED.</p>
+
+<h2>6.3 Replay Defence</h2>
+<p>Each signed envelope carries a 96-bit nonce and an RFC 3339 timestamp. Receivers MUST reject envelopes with skew &gt; ±300 seconds, reject envelopes whose (signer, nonce) tuple has been seen within the last 600 seconds, and maintain the seen-nonce cache for at least 600 seconds. For high-volume time-series ingestion, the cache MAY be a Bloom filter; false positives MUST trigger a re-fetch via the standard\x27s pull endpoints rather than silent drops.</p>
+
+<h2>6.4 Audience Controls</h2>
+<p>The same time series can carry very different sensitivity profiles depending on the deployment (an industrial vibration sensor is operationally sensitive but not personally identifying; a home thermostat reveals occupancy). The standard requires the host to declare the per-series sensitivity classification and the consumer to match the declared audience.</p>
+
+<h2>6.5 Cross-Operator Series Move</h2>
+<p>An operator transferring a series from one host to another (cloud migration, vendor change, on-prem to cloud) signs a series_move envelope. The new host fetches the series history from the prior host over a federated read; the old host returns 301 Moved Permanently for the series URL for at least 12 months.</p>
+
+<h2>Summary</h2>
+<p>Federation is what makes WIA-DATA-014 more than a vendor format — it is a wire format that survives organisational boundaries with auditable trust establishment between participants.</p>
+
+<p><a href="chapter-07.html">Next: Chapter 7 →</a></p>
+
+
+<h2>Cross-Chapter References</h2>
+<p>This chapter participates in the WIA-DATA-014 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. Chapter 1 sets context, Chapters 2-3 cover modeling and storage trade-offs, Chapters 4-7 walk the four-Phase specification, and Chapter 8 closes with conformance and roadmap.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-time-series-data-conformance</code> is the single source of truth for what your implementation needs to pass.</li>
+<li><strong>Reference container</strong> — <code>wia/time-series-data-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/time-series-data.sh</code> ships sample envelope generators (validate, series, point, query, rollup, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur across time-series implementations and are baked into the standard. First, cardinality management: every label dimension multiplies the number of distinct series the host must index, and beyond a few million distinct combinations index lookup latency degrades sharply. The standard recommends declaring per-series cardinality budgets and refusing writes that would push past them. Second, late-arriving points: mobile and edge sensors frequently emit measurements with timestamps in the past after a network outage; the standard requires hosts to accept late points up to a configurable bound (default 24 hours) and trigger a re-rollup. Third, retention policy: every series declares explicit retention bounds and downsampling rules, so capacity planning is not magic and operators can reason about long-term storage cost from the moment they create a series.</p>
+
+<h2>Further Reading</h2>
+<ul>
+<li>OpenMetrics 1.0 specification at <code>https://openmetrics.io/</code> — covers the operational metrics exposition format that Phase 4 §7.2 bridges from.</li>
+<li>InfluxDB line protocol reference — covers the IoT ingest format that Phase 4 §7.3 bridges from.</li>
+<li>OpenTelemetry metric SDK documentation — covers the metric SDK that Phase 4 §7.4 bridges from.</li>
+<li>HL7 FHIR R5 Observation resource — for time-series data tied to a clinical context, Phase 4 of the WIA Vital Sign Streaming companion standard provides the FHIR mapping.</li>
+<li>WIA-OMNI-API standard — for credential storage when running federated time-series infrastructure across multiple operators.</li>
+<li>WIA-AIR-SHIELD standard — for transport hardening and peer reputation scoring on cross-operator federation.</li>
+<li>JSON Schema 2020-12 — the validation reference for every WIA-DATA-014 envelope.</li>
+</ul>
+
+</body>
+</html>

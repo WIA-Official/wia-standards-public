@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 4: Phase 1 - Universal Data Format - WIA Screen Reader Standard Ebook</title>
+</head>
+<body>
+<h1>[Screen Reader] Chapter 4: Phase 1 - Universal Data Format</h1>
+
+## The WIA Screen Reader JSON Schema
+
+The foundation of WIA Screen Reader is a universal JSON format that encapsulates all accessibility data.
+
+## Schema Structure
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WIA Screen Reader Standard v1.0",
+  "type": "object",
+  "properties": {
+    "wia_screen_reader": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" },
+        "text": { "type": "string" },
+        "language": { "type": "string" },
+        "pronunciation": { "$ref": "#/definitions/pronunciation" },
+        "braille": { "$ref": "#/definitions/braille" },
+        "tts": { "$ref": "#/definitions/tts" },
+        "context": { "$ref": "#/definitions/context" }
+      }
+    }
+  }
+}
+```
+
+## Pronunciation Object
+
+```json
+{
+  "pronunciation": {
+    "ipa": "/həˈloʊ wɜːrld/",
+    "wihp": "헬로우 월드",
+    "romanized": "hello world",
+    "syllables": ["hel", "lo", "world"]
+  }
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ipa | string | IPA transcription |
+| wihp | string | Korean Hangul pronunciation |
+| romanized | string | Romanized form |
+| syllables | array | Syllable breakdown |
+
+## Braille Object
+
+```json
+{
+  "braille": {
+    "grade1": "⠓⠑⠇⠇⠕ ⠺⠕⠗⠇⠙",
+    "grade2": "⠓⠑⠇⠇⠕ ⠺⠕⠗⠇⠙",
+    "wia": "ㅎㅓㄹㄹㅗㅇ ㅇㅝㄹㄷㅡ",
+    "cells": 11
+  }
+}
+```
+
+## TTS Configuration
+
+```json
+{
+  "tts": {
+    "rate": 1.0,
+    "pitch": 1.0,
+    "volume": 1.0,
+    "voice": "default",
+    "ssml": "<speak>Hello World</speak>"
+  }
+}
+```
+
+## Context Object
+
+```json
+{
+  "context": {
+    "element_type": "heading",
+    "level": 1,
+    "landmark": "main",
+    "state": {
+      "expanded": false,
+      "selected": true
+    }
+  }
+}
+```
+
+## Complete Example
+
+```json
+{
+  "wia_screen_reader": {
+    "version": "1.0.0",
+    "text": "Welcome to WIA Standards",
+    "language": "en",
+    "pronunciation": {
+      "ipa": "/ˈwelkəm tuː/",
+      "wihp": "웰컴 투 WIA 스탠다즈"
+    },
+    "braille": {
+      "grade1": "⠺⠑⠇⠉⠕⠍⠑ ⠞⠕ ⠠⠺⠊⠁",
+      "cells": 15
+    },
+    "context": {
+      "element_type": "heading",
+      "level": 1,
+      "landmark": "banner"
+    }
+  }
+}
+```
+
+---
+
+*Next: Chapter 5 - Phase 2: Cross-Platform API*
+
+<h2>Cross-Chapter Anchors</h2>
+
+<p>This chapter sits inside the WIA Screen Reader 8-chapter sequence. Each chapter is intended to be readable standalone but gains depth when read in order. The standard's 4-Phase specification is cross-referenced throughout:</p>
+
+<ul>
+<li><strong>Phase 1 (Data Format)</strong> — pronunciation hint, accessibility tree node, reading order plan, braille mapping, user profile, telemetry frame envelopes.</li>
+<li><strong>Phase 2 (API Interface)</strong> — local IPC for NVDA / VoiceOver / Orca, browser-extension message-passing, cloud-relay HTTPS endpoints.</li>
+<li><strong>Phase 3 (Federation Protocol)</strong> — pronunciation hint sharing across vendors, profile portability across devices, telemetry consent enforcement, curator trust scoring.</li>
+<li><strong>Phase 4 (Integration)</strong> — NVDA addon, VoiceOver daemon, TalkBack module, Orca plugin, Chrome / Firefox / Edge browser extensions, EPUB 3 Accessibility integration, WIA family composition (WIHP for Korean phonetics, WIA Braille for the 8-dot extension, WIA-OMNI-API for credentials, WIA-ACCESSIBILITY for accommodations).</li>
+</ul>
+
+<h2>Conformance and Reference Implementation</h2>
+
+<p>A black-box conformance test suite is open-sourced at <code>https://github.com/WIA-Official/wia-screen-reader-conformance</code>. The reference implementation ships as separate addons / daemons / extensions per platform, all published from the same monorepo at <code>WIA-Official/wia-screen-reader-impl</code>. Implementers can either consume the reference implementations directly or build vendor-specific implementations that pass the conformance suite.</p>
+
+<h2>Why This Standard Matters</h2>
+
+<p>Screen-reader accessibility has historically been a per-vendor concern. NVDA users build pronunciation lexicons that VoiceOver users cannot consume. Korean braille readers use a Korean-specific 8-dot extension that English Grade 2 readers cannot understand. WIA Screen Reader exists to make these resources portable: a hint curated by a Korean medical-terminology educator works for an Android TalkBack reader on a Spanish keyboard, because the underlying envelope shapes are uniform.</p>
+
+<p>The 211-language support (via WIHP) is the standard's headline feature, but the more important architectural choice is the user profile portability described in Phase 3 §5: a user can move between work NVDA, home VoiceOver, and mobile TalkBack without losing their voice rate, braille grade, or hint subscriptions.</p>
+
+<h2>Implementer Notes</h2>
+
+<p>Three operational concerns recur across screen-reader integrations and are baked into the standard:</p>
+
+<ol>
+<li><strong>Latency budget for live announcements.</strong> Live regions (chat messages, form errors, search results) need to reach the user under the screen-reader's perceived latency threshold. The standard recommends an end-to-end budget of 250 ms from page event to spoken output for <code>polite</code> live regions, 100 ms for <code>assertive</code>, and 500 ms for the WIA-Screen-Reader-extension <code>gentle</code> tier.</li>
+<li><strong>Memory footprint of pronunciation hint cache.</strong> A Korean medical reader subscribed to two curators may cache 50,000+ hints. The standard recommends an LRU cache with a 100 MB ceiling and per-language eviction priorities tied to the user's preferred language.</li>
+<li><strong>Braille display I/O.</strong> Refreshable braille displays often connect via USB or Bluetooth with vendor-proprietary protocols. The standard does not define the wire protocol to the display itself; it defines only the JSON envelope that the host emits. Driver code remains per-vendor.</li>
+</ol>
+
+<h2>Accessibility-First Design</h2>
+
+<p>Every choice in this standard is filtered through the question: <em>"does this make the experience better for the visually impaired user, or just easier for the implementer?"</em> When the two conflict, the user wins. That is why the standard mandates explicit consent for telemetry, refuses to log raw page URLs in any host-side data, and requires implementations to surface name-source provenance so the user can debug why a button reads as a particular phrase.</p>
+
+<footer><p style="text-align:center;color:#888;margin-top:40px;">弘益人間 · Benefit All Humanity · WIA Screen Reader Standard v1.0.0</p></footer>
+</body>
+</html>

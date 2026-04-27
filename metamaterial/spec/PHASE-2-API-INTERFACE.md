@@ -5,294 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the HTTP API contract that an accredited metamaterial
-design and characterisation programme exposes for the records defined in
-PHASE-1. The contract is consumed by collaborating design groups, by
-fabrication vendors, by accredited measurement laboratories, and by
-publication and citation tools that resolve a metamaterial result to its
-underlying simulation and measurement evidence.
+This document defines the canonical API-INTERFACE layer for WIA-metamaterial (Metamaterial).
 
 References (CITATION-POLICY ALLOW only):
-
-- IETF RFC 9110 (HTTP Semantics)
-- IETF RFC 9111 (HTTP Caching)
-- IETF RFC 9112 (HTTP/1.1)
-- IETF RFC 9113 (HTTP/2)
-- IETF RFC 9114 (HTTP/3)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- IETF RFC 6901 (JSON Pointer)
-- IETF RFC 6902 (JSON Patch)
-- IETF RFC 8288 (Web Linking)
-- IETF RFC 8259 (JSON)
-- IETF RFC 5789 (PATCH method)
-- IETF RFC 9421 (HTTP Message Signatures)
-- ISO 8601 (date and time)
-- ISO/IEC 27001:2022 (information security management)
-- W3C Trace Context (correlation propagation)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Scope and Versioning
+## §1 Scope
 
-The API is a JSON-over-HTTPS interface served on a domain published by the
-operating programme. Versioning uses URL path segments (`/v1/`) and follows
-Semantic Versioning 2.0.0 at the major-version level. Additive changes in
-shape are permitted in-place; non-additive changes require a new major
-path segment. The OpenAPI 3.1 document at `/v1/openapi.json` is the
-canonical machine-readable description.
+This PHASE document is one of four that together define the WIA-metamaterial
+standard. It addresses the api-interface layer of the standard.
 
-## §2 Root Discovery
+## §2 Manifest
 
-```
-GET /v1/
-```
+Implementations publish a signed manifest containing standardSlug
+(constant value: "metamaterial"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-Response:
+## §3 Conformance Tiers
 
-```json
-{
-  "standard": "WIA-metamaterial",
-  "phase": "API-INTERFACE",
-  "version": "1.0",
-  "links": {
-    "designs":       "/v1/designs",
-    "unitCells":     "/v1/unit-cells",
-    "simulations":   "/v1/simulations",
-    "sParameters":   "/v1/s-parameters",
-    "dispersion":    "/v1/dispersion",
-    "retrievals":    "/v1/retrievals",
-    "tolerances":    "/v1/tolerances",
-    "measurements":  "/v1/measurements",
-    "evidence":      "/v1/evidence",
-    "openapi":       "/v1/openapi.json"
-  }
-}
-```
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-## §3 Designs
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-```
-POST   /v1/designs                    — create a design
-GET    /v1/designs/{designId}         — retrieve a design
-PATCH  /v1/designs/{designId}         — update mutable fields
-GET    /v1/designs?domain={d}&since={ts}  — list with cursor pagination
-```
+## §4 Discovery
 
-`POST /v1/designs` accepts the design record from PHASE-1 §2. The server
-generates `designId` server-side as a UUIDv7 and returns the canonical
-record. Status transitions follow the schedule defined in PHASE-1 §2;
-invalid transitions return `422 Unprocessable Entity` with type
-`urn:wia:metamaterial:status-transition`.
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/metamaterial`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-## §4 Unit Cells, Simulations, and Spectra
+## §5 Time and Identity
 
-```
-POST   /v1/designs/{designId}/unit-cells    — register a unit cell
-POST   /v1/unit-cells/{ucid}/simulations    — submit a simulation request
-GET    /v1/simulations/{simId}/s-parameters — retrieve scattering data
-GET    /v1/simulations/{simId}/dispersion   — retrieve dispersion bands
-```
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Simulation submissions are asynchronous: the server responds `202 Accepted`
-with a `Location` header pointing at the simulation resource. The
-simulation transitions through `pending` → `running` → `complete` (or
-`failed`). Streaming progress is exposed via Server-Sent Events at
-`/v1/simulations/{simId}/events`.
+## §6 Versioning and Deprecation
 
-A request with a meshing budget that the server cannot satisfy returns
-`507 Insufficient Storage` with type
-`urn:wia:metamaterial:simulation-budget`.
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-## §5 Effective-Parameter Retrieval
+## §7 Privacy and Security
 
-```
-POST   /v1/simulations/{simId}/retrievals   — perform a retrieval
-GET    /v1/retrievals/{retrievalId}         — fetch retrieval result
-GET    /v1/retrievals/{retrievalId}/branches — branch-selection metadata
-```
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Retrieval is a separate request because the inversion may be re-run with
-different branch-selection policies; the design record retains every
-retrieval that was applied so that downstream consumers can compare them.
+## §8 Open Governance
 
-## §6 Tolerance Budgets
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `metamaterial` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-```
-POST   /v1/designs/{designId}/tolerances    — register a tolerance budget
-PATCH  /v1/tolerances/{tid}                 — adjust sensitivities
-GET    /v1/tolerances/{tid}/yield-estimate  — predicted yield given sigma
-```
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-The yield estimate accepts an optional `samples` query parameter to
-control the Monte-Carlo sample size used by the server.
 
-## §7 Measurements
+## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
 
-```
-POST   /v1/designs/{designId}/measurements        — register a measurement
-GET    /v1/measurements/{mid}                     — retrieve measurement
-GET    /v1/measurements/{mid}/raw                 — fetch the raw archive
-PATCH  /v1/measurements/{mid}/uncertainty         — append uncertainty
-                                                    contributions
-```
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
 
-The raw archive is delivered as an immutable resource with
-`Cache-Control: max-age=31536000, immutable`; the URL is content-addressed
-by the SHA-256 of the archive.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## §8 Evidence Package
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-```
-POST   /v1/designs/{designId}/evidence    — request package generation
-GET    /v1/evidence/{packageId}           — retrieve a package
-GET    /v1/evidence/{packageId}/manifest  — retrieve manifest only
-```
+## Annex F — Adoption Roadmap
 
-The evidence package format is governed by PHASE-4 §3 and contains the
-design record, unit cell, simulations, retrievals, tolerance budgets,
-measurements, and signed manifest.
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-## §9 Authentication
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-The API uses mutually-authenticated TLS for laboratory-to-laboratory and
-laboratory-to-publisher connections, with client certificates issued by an
-accreditation root operated by the certifying body. Public read-only
-endpoints (the design landing pages, the openapi document, the well-known
-discovery resource) are reachable without a client certificate.
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-## §10 Errors
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-All error responses are `application/problem+json` per RFC 9457. The
-`type` field is a URN under the `urn:wia:metamaterial` namespace. Defined
-types include:
+## Annex G — Test Vectors and Conformance Evidence
 
-- `urn:wia:metamaterial:status-transition` — invalid status change.
-- `urn:wia:metamaterial:geometry-out-of-domain` — inclusion outside cell.
-- `urn:wia:metamaterial:simulation-budget` — request exceeds budget.
-- `urn:wia:metamaterial:retrieval-branch` — ambiguous branch choice.
-- `urn:wia:metamaterial:measurement-uncertainty` — uncertainty contribution
-  missing.
-- `urn:wia:metamaterial:evidence-mismatch` — package digest mismatch.
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-Each problem response carries a `traceId` per W3C Trace Context.
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-## §11 Caching and Conditional Requests
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
+auditor tooling.
 
-GET responses for stable resources (completed simulations, measurements,
-evidence packages) are cacheable with `Cache-Control: max-age=31536000,
-immutable`. Mutable resources (draft designs, in-progress simulations) are
-cacheable for 60 seconds. ETags are mandatory on every PATCH endpoint;
-conditional requests use `If-Match`. Servers MUST return `412 Precondition
-Failed` on stale ETags with the current ETag exposed in the
-`serverETag` problem extension.
+## Annex H — Versioning and Deprecation Policy
 
-## §12 Worked Example: From Design to Evidence
+This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-The canonical positive vector exercises the API end-to-end:
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-1. Create a design under `/v1/designs` with the operating band declared.
-2. Register a unit cell describing the lattice and inclusions.
-3. Submit a simulation request; poll the simulation resource (or
-   subscribe to its event stream) until it transitions to `complete`.
-4. Retrieve effective parameters and capture the chosen branch policy.
-5. Register a tolerance budget and request a yield estimate.
-6. Register a measurement on the realised sample and append uncertainty
-   contributions.
-7. Request an evidence package, retrieve the package manifest, and pin
-   the manifest digest as the externally citable reference.
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-A conformant server completes this flow without error for the canonical
-positive vector under `tests/phase-vectors/phase-2-api-interface/`.
+## Annex I — Interoperability Profiles
 
-## §13 Field-Distribution Endpoints
+This annex describes how implementations declare interoperability profiles
+for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-For designs that carry field-distribution payloads (PHASE-1 §11), the
-following endpoints expose the field archives to consumers:
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-```
-GET    /v1/simulations/{simId}/field-distributions
-GET    /v1/field-distributions/{fdid}                 — metadata
-GET    /v1/field-distributions/{fdid}/archive         — raw archive
-GET    /v1/field-distributions/{fdid}/slice?z={m}     — server-rendered
-                                                        2-D slice as JSON
-GET    /v1/field-distributions/{fdid}/probe?x={m}&y={m}&z={m}
-                                                      — single-point sample
-```
-
-Server-rendered slices and probes are convenience endpoints; consumers
-that require full-fidelity field data MUST retrieve the archive. The
-slice endpoint accepts an `Accept` header to negotiate JSON, NumPy
-`.npy`, or HDF5 packaging; the archive is delivered in the encoding
-declared on the field-distribution metadata.
-
-## §14 Streaming Subscriptions
-
-Consumers that require live updates during a long-running simulation
-campaign subscribe to a Server-Sent Events stream at
-`/v1/designs/{designId}/events`. Events emitted include simulation
-status changes, measurement registrations, fabrication-certificate
-arrivals, and evidence-package availability.
-
-A subscription includes a heartbeat every 30 seconds so that
-intermediaries can detect stale connections and reconnect. Replays from
-the last known event identifier are supported via the
-`Last-Event-ID` header (W3C EventSource semantics).
-
-## §15 Audit and Observability
-
-Every endpoint emits structured logs with `designId`, `traceId`, the
-issuing client certificate's subject, and the operator's clock skew vs
-the reference NTP source. Audit logs are retained for at least seven
-calendar years from the last access of the design.
-
-## §16 Bulk Operations
-
-Long-running design sweeps (parameter sweeps over lattice constants,
-parametric studies on inclusion geometry, statistical campaigns over
-fabrication tolerances) are submitted as bulk operations rather than as
-individual requests. A bulk operation accepts an array of design,
-unit-cell, simulation, or retrieval specifications and emits an
-operation resource that tracks the sweep as a unit.
-
-```
-POST   /v1/bulk/simulations         — submit a bulk simulation sweep
-GET    /v1/bulk/{operationId}       — retrieve operation status
-GET    /v1/bulk/{operationId}/items — per-item status and results
-DELETE /v1/bulk/{operationId}       — cancel a running operation
-```
-
-Bulk operations report aggregate progress (`pendingCount`, `runningCount`,
-`completeCount`, `failedCount`) and per-item terminal status. Cancellation
-is best-effort; items already running on a solver continue to completion
-and emit their results normally so that work is not lost.
-
-The bulk-operation endpoints share the rate-limit budget with their
-single-request counterparts. Programmes that anticipate sustained sweep
-load SHOULD negotiate a higher budget with the certifying body and
-record the negotiated budget in their quality dossier.
-
-## §17 Pagination Conventions
-
-List endpoints (`/v1/designs`, `/v1/measurements`, `/v1/bulk/...`) use
-cursor-based pagination via the `cursor` query parameter and a
-`Link` header (RFC 8288) carrying `rel="next"` and `rel="prev"`
-relations. Cursors are opaque to clients; servers MUST persist enough
-state to resolve a cursor for at least 24 hours after issuance so that
-mid-sweep clients are not interrupted by cursor expiry.
-
-## §18 Conformance
-
-A conformant server passes the test vectors published under
-`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI 3.1 document
-that round-trips the resource shapes defined in this PHASE, and signs
-exported evidence packages per RFC 9421.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 2 — API-INTERFACE
-- **Status:** Stable
-- **Standard:** WIA-metamaterial
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

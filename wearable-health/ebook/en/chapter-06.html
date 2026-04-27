@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 06: Phase 3 — Federation Protocol — WIA Wearable Health</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #10b981; }
+h1 { border-bottom: 2px solid #10b981; padding-bottom: 10px; }
+pre { background: #1e293b; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #10b981; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; font-size: 1.1em; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">[wearable-health] Standard Ebook</a> | Chapter 06 (of 8)</nav>
+
+<h1>Chapter 06: Phase 3 — Federation Protocol</h1>
+
+<h2>6.1 Phase 3 in one paragraph</h2>
+<p>Phase 3 specifies how independent wearable health hosts build trust over time, exchange device data without merging databases, defend against replay, and enforce the patient-consent boundary. The handshake state machine, replay defence bounds, and audience controls are designed so that a vendor cloud, a hospital RPM platform, and a research aggregator can collaborate on a patients data without any single party becoming the central database.</p>
+
+<h2>6.2 Roles</h2>
+<p>The five roles (vendor cloud, patient-controlled host, clinical host, research aggregator, custodian) are summarised in Chapter 3. Phase 3 specifies how they federate: each issues federation receipts to the others after a handshake, the receipts are persisted by both sides, and every cross-host data flow is gated on a fresh patient consent envelope.</p>
+
+<h2>6.3 Federation handshake</h2>
+<p>The handshake reuses the WIA-SOCIAL Phase 3 §5 receipt shape so that vendor implementations can share their federation library across multiple WIA family standards. State machine: IDLE → PENDING (origin verifies signature) → ACCEPTED (origin issues receipt) → optional REVOKED.</p>
+
+<h2>6.4 Patient consent envelope</h2>
+<p>The patient consent envelope is the gating control on cross-host data flow. It declares the audiences (clinical hosts, research aggregators) authorised to read the patient data, the scopes (clinical_dashboard, ehr_export, research_aggregate) of each authorisation, the validity window, and whether the consent is revocable.</p>
+
+<pre>
+{
+  "wia_wearable_health_version": "1.0.0",
+  "type": "patient_consent",
+  "patient_id": "did:wia:patient:01HXY",
+  "scopes": ["clinical_dashboard", "ehr_export"],
+  "audiences": [
+    { "audience_id": "did:wia:clinical-host:hospital-A", "scope": "clinical_dashboard" }
+  ],
+  "valid_from": "2026-04-01T00:00:00Z",
+  "valid_until": "2027-04-01T00:00:00Z",
+  "revocable": true,
+  "signature": { "alg": "Ed25519", "value": "AY3o..." }
+}
+</pre>
+
+<p>For paediatric patients the custodian is the legal guardian; the custodian MUST be cleared via a separate identity-proofing flow documented in Phase 4 §WIA-OMNI-API.</p>
+
+<h2>6.5 Replay defence</h2>
+<p>Each signed envelope (sync, alert, consent) carries a 96-bit nonce and an RFC 3339 timestamp. Receivers MUST reject envelopes with skew greater than ±300 seconds, reject envelopes whose <code>(signer, nonce)</code> tuple has been seen within the last 600 seconds, and maintain the seen-nonce cache for at least 600 seconds. For critical alerts the cache MUST be persistent across restarts so that a vendor failover does not re-open the window for a duplicated critical alert (which could trigger duplicate clinician pages).</p>
+
+<h2>6.6 Audience matrix</h2>
+<p>The audience matrix encodes who can see what. Public audience sees only aggregate engagement statistics. Patient sees their own full data. Caregiver sees per-scope summaries. Clinician sees full data for patients under active care. EHR bridge sees per-minute aggregates by default; full waveform requires elevated consent. Research sees de-identified data per HIPAA Safe Harbor §164.514(b)(2). Emergency service sees full data plus identifying metadata under emergency consent that auto-expires after 24 hours.</p>
+
+<h2>6.7 Cross-vendor patient move</h2>
+<p>A patient transferring from one vendor cloud to another publishes a signed <code>patient_move</code> envelope. The new vendor fetches the patients history from the prior vendor over a federated read; the old vendor returns <code>301 Moved Permanently</code> for the patients data URL for at least 12 months.</p>
+
+<h2>Chapter Cross-References</h2>
+<p>This chapter participates in the WIA-MED-020 8-chapter survey. Each chapter is intended to be readable standalone, but together they map the full surface of the standard. The Phase numbering used throughout (Phase 1 / 2 / 3 / 4) refers to the four-document specification — Chapter 4 covers Phase 1, Chapter 5 covers Phase 2, Chapter 6 covers Phase 3, Chapter 7 covers Phase 4.</p>
+
+<h2>Where to look next</h2>
+<ul>
+<li><strong>Conformance test suite</strong> — <code>https://github.com/WIA-Official/wia-wearable-health-conformance</code> is the single source of truth. When this book and the test suite disagree, the test suite wins.</li>
+<li><strong>Reference container</strong> — <code>wia/wearable-health-host:1.0.0</code> implements every Phase 2 endpoint with mock data; integrators exercise their bridge against it before going to production.</li>
+<li><strong>Companion CLI</strong> — <code>cli/wearable-health.sh</code> ships sample envelope generators (validate, device, measurement, alert, consent, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li>
+<li><strong>Companion standards</strong> — WIA-OMNI-API for credentials, WIA-AIR-SHIELD for transport hardening, WIA-INTENT for clinician intent lowering, WIA-ACCESSIBILITY for accommodations, WIA Vital Sign Streaming for high-rate continuous waveforms.</li>
+</ul>
+
+<h2>Patient-First Design</h2>
+<p>Every choice in this standard is filtered through the question: <em>"does this make wearable data more useful for the patient and their care team, or just easier for vendors to ship?"</em> When the two conflict, the patient and care team win. That is why the standard mandates explicit patient consent for cross-host data flow, refuses to accept clinical-grade claims without regulatory clearance, and requires implementations to surface calibration provenance so that clinicians can verify the source quality of every measurement they make decisions on.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-MED-020 Wearable Health Standard v1.0.0</p></footer>
+</body>
+</html>

@@ -5,257 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines how an accredited protein-dynamics programme
-integrates with the systems that surround it: simulation engines and
-high-performance-computing environments that produce trajectories;
-spectroscopy laboratories that produce observables; biobank governance
-services that mediate biospecimen consent; structural-biology
-repositories that hold deposited starting structures; long-term archives
-that hold externally cited evidence packages; and the regulators and
-accreditation bodies that read the evidence package. It also defines
-the evidence-package format that bundles a complete study for external
-publication and audit.
+This document defines the canonical INTEGRATION layer for WIA-protein-dynamics (Protein Dynamics).
 
 References (CITATION-POLICY ALLOW only):
-
-- IETF RFC 8259 (JSON)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- IETF RFC 8615 (well-known URIs)
-- IETF RFC 8288 (Web Linking)
-- IETF RFC 9421 (HTTP Message Signatures)
-- ISO/IEC 27001:2022 (information security management)
-- ISO/IEC 27701:2019 (privacy information management)
-- ISO/IEC 17025:2017 (testing and calibration laboratories)
-- ISO/IEC 17065:2012 (conformity-assessment bodies)
-- ISO 8601 (date and time)
-- HL7 FHIR R5 (biospecimen and consent resources)
-- W3C Verifiable Credentials Data Model 2.0 (optional re-issuance of
-  evidence summaries)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Simulation Engine Integration
+## §1 Scope
 
-Computational dynamics campaigns are executed on simulation engines that
-vary in input language, integrator implementation, and parallelisation
-strategy. Integration with an engine is achieved through an adapter that
-translates between the PHASE-1 simulation record and the engine's input
-and that translates the engine's outputs back into the PHASE-1
-trajectory record.
+This PHASE document is one of four that together define the WIA-protein-dynamics
+standard. It addresses the integration layer of the standard.
 
-The adapter is owned by the programme operating the engine and is
-exercised in the engine-vendor's reference test matrix at least once per
-calendar year. Adapter source SHOULD be open-source so that downstream
-consumers can reproduce simulations on alternate engines; closed-source
-adapters are permitted but the resulting simulations are flagged in the
-public catalogue as `closed-toolchain`.
+## §2 Manifest
 
-## §2 HPC Environment Integration
+Implementations publish a signed manifest containing standardSlug
+(constant value: "protein-dynamics"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-Long simulation campaigns run on shared HPC environments. The integration
-record carries the HPC site identifier, the queue and resource budget,
-the container or environment-module manifest used to execute the
-simulation, and the locked dependency manifest that PHASE-1 §7 expects.
-The locked manifest is content-addressed; programmes MUST refuse to
-publish a campaign whose locked manifest cannot be re-pinned at
-publication time.
+## §3 Conformance Tiers
 
-## §3 Evidence Package Format
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-The evidence package is the externally citable artefact for a study. It
-is produced by the API endpoint defined in PHASE-2 and is a tarball with
-the following layout:
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-```
-evidence/
-  manifest.json                     — package manifest (signed, see §4)
-  study.json                        — study record (PHASE-1 §2)
-  preparations/                     — preparation records and FHIR
-                                     biospecimen links
-  structures/                       — starting-structure records and
-                                     mmCIF artefacts
-  simulations/                      — simulation records, force-field
-                                     manifests, and integrator
-                                     parameters
-  trajectories/                     — trajectory metadata and
-                                     coordinate-archive references
-  observables/                      — spectroscopic observable records,
-                                     raw archives, and reduced data
-  analyses/                         — analysis pipelines, locked
-                                     environments, and outputs
-  validations/                      — cross-validation records
-  consent/                          — consent-chain hashes (FHIR R5)
-  audit/                            — API audit log excerpts
-```
+## §4 Discovery
 
-The package is content-addressable; the manifest carries the SHA-256 of
-each record file and the manifest itself is signed.
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/protein-dynamics`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-## §4 Manifest and Signatures
+## §5 Time and Identity
 
-The manifest is a JSON document that lists every file in the package,
-its SHA-256 digest, its size in bytes, and its content-type. The
-manifest is signed by the operating programme's HTTP-message-signature
-key (RFC 9421) and counter-signed by the experimental laboratory whose
-record appears in the package, when one is present.
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Verification tools that follow this PHASE emit Problem-Details (RFC 9457)
-responses on rejection, with a `type` of
-`urn:wia:protein-dynamics:evidence-mismatch`.
+## §6 Versioning and Deprecation
 
-## §5 well-known URI Discovery
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-A conformant programme exposes a discovery document at
-`/.well-known/wia-protein-dynamics` (RFC 8615) that links to the API
-root, the public accreditation certificate, the published quality
-dossier, the catalogue of published studies, and the round-robin
-participation history.
+## §7 Privacy and Security
 
-## §6 Biobank Governance Integration
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-For studies that consume clinical biospecimens, integration with the
-source biobank's governance service mediates consent verification
-(PHASE-3 §2). The integration record carries the biobank's identifier,
-the FHIR R5 endpoints that the biobank exposes, and the credentials
-under which the protein-dynamics programme accesses those endpoints.
-Credentials are mutual-TLS-based; the credential rotation cadence is
-recorded in the programme's quality dossier.
+## §8 Open Governance
 
-A study whose biospecimen consent has been revoked at the biobank is
-flagged in the public catalogue with the withdrawal notice produced by
-the API per PHASE-3 §2; consumers retrieving the evidence package
-receive a manifest that includes the withdrawal notice as a top-level
-artefact, even when the underlying simulation and analysis records are
-left in place for transparency.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `protein-dynamics` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-## §7 Structural Repository Integration
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-When a study's starting structure is deposited in a community structural
-repository (PDB, electron microscopy databank, model archive), the
-integration record carries the repository accession and the version of
-the deposited entry. The evidence package's structure record (§3)
-references the deposited entry by accession and by content-address, so
-that consumers can verify that the structure used in the simulation
-corresponds to the entry that was deposited at the repository.
 
-## §8 Publication and Citation
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
 
-When a study is cited externally, the citing party retrieves the
-evidence package once and pins the package's manifest digest in the
-citation. Subsequent consumers verify the citation by re-fetching the
-package and comparing content-addresses; programmes MUST keep evidence
-packages addressable by their pinned manifest digests for at least
-seven years from the citation event.
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
 
-A citation tool that adopts this PHASE emits citations in a machine-
-readable form (JSON-LD or BibTeX with WIA-specific extensions) so that
-downstream consumers can resolve a paper's reference to a study back to
-the study's evidence package without manual look-up.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## §9 Long-Term Archive Integration
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-Every programme that publishes externally cited studies designates a
-long-term archive (typically a national library or a discipline-specific
-archive with a stable funding commitment). Evidence packages are
-deposited at the archive on a quarterly cadence and the deposit is
-verified by re-pinning the content-addresses on each deposit. On
-programme wind-down, remaining packages transfer to the archive with
-content-addresses preserved.
+## Annex F — Adoption Roadmap
 
-## §10 Regulator and Accreditation Body Access
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-Regulators and accreditation bodies access the API via dedicated client
-certificates issued by the certifying body. Access scopes for these
-clients include the full study record set, including audit logs and
-consent-chain hashes; consumer-facing scopes are narrower and are
-documented in the API's OpenAPI document.
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## §11 Verifiable-Credential Re-Issuance (optional)
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-A programme that wishes to expose its evidence summaries to consumers
-of W3C Verifiable Credentials MAY re-issue a study summary as a
-Verifiable Credential under the Data Model 2.0 specification. The
-credential carries the manifest digest and the analysis-output
-identifiers and is signed under the same programme key. Re-issuance is
-optional; the canonical record remains the JSON evidence package.
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## §12 Worked Example: Citation Resolution
+## Annex G — Test Vectors and Conformance Evidence
 
-A reader encounters a peer-reviewed paper that cites a protein-dynamics
-study with the WIA citation extension. The reader's tooling resolves the
-citation as follows:
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-1. Parse the citation to extract the study ID and the manifest digest.
-2. Fetch the discovery document for the issuing programme.
-3. Resolve the manifest URL via the discovery document and retrieve the
-   manifest.
-4. Verify the manifest signatures against the programme and laboratory
-   keys advertised in the discovery document.
-5. Recompute the manifest digest and compare it to the pinned digest in
-   the citation; abort on mismatch.
-6. Retrieve the package; recompute the per-file digests; surface the
-   resolved evidence (trajectory, observable, analysis outputs, cross-
-   validation report) to the reader.
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-A conformant tool completes this flow without further input from the
-reader.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
 
-## §13 Cross-Standard Linkage
+## Annex H — Versioning and Deprecation Policy
 
-A protein-dynamics study that supports another WIA standard (a kinetic
-characterisation that enters a drug-discovery dossier under a
-WIA-pharma-pipeline standard, a structural ensemble that supports a
-diagnostic-imaging standard) carries a cross-standard linkage record in
-its evidence package. The record names the consuming standard, the
-version under which the linkage is claimed, and the assertion that the
-study satisfies the consuming standard's interface requirements.
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-Cross-standard linkages are not transitive: a consumer of the
-protein-dynamics study that wishes to invoke the consuming standard's
-guarantees MUST verify the consuming standard's evidence directly. The
-linkage record is a navigation aid, not a substitute attestation.
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## §14 Public Catalogue and Aggregator Feeds
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-Programmes that elect to publish a public catalogue of studies emit an
-Atom or JSON Feed listing the published studies with their
-evidence-package manifest digests. Feed entries carry the study's
-domain (computational, NMR, single-molecule, etc.), the operating
-laboratory's identifier, and the date of the most recent analysis
-output. The feed is a discovery mechanism and does not carry consent
-identifiers or unredacted clinical detail; it is intended for
-collaborator search, not for primary record-keeping.
+## Annex I — Interoperability Profiles
 
-## §15 Reader Tooling Compatibility
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-The evidence-package format is consumed by reader tools that range from
-human-driven viewers to automated citation crawlers. A programme MAY
-publish supplementary reader hints (a sample-rendering script for
-free-energy surfaces, a viewer-friendly slice of a long trajectory,
-preview thumbnails of FRET histograms) alongside the canonical evidence
-package; supplementary hints are non-normative and are clearly labelled
-as such in the manifest so that readers do not confuse them with
-authoritative records.
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-## §16 Conformance and Sunset
-
-A programme conformant with PHASE-4 has integrated successfully with at
-least one simulation engine, at least one experimental laboratory or
-externally accredited spectroscopy facility, at least one biobank
-governance service (when consuming clinical biospecimens), and at least
-one long-term archive, and has published at least one externally cited
-study through the catalogue.
-
-Sunsetting an integration is announced via the well-known discovery
-document at least 90 calendar days before removal; in-flight studies
-that depend on the sunsetting integration are migrated before removal.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 4 — INTEGRATION
-- **Status:** Stable
-- **Standard:** WIA-protein-dynamics
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

@@ -5,316 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical data-format layer for WIA-metamaterial.
-Metamaterials are engineered composites whose sub-wavelength geometry
-produces electromagnetic, acoustic, or elastic responses that are not
-available from their constituent bulk materials. The format captures the
-unit-cell geometry, the simulation conditions under which a unit cell is
-characterised, the S-parameter and dispersion data that the simulation
-produces, the effective constitutive parameters retrieved from those data,
-the fabrication tolerances under which the unit cell is realised, and the
-measurement evidence that correlates the realised structure with the
-simulated prediction.
+This document defines the canonical DATA-FORMAT layer for WIA-metamaterial (Metamaterial).
 
 References (CITATION-POLICY ALLOW only):
-
-- ISO 8601 (date and time representation)
-- ISO/IEC 17025:2017 (testing and calibration laboratories)
-- ISO/IEC 27001:2022 (information security management)
-- ISO 10110 (optics and photonics — preparation of drawings; relevant to
-  unit-cell drawing exchange when the metamaterial operates at optical
-  wavelengths)
-- ISO/IEC 11578 (UUID)
-- IETF RFC 4122 (UUID URN namespace)
-- IETF RFC 8259 (JSON Data Interchange Format)
-- IETF RFC 9457 (Problem Details for HTTP APIs)
-- W3C XML Schema Definition 1.1 (legacy CAD interchange envelope only)
-- IEEE Std 1597.1 (terminology and validation for computational
-  electromagnetics; cited only normatively for definitions)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
 ## §1 Scope
 
-This PHASE document defines the persistent shapes for unit-cell descriptors
-and their associated simulation, retrieval, and measurement records. It is
-intended for use by:
+This PHASE document is one of four that together define the WIA-metamaterial
+standard. It addresses the data-format layer of the standard.
 
-- Metamaterial design teams that exchange unit-cell descriptions between
-  electromagnetic, acoustic, and mechanical solvers.
-- Fabrication facilities (lithography houses, additive-manufacturing
-  vendors) that consume design files and emit measurement reports.
-- Reference laboratories that characterise realised metamaterial samples
-  and certify the correlation between simulation and measurement.
-- Publication and citation tools that resolve a published metamaterial
-  result to its underlying simulation and measurement evidence.
+## §2 Manifest
 
-Bulk-material constitutive databases, polymer-blend recipes, and
-process-control records that already have community-accepted exchange
-formats are referenced rather than re-defined here.
+Implementations publish a signed manifest containing standardSlug
+(constant value: "metamaterial"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 Design Identifier
+## §3 Conformance Tiers
 
-Every metamaterial design carries a stable identifier. The identifier is a
-UUIDv7 (RFC 4122 / ISO/IEC 11578) so that records sort by acquisition order
-in lexicographic storage.
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-```
-designId          : string (uuidv7)
-designCreatedAt   : string (ISO 8601 / RFC 3339, UTC, second precision)
-designAuthor      : string (institutional author identifier)
-designDomain      : enum  ("electromagnetic" | "acoustic" | "elastic" |
-                      "thermal" | "mechanical")
-designOperatingBand:
-  centerHz        : number (centre frequency, Hertz)
-  fractionalBW    : number (fractional bandwidth, dimensionless)
-designStatus      : enum ("draft" | "characterised" | "fabricated" |
-                      "verified" | "deprecated")
-```
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-The `designDomain` selects which subset of the format applies. A design that
-operates simultaneously in two domains (a phononic-photonic dual-band cell,
-for example) emits one design record per domain that share the same
-`designId` prefix and differ in their `designDomain` field.
+## §4 Discovery
 
-## §3 Unit-Cell Geometry
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/metamaterial`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-The unit-cell geometry is the primary record that downstream solvers
-consume. It carries the periodic lattice description, the sub-cell
-inclusions, and the boundary specification.
+## §5 Time and Identity
 
-```
-unitCell:
-  designId        : string (uuidv7)
-  lattice:
-    type          : enum ("cubic" | "tetragonal" | "hexagonal" |
-                      "rectangular" | "triclinic" | "honeycomb" | "kagome")
-    constantsM    : array of number (lattice constants in metres; exactly
-                      three entries for 3-D, exactly two for 2-D, one for 1-D)
-    angleRad      : array of number (lattice angles, radians; omitted for
-                      cubic and rectangular families)
-  inclusions      : array of Inclusion
-  boundary:
-    domainSize    : array of number (domain extents in metres)
-    pbcAxes       : array of integer (axes on which periodic boundary
-                      conditions apply, 0/1/2)
-    portFaces     : array of PortFace (faces that act as scattering ports)
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Inclusion:
-  inclusionId     : string (uuidv7)
-  geometryRef     : string (URI of the CAD file or parametric script)
-  geometryFormat  : enum ("step" | "iges" | "stl" | "openscad" | "freecad" |
-                      "parametric-json")
-  material:
-    materialKey   : string (key into the bulk-material database, see §6)
-    constitutive  : enum ("dielectric" | "magnetic" | "conductor" |
-                      "kerr-nonlinear" | "phase-change" | "elastic" |
-                      "viscoelastic")
-  placement:
-    rotationDeg   : array of number (Euler angles, degrees)
-    translationM  : array of number (metres)
-    scale         : number (dimensionless multiplier on the geometry)
+## §6 Versioning and Deprecation
 
-PortFace:
-  faceId          : string (e.g. "x+", "x-", "y+", "y-")
-  modeOrders      : array of integer (mode indices to capture at this port)
-  referencePlane  : number (offset from the geometric face, metres)
-```
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Implementations MUST validate that the inclusion geometries fit within
-`domainSize` after rotation, translation, and scaling; out-of-domain
-geometries are rejected with a Problem Details (RFC 9457) response of
-type `urn:wia:metamaterial:geometry-out-of-domain`.
+## §7 Privacy and Security
 
-## §4 Simulation Record
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Every unit-cell geometry is paired with at least one simulation record that
-captures the conditions under which the cell was characterised. The format
-is solver-agnostic so that identical conditions can be reproduced across
-finite-element, finite-difference, and method-of-moments solvers.
+## §8 Open Governance
 
-```
-simulation:
-  simulationId    : string (uuidv7)
-  designId        : string (uuidv7)
-  unitCellId      : string (uuidv7, references §3)
-  solverFamily    : enum ("finite-element" | "fdtd" | "method-of-moments" |
-                      "spectral-element" | "transfer-matrix")
-  meshing:
-    elementOrder  : integer (polynomial order for finite-element solvers)
-    elementsPerLambda : number (target spatial resolution in elements per
-                      operating wavelength)
-    refinementZones : array of RefinementZone
-  excitation:
-    portId        : string (references PortFace.faceId)
-    waveform      : enum ("plane-wave" | "modal" | "gaussian-pulse")
-    polarization  : enum ("te" | "tm" | "linear" | "circular-rh" |
-                      "circular-lh")
-    incidenceDeg  : array of number (theta, phi in degrees)
-    bandwidthHz   : number (excitation bandwidth)
-  outputs:
-    sParameters   : boolean
-    nearField     : boolean
-    farField      : boolean
-    dispersion    : boolean
-  convergence:
-    sParamDeltaDb : number (convergence threshold on S-parameter magnitude)
-    energyResidual: number (relative residual on stored energy)
-    maxIterations : integer
-```
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `metamaterial` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-## §5 S-Parameter and Dispersion Records
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-Simulation outputs are recorded as discrete frequency- (or wavenumber-)
-sampled spectra. The on-disk shape is independent of the solver that
-produced it.
 
-```
-sParameters:
-  simulationId    : string
-  ports           : array of string (port IDs in canonical order)
-  samples         : array of FrequencySample
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
 
-FrequencySample:
-  frequencyHz     : number
-  scatteringMatrix: array of array of complex (NxN, complex represented as
-                      [real, imag] pairs)
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
 
-dispersion:
-  simulationId    : string
-  brillouinZone   : string (e.g. "Gamma-X-M-Gamma")
-  bands           : array of Band
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-Band:
-  bandIndex       : integer
-  kPoints         : array of array of number (k-vectors in 1/metre)
-  frequenciesHz   : array of number (one frequency per k-point)
-```
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-## §6 Bulk-Material Reference
+## Annex F — Adoption Roadmap
 
-Constituent materials are referenced by key into a versioned material
-database shared by the design, simulation, and measurement records. The
-database itself is governed by community-maintained sources;
-implementations MUST record both the database identifier and the database
-version, so that re-running a simulation against the same record produces
-the same constitutive data.
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-```
-materialReference:
-  materialKey     : string
-  databaseId      : string (e.g. "wia-meta-mat-db-2026q2")
-  databaseVersion : string (Semantic Versioning 2.0.0)
-  modelType       : enum ("constant" | "drude" | "lorentz" | "drude-lorentz" |
-                      "tabulated" | "custom")
-  parameters      : object (model-specific; tabulated models reference an
-                      external tabulation file by content-address)
-```
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## §7 Effective-Parameter Retrieval
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-Retrieved effective parameters (effective permittivity, permeability,
-refractive index, impedance, density, bulk modulus, depending on the
-domain) accompany the S-parameter spectra. The retrieval method is
-recorded so that consumers can reproduce or revise the inversion.
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-```
-retrieval:
-  simulationId    : string
-  method          : enum ("nicolson-ross-weir" | "kramers-kronig-causality" |
-                      "homogenisation-asymptotic" | "field-averaging" |
-                      "transfer-matrix")
-  branchSelection : string (description of how branch ambiguity in
-                      logarithm-based inversions is resolved)
-  retrievedSamples: array of RetrievedSample
-```
+## Annex G — Test Vectors and Conformance Evidence
 
-## §8 Fabrication-Tolerance Record
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-Realisation of a unit-cell geometry is bounded by fabrication tolerances:
-linewidth bias, sidewall angle, layer-thickness variation, alignment
-error, and surface roughness. Tolerance budgets are recorded against the
-unit cell so that downstream consumers can correlate measured deviations
-with predicted performance shifts.
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-```
-toleranceBudget:
-  designId        : string
-  fabrication:
-    process       : enum ("ebeam-lithography" | "stepper-photolithography" |
-                      "two-photon" | "selective-laser-sintering" |
-                      "stereolithography" | "cnc-milling" | "etching")
-    expectedSigmaM: number (1-sigma feature deviation, metres)
-  sensitivities   : array of Sensitivity
-```
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
 
-## §9 Measurement Record
+## Annex H — Versioning and Deprecation Policy
 
-Realised samples are characterised in a reference laboratory and the
-measurement record is appended to the design.
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-```
-measurement:
-  measurementId   : string (uuidv7)
-  designId        : string (uuidv7)
-  laboratoryId    : string (ISO/IEC 17025-accredited laboratory ID)
-  instrument      : string (instrument register entry, see §10)
-  samplesUnderTest: integer (number of physical samples measured)
-  rawDataRef      : string (content-addressed URI of the raw data archive)
-  reducedSamples  : array of FrequencySample (in the same shape as §5)
-  uncertainty     : Uncertainty (type-A and type-B contributions)
-```
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## §10 Instrument Register
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-Each measurement instrument carries a stable identifier so that operational
-drift can be traced to the specific instrument. The register lists vector
-network analysers, optical frequency-domain reflectometers, ultrasonic
-phased arrays, dynamic mechanical analysers, and similar instrumentation
-appropriate to the design domain.
+## Annex I — Interoperability Profiles
 
-## §11 Field-Distribution Records
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-For designs whose downstream applications depend on field distribution
-(near-field cloaking, sub-wavelength imaging, sensor integration), the
-simulation record MAY carry a field-distribution payload alongside the
-S-parameter spectra. The payload describes the spatial sampling grid, the
-field components captured, and the storage encoding.
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-```
-fieldDistribution:
-  simulationId    : string
-  gridType        : enum ("uniform-cartesian" | "uniform-cylindrical" |
-                      "uniform-spherical" | "adaptive-tetrahedral")
-  gridSpacingM    : array of number (per-axis spacing in metres for
-                      uniform grids; absent for adaptive grids)
-  components      : array of enum ("Ex" | "Ey" | "Ez" | "Hx" | "Hy" |
-                      "Hz" | "ux" | "uy" | "uz" | "p" | "T")
-  encoding        : enum ("hdf5" | "netcdf" | "vti" | "binary-flat")
-  artefactRef     : string (content-addressed URI of the field archive)
-  samplingPlanes  : array of SamplingPlane (planar slices of interest)
-  samplingPoints  : array of SamplingPoint (specific probe coordinates)
-```
-
-The artefact itself is held in evidence storage (PHASE-4 §3) and is
-referenced from the simulation record by content-address. Implementations
-MUST NOT inline raw field arrays in the JSON record; the JSON carries
-metadata only.
-
-## §12 Conformance
-
-Implementations claiming PHASE-1 conformance MUST emit each of the records
-defined above for every characterised design and MUST honour the
-content-addressing rules in §6, §9, and §11. Conformance is independent
-across PHASE documents, but Deep certification under WIA-metamaterial
-requires attestations against all four PHASEs.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 1 — DATA-FORMAT
-- **Status:** Stable
-- **Standard:** WIA-metamaterial
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.
