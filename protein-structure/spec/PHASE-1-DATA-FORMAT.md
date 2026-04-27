@@ -5,237 +5,361 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-protein-structure (Protein Structure).
+This document defines the canonical data-format layer for
+WIA-protein-structure. The standard covers exchange of protein
+structural records — experimental and computationally predicted —
+among structural-biology laboratories, archive consortia,
+structure-prediction service operators, downstream consumers
+(drug-discovery, enzyme-engineering, vaccine-design teams),
+journals that cite structural results, and the regulators that
+ingest structural evidence in regulatory dossiers. The format is
+a thin envelope around community-standard structural representations
+(mmCIF / PDBx, BCIF, the Chemical Component Dictionary, and modern
+predicted-structure outputs) so that interoperation across
+deposit, prediction, and consumer systems is preserved.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 11578 (UUID)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- HL7 FHIR R5 (`MolecularSequence` resource for sequence references
+  carried alongside structural records when relevant to clinical
+  context)
+- W3C XML Schema Definition 1.1 (legacy PDBML envelope)
+
+The standard cites — but does not redefine — the wwPDB-managed
+mmCIF / PDBx dictionary, the BCIF binary serialisation of CIF, the
+Chemical Component Dictionary (CCD), and the published output
+schemas of contemporary structure-prediction services (AlphaFold,
+ESMFold, RoseTTAFold, and successors). Tooling such as Foldseek and
+DALI is referenced normatively for similarity-search pipelines.
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-protein-structure
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines persistent shapes for the records that
+flow during deposit, prediction, citation, and downstream
+consumption of protein structural data. Implementations covered
+include:
 
-## §2 Manifest
+- Structural-biology laboratories that deposit experimental
+  structures (X-ray crystallography, cryo-EM, solution NMR,
+  micro-electron diffraction, neutron diffraction).
+- Structure-prediction service operators that publish predicted
+  structures and their per-residue and inter-residue confidence
+  estimates.
+- Archive consortia (the wwPDB and its member archives, model
+  archives, predicted-structure archives) that ingest, validate,
+  and re-publish structural records.
+- Similarity-search and structure-mining services (Foldseek, DALI,
+  domain-classification systems) that index records into derived
+  resources.
+- Regulators and downstream consumers that ingest structural
+  evidence as part of broader submissions.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "protein-structure"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Sequence-only deposits (UniProt, NCBI), molecular-dynamics
+trajectory exchange (governed by adjacent WIA-protein-dynamics),
+and small-molecule crystallography deposits (governed by adjacent
+small-molecule standards) are out of scope here.
 
-## §3 Conformance Tiers
+## §2 Structure Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+structureId       : string (uuidv7)
+structureCreatedAt: string (ISO 8601 / RFC 3339)
+structureAuthor   : string (institutional author identifier)
+provenanceClass   : enum  ("experimental" | "predicted" |
+                       "integrative-hybrid")
+experimentalMethod: enum ("xray" | "cryo-em" | "cryo-et" |
+                       "solution-nmr" | "solid-state-nmr" |
+                       "micro-electron-diffraction" |
+                       "neutron-diffraction" |
+                       "small-angle-scattering" | "n/a")
+predictionEngine  : string (engine family + version when
+                       provenanceClass = "predicted"; e.g.
+                       "alphafold-3", "esmfold-1.0",
+                       "rosettafold-2"; absent for experimental)
+externalArchiveAccession : string (PDB / EMDB / model-archive
+                       accession when the structure is mirrored
+                       into an external archive; absent for
+                       internal-only structures)
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A structure that is both predicted and subsequently confirmed
+experimentally emits one record per provenance class; the records
+are linked by `crossRef` entries (§9).
 
-## §4 Discovery
+## §3 Coordinate Record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/protein-structure`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The coordinate payload is carried as a content-addressed CIF or
+BCIF artefact rather than inlined into JSON. The record references
+the artefact and carries the metadata needed to interpret it.
 
-## §5 Time and Identity
+```
+coordinateArtefact:
+  structureId     : string (uuidv7)
+  format          : enum ("mmcif" | "bcif" | "pdb-legacy" |
+                       "pdbml-legacy")
+  artefactRef     : string (content-addressed URI of the coordinate
+                       file)
+  contentDigest   : string (SHA-256 of the coordinate file)
+  cifDictionaryVersion : string (mmCIF dictionary version the
+                       coordinate file conforms to)
+  ccdVersion      : string (Chemical Component Dictionary version
+                       in force at deposit time)
+  asymUnitCount   : integer (number of asymmetric units in the
+                       file)
+  totalChainCount : integer
+  totalResidueCount : integer
+  totalAtomCount  : integer
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Coordinate files MUST conform to the cited CIF dictionary version;
+deposits whose CIF parsing fails are rejected with a Problem-Details
+(RFC 9457) response of type
+`urn:wia:protein-structure:cif-parse-failure`.
 
-## §6 Versioning and Deprecation
+## §4 Sequence and Composition
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Sequence and composition records describe the polymeric chains and
+non-polymer ligands present in the structure.
 
-## §7 Privacy and Security
+```
+chain:
+  chainId         : string (matches CIF `_atom_site.label_asym_id`
+                       or successor)
+  structureId     : string (uuidv7)
+  polymerKind     : enum ("polypeptide-l" | "polypeptide-d" |
+                       "polynucleotide-dna" |
+                       "polynucleotide-rna" |
+                       "polysaccharide" | "other")
+  oneLetterSequence : string (when applicable; absent for non-
+                       polymer chains)
+  uniprotAccession  : string (when the sequence corresponds to a
+                       UniProt entry)
+  fhirSequenceRef   : string (FHIR R5 MolecularSequence.id when
+                       the sequence is held in a clinical-genomics
+                       context)
+  modifiedResidues  : array of ModifiedResidue (CCD identifiers
+                       for non-standard residues)
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+ligand:
+  ligandId        : string
+  structureId     : string (uuidv7)
+  ccdComponentId  : string (CCD three-letter code or extended
+                       identifier)
+  bindingChainId  : string (the chain whose binding site holds the
+                       ligand)
+  isCovalentlyAttached : boolean
+```
 
-## §8 Open Governance
+## §5 Experimental Evidence Record (when applicable)
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `protein-structure` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+experimentalEvidence:
+  evidenceId      : string (uuidv7)
+  structureId     : string (uuidv7)
+  facility        : string (institutional identifier of the
+                       beamline / microscope / spectrometer)
+  startedAt       : string (ISO 8601)
+  endedAt         : string (ISO 8601)
+  rawDataRef      : string (content-addressed URI of the raw data
+                       archive)
+  processingPipelineRef : string (content-addressed URI of the
+                       processing pipeline manifest)
+  resolutionAngstrom : number (when applicable)
+  rWork           : number (X-ray refinement R-factor)
+  rFree           : number
+  ramachandranOk_pct : number
+  bondGeometryOutliers_per1000 : number
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Prediction Confidence Record (when applicable)
 
+```
+predictionConfidence:
+  confidenceId    : string (uuidv7)
+  structureId     : string (uuidv7)
+  perResidueRef   : string (content-addressed URI of per-residue
+                       confidence; pLDDT for AlphaFold-family
+                       models, equivalent quantities for others)
+  pairwiseRef     : string (content-addressed URI of pairwise
+                       confidence; PAE for AlphaFold-family
+                       models)
+  globalConfidence: object (model-specific summary; ipTM, pTM,
+                       global pLDDT median, etc.)
+  inputMSARef     : string (content-addressed URI of the input
+                       multiple-sequence alignment when the
+                       prediction engine consumes one)
+  inputTemplateRef : string (content-addressed URI of input
+                       templates when the prediction engine
+                       consumes them)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+## §7 Validation Report
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```
+validationReport:
+  reportId        : string (uuidv7)
+  structureId     : string (uuidv7)
+  reportRef       : string (content-addressed URI of the wwPDB-style
+                       validation report PDF and JSON)
+  overallQuality  : enum ("good" | "acceptable" | "borderline" |
+                       "rejected")
+  outlierResidues : array of ResidueRef
+  outlierLigands  : array of LigandRef
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Similarity and Annotation Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+similarity:
+  similarityId    : string (uuidv7)
+  structureId     : string (uuidv7)
+  searchTool      : enum ("foldseek" | "dali" | "tm-align" |
+                       "structure-search-service-other")
+  searchToolVersion : string
+  searchedAt      : string (ISO 8601)
+  hits            : array of SimilarityHit
 
-## Annex F — Adoption Roadmap
+SimilarityHit:
+  hitStructureId  : string (UUID or external accession)
+  scoreKind       : enum ("tm-score" | "lddt" | "rmsd" |
+                       "z-score" | "user-defined")
+  scoreValue      : number
+  alignedRange    : object (per-chain alignment ranges)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Cross-References
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+crossRef:
+  fromStructureId : string (uuidv7)
+  relationship    : enum ("predicted-of-experimental" |
+                       "experimental-of-predicted" |
+                       "alternate-conformation" |
+                       "successor" | "predecessor" |
+                       "covers-same-uniprot")
+  toStructureId   : string (uuidv7 or external accession)
+  notes           : string (free text)
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Modification and Post-Translational State Record
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Modified residues, glycans, and post-translational modifications
+catalogued in the Chemical Component Dictionary are recorded
+against the chain to which they belong. Modifications observed in
+experimental data but not yet present in the CCD are flagged
+`provisional-ccd` and emit a request to the dictionary maintainer.
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+postTranslationalState:
+  ptmId           : string (uuidv7)
+  chainId         : string
+  residuePosition : integer (residue number in author numbering)
+  modificationCcd : string (CCD identifier; may be `provisional-
+                       ccd-<requestId>` while pending)
+  modificationKind: enum ("phosphorylation" | "glycosylation" |
+                       "methylation" | "acetylation" |
+                       "ubiquitination" | "lipidation" |
+                       "disulfide" | "covalent-other" |
+                       "deletion-cleavage")
+  evidenceRef     : string (reference to experimental-evidence
+                       record or prediction-confidence record that
+                       supports the modification)
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Quaternary Assembly Record
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+For multi-chain or multi-copy structures, the quaternary assembly
+record describes the biological assembly the depositor or predictor
+believes the structure represents.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+```
+quaternaryAssembly:
+  assemblyId      : string (uuidv7)
+  structureId     : string (uuidv7)
+  assemblyKind    : enum ("monomer" | "homo-dimer" |
+                       "hetero-dimer" | "trimer" | "tetramer" |
+                       "higher-multimer" | "fibril-or-filament")
+  symmetryOperators : array of string (BIOMT-style operators or
+                       successor representations)
+  evidenceRef     : string (reference to the experimental or
+                       predicted evidence underlying the assembly
+                       claim)
+  alternateAssemblyRef : string (URI of an alternate assembly when
+                       multiple are plausible)
+```
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Domain and Function Annotation
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Protein chains may be annotated with domain assignments (e.g. SCOP,
+CATH, ECOD), functional sites (active-site residues, ligand-
+binding pockets, allosteric sites), and Gene Ontology biological-
+process / molecular-function / cellular-component terms.
+Annotations are content-addressed and link the chain to the
+external annotation source.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+annotation:
+  annotationId    : string (uuidv7)
+  chainId         : string
+  source          : enum ("scop" | "cath" | "ecod" | "go" |
+                       "interpro" | "uniprot-feature" |
+                       "user-defined")
+  sourceVersion   : string
+  artefactRef     : string (content-addressed URI of the
+                       annotation artefact)
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Withdrawal and Supersession Record
 
-## Annex I — Interoperability Profiles
+Structures may be withdrawn (incorrect refinement, retracted
+manuscript, sequencing error in the deposited chain) or superseded
+(refined version, alternate conformation, prediction with updated
+inputs). The withdrawal/supersession record captures the
+relationship and the reason.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+withdrawalSupersession:
+  recordId        : string (uuidv7)
+  affectedStructureId : string (uuidv7)
+  kind            : enum ("withdrawn" | "superseded")
+  successorStructureId : string (UUID or external accession;
+                       absent for `withdrawn` without a successor)
+  reason          : enum ("refinement-revision" |
+                       "sequence-correction" |
+                       "model-improvement" | "manuscript-retracted"
+                       | "incorrect-ligand" | "user-defined")
+  effectiveAt     : string (ISO 8601)
+  publicNoticeRef : string (URI of the public notice the
+                       operating programme issued)
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Withdrawn or superseded structures remain addressable at their
+content-addressed URLs so that historical citations resolve
+unambiguously, but the public catalogue marks them with the
+withdrawal/supersession status so that consumers do not consume
+them in error.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Conformance
+
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every released structure and honour the
+content-addressing rules in §3-§8.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-protein-structure
+- **Last Updated:** 2026-04-27

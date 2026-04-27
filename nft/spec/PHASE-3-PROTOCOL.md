@@ -1,241 +1,304 @@
-# WIA-nft PHASE 3 — PROTOCOL Specification
+# WIA-nft PHASE 3 — Protocol Specification
 
 **Standard:** WIA-nft
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-nft (Nft).
+This PHASE specifies the protocols binding the data format
+(PHASE 1) to the API surface (PHASE 2): authentication of
+creators, marketplace operators, indexers; on-chain call
+discipline; reorg-handling; metadata-availability protocol;
+EIP-712 signature handling; cross-chain bridge discipline;
+audit-chain construction; failure modes.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7519 (JWT), RFC 8705 (mTLS-bound JWT)
+- ERC-721, ERC-1155, ERC-2981, ERC-4906, ERC-5192
+- EIP-712 — Typed structured-data hashing and signing
+- EIP-191 — Signed Data Standard
+- EIP-3770 — Chain-specific addresses
+- W3C Decentralized Identifiers (DID) Core 1.0
+- ISO/TC 307 — Blockchain and distributed-ledger reference
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-nft
-standard. It addresses the protocol layer of the standard.
+Principals authenticate via JWS-signed JWTs alongside,
+where appropriate, EIP-712 / EIP-191 wallet signatures
+proving control of an Ethereum address:
 
-## §2 Manifest
+| Claim          | Source                                                |
+|----------------|-------------------------------------------------------|
+| `iss`          | identity-provider URL                                 |
+| `aud`          | the boundary URL                                      |
+| `sub`          | creator / marketplace / indexer URN                   |
+| `iat` / `exp`  | per RFC 7519                                          |
+| `wia.role`     | `creator`, `marketplace`, `indexer`, `bridge-operator`, `analyst` |
+| `wia.address`  | for wallet-bound roles, the EVM address                |
+| `cnf`          | mTLS certificate-thumbprint binding                    |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "nft"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Wallet-bound roles MUST present a fresh EIP-712 signature
+proving control of `wia.address`; the signature has a
+short window (≤ 5 minutes) to limit replay risk.
 
-## §3 Conformance Tiers
+## §2 On-chain call discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The boundary verifies on-chain state by calling the
+relevant standard methods on the contract:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- `ERC-721 ownerOf(tokenId)` — current owner
+- `ERC-721 tokenURI(tokenId)` — metadata URI
+- `ERC-1155 balanceOf(account, id)` — balance per
+  account
+- `ERC-1155 uri(id)` — metadata URI
+- `ERC-2981 royaltyInfo(tokenId, salePrice)` — royalty
+  receiver and amount
 
-## §4 Discovery
+Calls go via the deployment's authorised RPC providers;
+results are cross-checked against ≥ 2 independent
+providers when available. Provider mismatch triggers
+investigation and refusal of the cross-checked record.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/nft`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Reorg-handling
 
-## §5 Time and Identity
+For chain operations:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- The boundary maintains per-chain `finalityDepth`
+  thresholds (12 blocks ETH mainnet, 64 blocks for
+  L2s, chain-specific for non-EVM)
+- Transfer events on blocks below finality are flagged
+  `provisional`
+- Reorgs detected via canonical chain-tip mismatch
+  cause provisional records below the new fork point
+  to be marked `superseded`
+- Listings referencing superseded transfers auto-suspend
+  until their referenced transfers re-finalise on the
+  canonical chain
 
-## §6 Versioning and Deprecation
+Chain reorgs are themselves audit events; the deployment's
+quarterly compliance report tracks reorg frequency by
+chain.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Metadata-availability protocol
 
-## §7 Privacy and Security
+For IPFS metadata:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Deployment-controlled IPFS pinning service holds a
+  copy of every published metadata file
+- Public-gateway access is also offered for resilience
+- Metadata is content-addressed by CID; pinning failures
+  trigger re-pinning across redundant pinning providers
 
-## §8 Open Governance
+For HTTPS metadata:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `nft` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- The boundary records a SHA-256 hash commitment at
+  publish time
+- Subsequent retrievals verify against the commitment
+- Mismatch returns `urn:wia:nft:problem:metadata-mutation-detected`
+
+## §5 EIP-712 signature handling
+
+Listing and bid signatures follow EIP-712:
+
+1. Construct the typed-data hash per the listing's domain
+2. Recover the signer address via secp256k1 ecrecover
+3. Verify the recovered address matches the declared
+   seller / bidder
+4. Cross-check the recovered address against the wallet-
+   bound principal's `wia.address` claim
+
+Signature replay protection: each EIP-712 message includes
+a unique `nonce` field; the boundary tracks used nonces
+per address with a 90-day window.
+
+## §6 Cross-chain bridge discipline
+
+For cross-chain token bridges:
+
+- Boundary integrates with deployment-approved bridge
+  protocols (Wormhole, LayerZero, etc.) only; arbitrary
+  bridges are refused
+- Source-chain token-lock event and destination-chain
+  token-mint event are paired into a single
+  `urn:wia:nft:bridge:transfer` record
+- Bridge-side reorgs handled per the source chain's
+  finality discipline; destination minting is held
+  until source-side finality
+- Bridge-protocol exploit detection: the deployment
+  monitors known bridge-protocol oracle health and
+  refuses cross-chain operations during oracle-paused
+  states
+
+## §7 Audit-chain construction
+
+Every mint orchestration, transfer-event ingest,
+listing intake, royalty mutation, and licence binding
+emits an AuditEvent:
+
+```
+chain_input  = SHA-256(prev_chain_root || canonical(event))
+chain_root_t = chain_input
+```
+
+Canonicalisation uses RFC 8785 JSON Canonicalisation
+Scheme. Daily roots are signed by the deployment's
+signing key (ES384 default).
+
+For deployments operating across many chains, the audit
+chain is partitioned by chain so single-chain audit
+retrieves only that chain's entries.
+
+## §8 Time discipline
+
+Boundary clock: NTPv4 stratum-2. Block-time uses chain-
+canonical block timestamps, not local clock. EIP-712
+expiration windows reference UTC.
+
+## §9 Key management
+
+The deployment's signing key for audit-chain roots and
+attestation responses lives in an HSM. Rotation cadence:
+
+- Routine rotation every 180 days
+- Emergency rotation on suspected key compromise
+- Both signing keys (current + previous) appear in JWKS
+  for ≥ 365 days post-rotation
+
+For wallet-bound creator keys, the creator manages their
+own keys; the deployment's role is verification only.
+
+## §10 Failure modes
+
+| failure                                  | behaviour                                                    |
+|------------------------------------------|--------------------------------------------------------------|
+| Identity-provider JWKS unreachable        | Cached keys honoured until cache expiry                     |
+| RPC-provider mismatch                    | Record refused; investigation triggered                      |
+| Chain reorg above finality depth          | Records below fork point marked superseded                  |
+| Metadata-URI hash mismatch               | Mutation flagged; record marked tampered                    |
+| EIP-712 nonce reuse                      | Refused with `signature-replay-detected`                    |
+| Bridge-oracle paused                     | Cross-chain operations suspended                             |
+| Audit-chain write failure                | Operation rejected (consistency w/ payment-system)          |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Algorithm choices
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| Concern                       | Default                                | Notes                              |
+|-------------------------------|----------------------------------------|------------------------------------|
+| Token signing (boundary)      | ES256                                  | mTLS-bound (RFC 8705)              |
+| Wallet signature verification | secp256k1 ECDSA                        | per EIP-191 / EIP-712              |
+| Detached JWS body signature   | PS256 or ES256                         |                                    |
+| Audit-chain root signing      | ES384                                  |                                    |
+| Metadata hash                  | SHA-256                                | content-addressed where IPFS       |
+| TLS                           | 1.3 (RFC 8446)                         | hybrid groups via WIA-pq-crypto    |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — Conformance level
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Level     | Scope                                                                  |
+|-----------|------------------------------------------------------------------------|
+| Surface   | structural conformance to PHASEs 1–3                                    |
+| Verified  | annual third-party audit (chain-state cross-check + pinning verification) |
+| Anchored  | continuous evidence package + chain-anchored attestation roots          |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Worked sale lifecycle (informative)
 
-## Annex F — Adoption Roadmap
+```
+1. Creator mints token (POST /mints)
+2. Boundary verifies creator authority + EIP-712 signature
+3. Mint tx confirms; tokenRef returned
+4. Marketplace lists token (POST /listings)
+5. Buyer places offer (POST /listings/{id}/bids)
+6. Seller accepts; marketplace contract executes the swap
+7. ERC-2981 royalty triggers; royalty paid via marketplace
+8. Boundary records transfer event + royalty event
+9. Audit chain captures every step
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Negative-test vectors (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Stimulus                                                | Expected outcome                                |
+|---------------------------------------------------------|-------------------------------------------------|
+| Mint where caller is not contract minter                 | refused with `not-authorised-minter`           |
+| Listing for soulbound (ERC-5192) token                   | refused with `transfer-restricted`              |
+| Royalty policy update by non-creator                     | refused with `royalty-policy-update-forbidden`  |
+| EIP-712 signature with reused nonce                      | refused with `signature-replay-detected`       |
+| Bridge transfer with mismatched source/destination amts | refused with `bridge-amount-mismatch`           |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex E — Provider-mismatch resolution (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+When two RPC providers disagree on a critical read
+(`ownerOf`, `tokenURI`):
 
-## Annex G — Test Vectors and Conformance Evidence
+1. Boundary queries a third independent provider
+2. If 2-of-3 agreement, accept the agreed result;
+   flag the dissenting provider for investigation
+3. If no agreement, refuse the record with
+   `urn:wia:nft:problem:rpc-provider-disagreement`
+4. Provider-quality scores degraded for repeated
+   dissent
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Provider-quality is published in the deployment's
+quarterly compliance report (PHASE 4 §10).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex F — Bridge-protocol risk classification (informative)
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Bridges classified by security model:
 
-## Annex H — Versioning and Deprecation Policy
+| Class               | Examples                              | Boundary policy           |
+|---------------------|---------------------------------------|---------------------------|
+| Native (validated)  | rollup native bridges                  | Trusted by default         |
+| Multi-sig committee | early bridges                          | Requires manual review     |
+| MPC / threshold     | LayerZero, Wormhole core               | Trusted with ongoing audit |
+| Optimistic          | Across-style                           | Trusted with delay         |
+| Light-client        | IBC, Polymer                           | Trusted by design          |
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Bridge classification is reviewed quarterly; class drift
+(e.g., decommissioned multi-sig members) triggers re-
+review.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex G — Wallet-signature freshness (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+EIP-712 signatures from wallet-bound roles include:
 
-## Annex I — Interoperability Profiles
+```
+{
+  "wallet": "0xa1b2c3...",
+  "intent": "mint",
+  "tokenContract": "0xb47e3cd...",
+  "validUntil": 1714287000,
+  "nonce": "0x7f2c..."
+}
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Signatures past `validUntil` are refused. Per-address
+nonce tracking prevents replay.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex H — Per-chain finality discipline (informative)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+| Chain      | Default `finalityDepth` | Notes                                           |
+|------------|-------------------------|-------------------------------------------------|
+| eth        | 12 blocks               | Beacon-chain finality at ~64 blocks (preferred) |
+| pol        | 256 blocks              | Polygon PoS reorg-prone deeply                  |
+| arb1       | 7 days (challenge)      | Practical use: 200 blocks                        |
+| op         | 7 days (challenge)      | Practical use: 200 blocks                        |
+| base       | 7 days (challenge)      | Practical use: 200 blocks                        |
+| bsc        | 15 blocks               |                                                 |
+| sol        | absolute slot finality  | At slot finalisation                             |
+
+Deployments using the rollup chains (arb1/op/base) for
+high-value transfers SHOULD wait for sequencer-batch
+publication before treating as canonical.
+
+## Annex I — Indexer-direct vs. RPC-direct read selection
+
+For read paths:
+
+| Operation                           | Recommended source     |
+|-------------------------------------|-----------------------|
+| Token-discovery list                | Indexer (subgraph)    |
+| Single-token authoritative state    | RPC (cross-checked)   |
+| Transfer-history aggregate          | Indexer               |
+| Single-transfer verification         | RPC                  |
+| Marketplace-listing aggregation      | Adapter API + RPC    |

@@ -1,241 +1,343 @@
-# WIA-open-banking PHASE 2 — API-INTERFACE Specification
+# WIA-open-banking PHASE 2 — API Interface Specification
 
 **Standard:** WIA-open-banking
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-open-banking (Open Banking).
+This PHASE defines the API surface an ASPSP exposes for TPP
+registration, consent setup, account-information access, payment
+initiation, funds confirmation, SCA invocation, and notification
+delivery. The shape is FAPI 2.0-secured OAuth 2.1 + OIDC for the
+authorisation plane, with HTTP/JSON resources for the data plane.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- OpenID Foundation FAPI 2.0 (Baseline + Advanced Profile)
+- OpenID Connect Core 1.0
+- IETF OAuth 2.0 (RFC 6749), OAuth 2.1 draft, RFC 7636 (PKCE),
+  RFC 9101 (JAR), RFC 9126 (PAR), RFC 8705 (mTLS, certificate-bound tokens)
+- IETF RFC 9457 (Problem Details)
+- OBIE Read/Write API Specification v3.x — endpoint shapes for UK
+- Berlin Group NextGenPSD2 — endpoint shapes for EU
+- KFSC MyData Standard API — endpoint shapes for KR
+- ISO 20022 — payment-initiation message profiles
 
 ---
 
-## §1 Scope
+## §1 TPP registration
 
-This PHASE document is one of four that together define the WIA-open-banking
-standard. It addresses the api-interface layer of the standard.
+PSD2 deployments use Dynamic Client Registration (DCR) with TPP
+software statements per OBIE / Berlin Group:
 
-## §2 Manifest
+```
+POST /register HTTP/1.1
+Content-Type: application/jwt
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "open-banking"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+<software statement JWT signed by the OB Directory>
+```
 
-## §3 Conformance Tiers
+The boundary verifies the software statement signature against the
+OB Directory's published JWKS (or the equivalent national directory
+for KR/JP/AU), validates the TPP's licence status with the
+issuing regulator, and on success issues OAuth client credentials.
+Subsequent re-registration on licence change uses the same endpoint
+with an updated software statement.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Consent setup (PAR + RAR)
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Consent setup uses Pushed Authorization Requests (PAR, RFC 9126)
+plus Rich Authorization Requests (RAR) to convey the consent's
+detailed scope:
 
-## §4 Discovery
+```
+POST /authorize/par HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/open-banking`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+client_id=<tpp>&request=<JAR-signed-JWT>
+```
 
-## §5 Time and Identity
+The JAR JWT carries:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```json
+{
+  "iss": "<tppId>",
+  "aud": "<aspsp-authorize-base>",
+  "client_id": "<tpp>",
+  "redirect_uri": "<allowlisted>",
+  "code_challenge": "<PKCE>",
+  "code_challenge_method": "S256",
+  "authorization_details": [{
+    "type": "payment_initiation",
+    "instructedAmount": {"currency": "GBP", "amount": "100.00"},
+    "creditorAccount": {...},
+    "creditorName": "..."
+  }]
+}
+```
 
-## §6 Versioning and Deprecation
+PAR returns a `request_uri` that the TPP redirects the user to. The
+user authenticates via SCA (PHASE 3 §1) and the boundary creates the
+consent record (PHASE 1 §3).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §3 Token exchange
 
-## §7 Privacy and Security
+Tokens follow OAuth 2.0 authorisation_code with PKCE + mTLS-bound:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Cert-Subject: <TPP mTLS cert subject>
 
-## §8 Open Governance
+grant_type=authorization_code&code=<code>&code_verifier=<PKCE>&client_id=<tpp>
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `open-banking` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Issued access tokens are mTLS-bound per RFC 8705; the TPP MUST
+present the same client certificate on subsequent API calls. A token
+presented over a different mTLS session is rejected with
+`urn:wia:ob:problem:token-not-bound`.
+
+## §4 Account information
+
+```
+GET /accounts HTTP/1.1
+Authorization: Bearer <mtls-bound-token>
+x-fapi-interaction-id: <UUID>
+x-fapi-auth-date: <RFC 7231 date>
+x-fapi-customer-ip-address: <IP>
+```
+
+FAPI 2.0 mandatory headers (`x-fapi-interaction-id`,
+`x-fapi-auth-date`, `x-fapi-customer-ip-address`,
+`x-fapi-customer-last-logged-time`) are included on every call so
+the boundary can correlate TPP-side activity with the ASPSP's audit
+chain. Resource endpoints follow the OBIE / Berlin Group / KFSC
+shape per the deployment's regime.
+
+## §5 Payment initiation
+
+```
+POST /payment-initiations HTTP/1.1
+Authorization: Bearer <mtls-bound-token>
+x-fapi-interaction-id: <UUID>
+x-jws-signature: <JWS detached over body>
+Content-Type: application/json
+
+{
+  "Data": {
+    "ConsentId": "<consentId>",
+    "Initiation": {
+      "InstructionIdentification": "...",
+      "EndToEndIdentification": "E2E-91a7",
+      "InstructedAmount": {"Amount": "100.00", "Currency": "GBP"},
+      "DebtorAccount": {...},
+      "CreditorAccount": {...},
+      "CreditorAgent": {...},
+      "RemittanceInformation": {"Reference": "..."}
+    }
+  },
+  "Risk": {
+    "PaymentContextCode": "EcommerceGoods",
+    "MerchantCategoryCode": "5411",
+    "MerchantCustomerIdentification": "...",
+    "DeliveryAddress": {...}
+  }
+}
+```
+
+The boundary validates the consent reference, the JWS detached
+signature, applies the deployment's fraud / sanctions screening,
+forwards to clearing (WIA-payment-system), and returns the
+resulting UETR back to the PISP.
+
+## §6 Funds confirmation
+
+```
+POST /funds-confirmations HTTP/1.1
+{
+  "Data": {
+    "ConsentId": "<cofConsentId>",
+    "Reference": "...",
+    "InstructedAmount": {"Amount": "100.00", "Currency": "GBP"}
+  }
+}
+```
+
+Response carries `FundsAvailableResult: { FundsAvailable: true|false }`.
+PSD2 RTS Article 36(1)(c) limits this to a yes/no answer; the
+ASPSP MUST NOT return the actual balance.
+
+## §7 SCA invocation (decoupled and embedded)
+
+For decoupled SCA, the ASPSP starts an authentication flow on a
+separate channel (mobile banking app push notification, hardware
+token):
+
+```
+POST /authorize/decoupled-sca HTTP/1.1
+{
+  "consentRef": "...",
+  "scaChannel": "mobile-app-push"
+}
+```
+
+The boundary returns a poll URI; the TPP polls until the SCA
+completes or the user declines. For embedded SCA (less common in
+PSD2 / FAPI 2.0 because of redirect-based flows being preferred),
+the SCA UI is rendered inline with the consent setup.
+
+## §8 Notification webhook
+
+ASPSPs deliver asynchronous notifications to the TPP's registered
+webhook:
+
+```
+POST <tpp-webhook-uri> HTTP/1.1
+x-jws-signature: <JWS detached>
+Content-Type: application/json
+
+{
+  "notificationId": "...",
+  "notificationType": "consent-revoked",
+  "subjectRef": "<consentId>",
+  "notificationTimestamp": "..."
+}
+```
+
+The TPP MUST acknowledge with `200 OK`. Unacknowledged notifications
+retry per the deployment's retry budget; persistent failure
+suspends notification delivery and surfaces an incident.
+
+## §9 Errors and warnings
+
+| URI                                              | Status | Meaning                                      |
+|--------------------------------------------------|-------:|----------------------------------------------|
+| `urn:wia:ob:problem:tpp-licence-suspended`       | 403    | TPP licence is suspended/revoked              |
+| `urn:wia:ob:problem:consent-not-authorised`      | 403    | consent was never SCA-authorised              |
+| `urn:wia:ob:problem:consent-expired`             | 403    | consent past expirationDateTime               |
+| `urn:wia:ob:problem:permission-not-granted`      | 403    | call requires a permission outside consent    |
+| `urn:wia:ob:problem:token-not-bound`             | 403    | bearer token presented on different mTLS session |
+| `urn:wia:ob:problem:sca-required`                | 401    | call requires fresh SCA evidence              |
+| `urn:wia:ob:problem:fapi-headers-missing`        | 400    | x-fapi-* headers not provided                 |
+| `urn:wia:ob:problem:jws-signature-invalid`       | 400    | x-jws-signature header verification failed    |
+| `urn:wia:ob:problem:audit-unavailable`           | 503    | audit chain write failed                      |
+
+Warnings (200-OK with content caveats) use `Warning:` headers per
+RFC 7234 §5.5 with codes namespaced under `wia-ob-`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Capability advertisement (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET /.well-known/openid-configuration HTTP/1.1
+Accept: application/json
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Standard OpenID Connect discovery document, augmented with FAPI 2.0
+indicators:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```json
+{
+  "issuer": "https://aspsp.bank-uk.example",
+  "authorization_endpoint": "...",
+  "token_endpoint": "...",
+  "pushed_authorization_request_endpoint": "...",
+  "request_object_signing_alg_values_supported": ["PS256", "ES256"],
+  "token_endpoint_auth_methods_supported": ["tls_client_auth", "private_key_jwt"],
+  "tls_client_certificate_bound_access_tokens": true,
+  "require_pushed_authorization_requests": true,
+  "code_challenge_methods_supported": ["S256"],
+  "fapi_metadata": {
+    "fapi_profile": "fapi_2_advanced",
+    "regime": "UK-OBIE",
+    "obDirectoryEntry": "...",
+    "scopes_supported": ["accounts", "payments", "fundsconfirmations"]
+  }
+}
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Pagination and rate limiting (informative)
 
-## Annex F — Adoption Roadmap
+Account-information list and transaction-history queries paginate
+per OBIE / Berlin Group / KFSC profile (page size typically ≤ 500).
+Per-token rate limits default to OBIE's recommendations: 4 calls
+per second for AIS, 1 call per second for PIS. Rate-limit refusals
+carry `urn:wia:ob:problem:rate-limited`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Worked OAuth/OIDC + PAR sequence (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+1. TPP submits a PAR request (PHASE 2 §2) with a JAR-signed JWT
+   containing the consent's authorization_details
+2. ASPSP returns a `request_uri` valid for ≤ 90 seconds
+3. TPP redirects the user-agent to the authorize endpoint with
+   `request_uri`
+4. ASPSP performs SCA per PHASE 3 §1
+5. ASPSP redirects back to the TPP's redirect_uri with an
+   authorization_code
+6. TPP exchanges the code for a mTLS-bound access token (PHASE 2 §3)
+7. TPP calls the resource endpoints with the access token plus the
+   FAPI 2.0 mandatory headers
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Worked AIS read with permission filtering (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+GET /accounts/{AccountId}/transactions?fromBookingDateTime=2025-10-27T00:00:00Z&toBookingDateTime=2026-04-27T23:59:59Z HTTP/1.1
+Authorization: Bearer <mtls-bound-token>
+x-fapi-interaction-id: 6b7d2c1e-...
+x-fapi-auth-date: Mon, 27 Apr 2026 09:15:00 GMT
+x-fapi-customer-ip-address: 203.0.113.42
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Response (filtered to `ReadTransactionsDebits` permission only —
+credits omitted because the consent did not include
+`ReadTransactionsCredits`):
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```json
+{
+  "Data": {
+    "Transaction": [
+      {"AccountId": "...", "TransactionId": "...", "CreditDebitIndicator": "Debit", "Status": "Booked", "BookingDateTime": "...", "Amount": {"Amount": "5.50", "Currency": "GBP"}}
+    ]
+  },
+  "Links": {"Self": "..."},
+  "Meta": {"TotalPages": 1, "FirstAvailableDateTime": "2025-10-27T00:00:00Z", "LastAvailableDateTime": "2026-04-27T23:59:59Z"}
+}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The boundary's permission gate filters credits silently; the
+response does not indicate that credits exist or are filtered.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## Annex E — Worked PIS sequence (informative)
 
-## Annex H — Versioning and Deprecation Policy
+1. TPP submits PAR with payment-initiation `authorization_details`
+2. ASPSP returns request_uri; TPP redirects user
+3. User authenticates (SCA + dynamic linking)
+4. ASPSP redirects back with authorization_code
+5. TPP exchanges code for mTLS-bound token
+6. TPP submits POST /payment-initiations with the consent reference
+   and JWS-detached body signature
+7. Boundary validates, applies fraud + sanctions screening, forwards
+   to clearing
+8. Clearing returns UETR; boundary records and returns to TPP
+9. Settlement events (accepted-for-settlement, settled, returned)
+   propagate via webhook notifications back to the TPP
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex F — Versioning
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+OBIE 3.x and Berlin Group profiles bump independently from this PHASE; the deployment policy maps each PHASE version to the regime profile version it honours. Deprecation enters a 12-month sunset window with migration notes recorded in the audit chain.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex G — OBIE event-notification API (informative)
 
-## Annex I — Interoperability Profiles
+OBIE specifies an event-notification API for asynchronous events
+(consent revocation, payment-status updates, financial-data
+changes). The boundary delivers events as Server-Sent Events on a
+TPP-registered subscription, with each event carrying:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- `event-type` — closed enum per OBIE event-notification spec
+- `consent-ref` or `transaction-ref` — the subject of the event
+- `event-timestamp` — RFC 3339 with offset
+- `signature` — JWS detached over the event body
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Event delivery follows at-least-once semantics; duplicates are
+filtered on the TPP side via the event-id. Persistent delivery
+failure suspends the TPP's subscription and surfaces an incident.

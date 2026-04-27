@@ -1,241 +1,326 @@
-# WIA-nft PHASE 4 — INTEGRATION Specification
+# WIA-nft PHASE 4 — Integration Specification
 
 **Standard:** WIA-nft
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-nft (Nft).
+This PHASE specifies how an NFT deployment integrates the
+data, APIs, and protocols from PHASEs 1–3 with broader
+operational systems: chain RPC providers, indexers,
+marketplaces, IPFS pinning services, fiat on/off-ramps,
+KYC/AML compliance, royalty-distribution services, and
+licence-rights verification systems.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ERC-721, ERC-1155, ERC-2981, ERC-4906, ERC-5192
+- W3C Decentralized Identifiers (DID) Core 1.0, W3C Verifiable Credentials Data Model 2.0
+- IPFS / IPLD — content addressing
+- ISO/TC 307 — Blockchain reference framework
+- WIA-payment-system, WIA-identity-management,
+  WIA-network-security, WIA-pq-crypto
 
 ---
 
-## §1 Scope
+## §1 Chain RPC integration
 
-This PHASE document is one of four that together define the WIA-nft
-standard. It addresses the integration layer of the standard.
+The deployment subscribes to RPC providers per chain:
 
-## §2 Manifest
+- **Primary:** dedicated infrastructure (own node where
+  feasible) for high-volume chains
+- **Secondary:** managed providers for redundancy
+- **Tertiary:** public RPCs for last-resort failover
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "nft"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Provider rotation policy:
 
-## §3 Conformance Tiers
+- Health-check every 60 seconds
+- Auto-failover on consecutive failures
+- Cross-check critical reads (ownerOf, tokenURI) across
+  ≥ 2 providers before authoritative response
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Bills, latency budgets, and slashing-events from any
+self-hosted node feed into the deployment's RPC-quality
+report (PHASE 4 §10).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §2 Indexer integration
 
-## §4 Discovery
+Indexers (The Graph, Goldsky, Alchemy, custom) maintain
+materialised views of token state for fast retrieval:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/nft`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- **Subgraph manifests:** for chains supported by The
+  Graph, declared subgraph URLs serve query traffic
+- **Custom indexers:** for chains lacking The Graph,
+  the deployment runs its own indexer
+- **Index lag tracking:** indexer freshness is monitored;
+  excess lag triggers indexer restart
 
-## §5 Time and Identity
+Cross-checked discrepancies between RPC-direct and
+indexer-served reads are flagged as indexer-stale events.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §3 Marketplace integration
 
-## §6 Versioning and Deprecation
+Major marketplaces (OpenSea, Blur, Magic Eden, X2Y2,
+Rarible) each have a published API:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- **Listing publication:** boundary forwards listings to
+  per-marketplace endpoints
+- **Listing retrieval:** boundary aggregates listings
+  from multiple marketplaces
+- **Royalty honour disclosure:** the boundary tracks
+  per-marketplace royalty-honour status (full /
+  optional / not-honoured)
+- **Marketplace-specific signature verification:** each
+  marketplace has its own EIP-712 domain; the boundary
+  reconstructs the correct domain per marketplace
 
-## §7 Privacy and Security
+Cross-marketplace floor-price aggregation feeds creator
+analytics and royalty-projection tools.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 IPFS pinning integration
 
-## §8 Open Governance
+The deployment integrates with multiple pinning services
+(Pinata, Filecoin, Web3.Storage, NFT.Storage, self-hosted
+Filebase):
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `nft` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- Every published metadata is pinned across ≥ 3 pinning
+  providers
+- Pinning health monitored daily; failures trigger
+  re-pinning
+- Filecoin deals provide long-term economic guarantee
+  for high-value content
+
+Metadata referenced via centralised HTTPS URIs is
+flagged in the capability disclosure as
+`metadataAvailability=centralised`; consumers of the
+boundary's data can apply preference filters.
+
+## §5 Fiat on/off-ramp integration
+
+For consumer-facing marketplaces accepting fiat payments:
+
+- **On-ramp:** integrates with WIA-payment-system for
+  fiat-to-crypto conversion at point of sale
+- **Off-ramp:** for sellers cashing out, fiat
+  disbursement via WIA-payment-system after on-chain
+  settlement
+- **Stablecoin settlement:** for partners preferring
+  on-chain settlement, the boundary supports USDC, USDT,
+  DAI, and other audited stablecoins
+
+Currency-pair quotes flow from configured liquidity
+providers; the boundary records the quote-at-execution
+for dispute resolution.
+
+## §6 KYC/AML compliance
+
+For regulated marketplaces:
+
+- Wallet-to-identity binding via WIA-identity-management
+- Sanctions-list screening on every transfer of value
+  exceeding deployment-declared thresholds
+- PEP screening with EDD trigger for high-value
+  transactions
+- Travel-rule compliance for FATF-aligned transfers
+  (where the regime adopts FATF recommendations)
+- Suspicious-activity reporting per the regime's
+  financial-intelligence-unit
+
+Hits trigger investigations; transfers held until
+cleared. Investigation logs are themselves audit-chained.
+
+## §7 Royalty-distribution integration
+
+For creators with multi-recipient royalty splits:
+
+- Splits-contract integration (e.g., 0xSplits, Cobie's
+  splits, per-deployment custom contracts)
+- Off-chain split distribution where on-chain enforcement
+  fails (marketplace-honour gap)
+- Quarterly creator payment summary for tax-reporting
+
+## §8 Licence-rights verification
+
+For tokens conferring legal rights to underlying content:
+
+- Licence text retrieved and SHA-256-verified against
+  the chain commitment
+- Owner's rights enumerated per the licence type
+- Cross-domain references to WIA-supply-chain when the
+  underlying asset is physical
+- Notary-service integration for high-value licences
+  (luxury items, real-estate-tokenisation)
+
+## §9 Operational SLAs
+
+| Concern                                        | Default SLA               |
+|------------------------------------------------|---------------------------|
+| Token discovery query p95                      | ≤ 500 ms                   |
+| Mint orchestration → block confirmation        | per chain finality budget |
+| Listing intake acknowledgement                 | ≤ 1 s                      |
+| Reorg detection                                | ≤ 1 block depth            |
+| Metadata pinning success                       | ≥ 99.9% across providers  |
+| Audit-chain entry available                    | ≤ 10 s                     |
+
+## §10 Quarterly compliance report
+
+The boundary emits a quarterly compliance report:
+
+- Mint volume by chain and contract
+- Transfer volume by chain and transfer-kind
+- Royalty-policy distribution (BPS distribution)
+- Marketplace-listing aggregate volumes
+- Royalty-honour rate by marketplace
+- Pinning-provider success rates
+- RPC-provider quality metrics
+- Reorg frequency by chain
+- KYC/AML investigation rate
+- Bridge transfer volumes and success rates
+- Audit-chain integrity check results
+
+## §11 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every minted token has metadata pinned across ≥ 3
+   pinning providers
+2. Every transfer event is cross-checked across ≥ 2
+   independent RPC providers
+3. Royalty policy is queryable for every token-with-policy
+4. Marketplace integrations honour the deployment's
+   royalty-disclosure surface
+5. KYC/AML screening is active for every transfer of
+   value above threshold
+6. Audit-chain entries match the on-chain state for the
+   prior quarter
+7. Quarterly compliance report has no integrity-check
+   failures
+
+## §12 Common pitfalls (informative)
+
+- **Metadata centralisation drift** — many
+  early-generation NFT projects shipped HTTPS metadata
+  pointing to centralised servers that have since gone
+  offline. The boundary's metadata-availability surface
+  helps identify and migrate these to IPFS pinning
+- **Royalty enforcement variance** — marketplace policies
+  on royalty have shifted; deployments SHOULD periodically
+  refresh per-marketplace honour status
+- **Soulbound transfer attempts** — soulbound (ERC-5192)
+  tokens cannot transfer; common error is listing them
+  on marketplaces without honour-restriction; deployments
+  SHOULD pre-filter
+- **Bridge double-spend risk** — bridge protocols vary
+  in security model; deployments SHOULD prefer
+  audit-firm-reviewed bridges
+- **Sanctions-list refresh latency** — sanctions lists
+  update continuously; daily refresh is the floor
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain reference table
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Reference                    | Use site                                           |
+|------------------------------|----------------------------------------------------|
+| WIA-payment-system           | fiat on/off-ramp settlement                        |
+| WIA-identity-management      | KYC of marketplace participants                    |
+| WIA-network-security         | TLS cipher-suite floor                             |
+| WIA-pq-crypto                | post-quantum migration phase                       |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — Decommissioning checklist
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+When an NFT marketplace or creator platform winds down:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- [ ] Active listings cancelled with seller notification
+- [ ] In-flight bids refunded or matured
+- [ ] Custodied funds released to creators per terms
+- [ ] Metadata pinning continued via Filecoin contract
+- [ ] Successor service identified for ongoing support
+- [ ] Audit chain sealed and archive deposited
 
-## Annex F — Adoption Roadmap
+## Annex C — Conformance disclosure
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Sections §1, §2, §4, §9, §11 are mandatory.
+§3 is mandatory for deployments with marketplace functions.
+§5 is mandatory for deployments accepting fiat.
+§6 is mandatory for regulated jurisdictions.
+§7 is mandatory for deployments with multi-recipient
+royalties. §8 is mandatory for licence-bearing tokens.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Multi-chain creator workflow (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A creator wishing to mint across multiple chains:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+1. Single creative work; multiple per-chain deployments
+2. Per-chain royalty policy declared
+3. Cross-chain provenance via DID-bound creator identity
+4. Bridge-tracking record per chain pair (PHASE 1 §9)
+5. Aggregate analytics across chains in creator dashboard
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Real-estate tokenisation (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+For deployments offering tokenised real-estate:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- Token represents fractional ownership in an underlying
+  legal entity (LLC, SPV) holding the property
+- Transfer restrictions for accredited-investor compliance
+  per the regime
+- Cross-domain references to WIA-supply-chain for
+  property-condition reports
+- Notary-service binding to legal contracts at mint and
+  transfer
+- Annual-report generation via the deployment's
+  reporting pipeline
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## Annex F — Music-rights tokenisation (informative)
 
-## Annex H — Versioning and Deprecation Policy
+For tokenised music-rights:
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- Token represents a share in performance / mechanical /
+  master-recording royalties
+- Royalty policy includes split-by-rights-class
+- Integration with PRO-equivalent royalty collection
+  societies (ASCAP, BMI, KOMCA, JASRAC)
+- Per-jurisdiction collection report
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex G — Carbon-credit tokenisation (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+For tokenised carbon credits:
 
-## Annex I — Interoperability Profiles
+- Token references the underlying credit registry
+  (Verra, Gold Standard, KOC)
+- Retirement burns the token (transfer to address(0)
+  or custom retire function)
+- Verifiable retirement evidence via VC-bound
+  credential
+- Cross-domain references to WIA-environmental-monitoring
+  where the project has telemetry
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex H — Quarterly creator dashboard
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Per-creator dashboard summarising:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- Tokens minted by chain and contract
+- Transfer volume of creator's tokens
+- Royalty paid (on-chain ERC-2981 + marketplace-honoured)
+- Pinning-provider status across creator metadata
+- Marketplace listing distribution
+- Aggregate licence-rights status
+- Audit-trail summary for the period
+
+## Annex I — Capability-gap mitigation (informative)
+
+For deployments where some integrations are partial:
+
+- `metadataPinning=2-of-3` — two pinning providers
+  available; mitigation: re-pin to a third
+- `royaltyHonour=marketplace-mixed` — only some
+  marketplaces honour; mitigation: surface
+  per-marketplace status in listings UI
+- `bridgeIntegration=incomplete` — bridge integration
+  not deployed for a chain; mitigation: list bridges
+  not yet supported in capability document
+- `kycCoverage=high-value-only` — KYC active only
+  above threshold; mitigation: declare threshold publicly
+
+Each mitigation is recorded in the deployment policy and
+in PHASE 4 §10 quarterly compliance report.

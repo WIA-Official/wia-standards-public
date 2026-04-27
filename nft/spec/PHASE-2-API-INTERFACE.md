@@ -1,241 +1,405 @@
-# WIA-nft PHASE 2 — API-INTERFACE Specification
+# WIA-nft PHASE 2 — API Interface Specification
 
 **Standard:** WIA-nft
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-nft (Nft).
+This PHASE defines the API surface a deployment exposes
+for token discovery, token-metadata retrieval, ownership
+queries, transfer-event subscription, royalty queries,
+marketplace-listing intake and lifecycle, licence-binding
+queries, and creator-side mint orchestration. The shape is
+HTTP/JSON for routine interactions; high-volume event
+subscription uses streaming.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS), RFC 8259 (JSON), RFC 4122 (UUID)
+- ERC-721, ERC-1155, ERC-2981, ERC-4906, ERC-5192
+- EIP-712 — Typed structured-data hashing and signing
+- W3C Verifiable Credentials Data Model 2.0
+- W3C Decentralized Identifiers (DID) Core 1.0
 
 ---
 
-## §1 Scope
+## §1 Token discovery
 
-This PHASE document is one of four that together define the WIA-nft
-standard. It addresses the api-interface layer of the standard.
+```
+GET /tokens?contract=<contractAddress>&chain=eth HTTP/1.1
+GET /tokens/{tokenRef}
+GET /tokens?owner=<address>&chain=eth
+```
 
-## §2 Manifest
+Returns token records (PHASE 1 §2). Token-discovery queries
+typically resolve via index nodes that mirror chain state;
+the boundary verifies discovered records by cross-checking
+against on-chain calls before returning.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "nft"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Token-metadata retrieval
 
-## §3 Conformance Tiers
+```
+GET /tokens/{tokenRef}/metadata HTTP/1.1
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Returns the canonical token metadata (PHASE 1 §3). For
+IPFS-stored metadata the boundary either pins or proxies
+through a deployment-controlled gateway so metadata
+availability is not solely dependent on third-party
+gateways. ERC-4906 metadata-update events emit through
+the subscription endpoint (§5).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Ownership queries
 
-## §4 Discovery
+```
+GET /tokens/{tokenRef}/owners HTTP/1.1
+GET /accounts/{address}/holdings?chain=eth
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/nft`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+For ERC-1155 multi-quantity tokens, the response
+enumerates per-balance ownership. Soulbound (ERC-5192)
+ownership returns a `transferRestrictions` field reflecting
+the on-chain commitment.
 
-## §5 Time and Identity
+## §4 Mint orchestration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+For creators authorising mints through the deployment:
 
-## §6 Versioning and Deprecation
+```
+POST /mints HTTP/1.1
+Authorization: Bearer <jws-creator-jwt>
+Content-Type: application/json
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+{
+  "contractAddress": "0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB",
+  "tokenStandard": "erc-721",
+  "tokenIds": ["0x4d2", "0x4d3"],
+  "recipientAddresses": ["0xa1b2c3...", "0xa1b2c3..."],
+  "metadataURIs": ["ipfs://bafkreig.../...json", "ipfs://bafkreig.../...json"],
+  "royaltyPolicy": {
+    "creatorAddresses": ["0xa1b2c3..."],
+    "royaltyBps": 750
+  },
+  "ledgerNonceCoordination": "<coordinator URN>"
+}
+```
 
-## §7 Privacy and Security
+The boundary verifies the creator's authority over the
+target contract (via EIP-712 signature against a registered
+public key), submits the mint transaction, captures the tx
+hash, and returns the resulting token URNs once block
+confirmation is obtained.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Transfer-event subscription
 
-## §8 Open Governance
+```
+GET /transfers/stream?chain=eth&contract=<address> HTTP/1.1
+Accept: text/event-stream
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `nft` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Live SSE stream of transfer events for the requested
+chain/contract scope, drawing on chain index nodes and
+mempool feeds. Each event is one PHASE 1 §5 transfer
+record. Resume tokens permit reconnection without loss.
+
+```
+GET /tokens/{tokenRef}/transfers HTTP/1.1
+```
+
+Returns the historic transfer record for the token.
+
+## §6 Royalty queries
+
+```
+GET /tokens/{tokenRef}/royalty HTTP/1.1
+GET /tokens/{tokenRef}/royalty?at=blockNumber=12345678
+```
+
+Returns the royalty policy active at the requested block
+(or current). Cross-marketplace royalty enforcement is
+declared in capability documents (§9); the boundary
+publishes per-marketplace honour status alongside the
+royalty record.
+
+## §7 Marketplace-listing intake
+
+```
+POST /listings HTTP/1.1
+Authorization: Bearer <jws-marketplace-jwt>
+
+{
+  "tokenRef": "urn:wia:nft:token:eth:0xb47e3cd...:1234",
+  "marketplaceRef": "urn:wia:nft:marketplace:opensea",
+  "sellerAddress": "0xa1b2c3...",
+  "priceCurrency": "ETH",
+  "priceAmount": "1.5",
+  "listingType": "fixed-price",
+  "expiresAt": "2026-05-30T00:00:00Z",
+  "signedOrder": "<EIP-712 typed-data signature>"
+}
+```
+
+The boundary verifies the EIP-712 signature against the
+seller's address, checks the token's transfer
+restrictions (PHASE 1 §4), and records the listing.
+
+```
+GET /listings?tokenRef=...
+PUT /listings/{listingId}/cancel
+```
+
+Listings can be cancelled by the seller; cancellation
+emits a transfer-restriction-reset signal to listeners.
+
+## §8 Bid lifecycle
+
+For auction-listing types:
+
+```
+POST /listings/{listingId}/bids HTTP/1.1
+{
+  "bidderAddress": "0xc4d5e6...",
+  "bidAmount": "1.6",
+  "bidCurrency": "ETH",
+  "bidExpiresAt": "2026-05-25T00:00:00Z",
+  "signedBid": "<EIP-712>"
+}
+```
+
+The boundary tracks bid lifecycle (open / outbid / accepted
+/ expired / cancelled); auction settlement triggers the
+on-chain marketplace contract to execute the transfer.
+
+## §9 Capability discovery
+
+```
+GET /.well-known/wia/nft HTTP/1.1
+```
+
+Returns the deployment's capability document:
+
+```json
+{
+  "wia.standardVersion": "1.0",
+  "wia.implementationVersion": "marketplace-x-prod-v3.2.1",
+  "wia.chains": ["eth", "pol", "arb1", "base"],
+  "wia.tokenStandards": ["erc-721", "erc-1155", "erc-2981"],
+  "wia.royaltyHonour": "marketplace-honoured",
+  "wia.metadataGateway": "https://ipfs.gateway.example",
+  "wia.bridgeIntegrations": ["wormhole", "layerzero"],
+  "wia.conformanceLevel": "Verified"
+}
+```
+
+## §10 Errors and warnings
+
+| problem URN                                       | meaning                                       |
+|---------------------------------------------------|-----------------------------------------------|
+| `urn:wia:nft:problem:token-not-found`             | tokenRef not visible to the boundary          |
+| `urn:wia:nft:problem:transfer-restricted`         | token has soulbound or jurisdictional restriction |
+| `urn:wia:nft:problem:invalid-signature`           | EIP-712 signature verification failed         |
+| `urn:wia:nft:problem:metadata-unavailable`        | metadataURI unreachable beyond cache          |
+| `urn:wia:nft:problem:listing-expired`             | listing past expiresAt                        |
+| `urn:wia:nft:problem:auction-closed`              | bid attempted after auction closure           |
+| `urn:wia:nft:problem:chain-reorg-detected`        | recent transfer affected by chain reorg       |
+| `urn:wia:nft:problem:royalty-honour-not-supported`| target marketplace does not honour royalty    |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Pagination and rate limiting
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+List endpoints paginate at ≤ 1000 results per page.
+Per-token rate limits default to 60 listing-intake
+requests per minute per marketplace; high-volume index
+queries use longer burst windows tuned to deployment
+policy.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## Annex B — Idempotency
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+All write endpoints accept `Idempotency-Key`; the boundary
+stores keys for 30 days. Replays return the original
+response. Different body with same key returns
+`urn:wia:nft:problem:idempotency-conflict` (409).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — EIP-712 typed-data structure (informative)
 
-## Annex F — Adoption Roadmap
+Listing signature payload follows EIP-712 typed-data:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+EIP-712 Domain:
+  name: "WIA-NFT-Listing"
+  version: "1"
+  chainId: <chainId>
+  verifyingContract: <marketplace contract>
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Listing message:
+  tokenContract: address
+  tokenId: uint256
+  seller: address
+  price: uint256
+  currency: address (zero for native)
+  expiresAt: uint256
+  nonce: uint256
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Verification requires reconstructing the EIP-712 hash and
+checking the signature against the seller's address.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex D — Webhook delivery contract
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+POST /webhooks HTTP/1.1
+{
+  "endpoint": "https://creator-app.example/wia-webhook",
+  "events": ["transfer.executed", "listing.expired", "royalty.paid"],
+  "signingKid": "creator-app-2026"
+}
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Delivery uses TLS 1.3 with detached JWS in `Wia-Signature`.
+Listeners acknowledge with 200 OK; un-acknowledged events
+retry per the deployment's retry budget.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex E — Capability versioning
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Capability documents declare both `wia.standardVersion` and
+`wia.implementationVersion`. Standard-version mismatch is a
+hard refusal; implementation-version mismatch is logged.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Reorg-handling protocol
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+When a chain reorg affects a recent transfer:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+GET /tokens/{tokenRef}/reorg-status?lookbackBlocks=12 HTTP/1.1
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Returns whether any of the lookback's transfers are
+affected by reorg events. Listings referencing a
+reorged transfer auto-suspend until block-finality
+is re-established at the deployment-declared depth
+(typically 12 blocks for ETH mainnet, 64 for L2s).
 
-## Annex I — Interoperability Profiles
+## Annex G — Cross-chain token-bridge tracking
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+POST /bridges/track HTTP/1.1
+{
+  "sourceTokenRef": "urn:wia:nft:token:eth:0x...:1234",
+  "destinationChain": "pol",
+  "bridgeProtocolRef": "urn:wia:nft:bridge:wormhole",
+  "bridgeTxHash": "0x..."
+}
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The boundary tracks the cross-chain transfer state
+(initiated / in-flight / completed / failed) and
+records the destination tokenRef once minted at the
+bridged-to chain.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex H — Bulk-mint protocol (informative)
+
+For high-volume mint events (10,000+ tokens):
+
+```
+POST /mints/batch HTTP/1.1
+{
+  "contractAddress": "0xb47e3cd...",
+  "items": [/* per-token metadataURIs and recipients, 1–500 per batch */],
+  "batchOrdering": "sequential",
+  "blockBudget": 64
+}
+```
+
+The boundary submits each batch as a separate transaction
+with carefully managed nonce-coordination so concurrent
+mints don't collide. Failed batches retry with the next
+nonce window.
+
+## Annex I — Marketplace-aggregator (informative)
+
+For applications aggregating across marketplaces:
+
+```
+GET /aggregated-listings?tokenRef=...
+```
+
+Returns listings across all marketplaces the boundary
+mirrors. Aggregated floor-price queries:
+
+```
+GET /collections/{contractAddress}/floor-price?currency=ETH
+```
+
+## Annex J — Verifiable-credential issuance flow
+
+For credentials issued at mint:
+
+```
+POST /credentials HTTP/1.1
+{
+  "holderDid": "did:ethr:0xc4d5e6...",
+  "subjectTokenRef": "urn:wia:nft:token:eth:0xsoulbound...:101",
+  "credentialType": "MembershipCredential",
+  "issuanceDate": "2026-04-28",
+  "expirationDate": "2027-04-28"
+}
+```
+
+The boundary signs the VC with the issuer's signing key
+and registers it in the deployment's credential registry.
+
+## Annex K — Per-marketplace adapter registry
+
+The boundary maintains a registry of per-marketplace
+adapters declaring the marketplace's specific API:
+
+```
+GET /marketplace-adapters HTTP/1.1
+```
+
+Returns per-marketplace adapter capabilities: supported
+listing types, royalty-honour level, EIP-712 domain
+parameters, fee structure, and capability disclosure URI.
+
+Distribution to a new marketplace requires registering
+its adapter with the deployment; unauthorised marketplaces
+cannot route listings through the boundary.
+
+## Annex L — Royalty-payment audit endpoint
+
+For royalty recipients tracking actual receipt:
+
+```
+GET /royalty-payments?creator=<address>&period=2026-Q1
+```
+
+Returns per-payment records with token refs, marketplace
+refs, sale prices, computed royalty amounts, and
+delivered amounts. Where marketplace-honour falls below
+the configured policy, the discrepancy is flagged for
+creator action.
+
+## Annex M — Per-collection statistics endpoint
+
+For collection-level aggregates that downstream analytics
+and price-discovery tools depend on:
+
+```
+GET /collections/{contractAddress}/stats?currency=ETH&period=30d
+```
+
+Returns:
+
+- token-count (current)
+- holder-count (current; deduplicated by address)
+- floor-price (current; per the deployment's marketplace-aggregator)
+- 24h / 7d / 30d transfer volume
+- 24h / 7d / 30d sale volume (paid transfers only)
+- royalty volume (paid via ERC-2981 + marketplace-honoured)
+- listing-rate (listed / total ratio)
+
+The boundary returns aggregate values only; per-token
+detail is gated by the caller's authorisation. For
+collections under monitoring, stats refresh at the
+chain's block cadence; for non-monitored collections,
+on-demand queries cause a one-time refresh.
