@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-IND-023 Press Materials
+
+## Prompt 1: Hero Image - Global Supply Chain Command Center
+A state-of-the-art supply chain operations center with massive curved displays showing global supplier network visualization in amber (#F59E0B) accent colors: real-time shipment tracking across continents, blockchain provenance verification with immutable transaction ledgers, AI-powered risk scoring of suppliers, automated procurement workflows, and predictive analytics forecasting demand. Holographic 3D visualization of multi-tier supply network from raw materials to end consumers. Modern logistics technology photography, professional control room aesthetic.
+
+## Prompt 2: Problem Scenario - Traditional Supply Chain Chaos
+A chaotic traditional supply chain scene: paper-based purchase orders getting lost, delayed shipments with no real-time visibility causing production stoppages, counterfeit products entering the supply chain undetected, suppliers failing without warning creating disruptions, opaque multi-tier networks hiding risks, and sustainability violations going unnoticed. Show frustrated managers with spreadsheets, warehouse delays, quality issues, and lack of visibility. Documentary industrial photography emphasizing opacity, inefficiency, and vulnerability of traditional methods.
+
+## Prompt 3: Solution Visualization - Transparent, Optimized Supply Chain
+A seamless global supply chain enabled by WIA-IND-023: blockchain tracking every product from origin to destination with immutable records, AI predicting and preventing disruptions before they occur, automated procurement reducing costs by 25%, real-time visibility across all tiers, carbon footprint monitoring ensuring sustainability, and suppliers being paid fairly and on time. Dashboard shows 95% on-time delivery, 30% cost reduction, 100% product authenticity verification, ESG score 85/100. Clean, efficient, ethical global supply network. Modern logistics photography celebrating transparency and optimization.

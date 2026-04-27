@@ -49,8 +49,6 @@
 //! - [`types`]: Type definitions for smart home entities
 //! - [`core`]: Core smart home controller and traits
 //! - [`adapters`]: Device adapter implementations
-//! - [`protocol`]: Communication protocol (Matter + accessibility extensions)
-//! - [`ecosystem`]: WIA ecosystem integrations (Eye Gaze, BCI, AAC, etc.)
 //! - [`error`]: Error types
 //!
 //! ## Accessibility Support
@@ -83,9 +81,7 @@
 
 pub mod adapters;
 pub mod core;
-pub mod ecosystem;
 pub mod error;
-pub mod protocol;
 pub mod types;
 
 // Re-exports for convenience

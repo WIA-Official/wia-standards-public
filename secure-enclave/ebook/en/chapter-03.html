@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Phase 2 — Confidential Containers and ML Inference | WIA Secure Enclave</title><style>:root{--primary:#0ea5e9;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;color:#f8fafc;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#0ea5e9;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#10b981}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA Secure Enclave</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 3 · WIA Secure Enclave v1.0.0</div><h1>Phase 2 — Confidential Containers and ML Inference</h1>
+<p>Phase 2 extends Phase 1 to long-lived workloads. The two
+canonical Phase 2 deployments are confidential containers (Kata
+Containers in TDX mode, Confidential Containers, AMD SEV-SNP CVMs)
+and ML inference (running a quantised model inside an enclave so
+both the model weights and the inference inputs are confidential).</p>
+
+<h2>3.1 Confidential containers</h2>
+<p>A confidential container deployment runs every container image
+inside a TEE-backed pod. The pod's launch measurement is verified
+against a signed image-digest envelope before the container starts;
+unsigned or unverified images are refused with a
+<code>cc_image_refused</code> event.</p>
+
+<p>The five operational requirements specified in Phase 2 §2.4 are:
+image attestation, sealed secret injection, encrypted-memory
+budgeting, sealed crash dumps, and side-channel mitigation
+reporting. Each requirement maps to a specific event class so a
+fleet's confidential-computing health is visible at the dashboard
+level.</p>
+
+<h2>3.2 ML inference inside an enclave</h2>
+<p>The ML-inference profile mandates quantised model weights
+(INT8 or INT4) so the model fits in encrypted memory, streaming
+inputs in encrypted chunks rather than wholesale loads, and
+output redaction for inference outputs that risk leaking input
+content (gradients, attention maps).</p>
+
+<p>The threat model is two-sided: the model owner trusts the
+enclave to compute over inputs without revealing them, and the
+input owner trusts the enclave to compute over the model without
+revealing it. Both trust assumptions rest on the attestation
+chain plus a published model card describing the quantisation
+delta vs. FP32.</p>
+
+<h2>3.3 Memory accounting</h2>
+<p>EPC (SGX) and private memory (SEV-SNP, TDX) are finite. The
+standard requires the runtime to track per-tenant memory
+consumption and to refuse over-budget allocations rather than
+silently swap to host memory (which would defeat
+confidentiality). Capacity envelopes (Phase 2 §2.8) declare a
+tenant's reserved budget at onboarding so capacity is
+deterministic rather than discovered at workload-launch time.</p>
+
+<h2>3.4 Multi-tenant isolation</h2>
+<p>A confidential-computing node typically runs workloads from
+multiple tenants. The standard requires either per-tenant
+dedicated nodes (simplest) or per-tenant TEE instances with
+side-channel mitigations applied (more efficient but harder to
+audit). The chosen mode is declared in the node's attestation
+report so a tenant's policy engine can refuse mixed-tenant
+nodes when its policy demands isolation.</p>
+<h2>Cross-references</h2><p>This chapter participates in the WIA Secure Enclave eight-chapter sequence. Chapter 1 sets context. Chapters 2-5 walk through the four phases. Chapter 6 covers production deployment patterns. Chapter 7 covers incident response and forensics. Chapter 8 closes with the conformance regime, the forward roadmap, and governance.</p><ul><li><strong>Conformance test suite</strong> at <code>https://github.com/WIA-Official/wia-secure-enclave-conformance</code> is the single source of truth for what your implementation needs to pass to claim conformance at the Minimal, Core, or Full level.</li><li><strong>Reference container</strong> at <code>wia/secure-enclave-host:1.0.0</code> implements every Phase 2 endpoint with mock TEE evidence so integrators can exercise their bridge against it before going to production hardware.</li><li><strong>Companion CLI</strong> at <code>cli/secure-enclave.sh</code> ships sample envelope generators (validate, identity, attest, seal, verify, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li></ul><h2>Implementer notes</h2><p>Three operational concerns recur across TEE implementations and are baked into the standard. First, attestation collateral freshness — verifiers MUST refresh ahead of expiry and emit warning envelopes when seven days from expiry, because operations teams routinely miss month-out collateral expiry warnings buried in cloud-provider dashboards. Second, encrypted-memory budgeting — EPC and TDX private memory are finite and the runtime MUST refuse over-budget allocations rather than silently swap to host memory, which would defeat the confidentiality guarantee that motivates the entire deployment. Third, side-channel mitigation reporting — the runtime MUST report applied mitigations as part of the launch attestation so a downstream verifier can refuse pods running on unmitigated hardware, even if the operations team forgot to patch.</p><h2>Worked example</h2><p>Consider a regulated bank running confidential workloads across two clouds. The bank requires per-tenant nodes (no co-residency with other tenants), HSM-backed key wrapping, and federation of verifiers across both clouds plus an independent third-party verifier. Without this standard, the bank reimplements attestation glue per cloud, maintains three separate verifier libraries, and accepts that a workload migration between clouds is a multi-week project. With this standard, the bank publishes one capacity envelope per cloud, registers three verifiers in the federation envelope, and migration becomes a single signed event with audit-grade evidence on both sides.</p></div></body></html>

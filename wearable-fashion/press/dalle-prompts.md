@@ -1,0 +1,10 @@
+# DALL-E Prompts for WIA-IND-003 Press Materials
+
+## Prompt 1: Hero Image - Smart Wearable Fashion Collection
+A fashion-forward scene showing diverse smart wearable technology with indigo (#6366F1) LED accents: sleek smart jewelry ring monitoring heart rate with elegant display, LED-illuminated jacket with programmable RGB patterns responding to music, interactive smart textile shirt with embedded sensors tracking biosignals, solar-powered fashion accessories charging devices, and haptic feedback clothing providing tactile communication. Models wearing tech-integrated fashion that looks stylish and functional. High-fashion technology photography, runway aesthetic with innovation focus.
+
+## Prompt 2: Problem Scenario - Bulky Traditional Wearables
+A frustrated scene showing limitations of current wearable technology: uncomfortable rigid sensors causing skin irritation, bulky battery packs ruining clothing aesthetics, non-washable electronics limiting practical use, short 4-hour battery life requiring constant charging, obvious tech components destroying fashion appeal, and limited functionality offering only basic step counting. Person uncomfortable in traditional fitness tracker, annoyed by frequent charging. Documentary lifestyle photography emphasizing discomfort, inconvenience, and poor integration of technology into daily fashion.
+
+## Prompt 3: Solution Visualization - Elegant Tech-Integrated Fashion
+A beautiful lifestyle scene of people wearing WIA-IND-003 smart fashion: office worker in conductive fabric suit monitoring stress levels and posture while looking professionally dressed, athlete in LED sports jacket training with real-time biometric feedback and 50-hour battery life, fashionista at event wearing smart jewelry that's both stunning and health-tracking, all garments machine-washable IP67 rated. Dashboard shows multi-year battery life from energy harvesting, continuous health monitoring, seamless style integration. Clean, elegant, empowering wearable technology. Aspirational lifestyle photography celebrating fashion meeting function.

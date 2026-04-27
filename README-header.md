@@ -5,11 +5,11 @@
 
 | Tier | Count | Description |
 |------|:-----:|-------------|
-| 🏆 Deep Published v3 (21/21) | **539** | Publication-grade. All 17 size/structure + 4 veracity gates passed. Safe to cite externally. |
-| 🟡 Surface (Stub)             | 66 | v3 gates pass structurally, but content is generic boilerplate from a template. Pending domain-specific authoring. **Not safe to cite externally.** Marked by a `.boilerplate-pending` sentinel in the standard's directory. |
-| 📚 Draft                      | 380 | Imported from prior bulk merge. Pending content depth and/or citation cleanup. Not for external citation yet. |
+| 🏆 Deep Published v3 (21/21) | **531** | Publication-grade. All 17 size/structure + 4 veracity gates passed. Safe to cite externally. |
+| 🟡 Surface (Stub)             | 86 | v3 gates pass structurally, but content is generic boilerplate from a template. Pending domain-specific authoring. **Not safe to cite externally.** Marked by a `.boilerplate-pending` sentinel in the standard's directory. |
+| 📚 Draft                      | 368 | Imported from prior bulk merge. Pending content depth and/or citation cleanup. Not for external citation yet. |
 
-**Mission progress**: 539 / 749 standards Deep Published — **72.0%**
+**Mission progress**: 531 / 749 standards Deep Published — **70.9%**
 
 Standards graduate Draft → Surface → Deep as content depth and domain accuracy increase. See [`docs/CITATION-POLICY.md`](docs/CITATION-POLICY.md) for the policy that gates the transition.
 

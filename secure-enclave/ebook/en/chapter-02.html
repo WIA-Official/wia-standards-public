@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Phase 1 Envelopes — Identity, Attestation, Sealing | WIA Secure Enclave</title><style>:root{--primary:#0ea5e9;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;color:#f8fafc;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#0ea5e9;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#10b981}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA Secure Enclave</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 2 · WIA Secure Enclave v1.0.0</div><h1>Phase 1 Envelopes — Identity, Attestation, Sealing</h1>
+<p>Phase 1 specifies the canonical JSON envelopes that downstream
+phases build on: enclave identity, attestation request, attestation
+quote, sealed-data record, and key-derivation parameters. Every
+envelope is signed with Ed25519 (IETF RFC 8032) over the canonical
+JSON form (RFC 8785 JCS).</p>
+
+<h2>2.1 Enclave identity envelope</h2>
+<p>The enclave identity is derived from the platform measurement —
+MRENCLAVE on SGX, MRTD on TDX, the launch measurement on
+SEV-SNP — combined with the tenant identifier. The envelope is
+re-issued at every measured boot.</p>
+
+<pre><code>{
+  "wia_secure_enclave_version": "1.0.0",
+  "type": "enclave_identity",
+  "enclave_id": "encl_01HXY...",
+  "tenant_id": "did:wia:tenant:...",
+  "tee_family": "sgx" | "tdx" | "sev-snp" | "trustzone" | "nitro",
+  "platform_measurement": "0x...",
+  "signer_measurement": "0x...",
+  "issued_at": "RFC 3339",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+
+<h2>2.2 Attestation request envelope</h2>
+<p>A relying party requests attestation by sending a nonce and the
+expected enclave identity. The challenge nonce defends against
+replay; the expected identity lets the relying party fail fast if
+the wrong enclave answers.</p>
+
+<h2>2.3 Attestation quote envelope</h2>
+<p>The quote envelope wraps the native vendor evidence. The native
+blob is opaque to the envelope schema; the envelope provides
+enough metadata for a verifier to dispatch.</p>
+
+<h2>2.4 Sealed-data record</h2>
+<p>Sealed data is encrypted with a key derived from the enclave
+identity. The record carries the wrapped key, the AEAD ciphertext,
+the AAD that binds the ciphertext to a context, and a sealing
+policy that names the identities allowed to unseal.</p>
+
+<pre><code>{
+  "type": "sealed_data",
+  "record_id": "seal_01HXY...",
+  "wrapped_key": "<base64>",
+  "ciphertext": "<base64>",
+  "aad": "<base64>",
+  "sealing_policy": {
+    "allowed_identities": ["did:wia:enclave:..."],
+    "policy_kind": "exact" | "mrsigner" | "tenant"
+  }
+}</code></pre>
+
+<h2>2.5 Key-derivation parameters</h2>
+<p>The standard mandates HKDF-SHA-384 (FIPS 180-4) with a
+domain-separation context that includes the tenant ID, the enclave
+identity, and the sealing-policy kind. The derivation produces a
+256-bit key suitable for AES-256-GCM (NIST SP 800-38D).</p>
+<h2>Cross-references</h2><p>This chapter participates in the WIA Secure Enclave eight-chapter sequence. Chapter 1 sets context. Chapters 2-5 walk through the four phases. Chapter 6 covers production deployment patterns. Chapter 7 covers incident response and forensics. Chapter 8 closes with the conformance regime, the forward roadmap, and governance.</p><ul><li><strong>Conformance test suite</strong> at <code>https://github.com/WIA-Official/wia-secure-enclave-conformance</code> is the single source of truth for what your implementation needs to pass to claim conformance at the Minimal, Core, or Full level.</li><li><strong>Reference container</strong> at <code>wia/secure-enclave-host:1.0.0</code> implements every Phase 2 endpoint with mock TEE evidence so integrators can exercise their bridge against it before going to production hardware.</li><li><strong>Companion CLI</strong> at <code>cli/secure-enclave.sh</code> ships sample envelope generators (validate, identity, attest, seal, verify, info subcommands) so an implementer can produce conformant payloads without hand-rolling JSON.</li></ul><h2>Implementer notes</h2><p>Three operational concerns recur across TEE implementations and are baked into the standard. First, attestation collateral freshness — verifiers MUST refresh ahead of expiry and emit warning envelopes when seven days from expiry, because operations teams routinely miss month-out collateral expiry warnings buried in cloud-provider dashboards. Second, encrypted-memory budgeting — EPC and TDX private memory are finite and the runtime MUST refuse over-budget allocations rather than silently swap to host memory, which would defeat the confidentiality guarantee that motivates the entire deployment. Third, side-channel mitigation reporting — the runtime MUST report applied mitigations as part of the launch attestation so a downstream verifier can refuse pods running on unmitigated hardware, even if the operations team forgot to patch.</p><h2>Worked example</h2><p>Consider a regulated bank running confidential workloads across two clouds. The bank requires per-tenant nodes (no co-residency with other tenants), HSM-backed key wrapping, and federation of verifiers across both clouds plus an independent third-party verifier. Without this standard, the bank reimplements attestation glue per cloud, maintains three separate verifier libraries, and accepts that a workload migration between clouds is a multi-week project. With this standard, the bank publishes one capacity envelope per cloud, registers three verifiers in the federation envelope, and migration becomes a single signed event with audit-grade evidence on both sides.</p></div></body></html>

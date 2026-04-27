@@ -40,9 +40,6 @@ pub enum SmartHomeError {
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
 
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-
     #[error("Permission denied: {0}")]
     PermissionDenied(String),
 

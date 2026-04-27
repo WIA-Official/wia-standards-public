@@ -7,22 +7,6 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 // ============================================================================
-// Type Aliases
-// ============================================================================
-
-/// Device identifier type alias
-pub type DeviceId = Uuid;
-
-/// Zone identifier type alias
-pub type ZoneId = Uuid;
-
-/// Home identifier type alias
-pub type HomeId = Uuid;
-
-/// User profile identifier type alias
-pub type ProfileId = Uuid;
-
-// ============================================================================
 // Input/Output Modalities
 // ============================================================================
 

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-SEC-013 Secure Enclave Simulator | WIA Standards</title>
+    <style>
+        :root { --primary: #8B5CF6; --primary-dark: #7C3AED; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --gold: #ffd700; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .breadcrumb { display: flex; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb .current { color: var(--primary); }
+        .lang-switch { display: flex; gap: 5px; }
+        .lang-btn { padding: 6px 12px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 6px; cursor: pointer; }
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .hero { text-align: center; margin-bottom: 40px; }
+        .hero h1 { font-size: 2.5rem; background: linear-gradient(90deg, var(--primary), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: all 0.3s; }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .sim-container { background: var(--bg-card); border-radius: 16px; padding: 30px; border: 1px solid var(--border); }
+        .sim-title { font-size: 1.3rem; color: var(--primary); margin-bottom: 20px; }
+
+        .data-format-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .format-card { background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .format-icon { font-size: 3rem; text-align: center; margin-bottom: 15px; }
+        .format-name { font-size: 1.2rem; color: var(--primary); margin-bottom: 10px; text-align: center; }
+        .format-desc { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+
+        .code-block { background: #000; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: var(--success); overflow-x: auto; margin-top: 15px; line-height: 1.6; }
+        .code-comment { color: #94a3b8; }
+        .code-keyword { color: #06B6D4; }
+        .code-string { color: #10b981; }
+        .code-number { color: #f59e0b; }
+
+        .protocol-flow { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 20px 0; padding: 20px; background: var(--bg); border-radius: 12px; }
+        .flow-item { padding: 15px 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; text-align: center; }
+        .flow-arrow { color: var(--primary); font-size: 1.5rem; }
+
+        .metric-display { background: var(--bg); padding: 25px; border-radius: 12px; margin-top: 20px; border: 1px solid var(--border); }
+        .metric-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .metric-label { color: var(--text-muted); }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+
+        .btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; margin: 5px; }
+        .btn:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
+
+        .visual-enclave { width: 300px; height: 300px; margin: 20px auto; position: relative; }
+        .enclave-outer { width: 100%; height: 100%; border: 3px solid var(--border); border-radius: 16px; background: rgba(139, 92, 246, 0.05); position: relative; }
+        .enclave-inner { width: 60%; height: 60%; border: 3px solid var(--primary); border-radius: 12px; background: rgba(139, 92, 246, 0.2); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+        .shield-animation { animation: shield-pulse 2s ease-in-out infinite; }
+        @keyframes shield-pulse { 0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); } 50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.6); } }
+
+        .integration-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
+        .integration-item { background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+        .integration-item h4 { color: var(--primary); margin-bottom: 10px; }
+        .integration-item p { color: var(--text-muted); font-size: 0.9rem; }
+
+        .qr-container { display: flex; justify-content: center; align-items: center; gap: 30px; flex-wrap: wrap; margin: 20px 0; }
+        .qr-box { text-align: center; }
+        .qr-visual { width: 200px; height: 200px; border: 2px solid var(--primary); border-radius: 12px; background: white; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin-bottom: 10px; }
+        .qr-label { color: var(--text-muted); font-size: 0.9rem; }
+
+        footer { margin-top: 50px; text-align: center; padding: 20px; border-top: 1px solid var(--border); }
+        footer p { color: var(--text-muted); font-size: 0.9rem; }
+        .philosophy { color: #ffd700; margin-bottom: 10px; font-size: 1.1rem; }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .tabs { flex-direction: column; }
+            .tab { width: 100%; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="/secure-enclave/">WIA-SEC-013</a>
+                    <span>›</span>
+                    <span class="current">Simulator</span>
+                </div>
+            </div>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                <button class="lang-btn" onclick="setLang('ko')">KO</button>
+            </div>
+        </div>
+
+        <div class="hero">
+            <h1>🛡️ Secure Enclave Simulator</h1>
+            <p data-en="Interactive demonstration of TEE, Intel SGX, ARM TrustZone, and secure processing" data-ko="TEE, Intel SGX, ARM TrustZone 및 보안 처리의 대화형 시연">Interactive demonstration of TEE, Intel SGX, ARM TrustZone, and secure processing</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel('data-format')" data-en="Data Format" data-ko="데이터 형식">Data Format</div>
+            <div class="tab" onclick="showPanel('algorithms')" data-en="Algorithms" data-ko="알고리즘">Algorithms</div>
+            <div class="tab" onclick="showPanel('protocol')" data-en="Protocol" data-ko="프로토콜">Protocol</div>
+            <div class="tab" onclick="showPanel('integration')" data-en="Integration" data-ko="통합">Integration</div>
+            <div class="tab" onclick="showPanel('qr-vc')" data-en="QR & VC" data-ko="QR & VC">QR & VC</div>
+        </div>
+
+        <!-- Tab 1: Data Format -->
+        <div id="data-format" class="panel active">
+            <div class="sim-container">
+                <div class="sim-title" data-en="Secure Enclave Data Formats" data-ko="보안 엔클레이브 데이터 형식">Secure Enclave Data Formats</div>
+
+                <div class="data-format-grid">
+                    <div class="format-card">
+                        <div class="format-icon">🔐</div>
+                        <div class="format-name" data-en="Enclave Identity" data-ko="엔클레이브 신원">Enclave Identity</div>
+                        <div class="format-desc" data-en="Unique identifier and measurement hash (MRENCLAVE) for enclave code and data." data-ko="엔클레이브 코드 및 데이터에 대한 고유 식별자 및 측정 해시(MRENCLAVE).">Unique identifier and measurement hash (MRENCLAVE) for enclave code and data.</div>
+                    </div>
+
+                    <div class="format-card">
+                        <div class="format-icon">📜</div>
+                        <div class="format-name" data-en="Attestation Report" data-ko="증명 보고서">Attestation Report</div>
+                        <div class="format-desc" data-en="Cryptographically signed report proving enclave authenticity and configuration state." data-ko="엔클레이브 진위성 및 구성 상태를 증명하는 암호화 서명된 보고서.">Cryptographically signed report proving enclave authenticity and configuration state.</div>
+                    </div>
+
+                    <div class="format-card">
+                        <div class="format-icon">💾</div>
+                        <div class="format-name" data-en="Sealed Data" data-ko="봉인된 데이터">Sealed Data</div>
+                        <div class="format-desc" data-en="Encrypted data blob that can only be unsealed by the same enclave instance." data-ko="동일한 엔클레이브 인스턴스에서만 봉인을 해제할 수 있는 암호화된 데이터 블롭.">Encrypted data blob that can only be unsealed by the same enclave instance.</div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="code-comment">// Enclave Identity Structure</span>
+<span class="code-keyword">struct</span> EnclaveIdentity {
+    mr_enclave: [u8; <span class="code-number">32</span>],    <span class="code-comment">// SHA-256 hash of enclave code</span>
+    mr_signer: [u8; <span class="code-number">32</span>],     <span class="code-comment">// Hash of enclave signer key</span>
+    isv_prod_id: <span class="code-number">u16</span>,          <span class="code-comment">// Product ID</span>
+    isv_svn: <span class="code-number">u16</span>,              <span class="code-comment">// Security version number</span>
+    attributes: <span class="code-number">u64</span>,           <span class="code-comment">// Enclave attributes</span>
+}
+
+<span class="code-comment">// Attestation Report Structure</span>
+<span class="code-keyword">struct</span> AttestationReport {
+    version: <span class="code-number">u16</span>,
+    sign_type: <span class="code-number">u16</span>,
+    epid_group_id: [u8; <span class="code-number">4</span>],
+    qe_svn: <span class="code-number">u16</span>,
+    pce_svn: <span class="code-number">u16</span>,
+    basename: [u8; <span class="code-number">32</span>],
+    report_data: [u8; <span class="code-number">64</span>],    <span class="code-comment">// Custom data from enclave</span>
+    signature: Vec&lt;u8&gt;,
+}</div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Algorithms -->
+        <div id="algorithms" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="Secure Enclave Algorithms" data-ko="보안 엔클레이브 알고리즘">Secure Enclave Algorithms</div>
+
+                <div class="visual-enclave">
+                    <div class="enclave-outer">
+                        <div class="enclave-inner shield-animation">🛡️</div>
+                    </div>
+                </div>
+
+                <div class="metric-display">
+                    <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="TEE Technologies" data-ko="TEE 기술">TEE Technologies</h3>
+                    <div class="metric-row">
+                        <span class="metric-label" data-en="Intel SGX" data-ko="인텔 SGX">Intel SGX</span>
+                        <span class="metric-value">AES-128</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label" data-en="ARM TrustZone" data-ko="ARM TrustZone">ARM TrustZone</span>
+                        <span class="metric-value">AES-256</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label" data-en="AMD SEV" data-ko="AMD SEV">AMD SEV</span>
+                        <span class="metric-value">AES-128</span>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="code-comment">// Memory Encryption Engine (MEE)</span>
+<span class="code-keyword">function</span> encryptEnclaveMemory(plaintext, key) {
+    <span class="code-comment">// Counter mode encryption with integrity tree</span>
+    <span class="code-keyword">const</span> counter = getMemoryCounter(address);
+    <span class="code-keyword">const</span> ciphertext = AES_128_CTR(plaintext, key, counter);
+    <span class="code-keyword">const</span> mac = GMAC(ciphertext, key);
+    <span class="code-keyword">return</span> { ciphertext, mac };
+}
+
+<span class="code-comment">// Remote Attestation Key Derivation</span>
+<span class="code-keyword">function</span> deriveAttestationKey(mrenclave, mrsigner) {
+    <span class="code-keyword">const</span> seal_key_request = {
+        key_name: <span class="code-string">"SEAL_KEY"</span>,
+        key_policy: <span class="code-string">"MRENCLAVE"</span>,
+        isv_svn: current_svn
+    };
+    <span class="code-keyword">return</span> EGETKEY(seal_key_request);
+}
+
+<span class="code-comment">// Sealed Storage</span>
+<span class="code-keyword">function</span> sealData(data, seal_key) {
+    <span class="code-keyword">const</span> iv = generateRandomIV();
+    <span class="code-keyword">const</span> encrypted = AES_GCM_encrypt(data, seal_key, iv);
+    <span class="code-keyword">const</span> mac = GMAC(encrypted, seal_key);
+    <span class="code-keyword">return</span> { encrypted, iv, mac };
+}</div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Protocol -->
+        <div id="protocol" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="Attestation & Sealing Protocol" data-ko="증명 및 봉인 프로토콜">Attestation & Sealing Protocol</div>
+
+                <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="Remote Attestation Flow" data-ko="원격 증명 흐름">Remote Attestation Flow</h3>
+                <div class="protocol-flow">
+                    <div class="flow-item" data-en="1. Enclave Init" data-ko="1. 엔클레이브 초기화">1. Enclave Init</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="2. Generate Quote" data-ko="2. Quote 생성">2. Generate Quote</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="3. Send to IAS" data-ko="3. IAS로 전송">3. Send to IAS</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="4. Verify Report" data-ko="4. 보고서 확인">4. Verify Report</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="5. Establish Trust" data-ko="5. 신뢰 구축">5. Establish Trust</div>
+                </div>
+
+                <h3 style="color: var(--primary); margin: 30px 0 15px;" data-en="Sealed Storage Flow" data-ko="봉인된 저장소 흐름">Sealed Storage Flow</h3>
+                <div class="protocol-flow">
+                    <div class="flow-item" data-en="1. Data Input" data-ko="1. 데이터 입력">1. Data Input</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="2. Derive Key" data-ko="2. 키 유도">2. Derive Key</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="3. Encrypt+MAC" data-ko="3. 암호화+MAC">3. Encrypt+MAC</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="4. Store Sealed" data-ko="4. 봉인 저장">4. Store Sealed</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item" data-en="5. Unseal Later" data-ko="5. 나중에 봉인 해제">5. Unseal Later</div>
+                </div>
+
+                <div class="code-block">
+<span class="code-comment">// Remote Attestation Protocol</span>
+<span class="code-keyword">async function</span> performRemoteAttestation() {
+    <span class="code-comment">// Step 1: Create enclave report</span>
+    <span class="code-keyword">const</span> report = await createEnclaveReport({
+        target_info: quoting_enclave_info,
+        report_data: custom_data
+    });
+
+    <span class="code-comment">// Step 2: Generate quote from report</span>
+    <span class="code-keyword">const</span> quote = await generateQuote(report);
+
+    <span class="code-comment">// Step 3: Send to Intel Attestation Service</span>
+    <span class="code-keyword">const</span> attestation_result = await fetch(<span class="code-string">'https://api.trustedservices.intel.com/sgx/attestation/v4/report'</span>, {
+        method: <span class="code-string">'POST'</span>,
+        body: quote
+    });
+
+    <span class="code-comment">// Step 4: Verify signature and enclave identity</span>
+    <span class="code-keyword">const</span> verified = verifyAttestationReport(attestation_result);
+    <span class="code-keyword">return</span> verified;
+}
+
+<span class="code-comment">// Sealed Data Persistence</span>
+<span class="code-keyword">function</span> sealAndStore(sensitive_data) {
+    <span class="code-keyword">const</span> seal_key = deriveKey(<span class="code-string">"SEAL_KEY"</span>, <span class="code-string">"MRENCLAVE"</span>);
+    <span class="code-keyword">const</span> sealed = seal(sensitive_data, seal_key);
+    persistToUntrustedStorage(sealed);
+}</div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Integration -->
+        <div id="integration" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="Platform Integration" data-ko="플랫폼 통합">Platform Integration</div>
+
+                <div class="integration-grid">
+                    <div class="integration-item">
+                        <h4>⚡ Intel SGX</h4>
+                        <p data-en="x86_64 processors with SGX support. Requires BIOS enabled." data-ko="SGX 지원 x86_64 프로세서. BIOS 활성화 필요.">x86_64 processors with SGX support. Requires BIOS enabled.</p>
+                    </div>
+
+                    <div class="integration-item">
+                        <h4>🛡️ ARM TrustZone</h4>
+                        <p data-en="ARM Cortex-A processors. Separate secure world execution." data-ko="ARM Cortex-A 프로세서. 별도의 보안 세계 실행.">ARM Cortex-A processors. Separate secure world execution.</p>
+                    </div>
+
+                    <div class="integration-item">
+                        <h4>🔥 AMD SEV</h4>
+                        <p data-en="Secure Encrypted Virtualization for VM isolation." data-ko="VM 격리를 위한 보안 암호화 가상화.">Secure Encrypted Virtualization for VM isolation.</p>
+                    </div>
+
+                    <div class="integration-item">
+                        <h4>🌐 Cloud TEE</h4>
+                        <p data-en="Azure Confidential Computing, AWS Nitro Enclaves." data-ko="Azure 기밀 컴퓨팅, AWS Nitro Enclaves.">Azure Confidential Computing, AWS Nitro Enclaves.</p>
+                    </div>
+
+                    <div class="integration-item">
+                        <h4>📱 Mobile TEE</h4>
+                        <p data-en="Apple Secure Enclave, Android StrongBox." data-ko="Apple 보안 엔클레이브, Android StrongBox.">Apple Secure Enclave, Android StrongBox.</p>
+                    </div>
+
+                    <div class="integration-item">
+                        <h4>🔐 TPM</h4>
+                        <p data-en="Trusted Platform Module for key storage and attestation." data-ko="키 저장 및 증명을 위한 신뢰 플랫폼 모듈.">Trusted Platform Module for key storage and attestation.</p>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="code-comment">// Intel SGX Integration Example</span>
+<span class="code-keyword">import</span> { sgx } <span class="code-keyword">from</span> <span class="code-string">'@wia/secure-enclave'</span>;
+
+<span class="code-keyword">const</span> enclave = <span class="code-keyword">await</span> sgx.createEnclave({
+    path: <span class="code-string">'./enclave.signed.so'</span>,
+    debug: <span class="code-keyword">false</span>
+});
+
+<span class="code-comment">// Execute sensitive operation in enclave</span>
+<span class="code-keyword">const</span> result = <span class="code-keyword">await</span> enclave.call(<span class="code-string">'process_secret'</span>, {
+    data: sensitive_input
+});
+
+<span class="code-comment">// ARM TrustZone Integration Example</span>
+<span class="code-keyword">import</span> { trustzone } <span class="code-keyword">from</span> <span class="code-string">'@wia/secure-enclave'</span>;
+
+<span class="code-keyword">const</span> ta = <span class="code-keyword">await</span> trustzone.openSession({
+    uuid: <span class="code-string">'550e8400-e29b-41d4-a716-446655440000'</span>
+});
+
+<span class="code-keyword">const</span> encrypted = <span class="code-keyword">await</span> ta.invokeCommand(<span class="code-string">'encrypt_data'</span>, plaintext);</div>
+            </div>
+        </div>
+
+        <!-- Tab 5: QR & VC -->
+        <div id="qr-vc" class="panel">
+            <div class="sim-container">
+                <div class="sim-title" data-en="QR Codes & Verifiable Credentials" data-ko="QR 코드 및 검증 가능한 자격 증명">QR Codes & Verifiable Credentials</div>
+
+                <div class="qr-container">
+                    <div class="qr-box">
+                        <div class="qr-visual">🔐</div>
+                        <div class="qr-label" data-en="Attestation Report QR" data-ko="증명 보고서 QR">Attestation Report QR</div>
+                    </div>
+
+                    <div class="qr-box">
+                        <div class="qr-visual">🛡️</div>
+                        <div class="qr-label" data-en="Enclave Identity QR" data-ko="엔클레이브 신원 QR">Enclave Identity QR</div>
+                    </div>
+                </div>
+
+                <div class="metric-display">
+                    <h3 style="color: var(--primary); margin-bottom: 15px;" data-en="Verifiable Credential" data-ko="검증 가능한 자격 증명">Verifiable Credential</h3>
+                    <div class="metric-row">
+                        <span class="metric-label" data-en="Issuer:" data-ko="발급자:">Issuer:</span>
+                        <span class="metric-value" style="font-size: 1rem;">Intel Attestation Service</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label" data-en="Subject:" data-ko="주체:">Subject:</span>
+                        <span class="metric-value" style="font-size: 1rem;">Enclave MR: 0xABCD...1234</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label" data-en="Status:" data-ko="상태:">Status:</span>
+                        <span class="metric-value" style="font-size: 1rem; color: var(--success);">✓ Verified</span>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="code-comment">// Verifiable Credential for Enclave Attestation</span>
+{
+  <span class="code-string">"@context"</span>: [
+    <span class="code-string">"https://www.w3.org/2018/credentials/v1"</span>,
+    <span class="code-string">"https://wiastandards.com/credentials/secure-enclave/v1"</span>
+  ],
+  <span class="code-string">"type"</span>: [<span class="code-string">"VerifiableCredential"</span>, <span class="code-string">"EnclaveAttestationCredential"</span>],
+  <span class="code-string">"issuer"</span>: <span class="code-string">"did:web:attestation.intel.com"</span>,
+  <span class="code-string">"issuanceDate"</span>: <span class="code-string">"2025-12-25T00:00:00Z"</span>,
+  <span class="code-string">"credentialSubject"</span>: {
+    <span class="code-string">"id"</span>: <span class="code-string">"did:enclave:0xABCD1234..."</span>,
+    <span class="code-string">"enclaveType"</span>: <span class="code-string">"Intel SGX"</span>,
+    <span class="code-string">"mrenclave"</span>: <span class="code-string">"0xABCDEF1234567890..."</span>,
+    <span class="code-string">"mrsigner"</span>: <span class="code-string">"0x9876543210FEDCBA..."</span>,
+    <span class="code-string">"isvProdId"</span>: <span class="code-number">1</span>,
+    <span class="code-string">"isvSvn"</span>: <span class="code-number">2</span>,
+    <span class="code-string">"attestationStatus"</span>: <span class="code-string">"GROUP_OUT_OF_DATE"</span>,
+    <span class="code-string">"platformInfo"</span>: {
+      <span class="code-string">"cpuSvn"</span>: <span class="code-string">"0x0F0F..."</span>,
+      <span class="code-string">"pceSvn"</span>: <span class="code-number">10</span>
+    }
+  },
+  <span class="code-string">"proof"</span>: {
+    <span class="code-string">"type"</span>: <span class="code-string">"RsaSignature2018"</span>,
+    <span class="code-string">"created"</span>: <span class="code-string">"2025-12-25T00:00:00Z"</span>,
+    <span class="code-string">"proofPurpose"</span>: <span class="code-string">"assertionMethod"</span>,
+    <span class="code-string">"verificationMethod"</span>: <span class="code-string">"did:web:attestation.intel.com#key-1"</span>,
+    <span class="code-string">"jws"</span>: <span class="code-string">"eyJhbGc..."</span>
+  }
+}</div>
+
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn btn-success" data-en="Generate VC" data-ko="VC 생성">Generate VC</button>
+                    <button class="btn" data-en="Verify VC" data-ko="VC 검증">Verify VC</button>
+                    <button class="btn" data-en="Export QR" data-ko="QR 내보내기">Export QR</button>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy">弘益人間 · 널리 인간을 이롭게 하라 · Benefit All Humanity</p>
+            <p data-en="From the Republic of Korea to the World" data-ko="대한민국에서 세계로">From the Republic of Korea to the World</p>
+            <p style="margin-top: 10px;">© 2025 World Certification Industry Association (WIA)</p>
+        </footer>
+    </div>
+
+    <script>
+        function showPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function setLang(lang) {
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.lang-btn:${lang === 'en' ? 'first-child' : 'last-child'}`).classList.add('active');
+            document.querySelectorAll('[data-en]').forEach(el => {
+                el.textContent = el.getAttribute(`data-${lang}`);
+            });
+            localStorage.setItem('wia-lang', lang);
+        }
+        const savedLang = localStorage.getItem('wia-lang');
+        if (savedLang) setLang(savedLang);
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

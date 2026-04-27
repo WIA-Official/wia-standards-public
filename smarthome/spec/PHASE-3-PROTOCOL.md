@@ -284,12 +284,64 @@ WIA Protocol -> App: HapticFeedback.Vibrate(SHORT_TAP)
 
 ---
 
-## 10. References
+## 10. Multi-fabric coordination
+
+A typical accessibility-aware household has at least two fabrics: the
+primary WIA fabric, and a vendor's own ecosystem fabric (Apple Home,
+Google Home, Samsung SmartThings). The protocol explicitly supports a
+device being commissioned to multiple fabrics simultaneously so that
+the user retains the vendor's UX while gaining WIA's accessibility
+extensions.
+
+When a device is on multiple fabrics, conflict resolution between
+fabrics follows a deterministic rule: the most recent commissioned
+fabric's command takes precedence within a 50 ms window, after which
+each fabric's command is queued FIFO. This avoids the "two voice
+assistants fighting over a light" problem common in mixed ecosystems.
+
+## 11. Battery and power-aware scheduling
+
+Many accessibility-critical devices run on battery (door sensors, fall
+detectors, panic buttons). The protocol defines a power-aware
+scheduling extension:
+
+```
+PowerProfile {
+    battery_level: u8,           // 0-100, current charge
+    battery_capacity_mAh: u16,   // declared at commissioning
+    expected_lifetime_days: u16, // computed from usage
+    critical_threshold: u8,      // 0-100, alert below this
+}
+```
+
+A conformant hub MUST emit a `low_battery_warning` event when any
+device crosses below the `critical_threshold` and MUST escalate to a
+`device_offline_imminent` event when the device's expected lifetime
+drops below 24 hours. For accessibility-critical devices this alert
+also routes through the emergency channel of Phase 2.
+
+## 12. Network resilience
+
+Mesh networks (Thread, Zigbee) handle single-node failures
+transparently, but star-topology Wi-Fi devices need explicit recovery.
+The protocol requires:
+
+- Wi-Fi devices MUST re-attempt connection on exponential backoff
+  (1s, 2s, 4s, ..., max 5 min) after disconnection.
+- Hubs MUST track per-device "last seen" timestamps and surface
+  devices not seen in 24 hours as `degraded` in the device list API.
+- Critical devices (door locks, emergency alerts) MUST use a
+  redundant transport (Wi-Fi primary + Thread fallback if available)
+  and the protocol carries a `transport_redundancy` capability flag.
+
+## 13. References
 
 - [Matter Specification 1.0](https://csa-iot.org/developer-resource/specifications-download-request/)
 - [RFC 6762 - Multicast DNS](https://datatracker.ietf.org/doc/html/rfc6762)
 - [RFC 6763 - DNS-Based Service Discovery](https://datatracker.ietf.org/doc/html/rfc6763)
 - [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
+- [Thread Specification 1.3](https://www.threadgroup.org/)
+- [IETF RFC 9421 — HTTP Message Signatures](https://datatracker.ietf.org/doc/html/rfc9421)
 
 ---
 

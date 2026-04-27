@@ -1,301 +1,241 @@
-# WIA-payment-system PHASE 1 — Data Format Specification
+# WIA-payment-system PHASE 1 — DATA-FORMAT Specification
 
 **Standard:** WIA-payment-system
-**Phase:** 1 — Data Format
+**Phase:** 1 — DATA-FORMAT
 **Version:** 1.0
 **Status:** Stable
 
-This PHASE defines the canonical data format for retail and
-wholesale payment-system records: account identifiers, payment
-instructions, clearing and settlement records, dispute records,
-sanctions screening evidence, fraud-flag records, and the cross-
-references that bind these together. The shape interoperates with
-ISO 20022 financial messaging so that an existing payment scheme,
-RTGS, or instant-payments rail can adopt this PHASE without
-inventing parallel data models.
+This document defines the canonical DATA-FORMAT layer for WIA-payment-system (Payment System).
 
 References (CITATION-POLICY ALLOW only):
-- ISO 20022 — Financial Services Universal Financial Industry message scheme
-- ISO 20022 message catalogue — pacs.008 (FI-to-FI Customer Credit Transfer),
-  pacs.009 (FI Credit Transfer), pacs.002 (Status Report), pacs.004 (Return),
-  camt.053 (Bank-to-Customer Statement), camt.054 (Bank-to-Customer Debit/Credit Notification)
-- ISO 13616 — IBAN; ISO 9362 — BIC; ISO 4217 — Currency code
-- PCI DSS v4.0 — Payment Card Industry Data Security Standard
-- PCI Software Security Framework — Secure Software Standard / Secure SLC
-- EMVCo Book 2 / Book 3 — EMV Integrated Circuit Card specifications
-- EMVCo Tokenisation Framework v2.x
-- FATF Recommendations 10 (CDD), 16 (Wire Transfers), 32 (Cross-border)
-- IETF RFC 7515 (JWS), RFC 8785 (JCS), RFC 9162 (Certificate Transparency 2.0 pattern)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
 ## §1 Scope
 
-This PHASE applies to systems that originate, route, clear, settle,
-or report retail and wholesale payments: bank-to-bank credit
-transfers, card-network authorisations and clearings, instant-
-payment rails, payment-initiation services, and the controllers'
-audit and compliance records arising from those flows. It addresses
-the *shape* of records; transport protocols are addressed in
-PHASE 3, integration with existing rails in PHASE 4.
+This PHASE document is one of four that together define the WIA-payment-system
+standard. It addresses the data-format layer of the standard.
 
-The standard is jurisdiction-aware: an implementation MUST declare
-which regulatory regime its records fall under (one of: BIS RTGS
-member-bank rails, EU SEPA / TARGET2, US Fedwire / FedNow / NACHA,
-KR HOFINET / 한은금융망 / KFTC 신속이체, JP BOJ-NET / Zengin, etc.)
-so that downstream auditors apply the correct interpretation of
-finality, return windows, and sanctions screening.
+## §2 Manifest
 
-In scope: credit transfers (single and bulk), card authorisations
-and clearings, refund records, sanctions evidence, fraud flags,
-dispute and chargeback records. Out of scope: securities settlement
-(addressed by ISO 20022 securities messages, separate WIA standard
-in plan), cryptocurrency native protocols (separate WIA standard).
+Implementations publish a signed manifest containing standardSlug
+(constant value: "payment-system"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 Account identifier model
+## §3 Conformance Tiers
 
-Accounts carry a *structured* identifier:
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-| Identifier kind         | Source standard                                         |
-|-------------------------|---------------------------------------------------------|
-| IBAN                    | ISO 13616 — Europe / Saudi Arabia / others              |
-| BIC (SWIFT)             | ISO 9362 — Bank Identifier Code                          |
-| Domestic account number | per national scheme (KR 계좌번호, US ABA + DDA, JP 銀行・支店・口座) |
-| Card primary account number (PAN) | ISO/IEC 7812 BIN + check-digit                |
-| Tokenised PAN           | EMVCo Tokenisation Framework v2.x                       |
-| Phone-number proxy      | ITU-T E.164 (used by some instant-payment rails)         |
-| Alias                   | scheme-defined alias (e.g., KR 토스ID, JP J-Coin tag)    |
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-PAN-bearing fields are *in scope of PCI DSS v4* — they MUST be
-truncated, masked, or tokenised in any record that crosses the
-boundary into a non-PCI environment. This PHASE never carries a
-full PAN in audit trails; the audit trail references the tokenised
-PAN or the masked PAN ("************4242").
+## §4 Discovery
 
-## §3 Payment instruction record (ISO 20022-aligned)
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/payment-system`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-A payment instruction follows the ISO 20022 pacs.008 message profile:
+## §5 Time and Identity
 
-| Field group           | Source / Binding                                                 |
-|-----------------------|------------------------------------------------------------------|
-| GroupHeader           | MessageId (UETR-bound), CreationDateTime, NumberOfTransactions   |
-| CreditTransferTransactionInformation | Per-payment block:                                |
-|   PaymentId           | InstructionId, EndToEndId, UETR (ISO 20022 unique end-to-end txn id), ClearingSystemReference |
-|   InterbankSettlementAmount | currency (ISO 4217) + amount + fractional digits per currency |
-|   ChargeBearer        | DEBT, CRED, SHAR, SLEV (ISO 20022 closed enum)                   |
-|   Debtor / Creditor   | Name, postal address, identification (BIC/IBAN/local)            |
-|   DebtorAgent / CreditorAgent | BIC + clearing-system-id where applicable                |
-|   RemittanceInformation | structured (RemittanceLocation) or unstructured (free text)    |
-|   PurposeOfPayment    | ExternalPurposeCode (ISO 20022 ExternalPurposeCode list)         |
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-The instruction is signed using JWS (RFC 7515) by the originating
-institution. The detached signature is held alongside the ISO 20022
-canonical XML/JSON so the message remains canonical for downstream
-processing.
+## §6 Versioning and Deprecation
 
-## §4 Currency and amount handling
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Amounts are represented as fixed-point decimal with precision per
-ISO 4217 fractional-digit rules:
+## §7 Privacy and Security
 
-| Currency | Fractional digits | Examples |
-|----------|------------------|----------|
-| KRW, JPY | 0                | ₩100,000 / ¥10,000 |
-| USD, EUR, GBP, KRW… | 2     | $123.45 / €99.99 |
-| BHD, KWD, OMR, JOD | 3     | three-digit-fractional |
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Amounts MUST NEVER be stored as binary floats; the wire form is
-ISO 20022 numeric (string of digits with a decimal-point position
-defined by the currency). Currency mismatch between the
-InterbankSettlementAmount currency and the InstructedAmount
-currency is permitted only when an FX block (ExchangeRateInformation)
-is present and signed.
+## §8 Open Governance
 
-## §5 UETR and end-to-end traceability
-
-Every transaction carries a Universally-Unique End-to-End
-Transaction Reference (UETR) — a 36-character UUID per ISO 20022.
-The UETR is preserved across every leg of a multi-bank transfer
-so that auditors can reconstruct the full lifecycle from origination
-through settlement.
-
-This PHASE binds the UETR to the boundary's audit chain: every
-status change (accepted, accepted-for-settlement, settled, returned,
-rejected, cancelled) emits an AuditEvent referencing the UETR.
-Reconstruction of a transaction lifecycle is therefore a query
-against AuditEvents filtered by UETR.
-
-## §6 Card authorisation record (EMVCo / PCI DSS-aligned)
-
-A card authorisation carries:
-
-- `transactionId` — URN of form `urn:wia:pay:cardauth:<acquirer>:<seq>`
-- `tokenisedPAN` — EMVCo token (PAN never stored in clear post-
-  authorisation in the deployment's non-PCI scope)
-- `panSuffix` — last four digits of the underlying PAN (clear text,
-  permitted by PCI DSS for receipts)
-- `cardScheme` — Visa, Mastercard, AmEx, JCB, Discover, UnionPay,
-  RuPay, BC카드, KEB하나카드, etc.
-- `merchantId` — acquirer-assigned MID
-- `terminalId` — POS or e-commerce terminal identifier
-- `mcc` — ISO 18245 Merchant Category Code
-- `transactionType` — 00 (purchase), 01 (cash advance), 09 (purchase
-  with cashback), 20 (refund) per ISO 8583 / EMV book 3
-- `cvm` — Cardholder Verification Method (PIN, signature, no-CVM,
-  CDCVM device-side biometric)
-- `terminalEntryMode` — chip-and-PIN, contactless EMV, magstripe,
-  manual, e-commerce CNP (ISO 8583 PoS Entry Mode)
-- `authResult` — approved, declined, referral, partial-approval
-- `authNetworkId` — ISO 8583 RRN / authorisation code (returned by
-  the card network)
-
-PAN-equivalent data (CVV2, full magstripe Track 2, PIN block) are
-*never* persisted past the authorisation transaction — PCI DSS v4
-Requirement 3 forbids it.
-
-## §7 Sanctions screening evidence
-
-Every cross-border instruction (and any domestic instruction that
-exceeds the deployment's screening threshold) carries sanctions
-screening evidence:
-
-- `screeningId` — URN
-- `instructionRef` — UETR or card transaction ID
-- `screeningSource[]` — list of screened-against lists (UN, OFAC SDN,
-  EU consolidated, UK HMT, KR 외환관리법 별표, JP MOF, etc.)
-- `result` — clear, hit, partial-match
-- `matchEvidence` — name normalisation method, fuzzy-match score
-  band (none / low / moderate / high), reviewer disposition for
-  hits / partial-matches
-- `screeningTimestamp` — RFC 3339 with offset
-
-Screening evidence is signed with the screening service's key.
-A transaction without screening evidence at the time of release
-MUST not be released; the boundary refuses unscreened cross-border
-flows.
-
-## §8 Fraud-flag record
-
-Fraud-flag records bind to instructions or card authorisations:
-
-- `flagId` — URN
-- `subjectInstruction` — UETR or card transaction ID
-- `flagType` — coded type (velocity-anomaly, geolocation-mismatch,
-  device-anomaly, behavioural-anomaly, network-rule-flag, scheme-
-  blacklist-hit)
-- `severityBand` — informational, advisory, blocking
-- `originPrincipal` — fraud engine URN
-- `flagTimestamp` — RFC 3339 with offset
-
-Flags are *advisory* until promoted to a block by the deployment's
-fraud-policy engine. Promotions and demotions emit AuditEvents
-linked to the flag and the underlying transaction.
-
-## §9 Dispute and chargeback record
-
-Disputes follow the relevant scheme's chargeback workflow with
-state machine:
-
-- `disputeId` — URN
-- `subjectTransaction` — original card transaction ID
-- `chargebackReasonCode` — scheme-defined reason code
-- `state` — one of `inquiry`, `chargeback-issued`, `representment`,
-  `pre-arbitration`, `arbitration`, `accepted`, `withdrawn`,
-  `expired`
-- `transitions[]` — each transition: from-state, to-state, timestamp,
-  signing principal, evidence references
-- `disputedAmount` — currency + amount (may be partial of original)
-
-Disputes are append-only; revisions issue a new state-transition
-record referencing the prior. The chain ties to the original
-transaction's UETR so the full lifecycle (authorisation → clearing
-→ dispute → resolution) is reconstructable.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `payment-system` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## Annex A — Worked example: pacs.008 credit transfer (informative)
 
-A fully populated cross-border credit transfer:
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
 
-```json
-{
-  "messageType": "pacs.008.001.10",
-  "groupHeader": {
-    "messageId": "MSGID-2026-04-27-091500-0001",
-    "creationDateTime": "2026-04-27T09:15:00+09:00",
-    "numberOfTransactions": "1",
-    "settlementInformation": {"settlementMethod": "INDA", "settlementAccount": {...}}
-  },
-  "creditTransfer": {
-    "paymentId": {
-      "instructionId": "INSID-91a7",
-      "endToEndId": "E2E-7e2-91a7",
-      "uetr": "550e8400-e29b-41d4-a716-446655440000",
-      "clearingSystemReference": "BOK-WIRE-2026-04-27-91a7"
-    },
-    "interbankSettlementAmount": {"currency": "KRW", "amount": "1000000"},
-    "interbankSettlementDate": "2026-04-27",
-    "chargeBearer": "SHAR",
-    "instructedAmount": {"currency": "USD", "amount": "750.00"},
-    "exchangeRateInformation": {
-      "exchangeRate": 1333.33,
-      "rateType": "spot",
-      "contractIdentification": "FX-91a7"
-    },
-    "debtor": {"name": "Hong Gildong", "identification": {"organisationId": {"other": [{"id": "880101-1******"}]}}},
-    "debtorAccount": {"identification": {"iban": "GB29NWBK60161331926819"}},
-    "debtorAgent": {"financialInstitutionIdentification": {"bicfi": "BANKKRSE"}},
-    "creditor": {"name": "Acme Inc"},
-    "creditorAccount": {"identification": {"iban": "DE89370400440532013000"}},
-    "creditorAgent": {"financialInstitutionIdentification": {"bicfi": "DEUTDEFF"}},
-    "remittanceInformation": {"unstructured": ["INV 2026-04-27-1234"]},
-    "purposeOfPayment": {"code": "GDDS"}
-  }
-}
-```
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
 
-The boundary signs the canonical XML/JSON form (RFC 7515 detached
-JWS). All FATF Rec 16 fields are present (originator name, account,
-identification; beneficiary name, account); the boundary refuses
-the instruction otherwise.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## Annex B — Conformance disclosure
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-Implementations declare per-section conformance in their published
-capability document. Sections marked `partial` reference the
-deployment policy explaining the gap; sections marked `excluded`
-carry a justification citing the controlling jurisdiction's
-allowance. A deployment that is `partial` or `excluded` on §3
-(Payment instruction), §6 (Card authorisation), §7 (Sanctions),
-or §9 (Dispute) is non-conformant overall and cannot claim Deep v3.
+## Annex F — Adoption Roadmap
 
-## Annex C — Currency-precision pitfalls (informative)
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-KRW and JPY are zero-fractional currencies; storing "1000.00" as
-KRW is a malformed amount per ISO 4217. The boundary normalises
-on ingest:
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-- KRW "1,000,000" → store as "1000000" (no decimal)
-- JPY "10000" → store as "10000"
-- USD "123.45" → store as "123.45" (two decimals)
-- BHD "1.234" → store as "1.234" (three decimals)
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-A producer that emits a fractional-digit count inconsistent with
-the currency is rejected with `urn:wia:pay:problem:malformed-iso20022`.
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## Annex D — Cross-domain references (informative)
+## Annex G — Test Vectors and Conformance Evidence
 
-| Reference                       | Use site                                                |
-|---------------------------------|---------------------------------------------------------|
-| WIA-mobile-payment              | wallet-tokenised authorisation flowing through this PHASE |
-| WIA-open-banking                | PSD2/FAPI Payment Initiation invoking PHASE 2 §1         |
-| WIA-medical-data-privacy        | medical-bill insurance-payment integration               |
-| WIA-insurtech                   | insurance-claim disbursement payouts                    |
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-The boundary verifies the cross-domain reference exists at the
-referenced standard's boundary before delivery so downstream
-readers do not see dangling references.
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-## Annex E — Versioning and deprecation (informative)
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
 
-Versioning follows Semantic Versioning 2.0.0. ISO 20022 message profiles bump independently from this PHASE; the deployment policy maps each PHASE version to the ISO 20022 profile version it honours so correspondent banks know what to expect. Deprecation enters a 12-month sunset window with migration notes recorded in the audit chain.
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

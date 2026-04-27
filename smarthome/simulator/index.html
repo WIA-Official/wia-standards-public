@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA-IOT-SMARTHOME - Interactive Smart Home Simulator</title>
+    <style>
+        :root { --primary: #10B981; --primary-dark: #059669; --secondary: #34D399; --bg: #0f172a; --bg-card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+        header { padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-switch { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 16px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; }
+        .lang-btn.active { background: var(--primary); border-color: var(--primary); }
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; }
+        .form-group input[type="range"] { padding: 0; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; background: var(--primary); color: white; font-weight: 500; transition: all 0.3s; }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-center { display: flex; justify-content: center; margin-top: 20px; gap: 10px; }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { background: var(--border); }
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+        .sub-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .sub-section h4 { color: var(--primary); margin-bottom: 15px; }
+
+        /* Device Cards */
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+        .device-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; transition: all 0.3s; }
+        .device-card:hover { border-color: var(--primary); transform: translateY(-5px); }
+        .device-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .device-icon { font-size: 2rem; }
+        .device-name { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+        .device-status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .status-on { background: var(--success); color: white; }
+        .status-off { background: var(--border); color: var(--text-muted); }
+        .device-controls { margin-top: 15px; }
+        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 30px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .4s; border-radius: 30px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(30px); }
+
+        /* Value Display */
+        .value-display { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 10px; background: var(--bg-card); border-radius: 8px; }
+        .value-label { color: var(--text-muted); font-size: 0.85rem; }
+        .value-number { font-size: 1.2rem; font-weight: 600; color: var(--primary); }
+
+        /* Energy Chart */
+        .energy-chart { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; }
+        .chart-bars { display: flex; align-items: flex-end; gap: 10px; height: 200px; margin-top: 20px; }
+        .chart-bar { flex: 1; background: linear-gradient(to top, var(--primary), var(--secondary)); border-radius: 4px 4px 0 0; position: relative; transition: all 0.3s; }
+        .chart-bar:hover { opacity: 0.8; }
+        .chart-label { text-align: center; margin-top: 10px; font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Security Panel */
+        .security-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .security-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .security-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .security-label { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 5px; }
+        .security-value { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+
+        /* Automation Rules */
+        .rule-list { margin-top: 20px; }
+        .rule-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .rule-info { flex: 1; }
+        .rule-name { font-weight: 600; color: var(--text); margin-bottom: 5px; }
+        .rule-description { color: var(--text-muted); font-size: 0.85rem; }
+        .rule-actions { display: flex; gap: 10px; }
+        .icon-btn { background: transparent; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; color: var(--text); transition: all 0.3s; }
+        .icon-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; font-weight: 600; }
+        footer .links { margin-top: 15px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+        footer .links a { color: var(--text-muted); text-decoration: none; }
+        footer .links a:hover { color: var(--primary); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; text-align: center; }
+            .nav-left { flex-direction: column; gap: 10px; }
+            .nav-links { flex-wrap: wrap; justify-content: center; gap: 10px; }
+            .tabs { flex-direction: column; align-items: stretch; }
+            .tab { width: 100%; text-align: center; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .device-grid { grid-template-columns: 1fr; }
+            footer .links { flex-direction: column; gap: 10px; }
+        }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a><span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a><span class="sep">›</span>
+                    <span class="current">SmartHome</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank">🏆 Certification</a>
+                    <a href="https://wiabook.com/reader/simulators/" target="_blank">🎮 109+ Simulators</a>
+                    <a href="https://wiabook.com" target="_blank">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+                    <button class="lang-btn" onclick="setLang('ko')">KO</button>
+                </div>
+            </div>
+        </div>
+
+        <header><div class="logo">🏠 WIA-IOT-SMARTHOME</div></header>
+
+        <section class="hero">
+            <h1 data-en="Smart Home Standard" data-ko="스마트 홈 표준">Smart Home Standard</h1>
+            <p data-en="Control devices, manage climate, monitor security, track energy usage, automate your home" data-ko="기기 제어, 기후 관리, 보안 모니터링, 에너지 사용 추적, 홈 자동화">Control devices, manage climate, monitor security, track energy usage, automate your home</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="🎛️ Device Control" data-ko="🎛️ 기기 제어">🎛️ Device Control</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🌡️ Climate Control" data-ko="🌡️ 기후 제어">🌡️ Climate Control</div>
+            <div class="tab" onclick="showPanel(2)" data-en="🔒 Security System" data-ko="🔒 보안 시스템">🔒 Security System</div>
+            <div class="tab" onclick="showPanel(3)" data-en="⚡ Energy Monitor" data-ko="⚡ 에너지 모니터">⚡ Energy Monitor</div>
+            <div class="tab" onclick="showPanel(4)" data-en="🤖 Automation" data-ko="🤖 자동화">🤖 Automation</div>
+        </div>
+
+        <!-- Panel 0: Device Control -->
+        <div class="panel active">
+            <h2 data-en="🎛️ Device Control" data-ko="🎛️ 기기 제어">🎛️ Device Control</h2>
+            <p data-en="Control all your smart home devices from a single interface" data-ko="하나의 인터페이스에서 모든 스마트 홈 기기를 제어하세요">Control all your smart home devices from a single interface</p>
+
+            <div class="device-grid">
+                <!-- Living Room Lights -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div>
+                            <div class="device-icon">💡</div>
+                            <div class="device-name" data-en="Living Room Lights" data-ko="거실 조명">Living Room Lights</div>
+                        </div>
+                        <span class="device-status status-on" id="light-status" data-en="ON" data-ko="켜짐">ON</span>
+                    </div>
+                    <div class="device-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked onchange="toggleDevice('light', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label data-en="Brightness" data-ko="밝기">Brightness</label>
+                            <input type="range" min="0" max="100" value="75" id="light-brightness" oninput="updateValue('light-brightness-val', this.value + '%')">
+                            <div class="value-display">
+                                <span class="value-label" data-en="Current" data-ko="현재">Current</span>
+                                <span class="value-number" id="light-brightness-val">75%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Smart TV -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div>
+                            <div class="device-icon">📺</div>
+                            <div class="device-name" data-en="Smart TV" data-ko="스마트 TV">Smart TV</div>
+                        </div>
+                        <span class="device-status status-off" id="tv-status" data-en="OFF" data-ko="꺼짐">OFF</span>
+                    </div>
+                    <div class="device-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" onchange="toggleDevice('tv', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label data-en="Volume" data-ko="볼륨">Volume</label>
+                            <input type="range" min="0" max="100" value="30" id="tv-volume" oninput="updateValue('tv-volume-val', this.value + '%')">
+                            <div class="value-display">
+                                <span class="value-label" data-en="Current" data-ko="현재">Current</span>
+                                <span class="value-number" id="tv-volume-val">30%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coffee Maker -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div>
+                            <div class="device-icon">☕</div>
+                            <div class="device-name" data-en="Coffee Maker" data-ko="커피 메이커">Coffee Maker</div>
+                        </div>
+                        <span class="device-status status-off" id="coffee-status" data-en="OFF" data-ko="꺼짐">OFF</span>
+                    </div>
+                    <div class="device-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" onchange="toggleDevice('coffee', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label data-en="Brew Strength" data-ko="추출 강도">Brew Strength</label>
+                            <select id="coffee-strength">
+                                <option value="mild" data-en="Mild" data-ko="약하게">Mild</option>
+                                <option value="medium" selected data-en="Medium" data-ko="보통">Medium</option>
+                                <option value="strong" data-en="Strong" data-ko="강하게">Strong</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Smart Door Lock -->
+                <div class="device-card">
+                    <div class="device-header">
+                        <div>
+                            <div class="device-icon">🚪</div>
+                            <div class="device-name" data-en="Front Door Lock" data-ko="현관문 잠금">Front Door Lock</div>
+                        </div>
+                        <span class="device-status status-on" id="lock-status" data-en="LOCKED" data-ko="잠김">LOCKED</span>
+                    </div>
+                    <div class="device-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked onchange="toggleDevice('lock', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                        <div class="value-display" style="margin-top: 15px;">
+                            <span class="value-label" data-en="Last Activity" data-ko="마지막 활동">Last Activity</span>
+                            <span class="value-number" style="font-size: 0.9rem;">2m ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="executeDeviceControl()" data-en="Apply All Changes" data-ko="모든 변경사항 적용">Apply All Changes</button>
+            </div>
+
+            <div class="output" id="device-output"></div>
+        </div>
+
+        <!-- Panel 1: Climate Control -->
+        <div class="panel">
+            <h2 data-en="🌡️ Climate Control" data-ko="🌡️ 기후 제어">🌡️ Climate Control</h2>
+            <p data-en="Manage temperature, humidity, and air quality throughout your home" data-ko="집 전체의 온도, 습도 및 공기 질을 관리하세요">Manage temperature, humidity, and air quality throughout your home</p>
+
+            <div class="sub-section">
+                <h4 data-en="Temperature Settings" data-ko="온도 설정">Temperature Settings</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Current Temperature" data-ko="현재 온도">Current Temperature</label>
+                        <div class="value-display">
+                            <span class="value-number" style="font-size: 2rem;">22°C</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Target Temperature" data-ko="목표 온도">Target Temperature</label>
+                        <input type="range" min="16" max="30" value="22" id="temp-target" oninput="updateValue('temp-target-val', this.value + '°C')">
+                        <div class="value-display">
+                            <span class="value-label" data-en="Set to" data-ko="설정">Set to</span>
+                            <span class="value-number" id="temp-target-val">22°C</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-en="Mode" data-ko="모드">Mode</label>
+                        <select id="climate-mode">
+                            <option value="auto" data-en="Auto" data-ko="자동">Auto</option>
+                            <option value="cool" data-en="Cool" data-ko="냉방">Cool</option>
+                            <option value="heat" data-en="Heat" data-ko="난방">Heat</option>
+                            <option value="fan" data-en="Fan Only" data-ko="송풍">Fan Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-en="Fan Speed" data-ko="팬 속도">Fan Speed</label>
+                        <select id="fan-speed">
+                            <option value="low" data-en="Low" data-ko="약">Low</option>
+                            <option value="medium" selected data-en="Medium" data-ko="중">Medium</option>
+                            <option value="high" data-en="High" data-ko="강">High</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Humidity Control" data-ko="습도 제어">Humidity Control</h4>
+                <div class="form-group">
+                    <label data-en="Current Humidity" data-ko="현재 습도">Current Humidity</label>
+                    <div class="value-display">
+                        <span class="value-number" style="font-size: 2rem;">55%</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-en="Target Humidity" data-ko="목표 습도">Target Humidity</label>
+                    <input type="range" min="30" max="70" value="55" id="humidity-target" oninput="updateValue('humidity-target-val', this.value + '%')">
+                    <div class="value-display">
+                        <span class="value-label" data-en="Set to" data-ko="설정">Set to</span>
+                        <span class="value-number" id="humidity-target-val">55%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Air Quality Monitor" data-ko="공기질 모니터">Air Quality Monitor</h4>
+                <div class="form-row">
+                    <div class="value-display">
+                        <span class="value-label" data-en="PM2.5" data-ko="미세먼지">PM2.5</span>
+                        <span class="value-number">12 µg/m³</span>
+                    </div>
+                    <div class="value-display">
+                        <span class="value-label" data-en="CO2" data-ko="이산화탄소">CO2</span>
+                        <span class="value-number">450 ppm</span>
+                    </div>
+                    <div class="value-display">
+                        <span class="value-label" data-en="VOC" data-ko="휘발성 유기화합물">VOC</span>
+                        <span class="value-number">0.3 mg/m³</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="executeClimateControl()" data-en="Apply Climate Settings" data-ko="기후 설정 적용">Apply Climate Settings</button>
+            </div>
+
+            <div class="output" id="climate-output"></div>
+        </div>
+
+        <!-- Panel 2: Security System -->
+        <div class="panel">
+            <h2 data-en="🔒 Security System" data-ko="🔒 보안 시스템">🔒 Security System</h2>
+            <p data-en="Monitor and control your home security devices and cameras" data-ko="홈 보안 장치 및 카메라를 모니터링하고 제어하세요">Monitor and control your home security devices and cameras</p>
+
+            <div class="sub-section">
+                <h4 data-en="System Status" data-ko="시스템 상태">System Status</h4>
+                <div class="security-grid">
+                    <div class="security-item">
+                        <div class="security-icon">🏠</div>
+                        <div class="security-label" data-en="System Mode" data-ko="시스템 모드">System Mode</div>
+                        <div class="security-value" id="security-mode" data-en="Home" data-ko="재실">Home</div>
+                    </div>
+                    <div class="security-item">
+                        <div class="security-icon">📹</div>
+                        <div class="security-label" data-en="Active Cameras" data-ko="활성 카메라">Active Cameras</div>
+                        <div class="security-value">4/4</div>
+                    </div>
+                    <div class="security-item">
+                        <div class="security-icon">🚨</div>
+                        <div class="security-label" data-en="Sensors" data-ko="센서">Sensors</div>
+                        <div class="security-value">8/8</div>
+                    </div>
+                    <div class="security-item">
+                        <div class="security-icon">🚪</div>
+                        <div class="security-label" data-en="Door Locks" data-ko="도어락">Door Locks</div>
+                        <div class="security-value">3/3</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Security Mode" data-ko="보안 모드">Security Mode</h4>
+                <div class="form-group">
+                    <label data-en="Select Mode" data-ko="모드 선택">Select Mode</label>
+                    <select id="security-mode-select" onchange="updateSecurityMode(this.value)">
+                        <option value="home" data-en="Home (Motion sensors off inside)" data-ko="재실 (실내 동작 센서 꺼짐)">Home (Motion sensors off inside)</option>
+                        <option value="away" data-en="Away (All sensors active)" data-ko="외출 (모든 센서 활성)">Away (All sensors active)</option>
+                        <option value="night" data-en="Night (Perimeter sensors only)" data-ko="야간 (외부 센서만)">Night (Perimeter sensors only)</option>
+                        <option value="off" data-en="Off (Monitoring only)" data-ko="꺼짐 (모니터링만)">Off (Monitoring only)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Camera Feeds" data-ko="카메라 피드">Camera Feeds</h4>
+                <div class="device-grid">
+                    <div class="device-card">
+                        <div class="device-icon">📹</div>
+                        <div class="device-name" data-en="Front Door" data-ko="현관">Front Door</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Status" data-ko="상태">Status</span>
+                            <span class="value-number" style="color: var(--success); font-size: 0.9rem;" data-en="Recording" data-ko="녹화중">Recording</span>
+                        </div>
+                    </div>
+                    <div class="device-card">
+                        <div class="device-icon">📹</div>
+                        <div class="device-name" data-en="Backyard" data-ko="뒷마당">Backyard</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Status" data-ko="상태">Status</span>
+                            <span class="value-number" style="color: var(--success); font-size: 0.9rem;" data-en="Recording" data-ko="녹화중">Recording</span>
+                        </div>
+                    </div>
+                    <div class="device-card">
+                        <div class="device-icon">📹</div>
+                        <div class="device-name" data-en="Garage" data-ko="차고">Garage</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Status" data-ko="상태">Status</span>
+                            <span class="value-number" style="color: var(--success); font-size: 0.9rem;" data-en="Recording" data-ko="녹화중">Recording</span>
+                        </div>
+                    </div>
+                    <div class="device-card">
+                        <div class="device-icon">📹</div>
+                        <div class="device-name" data-en="Living Room" data-ko="거실">Living Room</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Status" data-ko="상태">Status</span>
+                            <span class="value-number" style="color: var(--success); font-size: 0.9rem;" data-en="Recording" data-ko="녹화중">Recording</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="executeSecurity()" data-en="Update Security Settings" data-ko="보안 설정 업데이트">Update Security Settings</button>
+                <button class="btn btn-secondary" onclick="triggerAlert()" data-en="Test Alert" data-ko="알림 테스트">Test Alert</button>
+            </div>
+
+            <div class="output" id="security-output"></div>
+        </div>
+
+        <!-- Panel 3: Energy Monitor -->
+        <div class="panel">
+            <h2 data-en="⚡ Energy Monitor" data-ko="⚡ 에너지 모니터">⚡ Energy Monitor</h2>
+            <p data-en="Track and optimize your home's energy consumption" data-ko="가정의 에너지 소비를 추적하고 최적화하세요">Track and optimize your home's energy consumption</p>
+
+            <div class="sub-section">
+                <h4 data-en="Current Usage" data-ko="현재 사용량">Current Usage</h4>
+                <div class="form-row">
+                    <div class="value-display">
+                        <span class="value-label" data-en="Real-time Power" data-ko="실시간 전력">Real-time Power</span>
+                        <span class="value-number" style="font-size: 2rem;">2.4 kW</span>
+                    </div>
+                    <div class="value-display">
+                        <span class="value-label" data-en="Today's Total" data-ko="오늘 총 사용량">Today's Total</span>
+                        <span class="value-number" style="font-size: 2rem;">18.5 kWh</span>
+                    </div>
+                    <div class="value-display">
+                        <span class="value-label" data-en="This Month" data-ko="이번 달">This Month</span>
+                        <span class="value-number" style="font-size: 2rem;">425 kWh</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="energy-chart">
+                <h4 data-en="Weekly Energy Consumption" data-ko="주간 에너지 소비">Weekly Energy Consumption</h4>
+                <div class="chart-bars" id="energy-chart">
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 75%;"></div>
+                        <div class="chart-label" data-en="Mon" data-ko="월">Mon</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 85%;"></div>
+                        <div class="chart-label" data-en="Tue" data-ko="화">Tue</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 60%;"></div>
+                        <div class="chart-label" data-en="Wed" data-ko="수">Wed</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 70%;"></div>
+                        <div class="chart-label" data-en="Thu" data-ko="목">Thu</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 90%;"></div>
+                        <div class="chart-label" data-en="Fri" data-ko="금">Fri</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 95%;"></div>
+                        <div class="chart-label" data-en="Sat" data-ko="토">Sat</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1; align-items: center;">
+                        <div class="chart-bar" style="height: 80%;"></div>
+                        <div class="chart-label" data-en="Sun" data-ko="일">Sun</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Device Breakdown" data-ko="기기별 분석">Device Breakdown</h4>
+                <div class="device-grid">
+                    <div class="device-card">
+                        <div class="device-icon">❄️</div>
+                        <div class="device-name" data-en="HVAC System" data-ko="냉난방 시스템">HVAC System</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Usage" data-ko="사용량">Usage</span>
+                            <span class="value-number">45%</span>
+                        </div>
+                    </div>
+                    <div class="device-card">
+                        <div class="device-icon">💡</div>
+                        <div class="device-name" data-en="Lighting" data-ko="조명">Lighting</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Usage" data-ko="사용량">Usage</span>
+                            <span class="value-number">15%</span>
+                        </div>
+                    </div>
+                    <div class="device-card">
+                        <div class="device-icon">📺</div>
+                        <div class="device-name" data-en="Entertainment" data-ko="엔터테인먼트">Entertainment</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Usage" data-ko="사용량">Usage</span>
+                            <span class="value-number">20%</span>
+                        </div>
+                    </div>
+                    <div class="device-card">
+                        <div class="device-icon">🏠</div>
+                        <div class="device-name" data-en="Other Devices" data-ko="기타 기기">Other Devices</div>
+                        <div class="value-display">
+                            <span class="value-label" data-en="Usage" data-ko="사용량">Usage</span>
+                            <span class="value-number">20%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="executeEnergyAnalysis()" data-en="Generate Report" data-ko="보고서 생성">Generate Report</button>
+                <button class="btn btn-secondary" onclick="optimizeEnergy()" data-en="Optimize Usage" data-ko="사용량 최적화">Optimize Usage</button>
+            </div>
+
+            <div class="output" id="energy-output"></div>
+        </div>
+
+        <!-- Panel 4: Automation -->
+        <div class="panel">
+            <h2 data-en="🤖 Automation Rules" data-ko="🤖 자동화 규칙">🤖 Automation Rules</h2>
+            <p data-en="Create and manage automation rules for your smart home" data-ko="스마트 홈을 위한 자동화 규칙을 생성하고 관리하세요">Create and manage automation rules for your smart home</p>
+
+            <div class="sub-section">
+                <h4 data-en="Active Rules" data-ko="활성 규칙">Active Rules</h4>
+                <div class="rule-list" id="rule-list">
+                    <div class="rule-item">
+                        <div class="rule-info">
+                            <div class="rule-name" data-en="Morning Routine" data-ko="아침 루틴">Morning Routine</div>
+                            <div class="rule-description" data-en="Turn on lights and start coffee at 7:00 AM on weekdays" data-ko="평일 오전 7시에 조명을 켜고 커피를 시작합니다">Turn on lights and start coffee at 7:00 AM on weekdays</div>
+                        </div>
+                        <div class="rule-actions">
+                            <button class="icon-btn" onclick="editRule(1)" data-en="✏️ Edit" data-ko="✏️ 편집">✏️</button>
+                            <button class="icon-btn" onclick="deleteRule(1)" data-en="🗑️ Delete" data-ko="🗑️ 삭제">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="rule-item">
+                        <div class="rule-info">
+                            <div class="rule-name" data-en="Away Mode" data-ko="외출 모드">Away Mode</div>
+                            <div class="rule-description" data-en="Lock doors and set security to Away when last person leaves" data-ko="마지막 사람이 나가면 문을 잠그고 보안을 외출로 설정합니다">Lock doors and set security to Away when last person leaves</div>
+                        </div>
+                        <div class="rule-actions">
+                            <button class="icon-btn" onclick="editRule(2)">✏️</button>
+                            <button class="icon-btn" onclick="deleteRule(2)">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="rule-item">
+                        <div class="rule-info">
+                            <div class="rule-name" data-en="Night Mode" data-ko="야간 모드">Night Mode</div>
+                            <div class="rule-description" data-en="Dim lights and lower temperature at 10:00 PM" data-ko="오후 10시에 조명을 어둡게 하고 온도를 낮춥니다">Dim lights and lower temperature at 10:00 PM</div>
+                        </div>
+                        <div class="rule-actions">
+                            <button class="icon-btn" onclick="editRule(3)">✏️</button>
+                            <button class="icon-btn" onclick="deleteRule(3)">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="rule-item">
+                        <div class="rule-info">
+                            <div class="rule-name" data-en="Energy Saver" data-ko="에너지 절약">Energy Saver</div>
+                            <div class="rule-description" data-en="Turn off unused devices when power exceeds 3 kW" data-ko="전력이 3kW를 초과하면 사용하지 않는 장치를 끕니다">Turn off unused devices when power exceeds 3 kW</div>
+                        </div>
+                        <div class="rule-actions">
+                            <button class="icon-btn" onclick="editRule(4)">✏️</button>
+                            <button class="icon-btn" onclick="deleteRule(4)">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section">
+                <h4 data-en="Create New Rule" data-ko="새 규칙 만들기">Create New Rule</h4>
+                <div class="form-group">
+                    <label data-en="Rule Name" data-ko="규칙 이름">Rule Name</label>
+                    <input type="text" id="rule-name" placeholder="e.g., Movie Night">
+                </div>
+                <div class="form-group">
+                    <label data-en="Trigger" data-ko="트리거">Trigger</label>
+                    <select id="rule-trigger">
+                        <option value="time" data-en="Time of day" data-ko="시간">Time of day</option>
+                        <option value="device" data-en="Device state" data-ko="기기 상태">Device state</option>
+                        <option value="sensor" data-en="Sensor reading" data-ko="센서 값">Sensor reading</option>
+                        <option value="location" data-en="Location" data-ko="위치">Location</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-en="Action" data-ko="동작">Action</label>
+                    <textarea id="rule-action" rows="3" placeholder="Describe what should happen..."></textarea>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn" onclick="createRule()" data-en="Create Rule" data-ko="규칙 만들기">Create Rule</button>
+                <button class="btn btn-secondary" onclick="testAutomation()" data-en="Test Automation" data-ko="자동화 테스트">Test Automation</button>
+            </div>
+
+            <div class="output" id="automation-output"></div>
+        </div>
+
+        <footer>
+            <div class="philosophy">弘益人間 (홍익인간) · Benefit All Humanity</div>
+            <p>© 2025 SmileStory Inc. / WIA</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank">WIA Standards</a>
+                <a href="https://cert.wiastandards.com" target="_blank">Certification</a>
+                <a href="https://wiabook.com" target="_blank">Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.querySelectorAll('[data-en]').forEach(elem => {
+                if (elem.tagName === 'INPUT' || elem.tagName === 'BUTTON' || elem.tagName === 'OPTION') {
+                    elem.textContent = elem.getAttribute('data-' + lang);
+                } else {
+                    elem.textContent = elem.getAttribute('data-' + lang);
+                }
+            });
+        }
+
+        function showPanel(index) {
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.panel').forEach((panel, i) => {
+                panel.classList.toggle('active', i === index);
+            });
+        }
+
+        function updateValue(id, value) {
+            document.getElementById(id).textContent = value;
+        }
+
+        function toggleDevice(device, isOn) {
+            const statusMap = {
+                'light': 'light-status',
+                'tv': 'tv-status',
+                'coffee': 'coffee-status',
+                'lock': 'lock-status'
+            };
+            const statusElem = document.getElementById(statusMap[device]);
+
+            if (device === 'lock') {
+                statusElem.textContent = isOn ? (currentLang === 'en' ? 'LOCKED' : '잠김') : (currentLang === 'en' ? 'UNLOCKED' : '열림');
+            } else {
+                statusElem.textContent = isOn ? (currentLang === 'en' ? 'ON' : '켜짐') : (currentLang === 'en' ? 'OFF' : '꺼짐');
+            }
+
+            statusElem.className = 'device-status ' + (isOn ? 'status-on' : 'status-off');
+        }
+
+        function executeDeviceControl() {
+            const brightness = document.getElementById('light-brightness').value;
+            const volume = document.getElementById('tv-volume').value;
+            const coffeeStrength = document.getElementById('coffee-strength').value;
+
+            const output = {
+                action: "device_control",
+                timestamp: new Date().toISOString(),
+                devices: {
+                    living_room_lights: { brightness: parseInt(brightness) },
+                    smart_tv: { volume: parseInt(volume) },
+                    coffee_maker: { strength: coffeeStrength }
+                },
+                status: "success"
+            };
+
+            document.getElementById('device-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function executeClimateControl() {
+            const temp = document.getElementById('temp-target').value;
+            const humidity = document.getElementById('humidity-target').value;
+            const mode = document.getElementById('climate-mode').value;
+            const fanSpeed = document.getElementById('fan-speed').value;
+
+            const output = {
+                action: "climate_control",
+                timestamp: new Date().toISOString(),
+                settings: {
+                    target_temperature: parseInt(temp),
+                    target_humidity: parseInt(humidity),
+                    mode: mode,
+                    fan_speed: fanSpeed
+                },
+                air_quality: {
+                    pm25: 12,
+                    co2: 450,
+                    voc: 0.3
+                },
+                status: "success"
+            };
+
+            document.getElementById('climate-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function updateSecurityMode(mode) {
+            const modeText = {
+                'home': currentLang === 'en' ? 'Home' : '재실',
+                'away': currentLang === 'en' ? 'Away' : '외출',
+                'night': currentLang === 'en' ? 'Night' : '야간',
+                'off': currentLang === 'en' ? 'Off' : '꺼짐'
+            };
+            document.getElementById('security-mode').textContent = modeText[mode];
+        }
+
+        function executeSecurity() {
+            const mode = document.getElementById('security-mode-select').value;
+
+            const output = {
+                action: "security_update",
+                timestamp: new Date().toISOString(),
+                mode: mode,
+                cameras: {
+                    active: 4,
+                    total: 4,
+                    recording: true
+                },
+                sensors: {
+                    active: 8,
+                    total: 8
+                },
+                door_locks: {
+                    locked: 3,
+                    total: 3
+                },
+                status: "success"
+            };
+
+            document.getElementById('security-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function triggerAlert() {
+            const output = {
+                action: "test_alert",
+                timestamp: new Date().toISOString(),
+                alert_type: "test",
+                notification: "Security alert test sent to all devices",
+                status: "success"
+            };
+
+            document.getElementById('security-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function executeEnergyAnalysis() {
+            const output = {
+                action: "energy_report",
+                timestamp: new Date().toISOString(),
+                current_usage: {
+                    realtime_power: 2.4,
+                    today_total: 18.5,
+                    month_total: 425
+                },
+                breakdown: {
+                    hvac: 45,
+                    lighting: 15,
+                    entertainment: 20,
+                    other: 20
+                },
+                weekly_data: [15.2, 17.3, 12.8, 14.5, 18.9, 19.5, 16.8],
+                recommendations: [
+                    "HVAC usage is above average. Consider adjusting temperature by 2°C.",
+                    "Peak usage detected during 6-9 PM. Schedule heavy appliances for off-peak hours.",
+                    "Lighting efficiency can be improved with motion sensors."
+                ],
+                status: "success"
+            };
+
+            document.getElementById('energy-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function optimizeEnergy() {
+            const output = {
+                action: "energy_optimization",
+                timestamp: new Date().toISOString(),
+                optimizations_applied: [
+                    "Adjusted thermostat to eco mode during non-peak hours",
+                    "Scheduled water heater to off-peak times",
+                    "Enabled smart lighting schedules",
+                    "Configured standby power reduction"
+                ],
+                estimated_savings: {
+                    daily: "3.5 kWh",
+                    monthly: "105 kWh",
+                    cost_reduction: "$15.75/month"
+                },
+                status: "success"
+            };
+
+            document.getElementById('energy-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function createRule() {
+            const name = document.getElementById('rule-name').value;
+            const trigger = document.getElementById('rule-trigger').value;
+            const action = document.getElementById('rule-action').value;
+
+            if (!name || !action) {
+                alert(currentLang === 'en' ? 'Please fill in all fields' : '모든 필드를 입력하세요');
+                return;
+            }
+
+            const output = {
+                action: "create_automation_rule",
+                timestamp: new Date().toISOString(),
+                rule: {
+                    id: Date.now(),
+                    name: name,
+                    trigger: trigger,
+                    action: action,
+                    enabled: true
+                },
+                status: "success"
+            };
+
+            document.getElementById('automation-output').textContent = JSON.stringify(output, null, 2);
+
+            // Clear form
+            document.getElementById('rule-name').value = '';
+            document.getElementById('rule-action').value = '';
+        }
+
+        function editRule(id) {
+            const output = {
+                action: "edit_rule",
+                timestamp: new Date().toISOString(),
+                rule_id: id,
+                message: "Rule editor would open here",
+                status: "info"
+            };
+
+            document.getElementById('automation-output').textContent = JSON.stringify(output, null, 2);
+        }
+
+        function deleteRule(id) {
+            if (confirm(currentLang === 'en' ? 'Delete this rule?' : '이 규칙을 삭제하시겠습니까?')) {
+                const output = {
+                    action: "delete_rule",
+                    timestamp: new Date().toISOString(),
+                    rule_id: id,
+                    status: "success"
+                };
+
+                document.getElementById('automation-output').textContent = JSON.stringify(output, null, 2);
+            }
+        }
+
+        function testAutomation() {
+            const output = {
+                action: "test_automation",
+                timestamp: new Date().toISOString(),
+                tests_run: [
+                    { rule: "Morning Routine", result: "passed" },
+                    { rule: "Away Mode", result: "passed" },
+                    { rule: "Night Mode", result: "passed" },
+                    { rule: "Energy Saver", result: "passed" }
+                ],
+                status: "success"
+            };
+
+            document.getElementById('automation-output').textContent = JSON.stringify(output, null, 2);
+        }
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>
