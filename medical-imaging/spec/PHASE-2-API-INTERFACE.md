@@ -1,241 +1,258 @@
-# WIA-medical-imaging PHASE 2 — API-INTERFACE Specification
+# WIA-medical-imaging PHASE 2 — API Interface Specification
 
 **Standard:** WIA-medical-imaging
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-medical-imaging (Medical Imaging).
+This PHASE defines the API surface a medical-imaging deployment
+exposes for retrieval, storage, query, and report exchange. The
+shape is DICOMweb (PS3.18) for imaging operations and FHIR R5 for
+non-image clinical context. Both surfaces share the privacy gate
+defined in WIA-medical-data-privacy PHASE 2.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- DICOM PS3.18 — Web Services (WADO-RS, QIDO-RS, STOW-RS, UPS-RS)
+- HL7 FHIR R5 — RESTful API, ImagingStudy, DiagnosticReport, ImagingSelection
+- IHE Radiology — Scheduled Workflow (SWF.b), Cross-Enterprise Document Sharing for Imaging (XDS-I.b), Imaging Object Change Management (IOCM)
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS)
 
 ---
 
-## §1 Scope
+## §1 DICOMweb endpoints
 
-This PHASE document is one of four that together define the WIA-medical-imaging
-standard. It addresses the api-interface layer of the standard.
+The following PS3.18 services are mandatory:
 
-## §2 Manifest
+| Service  | Purpose                                                           |
+|----------|-------------------------------------------------------------------|
+| QIDO-RS  | Query for Studies / Series / Instances (returns metadata)         |
+| WADO-RS  | Retrieve Study / Series / Instance / Frame / Bulkdata / Metadata  |
+| STOW-RS  | Store new instances                                               |
+| UPS-RS   | Unified Procedure Step (work-list management)                     |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-imaging"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Endpoints follow the canonical PS3.18 paths:
 
-## §3 Conformance Tiers
+```
+/studies                                 # QIDO-RS, STOW-RS
+/studies/{StudyInstanceUID}              # WADO-RS, QIDO-RS series
+/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}
+/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/instances/{SOPInstanceUID}
+/workitems                               # UPS-RS
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Privacy headers
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Every DICOMweb call carries the privacy headers from WIA-medical-data-
+privacy PHASE 2:
 
-## §4 Discovery
+```
+WIA-Purpose-Of-Use: TREAT
+WIA-Justification: pre-operative review, scheduled
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-imaging`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The boundary translates these into a consent gate before forwarding
+to the backing PACS/VNA. Calls without privacy headers are rejected
+with `urn:wia:mdp:problem:purpose-mismatch`. The boundary's gate
+decision is itself a DICOM AuditEvent (DICOM PS3.15 §A.5).
 
-## §5 Time and Identity
+## §3 QIDO-RS query model
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Queries return only the studies, series, and instances visible
+to the caller's purpose. The boundary applies these filters:
 
-## §6 Versioning and Deprecation
+- StudyInstanceUID lookup — returns the study only if the caller's
+  consent includes the Patient on the study and the purpose is
+  granted on that consent
+- Patient-level query (`/studies?PatientID=...`) — the PatientID
+  parameter MUST be a `subjectRef`; raw MRN is rejected at the
+  boundary
+- Date-range query — returns studies whose date falls inside the
+  active consent's period
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+QIDO-RS responses are DICOM JSON (Annex F of PS3.18). The boundary
+inserts a `0064,0007 ReferencedConsentSequence` field referencing
+the consent UID that authorised the call (a non-standard tag held
+in the deployment's private dictionary).
 
-## §7 Privacy and Security
+## §4 WADO-RS retrieval
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Retrieve operations honour the consent gate at the per-instance
+level. A study with mixed-consent (e.g., the patient consented to
+release of imaging instances except those in a sensitive series)
+returns only the consented subset. The response carries:
 
-## §8 Open Governance
+- An `In-Reply-To` header naming the consent UID
+- A `Warning: 199 - "filtered by consent"` header if any instances
+  were excluded
+- For DICOMweb metadata responses, a `0064,0008 ConsentExclusionCount`
+  tag indicating how many instances were filtered out (count only;
+  no metadata)
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-imaging` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Bulk data retrieval (multi-frame) is gated identically to
+per-instance retrieval; partial frame retrieval requires that the
+entire instance pass the consent gate (no per-frame consent).
+
+## §5 STOW-RS storage
+
+Storing new instances requires:
+
+- `WIA-Purpose-Of-Use: TREAT` or `HOPERAT` (research storage uses a
+  different consent class and is gated separately)
+- The instance's PatientID matches a known subject in the identity
+  broker — otherwise the boundary creates a new pseudonymous
+  subjectRef and emits a Provenance recording the binding
+- Instance UIDs are unique against the global UID registry; collision
+  is rejected with `urn:wia:mdp:problem:uid-collision`
+
+Successful STOW returns `200 OK` with a DICOM XML response listing
+the stored instances and any rejections. Each accepted instance
+emits a DICOM AuditEvent and a FHIR AuditEvent referencing the same
+chain.
+
+## §6 UPS-RS work-list
+
+The Unified Procedure Step service exposes scheduled imaging work
+for modalities to claim. Privacy treatment:
+
+- Work-items reference the patient by `subjectRef`, never MRN
+- The modality device authenticates via a SMART system token and
+  carries `purpose:TREAT`
+- A claimed work-item transitions through the IHE SWF.b state
+  machine (SCHEDULED → IN PROGRESS → COMPLETED / CANCELED)
+- Each transition emits an AuditEvent
+
+## §7 Report exchange
+
+Structured reports flow through both DICOMweb (as DICOM SR
+instances) and FHIR (as DiagnosticReport resources). The boundary
+mirrors changes in either direction:
+
+- A DICOM SR stored via STOW-RS produces a FHIR DiagnosticReport
+  via the boundary's projection
+- A FHIR DiagnosticReport created via the FHIR API produces a
+  DICOM SR via reverse projection (only when the deployment policy
+  enables FHIR-first authoring)
+
+The mirrored resource carries a Provenance reference to the source
+so that auditors can see which is canonical.
+
+## §8 Image-on-the-fly transformation
+
+WADO-RS supports rendering parameters (`/rendered` paths). The
+boundary applies the consent gate before rendering; rendered
+output inherits the source's consent UID. The boundary refuses to
+render content the caller could not retrieve raw.
+
+## §9 Errors and warnings
+
+| URI                                              | Status | Meaning                                |
+|--------------------------------------------------|-------:|----------------------------------------|
+| `urn:wia:mi:problem:study-not-found`             | 404    | StudyInstanceUID unknown or unconsented|
+| `urn:wia:mi:problem:transfer-syntax-not-supported` | 415  | Requested syntax not in the accept list|
+| `urn:wia:mi:problem:uid-collision`               | 409    | Instance UID already in use            |
+| `urn:wia:mi:problem:lossy-rejected`              | 422    | Lossy compression on diagnostic intent |
+| `urn:wia:mi:problem:work-item-claimed`           | 409    | UPS work-item claimed by another modality |
+
+Warnings (200-OK responses with consent-driven filtering applied)
+use `Warning:` headers per RFC 7234 §5.5 with the deployment's
+warning codes namespaced under `wia-mi-`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked DICOMweb exchange (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+A typical viewer retrieving a study:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+GET /studies/1.2.840.113619.2.55.3.604688.123/series HTTP/1.1
+Host: dicomweb.hospital-k.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImsxIn0...
+WIA-Purpose-Of-Use: TREAT
+WIA-Justification: scheduled outpatient review
+Accept: application/dicom+json
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The boundary validates the token, checks that the patient bound
+to the StudyInstanceUID has an active TREAT consent for the
+calling clinician, and forwards to the backing PACS. The response
+DICOM JSON includes the consent reference so downstream auditors
+can replay the gate decision deterministically.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Capability advertisement (informative)
 
-## Annex F — Adoption Roadmap
+The DICOMweb capability is advertised at `/dicomweb/conformance`
+in line with PS3.18 §6. The advertised conformance is augmented
+with WIA-specific extensions naming the purpose vocabulary,
+the consent profile, and the supported transfer syntaxes for
+STOW-RS.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Long-running operations (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Bulk operations (large multi-series exports, AI inference batch
+jobs) follow the WADO-RS asynchronous pattern: the request is
+accepted with `202 Accepted` and a status URI; the client polls
+the status URI until completion. The boundary emits AuditEvents
+both at request acceptance and at result retrieval so that the
+gap between the two is observable.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Long-poll and subscription model (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+For workflow-driven systems (RIS-PACS-AI pipelines), DICOMweb is
+extended with the FHIR Subscriptions framework. A deployment MAY
+expose:
 
-## Annex G — Test Vectors and Conformance Evidence
+- `POST /Subscription` — register a subscription on
+  `ImagingStudy.create` or `ImagingStudy.update`
+- `GET /$ws-binding` — WebSocket binding for push notifications
+  (per the FHIR R5 SubscriptionTopic / R5/subscription.html)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Subscriptions inherit the privacy gate: the subscriber receives
+only events for studies the subscriber's purpose grant covers.
+Notifications carry the `WIA-Audit-Event-Id` header binding the
+notification to its underlying audit event so auditors can
+trace pushed work.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex E — Bandwidth and compression policy (informative)
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Bulk operations are bandwidth-sensitive. Deployments use
+HTTP/2 multiplexing and chunked transfer encoding for large
+WADO-RS responses. Trans-coding to a smaller-but-lossless syntax
+(e.g., JPEG 2000 Lossless) at the boundary trades CPU for
+bandwidth. The trade-off is recorded in the deployment policy
+so that auditors can confirm pixel content is preserved across
+trans-codes.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Imaging worked search (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A typical patient-scoped search for a clinician:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+GET /studies?PatientID=urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e
+            &ModalitiesInStudy=CT,MR
+            &StudyDate=20260101-20260427
+            &includefield=00080050
+            &includefield=00080090
+HTTP/1.1
+Host: dicomweb.hospital-k.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImsxIn0...
+WIA-Purpose-Of-Use: TREAT
+WIA-Justification: encounter prep, scheduled
+Accept: application/dicom+json
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The boundary returns DICOM JSON describing the matching studies,
+filtered to those for which the requesting clinician's consent
+grant covers TREAT on this patient. Studies in the date range that
+the clinician cannot access are omitted entirely (no count is
+returned beyond the visible subset). The response carries a
+`WIA-Audit-Event-Id` and `WIA-Consent-Receipt` header set so that
+the search itself is replay-able.
 
-## Annex I — Interoperability Profiles
+## Annex G — Pagination and large result sets (informative)
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+QIDO-RS supports `limit` and `offset` parameters. The boundary
+caps `limit` at 5000 results per call; larger result sets paginate.
+Each page emits its own AuditEvent so that the audit chain reflects
+every view, not only the first. The boundary sets the response's
+`Warning: 200` header when the total count exceeds the cap so that
+clients know to paginate.

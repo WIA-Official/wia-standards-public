@@ -5,237 +5,277 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-mars-mission (Mars Mission).
+This document defines how an accredited Mars-mission programme
+integrates with the systems that surround it: ground-station
+networks; partner mission operations centres; planetary-data
+archives; international planetary-protection bodies; inter-agency
+review boards; press and public outreach systems; and long-term
+archives that preserve mission products beyond programme wind-down.
+It also defines the evidence-package format that bundles a mission's
+record set for citation and audit.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 8615 (well-known URIs)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- CCSDS 132.0-B / 232.0-B (Space Data Link Protocols)
+- CCSDS 633.0-B (Mission Operations Services)
+- CCSDS 727.0-B (CFDP)
+- COSPAR Planetary Protection Policy
 
 ---
 
-## §1 Scope
+## §1 Ground-Station Network Integration
 
-This PHASE document is one of four that together define the WIA-mars-mission
-standard. It addresses the integration layer of the standard.
+Ground-station networks (DSN, ESTRACK, the Chinese Deep Space
+Network, commercial providers) integrate with mission MOCs through
+the booking and tracking interfaces the network operator publishes.
+The mission programme records each booking, the actual track that
+took place, and the per-pass quality metrics. Integration is
+mutually authenticated; the network operator's client certificate
+authorises the mission to consume the network's resources within
+the booked window.
 
-## §2 Manifest
+## §2 Partner MOC Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mars-mission"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Multi-agency missions exchange records across partner MOCs. The
+exchange honours the records release policy negotiated at mission
+inception: some products are exchanged immediately, others on a
+delayed cadence aligned with each agency's domestic release rules.
+Partner MOC integrations carry the partner's identifier, the agreed
+exchange schedule, and the audit log of every record exchanged.
 
-## §3 Conformance Tiers
+## §3 Evidence Package Format
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+evidence/
+  manifest.json                — package manifest (signed, see §4)
+  mission.json                 — mission record
+  spacecraft/                  — per-spacecraft records
+  trajectory/                  — trajectory products and uncertainty
+                                  representations
+  ttc/                         — TT&C packet catalogues and archive
+                                  references
+  observation-requests/        — per-request records and approvals
+  science-products/            — product records and PDS-aligned
+                                  metadata
+  planetary-protection/        — bioburden assays and approvals
+  spectrum/                    — spectrum file revisions
+  anomalies/                   — anomaly investigations
+  audit/                       — API audit log excerpts
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The package is content-addressable; the manifest carries the SHA-256
+of every file. The manifest is signed by the operating MOC's
+HTTP-message-signature key (RFC 9421) and counter-signed by the
+planetary-protection officer.
 
-## §4 Discovery
+## §4 Manifest and Signatures
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mars-mission`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Verification tools recompute file digests, compare to the manifest,
+and reject the package on mismatch with type
+`urn:wia:mars-mission:evidence-mismatch`.
 
-## §5 Time and Identity
+## §5 well-known URI Discovery
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+A conformant programme exposes a discovery document at
+`/.well-known/wia-mars-mission` that links to the API root, the
+public mission registration, the published quality dossier, the
+release-policy schedule, the catalogue of released science products,
+and the planetary-protection officer's accreditation reference.
 
-## §6 Versioning and Deprecation
+## §6 Planetary-Data Archive Integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+PDS-aligned planetary-data archives consume science products at the
+release schedule the mission publishes. The integration record
+carries the archive's identifier, the data-product profile the
+archive accepts, and the deposit cadence. Deposit verification
+re-pins content-addresses on each deposit so that the archived copy
+matches the operationally-released copy.
 
-## §7 Privacy and Security
+## §7 Inter-Agency Review Board Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Inter-agency review boards (mission-critical-activity reviews,
+anomaly review boards, planetary-protection review panels) receive
+records appropriate to their scope through dedicated client
+certificates. The integration record carries each board's identifier,
+the records the board is authorised to access, and the review
+schedule.
 
-## §8 Open Governance
+## §8 Press and Public Outreach
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mars-mission` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Press and public outreach systems consume Level-1 product summaries
+and derived narrative content. The integration is one-way (mission
+to outreach) and is rate-limited; outreach systems do not re-write
+into the mission record set. Press releases that cite mission
+products carry the evidence-package manifest digest so that
+downstream readers can resolve the release back to the underlying
+records.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Long-Term Archive Integration
 
+Beyond the PDS-aligned archive, missions designate a long-term
+archive that holds operational records (TT&C catalogues, anomaly
+investigations, audit logs) that PDS does not host. Quarterly
+deposits round-trip content-addresses; on programme wind-down,
+remaining records transfer to the archive with content-addresses
+preserved.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §10 International Planetary-Protection Body Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Programmes register with the international planetary-protection
+body (the COSPAR Panel on Planetary Protection or the equivalent
+body the programme's jurisdiction recognises). Registration records
+the mission's category, the responsible officer, and the timeline
+under which the programme is willing to release planetary-
+protection records to the body for retrospective audit.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Verifiable-Credential Re-Issuance (optional)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Programmes that wish to expose mission attestations to consumers of
+W3C Verifiable Credentials MAY re-issue the planetary-protection
+record or the science-product release attestation as a Verifiable
+Credential. Re-issuance is optional; the canonical record remains
+the JSON evidence-package manifest.
 
-## Annex F — Adoption Roadmap
+## §12 Worked Example: Citation Resolution
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A reader encounters a peer-reviewed publication that cites a
+mission's surface observation. The reader's tool resolves the
+citation by:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+1. Parsing the citation to extract the science-product ID and
+   manifest digest.
+2. Fetching the discovery document for the issuing mission.
+3. Resolving the manifest URL and verifying the manifest signatures.
+4. Recomputing the manifest digest and comparing it to the pinned
+   digest; aborting on mismatch.
+5. Retrieving the package; recomputing per-file digests; surfacing
+   the resolved evidence (observation request, TT&C catalogue,
+   science product, planetary-protection record) to the reader.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A conformant tool completes this flow without further input.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Cross-Standard Linkage
 
-## Annex G — Test Vectors and Conformance Evidence
+A mission that supports adjacent WIA standards (a sample-return
+chain that consumes a WIA-quarantine standard, a crewed mission
+that consumes a WIA-life-support standard) emits cross-standard
+linkage records.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Reader Tooling
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programmes MAY publish supplementary reader hints (visual
+trajectory plots, observation-target maps, time-line visualisations
+of TT&C activity) alongside the canonical evidence package.
+Supplementary hints are non-normative.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §15 Sample-Return Curatorial Integration
 
-## Annex H — Versioning and Deprecation Policy
+Sample-return missions integrate with curatorial facilities that
+hold returned samples under climate- and atmospheric-controlled
+conditions. Curatorial integrations consume the sample-return chain
+records (PHASE-1 §11) and emit per-sample subsample-distribution
+records that record which subsamples were issued to which
+investigators under what consent/agreement. Integrators MUST honour
+the quarantine release criteria recorded in PHASE-3 §15 before
+distributing subsamples.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Public-Access Outreach Integration
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Mission programmes deploy public-access outreach systems that expose
+selected science products and narrative content to general
+audiences. The integration is read-only and rate-limited, and is
+governed by the release-policy schedule recorded in the well-known
+discovery document. Public-access systems do not consume operational
+records (TT&C catalogues, anomaly investigations) by default;
+opt-in disclosures are recorded under a separate scope.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Backwards-Compatibility Guarantee
 
-## Annex I — Interoperability Profiles
+PHASE-4 minor revisions remain backwards-compatible with prior-minor
+clients. Major revisions go through a deprecation window of at
+least one full mission planning cycle (typically two Earth years).
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Environmental-Data Aggregator Integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Climate-modelling teams and future-mission planners aggregate
+environmental observations across missions. The integration consumes
+the observations published under each contributing mission's
+release schedule and emits aggregated time series that re-credit
+the source missions. Aggregator integrations carry the aggregator's
+identifier and the access scope; out-of-scope queries return
+`403 Forbidden` with type
+`urn:wia:mars-mission:aggregator-scope`.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 Reader Tooling for Mission Timelines
+
+Mission timelines are dense and visual; programmes MAY publish
+supplementary timeline visualisers that present TT&C pass schedules,
+sol activity execution traces, and science-product availability as
+human-readable charts. These visualisers are non-normative reader
+hints; the canonical record remains the JSON evidence package.
+
+## §20 Cross-Standard Linkage
+
+Missions that consume adjacent WIA standards (sample-return chain
+under WIA-quarantine, crewed-mission life-support under
+WIA-life-support) emit cross-standard linkage records that name the
+consuming standard and the version under which the linkage is
+claimed. Linkages are not transitive; consumers verify each
+adjacent standard's evidence directly.
+
+## §21 Migration from Pre-Standard Records
+
+Programmes operated before WIA-mars-mission reached version 1.0 MAY
+migrate historical missions by emitting synthetic mission records
+that carry the original mission's identifying information plus a
+`legacyImport` flag. Synthetic missions are accepted by the public
+catalogue but are not eligible for evidence-package generation
+without contemporaneous re-validation of their record set.
+
+## §22 Verifiable-Credential Re-Issuance (optional)
+
+Programmes that wish to expose mission attestations (planetary-
+protection clearance, science-product release attestation,
+mission-critical-activity review outcome) to consumers of W3C
+Verifiable Credentials MAY re-issue the attestations as Verifiable
+Credentials under the Data Model 2.0 specification. Re-issuance is
+optional; the canonical record remains the JSON evidence-package
+manifest.
+
+## §23 Citation-Indexing Adapters
+
+Bibliographic indexing services and library catalogues consume
+machine-readable citation entries so that a paper that cites a
+mission product can be discovered by readers who start from the
+mission's catalogue. Programmes MAY publish citation-index adapters
+that emit citation entries in the indexing service's preferred
+format (BibTeX, JSON-LD, Atom-of-CitationStyle); adapters are
+non-normative integration extensions.
+
+## §24 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully with
+at least one ground-station network, at least one PDS-aligned
+archive, the relevant international planetary-protection body, and
+at least one partner MOC, and has published at least one externally
+citable evidence package.
+
+Sunsetting an integration is announced via the well-known discovery
+document at least 90 calendar days before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-mars-mission
+- **Last Updated:** 2026-04-27

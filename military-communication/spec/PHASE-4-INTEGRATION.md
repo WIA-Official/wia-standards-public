@@ -1,241 +1,291 @@
-# WIA-military-communication PHASE 4 — INTEGRATION Specification
+# WIA-military-communication PHASE 4 — Integration Specification
 
 **Standard:** WIA-military-communication
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-military-communication (Military Communication).
+This PHASE describes how a deployment integrates the data, APIs,
+and protocols from PHASEs 1–3 with the operational picture: terminal
+fleet management, command-and-control consoles, gateway / bridging
+infrastructure, spectrum-management offices, EMCON enforcement,
+ALE coordination, and coalition exchange. It is non-prescriptive
+about specific vendor products; it specifies the integration
+*contracts* a deployment must satisfy.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 4406 — Military Message Handling System
+- STANAG 5066 — bandwidth-constrained tactical data exchange
+- STANAG 4774 / 4778 — Confidentiality and Information labelling
+- MIL-STD-2045-47001D — Variable Message Format
+- ITU-R Recommendations for spectrum coordination
+- WIA-medical-data-privacy / WIA-nbc-defense — for cross-domain
+  integration when communications carry medical or NBC content
 
 ---
 
-## §1 Scope
+## §1 Terminal fleet registry
 
-This PHASE document is one of four that together define the WIA-military-communication
-standard. It addresses the integration layer of the standard.
+The deployment maintains a registry of every fielded terminal:
 
-## §2 Manifest
+- `terminalRef` — endpoint URN
+- vendor, model, serial number
+- supported waveforms and bands
+- firmware version, last firmware update
+- crypto-suite identifier(s) loaded
+- TLS client certificate fingerprint and expiry
+- operator (the unit owning the terminal)
+- operating-area policy (geographic and EMCON scope)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-communication"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A terminal not in the registry, or with expired certificate or
+expired firmware revision, is refused at PHASE 2 §1 message
+origination. Registry changes are themselves auditable.
 
-## §3 Conformance Tiers
+## §2 C2 integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The C2 system consumes the operational picture by subscribing to:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- New `precedence: flash`/`immediate` messages addressed to the
+  command's monitoring endpoints
+- Link-state changes (degraded, lost, restored)
+- EMCON posture changes
+- Spectrum-conflict alerts
 
-## §4 Discovery
+The C2 system displays this on its operational picture; messages
+can be acknowledged or referenced through the boundary's API. The
+C2 system does not write back over the boundary; new messages flow
+through PHASE 2 §1 from the originating principal, not from the
+C2 console's edit path. This preserves a single canonical record
+per message.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-communication`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Gateway / bridging infrastructure
 
-## §5 Time and Identity
+Gateways translate between waveforms (Link 16 ↔ Link 22, MMHS ↔
+SMS over satellite, etc.). The integration contract:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Each gateway is itself an addressable endpoint with a
+  `wia_role: gateway` token
+- Bridge events (PHASE 1 §8) are emitted at the gateway and
+  recorded in the audit chain
+- Lossy bridges require a recorded `translationPolicy:
+  "lossy-acknowledged"` signed by a release authority before the
+  bridge event commits
+- Cross-coalition bridges are gated by the federation manifest;
+  unfederated coalition bridging is refused
 
-## §6 Versioning and Deprecation
+A gateway that fails to record its bridge events is treated as
+a non-conformant gateway and its traffic is suspended pending
+remediation.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Spectrum-management offices
 
-## §7 Privacy and Security
+Spectrum allocation requests (PHASE 2 §4) are coordinated with
+spectrum-management offices in the operating area:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Host-nation coordination — for forward-deployed units, the host
+  nation's frequency-management body must approve operating bands
+- ITU-R Region adherence — broadcast and shared-use bands obey the
+  operating area's ITU-R Region rules
+- Mission-priority routing — multiple competing requests in the
+  same band/area are resolved by the priority class defined in
+  PHASE 1 §6
 
-## §8 Open Governance
+The boundary surfaces upcoming allocation expirations to the
+spectrum-management office at least 14 days in advance so renewals
+proceed without operational impact.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-communication` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 EMCON enforcement
+
+EMCON postures (PHASE 2 §7) propagate from the issuing authority
+to all affected terminals in the operating area:
+
+- The boundary blocks message origination for affected endpoints
+  unless a flash-precedence override accompanied by release-authority
+  signature is present
+- Override events are themselves audited and reviewed within 24
+  hours of the override
+- Terminals confirm EMCON acknowledgement so the issuing authority
+  knows posture is in effect
+
+EMCON expiry is automatic at the recorded end timestamp; manual
+extension issues a new posture record.
+
+## §6 ALE coordination
+
+For HF Automatic Link Establishment networks:
+
+- Terminals report scan results (PHASE 2 §8) to the boundary
+- The boundary aggregates scan results and surfaces a current
+  reachable-peer view for each terminal
+- The reachable-peer view drives automatic call-setup decisions
+  in higher-layer applications
+- Channel stress (overuse, jamming) surfaces from aggregated scans
+  and is reported to the spectrum-management office for
+  reassignment
+
+ALE network health is itself a metric; degraded ALE health prompts
+operational review of the deployment's HF posture.
+
+## §7 Cross-domain integration
+
+Communications often carry classified content from other domains.
+The boundary integrates with adjacent WIA standards:
+
+- **NBC events** — when a `validated` NBC event is to be reported
+  to a coalition partner, the message body references the NBC
+  event ID and the boundary applies the NBC-defence release-
+  authority handshake in addition to the milcomms handshake
+- **Medical evacuation coordination** — casualty handoffs use the
+  pseudonymous subjectRef from WIA-medical-data-privacy; the
+  message body references the medical record without exposing
+  direct identifiers on the wire
+- **Imaging hand-off** — pre-operative imaging shared with a
+  forward surgical team flows via the milcomms system; the
+  imaging metadata is referenced and the bulk transfer follows
+  WIA-medical-imaging PHASE 2 §7 bulk export
+
+Cross-domain references in messages are validated end-to-end:
+the receiving boundary verifies that the referenced records exist,
+are still active, and are accessible to the receiving organisation
+under the relevant federation manifest.
+
+## §8 Quarterly compliance report
+
+The boundary emits a quarterly compliance report covering:
+
+- Total messages originated by precedence and classification
+- Releasability mismatches detected and refused
+- EMCON postures issued, overrides invoked, override review backlog
+- Spectrum allocations created, conflicts resolved, expirations
+- Bridge events with their translation policies (lossless / lossy)
+- Cross-coalition releases by federation peer
+- Federation manifest health (active, expiring, expired)
+- Terminal-fleet certificate health (current, expiring, expired)
+- Audit-chain integrity check results
+
+The report is signed and is itself in scope for the audit chain so
+report tampering would surface in the chain.
+
+## §9 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every fielded terminal is in the registry with current
+   certificate and current firmware
+2. Every message in the past quarter has a matching audit chain
+   entry with verifiable inclusion proof
+3. Every cross-coalition release has both release-authority
+   signatures on file
+4. EMCON override review backlog is zero over the prior 30 days
+5. Federation manifests for all listed peers are current
+6. Spectrum allocations have no unresolved conflicts beyond the
+   resolution window declared in the deployment policy
+7. ALE health is within operational thresholds for the deployment
+8. Quarterly compliance report has no integrity-check failures
+
+A deployment failing any of these reports the gap in its compliance
+package rather than concealing it.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Operational SLAs (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Concern                                          | Default SLA              |
+|--------------------------------------------------|--------------------------|
+| Message origination p95 added latency            | ≤ 100 ms                 |
+| Tactical narrowband round-trip                   | ≤ 60 s                   |
+| Spectrum-allocation conflict resolution          | ≤ 60 s                   |
+| EMCON propagation to all affected terminals      | ≤ 5 minutes              |
+| Federation manifest expiry alert lead time       | ≥ 30 days                |
+| Catalogue refresh cycle                          | ≥ daily                  |
+| Audit chain entry available after operation      | ≤ 10 s                   |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Tighter SLAs are negotiable per deployment; loosening them requires
+operational-command sign-off.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex B — Decommissioning (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+When a deployment is decommissioned:
 
-## Annex F — Adoption Roadmap
+1. Outstanding messages are either delivered, returned, or recorded
+   as undeliverable with structured reasons
+2. Active spectrum allocations are released back to the coordinating
+   authorities
+3. Outstanding EMCON postures expire or transfer to a successor
+   deployment
+4. Final daily root is sealed and the chain exported to the
+   receiving custodian
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The decommissioning manifest is itself an audit event in the final
+chain root, signed by both outgoing and incoming custodians.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Acceptance checklist (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A new deployment claims conformance after a checklist sign-off:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- [ ] Doctrine declared and matches the issuing authority on file
+- [ ] KA published JWKS with current keys; cross-coalition manifests
+      signed and current
+- [ ] Terminal fleet registry populated with current certificates
+      and current firmware
+- [ ] Spectrum-management interface bound and tested with the
+      coordinating authority
+- [ ] EMCON propagation tested in dry-run
+- [ ] Cross-domain references validated end-to-end with adjacent
+      WIA standards' boundaries
+- [ ] Audit chain initialised with a signed genesis root
+- [ ] Disaster-recovery test completed with audit-chain
+      reconstruction
+- [ ] Quarterly compliance report scheduled and signed
 
-## Annex G — Test Vectors and Conformance Evidence
+A deployment failing any item logs the gap in its compliance
+package and tracks remediation publicly.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex D — Common pitfalls (informative)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Field experience surfaces a small set of recurring integration
+pitfalls. They are not normative requirements, but deployments
+SHOULD avoid them:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+- Catalogue drift — issuing authorities change endpoint URNs
+  without notice; the boundary's cache must refresh frequently
+  enough to catch this
+- Time skew on tactical terminals after long air-gap operation —
+  GPS-disciplined PPS clocks recover quickly; software-only clocks
+  may need manual resync
+- Releasability flip after coalition reorganisation — federation
+  manifests must be re-signed promptly when a coalition adds or
+  removes a partner
+- Bridge classification ratchet — repeated bridges of the same
+  message can accumulate caveats; the boundary refuses bridges
+  whose accumulated caveats exceed a per-policy threshold
 
-## Annex H — Versioning and Deprecation Policy
+## Annex E — Decommissioning (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+When a deployment is decommissioned, the final daily root is sealed,
+outstanding messages are delivered or returned, active spectrum
+allocations are released back to coordination authorities, and the
+chain is exported to the receiving custodian. The decommissioning
+manifest is itself an audit event in the final chain root, signed
+by both outgoing and incoming custodians so coalition partners can
+trace continuity.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex F — Coalition exchange pitfall summary (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Recurring lessons learned across coalition exercises:
 
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Manifest renewal cadence** — federations renewed 30 days
+  before expiry have the smoothest flow; renewals at ≤ 7 days
+  have observable disruption to operational traffic
+- **Releasability label drift** — when a coalition adds a new
+  partner, every existing endpoint's releasability set may need
+  review; deployments SHOULD schedule a quarterly releasability
+  audit
+- **EMCON propagation gap** — a posture issued at the C2 level
+  has measurable propagation delay to fielded terminals; the
+  deployment's network-management layer SHOULD verify terminal
+  acknowledgement before the posture is reported as "in effect"
+- **Bridge accumulation** — a message bridged across multiple
+  waveforms may accumulate caveats; the boundary refuses bridges
+  whose caveat count exceeds the per-policy threshold (typically
+  3) without explicit release-authority sign-off

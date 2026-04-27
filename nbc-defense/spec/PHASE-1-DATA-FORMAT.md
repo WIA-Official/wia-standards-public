@@ -1,241 +1,294 @@
-# WIA-nbc-defense PHASE 1 — DATA-FORMAT Specification
+# WIA-nbc-defense PHASE 1 — Data Format Specification
 
 **Standard:** WIA-nbc-defense
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-nbc-defense (Nbc Defense).
+This PHASE defines the canonical data format for nuclear-biological-
+chemical (NBC) defence detection records: agent identification, sensor
+event payloads, contamination plume modelling inputs, decontamination
+work-orders, casualty triage records, and the cross-references that
+bind these to the operational picture. The shape interoperates with
+allied-nation NBC reporting standards so that a multi-national
+deployment does not require parallel data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 2103 / AArtyP-1 — NBC reports (NBC-1 through NBC-6) for Allied land forces
+- STANAG 4632 / AEP-66 — Deployable Nuclear, Biological and Chemical detection systems
+- ATP-3.8.1 / AJP-3.8 — Allied Joint Doctrine for Comprehensive CBRN Defence
+- ISO/IEC 19762:2008 — automatic identification and data capture vocabulary
+- ISO 17025:2017 — testing and calibration laboratory competence
+- WHO IHR (2005) — International Health Regulations (notification of public-health events)
+- OPCW Verification Annex — Chemical Weapons Convention verification regime
+- HL7 FHIR R5 — Observation, DiagnosticReport, Patient (for medical CBRN integration)
+- IETF RFC 7515 (JWS), RFC 9162 (Certificate Transparency 2.0 pattern)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-nbc-defense
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that detect, classify, track, and
+respond to NBC threats: hand-held and stationary chemical detectors,
+biological identifiers, radiation portal monitors, dosimetry networks,
+plume-modelling pipelines, and the medical-treatment records arising
+from exposure or suspected exposure. It defines the *shape* of the
+records; the protocols for transport and access are addressed in
+PHASE 3, integration with command-and-control in PHASE 4.
 
-## §2 Manifest
+The standard is allied-doctrine-aware: a single implementation MUST
+declare which national or coalition doctrine its records originate
+under so that downstream consumers can apply the correct interpretation
+of categorisation, release authority, and public-health notification.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "nbc-defense"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: chemical (CWA, TIC), biological (Category A/B/C agents),
+radiological (sealed and unsealed sources, dispersal events), and
+nuclear (criticality, fallout). Out of scope: directed-energy and
+electromagnetic threats addressed by separate WIA standards.
 
-## §3 Conformance Tiers
+## §2 Agent identifier model
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Agents are identified by structured codes drawn from existing
+inventories:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Domain | Identifier source | Example |
+|--------|-------------------|---------|
+| Chemical | OPCW Schedule 1/2/3 + CAS number | Sarin (GB) — Schedule 1, CAS 107-44-8 |
+| Biological | ICTV taxonomy + CDC category | *Bacillus anthracis* (Category A) |
+| Radiological | IAEA radionuclide table | Cs-137, Co-60, Am-241 |
+| Nuclear | IAEA fission-product inventory | I-131, Cs-137, Sr-90 from criticality |
+| Toxic Industrial Chemical | UN Recommendations on the Transport of Dangerous Goods (UN number) | UN 1017 (Chlorine), UN 1005 (Anhydrous Ammonia) |
 
-## §4 Discovery
+An agent record is a stable triple `(domain, source-vocabulary, code)`
+plus a free-text `localName` for human display. Implementations MUST
+NOT invent agent codes; an unrecognised agent surfaces as
+`(domain, "unknown", "<sensor-raw>")` and is queued for analyst
+review rather than auto-classified.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/nbc-defense`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Sensor event record
 
-## §5 Time and Identity
+A detection emits a sensor event record with the fields:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `eventId` — URN of form `urn:wia:nbc:event:<sensor>:<timestamp>:<seq>`
+- `sensorRef` — URN of the emitting sensor (PHASE 4 §3 fleet registry)
+- `agentRef` — agent identifier per §2 (or `unknown`)
+- `confidence` — declared band (`presumptive`, `confirmed`, `validated`)
+- `timestamp` — RFC 3339 with offset; sensor-clock plus authoritative
+  time-source skew (PHASE 3 §6)
+- `position` — WGS-84 lat/lon/alt with horizontal/vertical uncertainty;
+  for fixed sensors a static survey position is permitted
+- `concentration` — value + unit + measurement uncertainty (per
+  ISO 17025 reporting style); permitted units are restricted to
+  the per-domain inventory below
+- `metadata` — sensor model, firmware, calibration date, last
+  field-check date
 
-## §6 Versioning and Deprecation
+Permitted units (closed):
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+| Domain | Unit |
+|--------|------|
+| Chemical (vapour) | mg/m³, ppm |
+| Chemical (liquid) | mg/cm² |
+| Biological | particles/L of air, CFU/mL |
+| Radiological (rate) | µSv/h, mSv/h, Sv/h |
+| Radiological (activity) | Bq, kBq, MBq, GBq |
+| Surface contamination | Bq/cm² |
 
-## §7 Privacy and Security
+Concentrations outside the unit list are rejected at ingest. If a
+sensor emits a non-listed unit, integration is responsible for
+conversion to a listed unit before submitting the record (PHASE 4 §2).
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Confidence bands
 
-## §8 Open Governance
+Detection confidence follows allied doctrine:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `nbc-defense` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- `presumptive` — single-technology hit, single sensor; suitable for
+  alerting but not for releasing fire or commencing decontamination
+- `confirmed` — multi-technology or multi-sensor hit; basis for
+  immediate operational response within the doctrine
+- `validated` — laboratory analysis from a sample submitted under
+  ISO 17025-conformant chain-of-custody; basis for permanent record
+  and external reporting
+
+Promotion across bands requires evidence linkage: a `confirmed`
+record references the contributing `presumptive` events; a
+`validated` record references the sample chain-of-custody log
+(§5) and the analysing laboratory's accreditation reference.
+
+## §5 Sample chain of custody
+
+When physical samples are taken (chemical wipe, biological swab,
+radiological smear, environmental air-filter), the chain-of-custody
+log captures:
+
+- `sampleId` — URN with sealed-bag identifier
+- `collector` — authenticated principal who took the sample
+- `collectionPoint` — geo-coordinate + descriptive locality
+- `collectionTime` — RFC 3339
+- `transferEvents[]` — each entry: from-principal, to-principal,
+  timestamp, integrity check (seal status, optional photograph hash)
+- `analysisRequest` — destination laboratory, requested test panel,
+  release authority
+
+The log is hash-chained per PHASE 3 §4 so that any retrospective
+edit is detectable. A sample without an unbroken custody chain
+cannot promote a sensor event to `validated`.
+
+## §6 Plume model input record
+
+Forecasts of contamination spread require structured inputs:
+
+- Source term — agent ID, release rate (kg/s for chemical;
+  Bq/s for radiological; CFU/s for biological), release elevation,
+  source geometry (point, line, area)
+- Meteorology — wind vector at multiple altitudes, atmospheric
+  stability class (Pasquill A–F), mixing height, surface roughness
+- Terrain — digital elevation model reference, land-use grid
+- Time horizon — start, duration, time-step
+
+The record references the model implementation used (HPAC, ALOHA,
+RIMPUFF, etc.) and the input-data lineage so that two different
+model runs against the same inputs are reproducible.
+
+## §7 Decontamination work-order
+
+A decontamination action is recorded as a work-order with:
+
+- `triggerEventId` — the sensor event(s) or sample finding that
+  triggered the action
+- `targetArea` — polygon of WGS-84 coordinates
+- `methodCodes[]` — coded methods (water-with-detergent,
+  bleach-solution-1.5%, hot-air, mechanical-removal,
+  catalysed-decomposition)
+- `personnel[]` — authenticated principals on the work-order with
+  protective-posture (MOPP level for ground forces, equivalent for
+  emergency services)
+- `commencementTime`, `completionTime`
+- `verificationEvent` — sensor event after completion confirming
+  residual below the action threshold
+
+Records are signed with the issuing organisation's signing key
+(PHASE 3 §3) so that the work-order's integrity survives across
+multi-organisation incident responses.
+
+## §8 Casualty triage record
+
+When personnel are exposed or suspected exposed, a triage record
+binds the NBC event to a clinical record:
+
+- `subjectRef` — pseudonymous subject identifier (interop with
+  WIA-medical-data-privacy PHASE 1 §2 when the subject is a
+  civilian; military deployments use the relevant force-protection
+  identifier per the deployment policy)
+- `exposureEventId` — sensor event(s) implicating the exposure
+- `triageCategory` — coded triage code (T1 immediate, T2 delayed,
+  T3 minimal, T4 expectant, deceased)
+- `decontaminationStatus` — pre-decon, decon-complete, not-required
+- `clinicalFindings` — FHIR Observation references when integrated
+  with a medical record system
+- `releaseAuthority` — for record release outside the operational
+  chain (e.g., to a national poisons centre or epidemiology
+  authority)
+
+Triage records are read-only post-issue; subsequent clinical
+updates create new linked records rather than overwriting.
+
+## §9 Allied report shapes (NBC-1 through NBC-6)
+
+STANAG 2103 defines six standard NBC-report shapes. This PHASE
+preserves them as derived projections of the records above:
+
+| Report | Trigger | Source records |
+|--------|---------|----------------|
+| NBC-1  | Initial detection | `sensor event` with `presumptive` band |
+| NBC-2  | Updated information | refinements after multi-sensor fusion |
+| NBC-3  | Plume forecast | `plume model input` + run |
+| NBC-4  | Reconnaissance results | promoted `confirmed` events |
+| NBC-5  | Contaminated area | aggregated polygon over `validated` events |
+| NBC-6  | Detailed information | full chain-of-custody + lab analysis |
+
+A deployment that needs to emit STANAG-conformant reports renders
+them on demand from the underlying records; the canonical record
+remains in the WIA shape, which is more general and lossless.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked example: NBC-1 record (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+The following is a fully populated sensor event record at
+`presumptive` confidence, ready for derivation into a STANAG 2103
+NBC-1 report:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```json
+{
+  "eventId": "urn:wia:nbc:event:cpd-91a7:2026-04-27T09:31:14+09:00:0001",
+  "sensorRef": "urn:wia:nbc:sensor:fielded:cpd-91a7",
+  "agentRef": {"domain": "chemical", "vocab": "OPCW", "code": "GB", "localName": "Sarin"},
+  "confidence": "presumptive",
+  "timestamp": "2026-04-27T09:31:14+09:00",
+  "position": {"lat": 37.4516, "lon": 126.6531, "alt": 12, "h_uncert_m": 2.5, "v_uncert_m": 1.0},
+  "concentration": {"value": 0.18, "unit": "mg/m3", "uncert": 0.03},
+  "metadata": {
+    "model": "vendor-X.IMS-portable",
+    "firmware": "fw-3.4.2",
+    "calibration": {"date": "2026-03-15", "lab": "urn:wia:org:lab:nat-cal-A"},
+    "fieldCheckDate": "2026-04-26"
+  },
+  "doctrine": "NATO-AJP-3.8"
+}
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex B — Conformance disclosure
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Implementations declare per-section conformance in their published
+capability document. Sections marked `partial` reference the
+deployment policy explaining the gap; sections marked `excluded`
+carry a justification citing the controlling doctrine's allowance.
+A deployment that is `partial` or `excluded` on §3 (Sensor event
+record), §4 (Confidence bands), §5 (Sample chain-of-custody), or
+§9 (Allied report shapes) is non-conformant overall.
 
-## Annex F — Adoption Roadmap
+## Annex C — Confidence promotion worked example (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A typical chemical-agent confirmation sequence:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+1. **Presumptive** — handheld IMS detector at outpost reports
+   `(chemical, OPCW, GB)` at 0.18 mg/m³, h_uncert 2.5 m, evening 27 April. Single technology, single sensor — bandwidth `presumptive`.
+2. **Cross-cuing** — fixed FPA detector 200 m downwind reports
+   `(chemical, OPCW, GB)` at 0.04 mg/m³ five minutes later.
+3. **Promotion to confirmed** — operator submits `$promote-to-confirmed`
+   referencing both presumptive event IDs, technology codes
+   `["IMS", "FPA"]`, operator URN. Boundary creates a `confirmed`
+   record referencing both contributors and emits an AuditEvent.
+4. **Sample take** — CBRN team takes a swab on a downwind surface
+   under sealed-bag custody (PHASE 1 §5).
+5. **Lab analysis** — sample submitted to the deployment's
+   designated OPCW-accredited laboratory; analysis confirms GB
+   identity at quantitative concentration.
+6. **Promotion to validated** — operator submits `$promote-to-validated`
+   with the lab report URI and the chain-of-custody log reference.
+   Boundary creates a `validated` record citing both confirmed event
+   and lab evidence; the `validated` record is the basis for STANAG
+   2103 NBC-4 reporting and OPCW notification.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Each step in the sequence emits an AuditEvent so that the
+promotion path is reconstructable post-incident.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex D — Decontamination method codes (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+The closed list of method codes used in PHASE 1 §7:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Code                          | Description                                                |
+|-------------------------------|------------------------------------------------------------|
+| `water-with-detergent`        | mechanical removal with surfactant solution                |
+| `bleach-solution-1.5%`        | sodium hypochlorite solution at 1.5% available chlorine    |
+| `hot-air`                     | thermal degradation by heated airflow                      |
+| `mechanical-removal`          | physical scraping or mopping without chemical action       |
+| `catalysed-decomposition`     | chemical neutralisation using a deployed catalyst          |
+| `weathering`                  | ambient-condition decay (no active intervention)           |
+| `ventilation`                 | enclosed-space air exchange                                 |
+| `surface-coating`             | sequestration coating applied over contaminant              |
+| `controlled-burn`             | thermal destruction of porous contaminated material         |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The list is appendable in future minor versions; existing codes
+are stable across versions.

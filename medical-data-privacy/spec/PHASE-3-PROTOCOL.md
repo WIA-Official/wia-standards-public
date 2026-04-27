@@ -1,241 +1,273 @@
-# WIA-medical-data-privacy PHASE 3 — PROTOCOL Specification
+# WIA-medical-data-privacy PHASE 3 — Protocol Specification
 
 **Standard:** WIA-medical-data-privacy
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-medical-data-privacy (Medical Data Privacy).
+This PHASE defines the protocols that bind the data format (PHASE 1)
+to the API interface (PHASE 2): authentication, key management, audit
+chain construction, identity-broker rotation, retention enforcement,
+and the cross-controller disclosure handshake. Where a healthcare-
+specific protocol exists (SMART App Launch, IHE ATNA), this standard
+defers to it; where one does not, this PHASE specifies the gap.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 SMART App Launch 2.2 — clinician/app authentication and scope strings
+- IHE ATNA — Audit Trail and Node Authentication (BITS-1.0 transport)
+- IETF RFC 7515 (JWS), RFC 7519 (JWT), RFC 7517 (JWK), RFC 7518 (JWA)
+- IETF RFC 8446 (TLS 1.3), RFC 6066 (TLS extensions, SNI)
+- IETF RFC 9162 (Certificate Transparency 2.0) — pattern for hash-chain transparency
+- ISO/IEC 27001:2022 §A.5–§A.8 — information security controls
+- ISO/IEC 27018:2019 — controller-to-processor PII flows in cloud
+- NIST SP 800-66r2 — implementing the HIPAA Security Rule (informational mapping)
+- KISA "보건의료 정보 보호 가이드" — for K-PIPA implementations (informational mapping)
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-medical-data-privacy
-standard. It addresses the protocol layer of the standard.
+Clinician applications authenticate using SMART App Launch 2.2:
 
-## §2 Manifest
+- `launch-ehr` flow for in-EHR launch (clinician identity carried by the EHR session)
+- `launch-standalone` for external apps (full OAuth 2.0 authorisation_code with PKCE)
+- `client_credentials` for server-to-server (research pipelines, regulator gateways)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-data-privacy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Scope strings combine the SMART resource scope with the PHASE 1 §4
+purpose vocabulary. Examples:
 
-## §3 Conformance Tiers
+- `patient/Observation.rs` (SMART) + `purpose:TREAT` (this standard)
+- `system/Patient.rs purpose:HRESCH`
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+A token MUST carry both forms; missing the purpose suffix is treated
+as an unscoped token and rejected at the edge. Tokens are short-lived
+(≤15 minutes for clinician sessions, ≤5 minutes for system tokens).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §2 Token format
 
-## §4 Discovery
+Tokens are JWS-signed JWTs (RFC 7515 + RFC 7519). The header uses
+ES256 or ES384 (P-256 / P-384 ECDSA). RS256 is permitted for
+backward compatibility but new deployments SHOULD use ECDSA. Mandatory
+claims:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-data-privacy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+| Claim     | Source                                                    |
+|-----------|-----------------------------------------------------------|
+| `iss`     | the issuing authorisation server's URL                    |
+| `aud`     | the resource server's FHIR base URL                       |
+| `sub`     | the principal (clinician URN or service URN)              |
+| `iat`     | issuance time (RFC 7519 §4.1.6)                           |
+| `exp`     | expiry time                                               |
+| `scope`   | space-separated SMART scopes including `purpose:<X>`      |
+| `wia_org` | the controller organisation ID                            |
+| `wia_jur` | the jurisdiction declared by the controller (PHASE 1 §1)  |
 
-## §5 Time and Identity
+Tokens MUST be sent over TLS 1.3 (RFC 8446); TLS 1.2 is permitted only
+for legacy interfaces explicitly listed in the deployment policy.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §3 Key management
 
-## §6 Versioning and Deprecation
+Each controller publishes a JSON Web Key Set (RFC 7517) at a fixed
+well-known URI: `/.well-known/jwks.json`. The signing key for
+consent receipts and AuditEvent rollups MUST appear in the JWKS
+with `use: sig` and `kid` matching the receipt's `kid` header.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Keys rotate at least every 90 days. After rotation, the prior key
+remains in the JWKS for ≥180 days so that signatures on long-lived
+receipts can still be verified. Rotation evidence (the prior key's
+fingerprint, the new key's fingerprint, the rotation timestamp) is
+itself an AuditEvent.
 
-## §7 Privacy and Security
+Private keys live in an HSM (FIPS 140-3 Level 2 or equivalent
+national certification — for KR deployments KCMVP is acceptable).
+Keys never leave the HSM; signing is a remote operation.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Audit-chain construction
 
-## §8 Open Governance
+AuditEvents form a per-controller hash chain. For each event:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-data-privacy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+chain_input  = SHA-256(prev_chain_root || canonical(event))
+chain_root_t = chain_input
+```
+
+Canonicalisation uses RFC 8785 JSON Canonicalisation Scheme on the
+FHIR JSON (with FHIR's element ordering preserved). The chain root
+is sealed once per UTC day (`23:59:59.999Z`) by signing the root
+with the controller's signing key.
+
+The signed daily root MAY be published to a transparency log if the
+deployment policy enables it. If it is, the publishing protocol
+follows the pattern of RFC 9162 Certificate Transparency 2.0
+(append-only Merkle tree, signed tree head, inclusion proofs). If
+it is not, the daily root is held in a controller-internal
+append-only store with offline backups.
+
+Auditors reconstructing a window of activity request:
+
+1. The signed daily root for each day in the window
+2. The Merkle inclusion proof for each event of interest
+3. The events themselves
+
+Reconstruction failure (proof mismatch, missing event, missing
+daily root) is itself an incident requiring breach-notification
+review per PHASE 1 §8.
+
+## §5 Identity broker
+
+Re-identification operations (mapping `subjectRef` to MRN, or
+linking two `subjectRef` values per PHASE 1 §5) flow through the
+identity broker. The broker exposes a private API reachable only
+from the controller's network, never from the open internet.
+
+The broker holds:
+- the MRN ↔ `subjectRef` table (encrypted at rest with a key
+  separate from the FHIR store)
+- the `subjectRef` ↔ `subjectRef` linkage table (encrypted likewise)
+- the linkage authorisation records (PHASE 1 §5)
+
+Broker operations emit AuditEvents into the same chain as the
+FHIR store so that auditors see read patterns on identifiers
+alongside reads on records.
+
+## §6 Identity rotation
+
+Subject identifiers rotate when:
+
+1. A linkage authorisation expires (the linked identifier is
+   discarded; subsequent calls re-mint a fresh per-purpose
+   identifier).
+2. A controller is dissolved or transferred (the new controller
+   re-mints all identifiers under its own URN namespace).
+3. A subject exercises a "withdraw and re-enrol" right under
+   the controlling jurisdiction.
+
+Rotation issues a Provenance resource (PHASE 1 §5) so that
+historic AuditEvents can be reattributed to the new
+identifier with explicit audit visibility.
+
+## §7 Retention enforcement
+
+Each resource carries a retention policy derived from its
+jurisdiction and resource type. Examples:
+
+| Jurisdiction | Resource          | Retention                       |
+|--------------|-------------------|---------------------------------|
+| HIPAA        | Designated Record | 6 years (45 CFR §164.530(j))    |
+| K-PIPA       | 의료기록           | 10 years for medical records (의료법 §22)    |
+| GDPR         | Most clinical     | "no longer than necessary" — set by deployment policy |
+
+The retention engine runs daily, marks records past retention as
+`tombstoned` (not deleted), and serves them as `410 Gone` with a
+problem URI of `urn:wia:mdp:problem:retention-expired`. Tombstones
+are themselves retained for the audit-trail retention period
+(typically 6 years longer than the underlying record).
+
+Hard deletion of tombstones is a privileged operation requiring
+two-person integrity; a single-principal deletion is rejected.
+
+## §8 Cross-controller disclosure
+
+When a record crosses controller boundaries (e.g., from a hospital
+to a research consortium), the sending controller emits a
+*disclosure manifest*:
+
+- the consent receipt that authorises the disclosure
+- the resource set (FHIR Bundle hash)
+- the receiving controller's identifier
+- the purpose
+- the period during which the receiver may retain the data
+- the receiver's signature acknowledging the manifest
+
+The manifest is signed by both controllers and is stored in both
+audit chains. A receiver that uses the data outside the manifest's
+purpose has, by construction, a falsified audit trail — the breach
+is detectable.
+
+## §9 Failure modes
+
+If an AuditEvent cannot be persisted, the underlying operation
+MUST fail (the response is `503 Service Unavailable` with a
+problem URI of `urn:wia:mdp:problem:audit-unavailable`). The
+deployment SHOULD NOT relax this rule; a successful disclosure
+without an audit record is the exact pattern that creates an
+unprovable breach later.
+
+If the signing key is unavailable, consent issuance and audit
+sealing fail. Reads against existing records continue, gated by
+the cached consent JWS signatures (verified against the prior
+key still in the JWKS per §3).
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Algorithm choices (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+The protocol defaults below are intended for new deployments. Existing
+deployments SHOULD migrate at the next planned key rotation; legacy
+algorithms remain permitted only for backward-compatibility with
+data created before the upgrade.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+| Concern              | Default                         | Legacy permitted |
+|----------------------|---------------------------------|------------------|
+| Token signature      | ES256 (P-256, SHA-256)          | RS256, RS384     |
+| Receipt signature    | ES384 (P-384, SHA-384)          | RS256            |
+| Daily-root signature | ES384                           | RS256            |
+| Audit hash           | SHA-256 (RFC 6234)              | n/a              |
+| TLS                  | 1.3 (RFC 8446)                  | 1.2 explicit-list|
+| Symmetric at rest    | AES-256-GCM                     | AES-128-GCM      |
+| Key wrapping         | RSA-OAEP-SHA-256 or ECDH-ES     | n/a              |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Quantum-resistance is out of scope for this version; a migration plan
+will be addressed in a future minor version when NIST post-quantum
+signature standards are stable enough for production HSM support.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Failure-mode matrix (informative)
 
-## Annex F — Adoption Roadmap
+| Failure                          | Behaviour                                               |
+|----------------------------------|---------------------------------------------------------|
+| AuditEvent persistence fails     | reject the originating request (PHASE 3 §9)             |
+| Signing key unavailable          | deny new consents and audit sealing; allow existing reads using cached signatures |
+| Identity broker unreachable      | deny linkage operations; allow purpose-internal reads   |
+| JWKS endpoint unreachable        | deny new tokens; allow existing tokens until expiry     |
+| Transparency log unreachable     | continue local chain; backfill at next reachable window |
+| Time skew > 5 min from authoritative source | reject token issuance; alert ops               |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Daily-root sealing (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The following pseudocode illustrates the daily-root sealing
+operation. Production implementations use a properly tested HSM
+client; the snippet is for clarity only.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+events = audit_store.fetch_window(day_start, day_end)
+prev   = audit_store.previous_root(day_start)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+root = prev
+for ev in events:                    # ordered by seq
+    canon = jcs_canonicalise(ev.body)        # RFC 8785
+    root  = sha256(root || canon)
 
-## Annex G — Test Vectors and Conformance Evidence
+signed = hsm_sign(controller_kid, root)      # ES384 over root
+audit_store.write_daily_root(day_end, root, signed)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+if policy.transparency_log_enabled:
+    log_handle = transparency_log.append(signed)
+    audit_store.bind_log_handle(day_end, log_handle)
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A re-derivation of the day's root from the persisted events MUST
+match the stored signed root; mismatch is a chain-integrity incident
+and triggers the breach-investigation flow (PHASE 1 §8).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The seal happens once per UTC day; it never re-seals retrospectively.
+A late-arriving event with a timestamp inside an already-sealed day
+is rejected and routed to the late-arrival queue, which is itself
+auditable.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex D — Time discipline
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Clocks are synchronised by NTPv4 with stratum-2 or better authoritative
+servers. Time drift exceeding 500 ms from the authoritative source
+is treated as an operational incident. Token issuance is suspended
+when drift exceeds 5 s because token validity windows depend on
+agreed time. The stratum-2 source itself is documented in the
+deployment policy so that auditors can replicate the time reference.

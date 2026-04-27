@@ -5,237 +5,312 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-prosthetic-control (Prosthetic Control).
+This document defines the HTTP API contract that an accredited
+prosthetic-control programme exposes for the records defined in
+PHASE-1. The contract is consumed by clinics that fit devices, by
+prosthesis manufacturers that operate post-market surveillance, by
+clinical-trial sponsors that aggregate device-use data, and by national
+medical-device authorities that audit serious adverse events. It is not
+intended for direct end-user consumption; consumer-facing apps mediate
+through the operating clinic's electronic health record.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 6901 (JSON Pointer)
+- IETF RFC 6902 (JSON Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 5789 (PATCH method)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- HL7 FHIR R5 (Patient, Device, DeviceUseStatement, Observation,
+  ClinicalImpression resources)
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-prosthetic-control
-standard. It addresses the api-interface layer of the standard.
+The API is JSON-over-HTTPS served on a domain published by the operating
+programme. Versioning uses URL path segments (`/v1/`) and follows
+Semantic Versioning 2.0.0 at the major-version level. The OpenAPI 3.1
+document at `/v1/openapi.json` is the canonical machine-readable
+description.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "prosthetic-control"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+Response:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-prosthetic-control",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "subjects":          "/v1/subjects",
+    "acquisitions":      "/v1/acquisitions",
+    "decoders":          "/v1/decoders",
+    "motorCommands":     "/v1/motor-commands",
+    "calibrations":      "/v1/calibrations",
+    "feedback":          "/v1/feedback",
+    "adverseEvents":     "/v1/adverse-events",
+    "evidence":          "/v1/evidence",
+    "fhirBridge":        "/v1/fhir",
+    "openapi":           "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Subjects
 
-## §4 Discovery
+```
+POST   /v1/subjects                — register a fitted subject
+GET    /v1/subjects/{subjectId}    — retrieve subject record
+PATCH  /v1/subjects/{subjectId}    — update mutable fields
+GET    /v1/subjects?cohort={c}     — list subjects in cohort
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/prosthetic-control`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Subject records carry the opaque `subjectId` token defined in PHASE-1 §2;
+the API never returns clinical identifiers. A request that attempts to
+publish a clinical identifier in the body returns `422` with type
+`urn:wia:prosthetic-control:identifier-leak`.
 
-## §5 Time and Identity
+## §4 Acquisitions
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/subjects/{sid}/acquisitions     — register an acquisition
+GET    /v1/acquisitions/{aid}              — retrieve acquisition
+GET    /v1/acquisitions/{aid}/raw          — fetch raw archive
+PATCH  /v1/acquisitions/{aid}/notes        — append clinical notes
+```
 
-## §6 Versioning and Deprecation
+Raw archives are immutable resources delivered with content-addressed
+URLs and `Cache-Control: max-age=31536000, immutable`. Acquisitions
+performed during home use are uploaded in batches at the next
+clinic-side sync; the upload endpoint accepts batched archives via
+`POST /v1/acquisitions/batch`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Decoders
 
-## §7 Privacy and Security
+```
+POST   /v1/subjects/{sid}/decoders         — register a decoder
+GET    /v1/decoders/{did}                  — decoder record
+GET    /v1/decoders/{did}/model            — fetch model artefact
+POST   /v1/decoders/{did}/online-update    — append an adaptation step
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Online-update events are appended monotonically; servers MUST NOT permit
+out-of-order appends and MUST reject updates whose timestamps regress
+with type `urn:wia:prosthetic-control:adaptation-regress`. Adaptation
+logs are retained per PHASE-3 §7.
 
-## §8 Open Governance
+## §6 Motor Commands
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `prosthetic-control` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/subjects/{sid}/motor-commands         — bulk command upload
+GET    /v1/motor-commands/{cid}                  — single command record
+GET    /v1/motor-commands?subject={sid}&from={t} — query a window
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Motor-command uploads are typically batched at the end of a use-window
+or a clinic visit; servers MUST accept gzip-compressed batches and MUST
+emit a per-batch ingest receipt that lists the count of accepted
+records, the count of rejected records, and the rejection-reason
+histogram.
 
+## §7 Calibration Sessions
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/subjects/{sid}/calibrations    — register a calibration session
+GET    /v1/calibrations/{calId}           — calibration record
+PATCH  /v1/calibrations/{calId}/outcome   — update outcome
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Calibration outcomes drive the device's clinical state; an outcome of
+`needs-rework` triggers a follow-up scheduling event in the clinic
+EHR via the FHIR bridge (§9).
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Feedback and Stimulation
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/subjects/{sid}/feedback        — register a feedback session
+GET    /v1/feedback/{fid}                 — feedback record
+PATCH  /v1/feedback/{fid}/limits          — update per-channel limits
+```
 
-## Annex F — Adoption Roadmap
+Stimulation-based feedback configurations (TENS, peripheral-nerve) are
+gated by IEC 60601-aligned safety limits that the API enforces:
+attempts to set limits beyond the device's certified envelope return
+`422` with type `urn:wia:prosthetic-control:limit-exceeded`.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 FHIR Bridge
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The API exposes a read-only FHIR R5 facade that translates subject and
+device-use records into FHIR `Patient`, `Device`,
+`DeviceUseStatement`, `Observation`, and `ClinicalImpression` resources.
+The bridge does not expose the FHIR write endpoints; data flows clinic
+→ programme through the WIA-native endpoints, and the FHIR facade is a
+read facade for clinic EHRs that are FHIR-only.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Errors
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+All error responses are `application/problem+json` per RFC 9457. Defined
+types under `urn:wia:prosthetic-control` include:
 
-## Annex G — Test Vectors and Conformance Evidence
+- `urn:wia:prosthetic-control:identifier-leak`
+- `urn:wia:prosthetic-control:adaptation-regress`
+- `urn:wia:prosthetic-control:limit-exceeded`
+- `urn:wia:prosthetic-control:risk-file-missing`
+- `urn:wia:prosthetic-control:adverse-event-late-report`
+- `urn:wia:prosthetic-control:evidence-mismatch`
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Adverse-Event Reporting Endpoint
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+POST   /v1/adverse-events                 — report an adverse event
+GET    /v1/adverse-events/{eid}           — retrieve a report
+PATCH  /v1/adverse-events/{eid}/follow-up — append follow-up notes
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+An event registered with `severity = "serious"` or
+`severity = "life-threatening"` automatically triggers an outbound
+notification to the configured national medical-device authority via
+the integration described in PHASE-4 §10. The authority's report
+reference is appended to the event record on receipt.
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Caching, ETag, and Conditional Requests
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Stable resources (calibration outcomes, completed sessions, evidence
+packages) are cacheable with `Cache-Control: max-age=31536000,
+immutable`. Live subject records are cacheable for 60 seconds. ETags
+are mandatory on every PATCH endpoint with conditional requests via
+`If-Match`.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §13 Worked Example: From Fitting to Adverse-Event Report
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+1. Clinic POSTs a subject record at fitting; PATCHes the subject's
+   `controlMode` after a control-mode revision.
+2. Acquisitions are uploaded across the fitting visit and during
+   home-use sync events.
+3. Decoders are registered and updated; online-update events flow as
+   the user's signals drift.
+4. Motor-command batches arrive at clinic syncs with ingest receipts.
+5. Calibration sessions are POSTed; an outcome of `needs-rework`
+   triggers a clinic follow-up via the FHIR bridge.
+6. A serious adverse event is reported; the API forwards the event to
+   the national authority and records the authority's report
+   reference.
 
-## Annex I — Interoperability Profiles
+A conformant server completes this flow without error for the canonical
+positive vector.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §14 Outcomes and Configuration-Snapshot Endpoints
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST   /v1/subjects/{sid}/outcomes              — register an outcome
+GET    /v1/outcomes/{oid}                       — outcome record
+GET    /v1/subjects/{sid}/outcomes?inst={i}     — series for an instrument
+POST   /v1/subjects/{sid}/configuration-snapshots — register a snapshot
+POST   /v1/subjects/{sid}/configuration-rollback  — request a rollback
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A rollback request names a prior snapshot identifier; the API
+validates that the snapshot is present and signed, schedules the
+rollback for the next clinic visit (rollback-on-firmware is permitted
+in some jurisdictions but is not the default), and returns an
+operation resource that the clinic worklist consumes.
+
+## §15 Streaming Subscriptions
+
+Long device-use windows produce a continuous motor-command and
+feedback stream. Subscribers (clinic dashboards, manufacturer
+surveillance teams) consume the streams via Server-Sent Events at
+`/v1/subjects/{sid}/stream` with topic filters
+(`?topic=motor`, `?topic=adverse`, `?topic=adaptation`).
+
+A subscription includes a heartbeat every 30 seconds. Subscribers
+that disconnect can resume from the last seen event identifier via
+the `Last-Event-ID` header (W3C EventSource semantics). Stream events
+do not carry raw acquisition payloads; subscribers fetch raw archives
+through the acquisition endpoints when needed.
+
+## §16 Audit and Observability
+
+Every endpoint emits structured logs with `subjectId`, `traceId`, the
+issuing client certificate's subject, and the device's clock skew vs
+the clinic's reference NTP source. Audit logs are retained per
+PHASE-3 §7.
+
+## §17 Bulk Operations
+
+Long observation windows and clinical-trial cohorts produce large
+volumes of acquisitions, motor commands, and outcomes that are
+exchanged in bulk rather than per-record. Bulk endpoints accept
+arrays of records and emit operation resources that track the
+batch as a unit:
+
+```
+POST   /v1/bulk/acquisitions       — submit a batched acquisition upload
+POST   /v1/bulk/motor-commands     — submit a batched motor-command set
+POST   /v1/bulk/outcomes           — submit a batched outcome set
+GET    /v1/bulk/{operationId}      — retrieve operation status
+GET    /v1/bulk/{operationId}/items — per-item status
+```
+
+Bulk operations report aggregate progress and per-item terminal
+status. Servers MUST tolerate partial success and emit a per-batch
+ingest receipt so that clinics can reconcile against their local
+records.
+
+## §18 Pagination Conventions
+
+List endpoints (`/v1/subjects`, `/v1/acquisitions`,
+`/v1/motor-commands`, `/v1/bulk/...`) use cursor-based pagination via
+the `cursor` query parameter and a `Link` header (RFC 8288) carrying
+`rel="next"` and `rel="prev"` relations. Cursors are opaque to
+clients; servers MUST persist enough state to resolve a cursor for
+at least 24 hours after issuance so that clinic-side workflows are
+not interrupted by cursor expiry.
+
+## §19 Privacy-Preserving Aggregation Endpoints
+
+Aggregate-only consumers (insurance carriers, public-health analysts)
+fetch population-level statistics through endpoints that emit only
+counts, means, and dispersions. The endpoints honour a minimum
+cohort-size threshold so that small cohorts do not allow
+re-identification by intersection.
+
+```
+GET    /v1/aggregate/outcomes?instrument=...&cohort=...
+GET    /v1/aggregate/adverse-events?category=...&period=...
+```
+
+Requests that target cohorts smaller than the threshold return `403
+Forbidden` with type
+`urn:wia:prosthetic-control:cohort-too-small`.
+
+## §20 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI 3.1
+document, signs evidence packages per RFC 9421, and rejects clinical-
+identifier leaks at request validation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-prosthetic-control
+- **Last Updated:** 2026-04-27

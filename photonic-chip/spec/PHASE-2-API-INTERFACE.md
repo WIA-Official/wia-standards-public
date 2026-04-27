@@ -5,237 +5,322 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-photonic-chip (Photonic Chip).
+This document defines the HTTP API contract that an accredited
+photonic-chip programme exposes for the records defined in PHASE-1.
+Consumers include design houses that submit layouts, foundries that
+publish PDKs and consume tape-out submissions, wafer-test laboratories
+that emit per-die reports, packaging facilities, system integrators,
+and reference laboratories that re-measure deployed modules.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 (JSON Pointer)
+- IETF RFC 6902 (JSON Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 5789 (PATCH)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-photonic-chip
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS, served from a domain published by the operating
+programme. Versioning uses `/v1/` path segments and Semantic
+Versioning 2.0.0 at the major-version level. The OpenAPI 3.1 document
+at `/v1/openapi.json` is canonical.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "photonic-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-photonic-chip",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "designs":          "/v1/designs",
+    "schematics":       "/v1/schematics",
+    "layouts":          "/v1/layouts",
+    "fabricationRuns":  "/v1/fabrication-runs",
+    "waferTests":       "/v1/wafer-tests",
+    "components":       "/v1/components",
+    "packages":         "/v1/packages",
+    "telemetry":        "/v1/telemetry",
+    "evidence":         "/v1/evidence",
+    "openapi":          "/v1/openapi.json"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Designs and PDK Pinning
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST   /v1/designs                   — register a design
+GET    /v1/designs/{designId}        — retrieve a design
+PATCH  /v1/designs/{designId}        — update mutable fields
+GET    /v1/designs?platform={p}      — list designs by platform
+```
 
-## §4 Discovery
+A design submission MUST pin a PDK identifier and version (PHASE-1 §3);
+submissions whose PDK reference does not resolve return `422` with
+type `urn:wia:photonic-chip:pdk-unresolvable`.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/photonic-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Schematics and Layouts
 
-## §5 Time and Identity
+```
+POST   /v1/designs/{designId}/schematics    — register a schematic
+GET    /v1/schematics/{sid}                 — retrieve schematic
+POST   /v1/designs/{designId}/layouts       — register a layout
+GET    /v1/layouts/{lid}                    — retrieve layout
+GET    /v1/layouts/{lid}/drc                — fetch DRC report
+GET    /v1/layouts/{lid}/lvs                — fetch LVS report
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Layouts whose DRC or LVS reports are missing or fail return `422` with
+type `urn:wia:photonic-chip:drc-lvs-incomplete`. Foundries MUST refuse
+tape-out acceptance for such layouts and the API enforces the refusal
+at submission time.
 
-## §6 Versioning and Deprecation
+## §5 Fabrication Runs
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/fabrication-runs              — foundry registers a run
+GET    /v1/fabrication-runs/{rid}        — retrieve run
+PATCH  /v1/fabrication-runs/{rid}/yield  — update yield estimate
+```
 
-## §7 Privacy and Security
+Foundries register fabrication runs against the design via the API.
+The foundry's client certificate is bound to the foundry's identifier
+so that the API can verify the registering party's authority over the
+run.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Wafer-Test and Component Measurements
 
-## §8 Open Governance
+```
+POST   /v1/fabrication-runs/{rid}/wafer-tests   — register a wafer test
+GET    /v1/wafer-tests/{wid}                    — retrieve a wafer test
+POST   /v1/wafer-tests/{wid}/component-measurements — append per-component
+                                                       measurements
+GET    /v1/components/{cid}                     — retrieve component
+                                                  measurement record
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `photonic-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Component measurements are immutable once posted; subsequent
+measurements of the same component on the same die emit new
+measurement records rather than overwriting existing ones.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Packaging
 
+```
+POST   /v1/wafer-tests/{wid}/packages    — register a packaged die
+GET    /v1/packages/{pid}                — retrieve package record
+PATCH  /v1/packages/{pid}/laser-class    — update laser-safety class
+                                          after re-classification
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Laser-safety class changes that cross IEC 60825-1 boundaries trigger
+notification to downstream consumers via the streaming subscription
+defined in §13.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Telemetry
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/packages/{pid}/telemetry     — append a telemetry sample
+GET    /v1/telemetry/{tid}              — retrieve a telemetry record
+GET    /v1/packages/{pid}/telemetry?since={t}  — telemetry window
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Telemetry uploads are typically batched at the deployed module's next
+sync; the API accepts gzip-compressed batched uploads at
+`POST /v1/bulk/telemetry` and emits per-batch ingest receipts.
 
-## Annex F — Adoption Roadmap
+## §9 Evidence Package
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST   /v1/packages/{pid}/evidence    — request package generation
+GET    /v1/evidence/{packageId}       — retrieve package
+GET    /v1/evidence/{packageId}/manifest  — manifest only
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The evidence-package format is governed by PHASE-4 §3 and contains the
+design, schematic, layout, fabrication run, wafer-test, component
+measurements, package record, and signed manifest.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Errors
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+All error responses are `application/problem+json` per RFC 9457.
+Defined types under `urn:wia:photonic-chip` include:
 
-## Annex G — Test Vectors and Conformance Evidence
+- `urn:wia:photonic-chip:pdk-unresolvable`
+- `urn:wia:photonic-chip:drc-lvs-incomplete`
+- `urn:wia:photonic-chip:laser-class-mismatch`
+- `urn:wia:photonic-chip:component-measurement-missing`
+- `urn:wia:photonic-chip:evidence-mismatch`
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Authentication
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The API uses mutually-authenticated TLS for foundry-to-programme,
+laboratory-to-programme, and integrator-to-programme connections.
+Public read-only endpoints (the design landing pages, the OpenAPI
+document, the well-known discovery resource) are reachable without a
+client certificate.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §12 Caching
 
-## Annex H — Versioning and Deprecation Policy
+Stable resources (completed fabrication runs, signed evidence
+packages) are cacheable with `Cache-Control: max-age=31536000,
+immutable`. Mutable resources (draft designs, in-progress test
+sessions) are cacheable for 60 seconds. ETags are mandatory on every
+PATCH endpoint with conditional requests via `If-Match`.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Streaming Subscriptions
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Consumers monitor long fabrication and test campaigns via
+Server-Sent Events at `/v1/designs/{designId}/events`. Events
+emitted include fabrication-run status changes, wafer-test
+completions, package emissions, and laser-class re-classifications.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Worked Example: Tape-Out to Citation
 
-## Annex I — Interoperability Profiles
+1. Design house registers the design with a pinned PDK.
+2. Schematic and layout are registered; DRC and LVS reports
+   accompany the layout.
+3. Foundry accepts tape-out and registers a fabrication run.
+4. Wafer-test laboratory registers per-die test results with
+   component measurements.
+5. Packaging facility registers packaged dies; laser-safety class
+   is set per IEC 60825-1.
+6. System integrator deploys the module and uploads field telemetry.
+7. Reference laboratory re-measures deployed modules; new
+   measurement records are appended.
+8. Citation tool requests an evidence package and pins the manifest
+   digest.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §15 Wavelength-Plan and Calibration Endpoints
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST   /v1/designs/{designId}/wavelength-plans      — register a plan
+GET    /v1/wavelength-plans/{wpid}                  — retrieve plan
+POST   /v1/packages/{pid}/phase-calibrations        — register calibration
+GET    /v1/phase-calibrations/{cid}                 — retrieve calibration
+GET    /v1/packages/{pid}/phase-calibrations?since={t} — calibration series
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Calibration submissions are signed by the laboratory's client
+certificate. Submissions whose drive-level sweep falls outside the
+device's certified envelope return `422` with type
+`urn:wia:photonic-chip:phase-calibration-out-of-envelope`.
+
+## §16 Bulk Operations
+
+Wafer-test campaigns produce hundreds of die-level records per wafer
+and tens of thousands of component-measurement records per campaign;
+these are exchanged in bulk. The bulk endpoints accept arrays of
+records and emit operation resources that track the batch:
+
+```
+POST   /v1/bulk/wafer-tests           — submit a batched wafer-test
+                                          campaign
+POST   /v1/bulk/component-measurements — submit a batched per-component
+                                          measurement set
+GET    /v1/bulk/{operationId}         — campaign status
+```
+
+Bulk operations report aggregate progress and per-item status. Servers
+MUST tolerate partial success and emit a per-batch ingest receipt.
+
+## §17 Pagination Conventions
+
+List endpoints use cursor-based pagination via the `cursor` query
+parameter and `Link` headers (RFC 8288). Cursors are opaque to
+clients; servers MUST persist enough state to resolve a cursor for
+at least 24 hours.
+
+## §18 Audit and Observability
+
+Every endpoint emits structured logs with `designId`, `traceId`, the
+issuing client certificate's subject, and the foundry / laboratory
+clock skew vs the reference NTP source.
+
+## §19 Loss-Budget and Reliability Endpoints
+
+```
+POST   /v1/designs/{designId}/loss-budgets         — register a budget
+GET    /v1/loss-budgets/{bid}                      — retrieve a budget
+PATCH  /v1/loss-budgets/{bid}                      — update measured-db
+POST   /v1/designs/{designId}/reliability          — register a result
+GET    /v1/reliability/{rid}                       — retrieve a result
+```
+
+Reliability submissions are signed by the test laboratory's client
+certificate. The API rejects population sizes below the minimum that
+the operating programme has registered for the relevant test family
+(typical minima are documented in the foundry's qualification
+package); rejections return `422` with type
+`urn:wia:photonic-chip:reliability-population-too-small`.
+
+## §20 Recall-Notice Endpoint
+
+```
+POST   /v1/recall-notices                          — issue a recall
+GET    /v1/recall-notices/{nid}                    — retrieve a notice
+POST   /v1/recall-notices/{nid}/receipts           — system-integrator
+                                                    acknowledgement
+GET    /v1/recall-notices/{nid}/reach              — reach metrics
+```
+
+Recall notices are signed by the operating programme's release key.
+System-integrator receipts are signed by the integrator's client
+certificate; receipts identify the deployed devices that contain
+modules covered by the notice. Reach metrics are computed from
+receipts and are exposed to the relevant authority on request.
+
+## §21 Privacy-Preserving Aggregation
+
+Aggregate-only consumers (supply-chain analysts, public-policy
+analysts) fetch population-level statistics through aggregation
+endpoints that emit counts, means, and dispersions. The endpoints
+honour a minimum cohort threshold so that small-volume foundries
+are not exposed to inference-by-intersection.
+
+```
+GET    /v1/aggregate/yield?platform=...&period=...
+GET    /v1/aggregate/recall-reach?period=...
+```
+
+Out-of-policy queries return `403 Forbidden` with type
+`urn:wia:photonic-chip:cohort-too-small`.
+
+## §22 FHIR-Adjacent Bridges (optional)
+
+Programmes whose modules deploy into clinical or biomedical settings
+MAY expose a FHIR R5 facade that translates module identity and
+calibration records into FHIR `Device` and `DeviceMetric`
+resources. The facade is read-only and is consumed by clinical
+deployment software that prefers FHIR over WIA-native APIs.
+
+## §23 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI 3.1
+document, and signs evidence packages per RFC 9421.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-photonic-chip
+- **Last Updated:** 2026-04-27

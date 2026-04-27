@@ -1,241 +1,305 @@
-# WIA-medical-imaging PHASE 4 — INTEGRATION Specification
+# WIA-medical-imaging PHASE 4 — Integration Specification
 
 **Standard:** WIA-medical-imaging
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-medical-imaging (Medical Imaging).
+This PHASE describes how a deployment integrates the imaging data,
+APIs, and protocols defined in PHASEs 1–3 with adjacent systems:
+RIS work-flow, PACS/VNA storage, modality fleets, viewers, AI
+inference services, research data warehouses, and tele-radiology
+exchange. It is non-prescriptive about specific vendor products;
+it specifies the integration *contracts* a deployment must satisfy.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IHE Radiology Technical Framework — Scheduled Workflow (SWF.b),
+  Cross-Enterprise Document Sharing for Imaging (XDS-I.b),
+  Imaging Object Change Management (IOCM), Mammography Image (MAMMO)
+- DICOM PS3.4 — Service Class Specifications
+- DICOM PS3.15 — Security Profiles
+- DICOM PS3.18 — Web Services
+- HL7 FHIR R5 — ImagingStudy, DiagnosticReport, ImagingSelection
+- WIA-medical-data-privacy (PHASE 1–4)
 
 ---
 
-## §1 Scope
+## §1 RIS-driven workflow
 
-This PHASE document is one of four that together define the WIA-medical-imaging
-standard. It addresses the integration layer of the standard.
+The Radiology Information System (RIS) drives orders. The
+integration contract:
 
-## §2 Manifest
+- The RIS publishes orders as FHIR ServiceRequest resources, each
+  referencing a Patient (`subjectRef`), an Encounter, and a
+  procedure code
+- The boundary projects approved ServiceRequests into UPS-RS
+  work-items consumed by modalities (PHASE 2 §6)
+- Completion of a work-item updates the originating ServiceRequest
+  status (`completed`, `revoked`, etc.) and links the produced
+  ImagingStudy
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-imaging"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The RIS owns the schedule and the procedure code; the PACS owns
+the produced images; the boundary owns the privacy gate and the
+audit chain. Each owns its own truth.
 
-## §3 Conformance Tiers
+## §2 PACS / VNA integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The deployment may run a single PACS, a vendor-neutral archive
+(VNA) backed by multiple departmental PACSes, or a cloud-native
+imaging store. The integration contract:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- DICOM Storage SCP exposed for STOW-RS (PHASE 2 §5) and for
+  C-STORE on the upper layer
+- Query/Retrieve services (QIDO-RS, WADO-RS, C-FIND, C-MOVE)
+  exposed through the boundary
+- Lifecycle hooks for IOCM events (study merged, study split,
+  patient ID corrected, instance rejected) so that the audit
+  chain reflects retroactive corrections
 
-## §4 Discovery
+Multi-PACS VNA deployments register their constituent storage
+domains with the boundary so that QIDO queries fan out and
+results aggregate — the caller sees a single virtual archive.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-imaging`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Modality fleet
 
-## §5 Time and Identity
+Modality devices run firmware versions, hold local cache, and
+participate in clinical workflow. The integration contract:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Each modality registers an Application Entity (AE) title and
+  a TLS client certificate with the deployment
+- Modality firmware versions are tracked in the deployment's
+  configuration management database; firmware affecting
+  acquisition technique or pixel encoding requires a re-validation
+  cycle before being routed live traffic
+- Modalities emit DICOM PS3.15 audit messages to the boundary's
+  ATNA receiver; the boundary projects these into the AuditEvent
+  chain
 
-## §6 Versioning and Deprecation
+Modality replacement preserves AE-title continuity (the new
+modality acquires the old AE title only after the old modality's
+last study is fully audited and retired).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Viewer integration
 
-## §7 Privacy and Security
+Diagnostic viewers retrieve via WADO-RS (or DICOMweb's RESTful
+metadata + bulk data path). Integration contract:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Viewers authenticate via SMART App Launch and carry purpose
+  headers (TREAT for diagnostic reading; HOPERAT for QA review)
+- Viewer-side annotations (Presentation States, Key Object
+  Selections, Structured Reports) are stored back via STOW-RS
+  with provenance referencing the source instances
+- Hanging protocols (PHASE 3 §5) ensure consistent layout across
+  viewers in the deployment
 
-## §8 Open Governance
+A viewer that bypasses the boundary (direct PACS access) is
+non-conformant; the deployment policy SHOULD block direct PACS
+network access except from the boundary itself.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-imaging` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 AI inference services
+
+AI services (CADx, segmentation, prioritisation) consume images
+and produce annotations. Integration contract:
+
+- AI services are registered with their FDA / KFDA / CE / NMPA
+  clearance numbers and intended-use statements; the boundary
+  refuses to route to an unregistered service for clinical use
+- Inputs to AI services are gated by purpose `HOPERAT` (operations)
+  unless the service is part of a clinical workflow tied to a
+  patient consent for `TREAT`
+- AI outputs are stored as new DICOM instances (Segmentation, SR,
+  or Comprehensive 3D SR) carrying the algorithm identifier
+  (PHASE 1 §9)
+- AI confidence scores are recorded but not displayed to clinicians
+  without context — the deployment's clinical governance committee
+  signs off on the disclosure rules per service
+
+Research-purpose AI inference (model evaluation against historic
+extracts) flows through the de-identified extract pipeline and
+does not affect production routing.
+
+## §6 Research data warehouse
+
+Research access to imaging follows WIA-medical-data-privacy PHASE 4
+§2 plus imaging-specific obligations:
+
+- Each research extract names the PS3.15 de-identification profile
+  in use and the residual-risk band per the de-identification
+  job record
+- Pixel-level burn-in (text or PHI in pixels) is cleaned per the
+  configured cleanup region; a study with pixel-level PHI in a
+  region not covered by the cleanup configuration is rejected for
+  research export
+- The exported NDJSON Bundle includes ImagingStudy resources only
+  (with references); the actual DICOM bulk data is held in the
+  research-store's WADO-RS endpoint and retrieved on demand by
+  the analyst's workflow
+
+Re-identification of a research extract (mapping a de-identified
+StudyInstanceUID back to a patient) requires a linkage
+authorisation per WIA-medical-data-privacy PHASE 1 §5.
+
+## §7 Tele-radiology exchange
+
+Cross-organisation reading (a remote radiologist reads images
+acquired at a different site) follows IHE XDS-I.b plus the
+boundary's purpose gate:
+
+- The receiving organisation's reading radiologist holds a SMART
+  grant naming TREAT scope on the originating organisation's
+  patients (typically negotiated bilaterally and renewed
+  per-quarter)
+- A read session retrieves only the studies named in the
+  current case list; opportunistic browsing is not permitted
+- Returned reports flow back via STOW-RS and reverse-projection
+  to FHIR DiagnosticReport in the originating system
+
+The two organisations share an audit chain segment for the
+exchange duration; on session end, the segment is sealed and
+both audit chains record the seal.
+
+## §8 IOCM corrections
+
+Imaging Object Change Management (IHE-RAD IOCM) handles after-the-
+fact corrections:
+
+- Study merged: two studies for the same encounter unified under
+  one StudyInstanceUID; affected references updated; audit chain
+  records both before and after
+- Study split: misattributed instances moved to their correct
+  patient; consent gates re-evaluated; previous reads against
+  the misattributed series flagged for review
+- Instance rejected: an instance withdrawn from clinical use
+  (e.g., wrong patient) marked rejected (PS3.3 IOCM rejection
+  reason codes); the rejected instance remains in the store
+  for audit but is excluded from clinical retrievals
+
+## §9 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every clinically-routed instance has a matching audit chain
+   entry within the operational SLA
+2. Every cross-organisation exchange has a valid bilateral grant
+   on file for the duration of the exchange
+3. The de-identification engine has been validated against the
+   deployment's modality fleet (no escaped PHI in the
+   most-recent quarterly spot-check sample)
+4. AI services in production have current regulatory clearance
+   on file
+5. Modality firmware tracking is up to date (no untracked firmware
+   in the configuration database)
+6. IOCM corrections are reflected in the audit chain within the
+   operational SLA after the correction is issued
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Modality-fleet configuration (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+The configuration database holds, per modality:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- AE title (DICOM identifier)
+- Vendor, model, serial number
+- Firmware version and last firmware update timestamp
+- Active TLS certificate fingerprint and expiry
+- Pixel-cleanup region(s) used by de-identification
+- Default transfer syntax(es) used at storage
+- Active routing rules (which PACS / VNA receives which series type)
+- Validation status (validated / not validated for current firmware)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+A modality not in the database, or with a firmware version not
+matching the database record, is refused association by the
+boundary.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Vendor-neutral storage notes (informative)
 
-## Annex F — Adoption Roadmap
+VNA deployments aggregate multiple departmental archives. The
+boundary handles aggregation:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- A QIDO query at the boundary fans out to each constituent
+  archive and merges results
+- Duplicate StudyInstanceUIDs across archives are an integrity
+  incident (UIDs are globally unique by construction); the
+  boundary refuses to merge and routes the conflict to the
+  imaging operations team
+- Storage tiering (hot / warm / cold) is internal to the VNA;
+  the boundary does not see tier transitions and does not need to
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Operational SLAs (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Default operational SLAs for a deployment:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Concern                                          | SLA                              |
+|--------------------------------------------------|----------------------------------|
+| Audit-chain entry available after instance store | ≤ 5 seconds                      |
+| Boundary p95 added latency                       | ≤ 50 ms                          |
+| Modality-to-PACS first byte after C-STORE start  | ≤ 200 ms                         |
+| WADO-RS bulk first byte                          | ≤ 500 ms                         |
+| Study merge audit reflection (PHASE 4 §8)        | ≤ 60 minutes after IOCM correction |
+| Daily-root publication                           | ≤ 5 minutes after UTC midnight   |
 
-## Annex G — Test Vectors and Conformance Evidence
+The deployment policy SHOULD tighten these SLAs where modality
+fleet capability allows; loosening them requires sign-off from
+clinical operations.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex D — Audit reporting cadence (informative)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The boundary emits a quarterly audit report covering:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+- Total studies stored and retrieved
+- Studies filtered by consent (count only, no patient-level
+  detail)
+- Break-glass invocations (count, average review-time, count
+  of overdue reviews)
+- AI inference events and their associated regulatory clearances
+- IOCM corrections issued and their downstream impacts
+- Cross-organisation exchange volumes per partner
 
-## Annex H — Versioning and Deprecation Policy
+The report is signed and is itself in scope for the audit chain so
+that report tampering would surface in the chain.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex E — Migration from legacy archive (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A deployment migrating from a legacy PACS into a boundary-fronted
+deployment follows a one-time backfill:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+1. Export the legacy archive's metadata (DICOM JSON or HL7 v2 ORU)
+2. Wrap each instance with a FHIR ImagingStudy resource at the
+   boundary; the original DICOM remains canonical, the FHIR resource
+   is a projection
+3. Insert AuditEvent records for the import, signed at insertion
+   time, with the prior storage time preserved in `entity.detail`
+4. The chain genesis root for the post-migration era references the
+   final wrapped event's hash so audit continuity is preserved
 
-## Annex I — Interoperability Profiles
+This is non-lossy: auditors can still read the legacy DICOM exactly
+as it was; the boundary projection is a layered view, not a
+replacement.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex F — Imaging-AI service registration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The deployment maintains a registry of approved AI inference
+services:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```yaml
+ai_services:
+  - id: vendor-A.lung-nodule-cadx
+    intended_use: "Detect pulmonary nodules in chest CT, ≥3mm"
+    regulatory:
+      kfda: "제2025-1234호"
+      fda: "K251234"
+    input_modality: CT
+    output_iod: 1.2.840.10008.5.1.4.1.1.66.4   # Segmentation
+    confidence_disclosure: aggregate-only
+  - id: vendor-B.bone-age
+    intended_use: "Estimate skeletal maturity from hand DX"
+    regulatory:
+      ce_class: "IIa"
+    input_modality: DX
+    output_iod: 1.2.840.10008.5.1.4.1.1.88.11   # Basic Text SR
+    confidence_disclosure: per-image
+```
+
+A service not in the registry is refused for clinical routing.
+Research-purpose evaluation against historic extracts is permitted
+without registry entry but is gated by HRESCH purpose.

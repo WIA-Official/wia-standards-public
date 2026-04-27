@@ -1,241 +1,316 @@
-# WIA-missile-defense PHASE 2 — API-INTERFACE Specification
+# WIA-missile-defense PHASE 2 — API Interface Specification
 
 **Standard:** WIA-missile-defense
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-missile-defense (Missile Defense).
+This PHASE defines the API surface a missile-defence boundary exposes
+for sensor observation ingest, track query, threat-assessment
+publication, engagement decision authorisation, weapon-status
+reporting, and outcome retrieval. The shape is HTTP/JSON for
+command-and-control planes; for tactical fire-control loops, a
+constrained-binary form is described in PHASE 3.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS), RFC 8259 (JSON)
+- STANAG 5516 — Tactical Data Link 16 (J-series messages)
+- STANAG 5522 — Link 22
+- MIL-STD-6016 — J-series message realisation
+- WIA-military-communication (referenced for transport)
+- WIA-medical-data-privacy (referenced for casualty integration)
 
 ---
 
-## §1 Scope
+## §1 Sensor observation ingest
 
-This PHASE document is one of four that together define the WIA-missile-defense
-standard. It addresses the api-interface layer of the standard.
+```
+POST /observations HTTP/1.1
+Host: md.coalition-c2.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImsxIn0...
+Content-Type: application/wia-md+json
+WIA-Doctrine: NATO-AAP-15
+WIA-Sensor-Id: urn:wia:md:sensor:fielded:radar-7e2
 
-## §2 Manifest
+{
+  "timestamp": "2026-04-27T09:31:14.523+09:00",
+  "position": {"lat": 37.4516, "lon": 126.6531, "alt": 12500, "covarianceM2": [...]},
+  "velocity": {"vx": 280, "vy": -50, "vz": 1500, "covarianceM2s2": [...]},
+  "kinematicCategory": "tactical-ballistic",
+  "signature": {"rcsM2": 0.18, "uncert": 0.05}
+}
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "missile-defense"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The boundary validates units, covariance well-formedness, and the
+sensor's authority to ingest, then forwards to the fusion engine
+(PHASE 4 §4) and emits an AuditEvent. Observations from sensors not
+in the registry (PHASE 4 §3) are rejected with
+`urn:wia:md:problem:unknown-sensor`.
 
-## §3 Conformance Tiers
+## §2 Track query
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /tracks?identification=hostile,suspect
+            &kinematic=tactical-ballistic,medium-range-ballistic
+            &area=polygon:37.4,126.6;37.6,126.6;37.6,126.8;37.4,126.8
+            &since=2026-04-27T09:30:00+09:00
+HTTP/1.1
+Authorization: Bearer ...
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The boundary returns tracks matching the filter, gated by the
+caller's releasability scope. Aggregated views (per-area count,
+per-class count) are at `/tracks/$summary` with the same gate.
 
-## §4 Discovery
+## §3 Threat-assessment publication
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/missile-defense`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST /assessments HTTP/1.1
+{
+  "trackRef": "urn:wia:md:track:fusion-A:91a7",
+  "threatLevel": "high",
+  "threatType": "tbm-class-A",
+  "predictedImpact": {
+    "area": {...},
+    "timeWindow": {"start": "...", "end": "..."},
+    "uncertainty": "medium"
+  },
+  "confidenceBand": "probable"
+}
+```
 
-## §5 Time and Identity
+The boundary validates the track reference, applies the
+deployment's threat-catalogue check, and emits the assessment to
+the engagement-authority queue. Subscribers to threat alerts
+receive the assessment over Server-Sent Events on a separate
+channel (PHASE 2 Annex C).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Engagement decision
 
-## §6 Versioning and Deprecation
+```
+POST /decisions HTTP/1.1
+WIA-Engagement-Authority: urn:wia:org:rok-army.adcc
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+{
+  "assessmentRef": "urn:wia:md:assessment:9c0a",
+  "engagementType": "intercept",
+  "roeBasis": ["roe-2026-04-mainland-defence-§7"],
+  "weaponSystemRef": "urn:wia:md:ws:patriot-pac3-bty-7"
+}
+```
 
-## §7 Privacy and Security
+The boundary validates the engagement authority's signed token
+and the weapon system's readiness. On acceptance, the decision is
+hashed into the audit chain and pushed to the weapon system. The
+weapon system acknowledges receipt before the decision is
+considered live.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Weapon-status reporting
 
-## §8 Open Governance
+```
+POST /weapons/<wsRef>/status HTTP/1.1
+{
+  "decisionRef": "urn:wia:md:decision:d-91a7",
+  "state": "launched",
+  "interceptorRef": "urn:wia:md:int:i-91a7-01",
+  "telemetry": {
+    "position": {...},
+    "velocity": {...},
+    "propellantRemaining": 0.78,
+    "guidanceLock": true
+  },
+  "stateTimestamp": "2026-04-27T09:31:18.220+09:00"
+}
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `missile-defense` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+State transitions are signed by the weapon system's signing key.
+The boundary refuses status updates that do not chain from the
+prior status (e.g., `terminal` cannot follow `slewed` without
+intermediate states) so that timeline reconstruction is consistent.
+
+## §6 Outcome retrieval
+
+```
+GET /outcomes?since=2026-04-27T09:00:00+09:00
+              &decisionRef=...
+HTTP/1.1
+```
+
+Returns outcome records and any subsequent revisions. The
+boundary applies the same release-authority gate as decisions;
+outcomes the requester cannot reach are filtered out.
+
+## §7 Track correlation
+
+When two fusion engines determine they hold the same physical
+object, they create a federation track:
+
+```
+POST /federation/correlations HTTP/1.1
+{
+  "trackRefs": [
+    "urn:wia:md:track:fusion-A:91a7",
+    "urn:wia:md:track:fusion-B:7e2c"
+  ],
+  "evidence": ["range-bearing-overlap", "shared-iff-mode-5", "kinematic-co-track"],
+  "correlatingPrincipal": "urn:wia:md:fusion:coalition-fed-01"
+}
+```
+
+The boundary creates a federation track referencing both
+authorities' tracks and emits an AuditEvent visible to both
+authorities so the decision can be audited.
+
+## §8 Subscription channels
+
+For real-time fire-control loops, the boundary supports streaming:
+
+- `GET /tracks/$subscribe?identification=hostile&kinematic=...`
+- `GET /assessments/$subscribe?threatLevel=high,critical`
+- `GET /weapons/<wsRef>/status/$subscribe`
+
+Streams use Server-Sent Events with each event carrying the
+WIA-Audit-Event-Id so subscribers can replay the audit chain.
+Subscriptions inherit the same release-authority gate as one-shot
+queries.
+
+## §9 Errors and warnings
+
+| URI                                              | Status | Meaning                                    |
+|--------------------------------------------------|-------:|--------------------------------------------|
+| `urn:wia:md:problem:unknown-sensor`              | 400    | sensor not in registered fleet              |
+| `urn:wia:md:problem:invalid-covariance`          | 422    | covariance matrix not positive-semidefinite |
+| `urn:wia:md:problem:track-correlation-conflict`  | 409    | proposed correlation conflicts with existing|
+| `urn:wia:md:problem:engagement-authority-lacking`| 403    | principal lacks engagement authority        |
+| `urn:wia:md:problem:weapon-not-ready`            | 409    | weapon system not in a state to engage      |
+| `urn:wia:md:problem:state-transition-invalid`    | 422    | weapon-state transition out of order        |
+| `urn:wia:md:problem:audit-unavailable`           | 503    | audit chain write failed                    |
+
+Warnings (200-OK with content caveats) use `Warning:` headers per
+RFC 7234 §5.5 with codes namespaced under `wia-md-`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked engagement decision sequence (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+1. Sensor radar-7e2 emits an observation:
+   `POST /observations` → `urn:wia:md:obs:radar-7e2:...`
+2. Fusion engine fuses observations into track
+   `urn:wia:md:track:fusion-A:91a7` with kinematic-category
+   `tactical-ballistic` and identification `hostile` (NCTR + flight-
+   pattern). Track update emits AuditEvent.
+3. Threat-assessment engine surfaces a `high` threat-level
+   assessment with predicted impact area; this is published and
+   subscribers (engagement-authority consoles) receive the alert.
+4. Engagement authority `urn:wia:org:rok-army.adcc` reviews the
+   recommended Patriot-PAC3 engagement, signs the decision, and
+   submits `POST /decisions`.
+5. Boundary verifies the authority's `wia_engagement_scope`
+   covers the track's predicted-impact area and the kinematic
+   class. Decision committed; weapon system tasked.
+6. Patriot-PAC3 weapon system acknowledges, transitions through
+   `slewed → armed → launched → boost → mid-course → terminal →
+   intercept-attempt → success`. Each transition emits a
+   weapon-status record.
+7. Outcome record published with `outcome: success` and
+   confidence-basis `sensor-reacquisition-loss` plus
+   `optical-signature-burst`. Audit chain captures the complete
+   timeline.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## Annex B — Capability advertisement (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+GET /.well-known/wia/missile-defense/capabilities HTTP/1.1
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Response carries the deployment's doctrine, supported sensor
+modalities, supported weapon-system classes, federation peers,
+and conformance level. Cached capability documents expire on the
+deployment's session-token lifetime.
 
-## Annex F — Adoption Roadmap
+## Annex C — Pagination and rate limiting (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Track and observation queries paginate at ≤ 1000 results per page.
+Per-token rate limit defaults: 1000 observation ingest calls per
+second per sensor, 100 query calls per second per operator.
+Rate-limit refusals carry `urn:wia:md:problem:rate-limited` and are
+themselves audit events.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Outcome revision worked example (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Initial outcome:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+POST /outcomes
+{
+  "decisionRef": "urn:wia:md:decision:d-91a7",
+  "outcome": "success",
+  "confidenceBasis": ["sensor-reacquisition-loss"],
+  "outcomeTimestamp": "2026-04-27T09:31:24.480+09:00"
+}
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Two minutes later, sensor re-acquires what may be debris but
+could be a remaining payload:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+POST /outcomes
+{
+  "decisionRef": "urn:wia:md:decision:d-91a7",
+  "outcome": "partial",
+  "confidenceBasis": ["sensor-reacquisition-loss", "debris-track-residual"],
+  "supersedes": "urn:wia:md:outcome:o-91a7",
+  "outcomeTimestamp": "2026-04-27T09:33:42.115+09:00"
+}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The revision is a new record referencing the prior; both are
+preserved in the audit chain so the reasoning timeline is
+reconstructable.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## Annex E — Long-running operation pattern (informative)
 
-## Annex H — Versioning and Deprecation Policy
+For long-running queries (broad-area searches, historical reanalysis),
+the boundary uses the FHIR-style asynchronous pattern: client
+submits request, receives `202 Accepted` with a status URI, polls
+the status URI until completion. Asynchronous results are signed
+on completion and held at the result URI for the deployment's
+result-retention policy.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The asynchronous pattern is preferred when the synchronous response
+would exceed the deployment's response-latency SLA; it is required
+when the result set exceeds the boundary's pagination cap.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex F — Capability discovery worked example (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+GET /.well-known/wia/missile-defense/capabilities HTTP/1.1
+Accept: application/json
+```
 
-## Annex I — Interoperability Profiles
+```
+200 OK
+Content-Type: application/json
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+{
+  "wia.doctrine": "NATO-AAP-15",
+  "wia.confidenceModel": "standard",
+  "wia.supportedKinematicClasses": ["aircraft", "cruise-missile", "tactical-ballistic", "medium-range-ballistic", "hypersonic-glide", "space-object"],
+  "wia.supportedWeaponClasses": ["patriot-pac3", "thaad", "aegis-bmd", "sm-3", "sm-6"],
+  "wia.federations": [
+    {"peerOrgRef": "urn:wia:org:us-army.380adabde", "manifestExpiry": "2027-04-27"}
+  ],
+  "wia.releaseAuthorities": [
+    {"role": "tactical-engagement-authority", "scope": "tactical-ballistic, area: KAOR"},
+    {"role": "national-engagement-authority", "scope": "all kinematicClasses, area: ROK national airspace"}
+  ],
+  "wia.signature": "<JWS detached>"
+}
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Clients verify the signature against the deployment's JWKS before
+honouring any advertised capability.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex G — Pagination header
+
+Paginated responses set `Link: <...>; rel="next"` and `X-WIA-Total-Count` headers consistent with the boundary's release policy. Counts honour the same gate as records, so totals never leak the existence of records the caller cannot see.

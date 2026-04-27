@@ -5,237 +5,267 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-photonic-chip (Photonic Chip).
+This document defines how an accredited photonic-chip programme
+integrates with the systems that surround it: design-tool ecosystems
+that produce schematics and layouts; foundry ordering systems that
+schedule tape-outs; wafer-test and packaging facilities; system
+integrators that deploy photonic modules; recall coordination
+networks; long-term archives that hold externally cited evidence
+packages; and the regulators and accreditation bodies that read the
+evidence package. It also defines the evidence-package format that
+bundles a complete photonic chip's record for external audit.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 8615 (well-known URIs)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 10110 (optics — preparation of drawings)
+- ISO 8601 (date and time)
+- IEC 60825-1 (laser safety)
+- IEC 62496-2 (optical circuit boards)
 
 ---
 
-## §1 Scope
+## §1 Design-Tool Integration
 
-This PHASE document is one of four that together define the WIA-photonic-chip
-standard. It addresses the integration layer of the standard.
+Photonic schematic and layout tools integrate with the WIA API via
+plugins or adapters that submit schematic and layout artefacts on
+behalf of the design house. Adapters are owned by the operating
+programme; tool-vendor responsibility is limited to keeping the
+adapter's public API stable.
 
-## §2 Manifest
+A design-tool adapter MUST honour the PDK pinning rules of PHASE-3 §2
+and MUST refuse to submit a layout whose DRC or LVS reports are not
+present and clean.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "photonic-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Foundry Ordering Integration
 
-## §3 Conformance Tiers
+Foundry ordering systems schedule tape-outs against reticle slots and
+manage the fabrication queue. Integration is bidirectional: the
+operating programme publishes accepted tape-outs to the foundry's
+queue and the foundry publishes fabrication-run completion events
+back to the programme.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The API's evidence package (§3) consumes both ends of the
+integration: it includes the design house's tape-out record and the
+foundry's fabrication-run record, signed by both parties.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Evidence Package Format
 
-## §4 Discovery
+```
+evidence/
+  manifest.json                 — package manifest (signed, see §4)
+  design.json                   — design record
+  pdk.json                      — PDK reference
+  schematic/                    — schematic file and components list
+  layout/                       — GDSII or OASIS file and DRC/LVS
+                                  reports
+  fabrication-run.json          — foundry-emitted run record
+  wafer-tests/                  — per-wafer test reports
+  components/                   — per-component measurement records
+  package/                      — package record and laser-safety
+                                  classification
+  telemetry/                    — field-telemetry summaries
+  recall-history/               — any recall notices affecting this
+                                  module
+  audit/                        — API audit log excerpts
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/photonic-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The package is content-addressable; the manifest carries the SHA-256
+of every file. The manifest is signed by the operating programme's
+HTTP-message-signature key (RFC 9421) and counter-signed by the
+foundry whose fabrication-run record appears in the package.
 
-## §5 Time and Identity
+## §4 Manifest and Signatures
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Verification tools recompute file digests, compare to the manifest,
+and reject the package on any mismatch with type
+`urn:wia:photonic-chip:evidence-mismatch`.
 
-## §6 Versioning and Deprecation
+## §5 well-known URI Discovery
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+A conformant programme exposes a discovery document at
+`/.well-known/wia-photonic-chip` that links to the API root, the
+public accreditation certificate, the published quality dossier, the
+catalogue of published designs, the round-robin participation
+history, and any active recall notices.
 
-## §7 Privacy and Security
+## §6 System-Integrator Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+System integrators (transceiver vendors, LiDAR builders, photonic-
+sensing system houses, photonic-compute fabrics) consume packaged
+modules and integrate them into deployed systems. Integration is
+mediated by the package record (PHASE-1 §9) and the evidence
+package; integrators record their downstream binding (transceiver
+serial number, LiDAR head serial number) so that the deployed device
+can be traced back to the photonic chip and through to the
+fabrication run.
 
-## §8 Open Governance
+## §7 Recall Coordination
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `photonic-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+When a programme issues a recall (PHASE-3 §7), the recall notice is
+published through the well-known discovery document and broadcast
+through the streaming subscription (PHASE-2 §13). System integrators
+acknowledge the recall through a signed receipt that lists the
+deployed devices that contain affected modules. The API aggregates
+receipts and publishes recall reach metrics for the operating
+programme and the relevant authority.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Citation and Pinning
 
+Externally cited photonic chips are referenced by their evidence
+package's manifest digest. Citing parties retrieve the package once
+and pin the digest in the citation. Programmes MUST keep evidence
+packages addressable by their pinned digests for at least seven
+years from the citation event.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §9 Long-Term Archive Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Programmes designate a long-term archive that holds evidence packages
+beyond programme wind-down. Quarterly deposits round-trip
+content-addresses; on wind-down, remaining packages transfer to the
+archive with content-addresses preserved.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Regulator and Accreditation Body Access
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Regulators and accreditation bodies access the API via dedicated
+client certificates. Access scopes for these clients include the full
+design record set, including DRC/LVS reports and risk files;
+consumer-facing scopes (foundry-customer, system-integrator,
+citation tool) are narrower.
 
-## Annex F — Adoption Roadmap
+## §11 Public Catalogue and Aggregator Feeds
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Programmes that publish a public catalogue emit an Atom or JSON Feed
+listing the designs they have published with their evidence-package
+manifest digests, the platform, the operating band, and the
+foundry. The feed does not carry tape-out commercial detail; it is
+intended for engineering discovery and supply-chain analysis.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 Worked Example: From Tape-Out to Field Recall
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+1. Design house registers a design with a pinned PDK and submits
+   a tape-out.
+2. Foundry accepts the tape-out, completes fabrication, and
+   registers the fabrication run with the wafer lot.
+3. Wafer-test laboratory registers per-die results with component
+   measurements.
+4. Packaging facility registers packages and sets the laser-safety
+   class per IEC 60825-1.
+5. System integrators deploy modules into transceivers and upload
+   field telemetry.
+6. Reference laboratory re-measures deployed modules; an excursion
+   is detected on a sub-population of devices.
+7. Programme issues a recall notice; system integrators
+   acknowledge with signed receipts.
+8. Recall reach is published; affected devices are remediated; the
+   evidence package is amended with the recall correspondence.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+A conformant tool completes the technical portion of this flow
+without further input from the operating programme.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Migration from Pre-Standard Records
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Programmes that operated before WIA-photonic-chip reached version
+1.0 MAY migrate historical designs by emitting synthetic design
+records with a `legacyImport` flag.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §14 Cross-Standard Linkage
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+Photonic chips that participate in adjacent WIA standards (a
+silicon-photonic transceiver under WIA-optical-transport; a photonic
+front-end for WIA-quantum-key-distribution) emit cross-standard
+linkage records that name the consuming standard and the version
+under which the linkage is claimed.
 
-## Annex H — Versioning and Deprecation Policy
+## §15 Reader Tooling
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Evidence-package consumers include foundry auditors, integrator
+acceptance teams, and certifying-body inspectors. Programmes MAY
+publish supplementary reader hints (compressed plain-text summaries,
+visual layout previews under ISO 10110, paginated PDF exports of
+component-measurement statistics) alongside the canonical evidence
+package.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §16 Backwards-Compatibility Guarantee
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+PHASE-4 minor revisions remain backwards-compatible with PHASE-4
+clients of the prior minor version. Major revisions go through a
+deprecation window of at least one full PDK release cycle.
 
-## Annex I — Interoperability Profiles
+## §17 Eye-Diagram and BER Acceptance
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+For modules deployed in transceiver and high-speed link applications,
+the integration record carries the eye-diagram and bit-error-rate
+acceptance results. The acceptance report names the standard test
+pattern (PRBS31, PRBS15, KP4-FEC compliant patterns), the loss
+budget under which the test was run, and the measured eye height and
+width along with the bit-error-rate at the agreed observation
+window. Acceptance reports are signed by the test laboratory and are
+attached to the evidence package as auxiliary records.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §18 Optical-I-O Alignment Records
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Modules that include fibre or free-space optical I-O carry alignment
+records: the alignment method (active alignment, passive alignment),
+the achieved coupling loss per port, the alignment uncertainty, and
+the post-alignment cure or fixation method. Alignment records are
+referenced from the package record and are part of the evidence
+package.
+
+## §19 Quantum and Classical Module Distinction
+
+Modules that carry quantum optical functions (single-photon sources,
+heralded entangled-pair generators, quantum-key-distribution
+front-ends) are distinguished from classical modules in the package
+record so that downstream consumers do not consume a quantum module
+in a classical role or vice versa. Quantum modules carry
+quantum-specific characterisation records (single-photon purity,
+heralded efficiency, second-order correlation g²(0) measurements)
+that are out of scope for classical modules; these records reference
+the same evidence package and are signed by quantum-specialised
+reference laboratories.
+
+## §20 Photonic-Compute Fabric Integration
+
+Modules that participate in photonic-compute fabrics (matrix-vector
+multipliers, photonic neural networks, optical interconnect for AI
+accelerators) carry compute-fabric integration records. The records
+name the host system (a particular AI accelerator, a particular
+data-centre interconnect product line), the slot the module
+occupies, and the calibration the host applies to compensate for the
+module's per-channel transfer characteristic. Compute-fabric
+integration is bidirectional: the host supplies calibration coefficients
+back to the module's calibration record (PHASE-1 §12) so that
+post-deployment drift can be tracked.
+
+## §21 Backwards-Compatibility Guarantee
+
+PHASE-4 minor revisions remain backwards-compatible with prior-minor
+clients: foundry adapters, integrator adapters, and citation tools
+continue to function across minor revisions. Major revisions go
+through a deprecation window of at least one full PDK release cycle.
+
+## §22 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully with
+at least one design tool, at least one foundry, at least one
+wafer-test laboratory, at least one packaging facility, and at least
+one system integrator, and has published at least one externally
+citable evidence package.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-photonic-chip
+- **Last Updated:** 2026-04-27

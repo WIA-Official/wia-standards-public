@@ -5,237 +5,267 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-neuromorphic-chip (Neuromorphic Chip).
+This document defines how an accredited neuromorphic-chip programme
+integrates with the systems that surround it: SDK and compiler
+toolchains; vendor publication channels for hardware descriptions;
+sensor front-ends that emit address-event traffic (event cameras,
+spiking cochlea, tactile event sensors); host runtimes that manage
+the deployed accelerator; long-term archives that preserve evidence
+packages; and the regulators and certifying bodies that audit
+neuromorphic deployments. It also defines the evidence-package
+format for citation.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 8615 (well-known URIs)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- W3C Verifiable Credentials Data Model 2.0 (optional re-issuance)
 
 ---
 
-## §1 Scope
+## §1 SDK and Compiler Toolchain Integration
 
-This PHASE document is one of four that together define the WIA-neuromorphic-chip
-standard. It addresses the integration layer of the standard.
+SDKs that compile networks for deployment integrate via plugins or
+adapters that submit network descriptions and consume mapping
+results. Adapters are owned by the operating programme; SDK-vendor
+responsibility is limited to keeping the adapter's public API stable.
+Adapters MUST honour the model-support matrix declared by the target
+hardware description and MUST refuse to submit a network that
+declares a model not supported by the target.
 
-## §2 Manifest
+## §2 Vendor Publication Channel
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "neuromorphic-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Vendors publish hardware descriptions through the operating programme's
+API per PHASE-2 §4. The publication channel is mutually
+authenticated; the vendor's release key signs each description.
+Programmes mirror published descriptions to their public catalogue
+under the vendor's profile.
 
-## §3 Conformance Tiers
+## §3 Evidence Package Format
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+evidence/
+  manifest.json                — package manifest (signed, see §4)
+  network.json                 — network record
+  network-description/         — network description archive
+  hardware.json                — hardware description record
+  mapping/                     — mapping records and routing plans
+  aer-streams/                 — AER traffic (full or windowed summary)
+  plasticity/                  — plasticity event logs
+  characterisations/           — per-core characterisation records
+  calibration/                 — calibration tables in use at deployment
+  telemetry/                   — telemetry summaries
+  audit/                       — API audit log excerpts
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The package is content-addressable; the manifest carries the SHA-256
+of every file. The manifest is signed by the operating programme's
+HTTP-message-signature key (RFC 9421) and counter-signed by the
+hardware vendor when the package is consumed for warranty or
+support purposes.
 
-## §4 Discovery
+## §4 Manifest and Signatures
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/neuromorphic-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Verification tools recompute file digests, compare to the manifest,
+and reject the package on any mismatch with type
+`urn:wia:neuromorphic-chip:evidence-mismatch`.
 
-## §5 Time and Identity
+## §5 well-known URI Discovery
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+A conformant programme exposes a discovery document at
+`/.well-known/wia-neuromorphic-chip` that links to the API root, the
+public accreditation certificate, the published quality dossier, the
+catalogue of published networks, and any active recall notices.
 
-## §6 Versioning and Deprecation
+## §6 Sensor Front-End Integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Event cameras, spiking cochlea, tactile-event sensors, and other
+event-driven sensors emit AER traffic that flows directly into the
+deployed accelerator. The integration record carries the sensor
+identifier, the AER format the sensor emits, and the address-space
+mapping from sensor output to network input populations. Sensor
+front-ends MAY be operated under adjacent WIA standards; the
+integration record cross-references those standards under §13.
 
-## §7 Privacy and Security
+## §7 Host-Runtime Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Host runtimes manage the deployed accelerator's lifecycle: power-on,
+mapping load, AER stream routing, plasticity-state persistence at
+shutdown, and recovery from faults. Host runtimes integrate with the
+operating programme's API to fetch mappings and to publish telemetry
+and plasticity events. The runtime's API client carries the system-
+integrator's client certificate; the certificate is bound to the
+deployed devices the integrator is authorised to manage.
 
-## §8 Open Governance
+## §8 Long-Term Archive Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `neuromorphic-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Programmes designate a long-term archive that holds evidence packages
+beyond programme wind-down. Quarterly deposits round-trip
+content-addresses; on wind-down, remaining packages transfer to the
+archive with content-addresses preserved.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Regulator and Accreditation Body Access
 
+Regulators and accreditation bodies access the API via dedicated
+client certificates issued by the certifying body. Access scopes for
+these clients include the full record set; consumer-facing scopes
+(SDK developer, integrator, citation tool) are narrower.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §10 Verifiable-Credential Re-Issuance (optional)
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Programmes that wish to expose their characterisation summaries to
+consumers of W3C Verifiable Credentials MAY re-issue a characterisation
+summary as a Verifiable Credential under the Data Model 2.0
+specification. Re-issuance is optional; the canonical record remains
+the JSON evidence package.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Public Catalogue and Aggregator Feeds
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Programmes that publish a public catalogue of compiled networks emit
+an Atom or JSON Feed listing the networks with their evidence-
+package manifest digests, the target hardware family, and the
+network's purpose. The feed does not carry sensor input data or
+trained weight matrices; it is a discovery mechanism, not a primary
+record.
 
-## Annex F — Adoption Roadmap
+## §12 Worked Example: Citation Resolution
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A reader encounters a paper that cites a neuromorphic-compute result
+with the WIA citation extension. The reader's tool resolves the
+citation by:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+1. Parsing the citation to extract the mapping ID and manifest digest.
+2. Fetching the discovery document for the issuing programme.
+3. Resolving the manifest URL and verifying the manifest signatures.
+4. Recomputing the manifest digest and comparing it to the pinned
+   digest; aborting on mismatch.
+5. Retrieving the package; recomputing per-file digests; surfacing the
+   resolved evidence (network description, hardware description,
+   mapping, characterisation, plasticity log) to the reader.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A conformant tool completes this flow without further input.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Cross-Standard Linkage
 
-## Annex G — Test Vectors and Conformance Evidence
+A neuromorphic deployment that consumes input from a WIA-event-camera
+sensor or that emits decisions consumed by a WIA-prosthetic-control
+prosthesis emits cross-standard linkage records. Linkages are not
+transitive; consumers of a downstream result verify the consuming
+standard's evidence directly.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Reader Tooling
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Evidence-package consumers include compiler-toolchain auditors,
+deployment-team reviewers, and certifying-body inspectors. Programmes
+MAY publish supplementary reader hints (visual mapping plots,
+plasticity-log summaries, energy-budget reports) alongside the
+canonical evidence package.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §15 Backwards-Compatibility Guarantee
 
-## Annex H — Versioning and Deprecation Policy
+PHASE-4 minor revisions remain backwards-compatible with prior-minor
+clients. Major revisions go through a deprecation window of at
+least one full hardware-description release cycle.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Workload-Definition Catalogue
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A workload-definition catalogue is published by the operating
+programme for collaborator use. Catalogue entries cross-reference the
+community workloads that the programme has adopted and the
+programme-defined workloads under which it publishes its own
+results. Each entry carries the workload's content-address, a
+human-readable description, the date of last revision, and the
+programme's reproducibility tolerance for the workload.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Energy-Reporting Convention
 
-## Annex I — Interoperability Profiles
+The integration's energy-reporting convention follows the format
+documented in the energy-account record (PHASE-1 §11). Programmes
+that participate in energy-comparison studies (cross-platform
+benchmarks for low-power inference) submit their energy accounts to
+the study coordinator under the study's named protocol. The
+operating programme records each study participation in its quality
+dossier so that downstream consumers can verify the lineage of
+externally cited energy claims.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Open-Source Adapter Encouragement
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Adapters between SDKs and the WIA API are SHOULD be open-source so
+that downstream consumers can audit the path from their network to
+the deployed mapping. Closed-source adapters are permitted but are
+flagged in the integration record so that consumers consuming a
+closed-toolchain result understand the audit constraint.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 Reproducibility-Test Endpoint
+
+Citation tools that wish to verify a published result without
+re-deploying it consume a reproducibility-test endpoint that the
+operating programme exposes. The endpoint accepts a network-mapping-
+hardware tuple and returns a deterministic-execution receipt or a
+non-determinism flag with the workload's tolerance bounds.
+
+## §20 Cross-Standard Linkage to Sensor Front-Ends
+
+When a deployed network consumes input from a sensor front-end
+governed by an adjacent WIA standard (event-camera, spiking-cochlea,
+tactile-event), the integration record carries a cross-standard
+linkage that names the sensor standard, the version under which the
+linkage is claimed, and the address-space mapping from sensor output
+to network input. Linkages are not transitive; consumers verify each
+sensor standard's evidence directly.
+
+## §21 Backwards-Compatibility Guarantee
+
+PHASE-4 minor revisions remain backwards-compatible with prior-minor
+clients: SDK adapters, host-runtime adapters, and citation tools
+continue to function across minor revisions. Major revisions go
+through a deprecation window of at least one full hardware-
+description release cycle.
+
+## §22 Migration from Pre-Standard Records
+
+Programmes that operated before WIA-neuromorphic-chip reached
+version 1.0 MAY migrate historical mappings by emitting synthetic
+mapping records that carry the original mapping's identifying
+information plus a `legacyImport` flag. Synthetic mappings are
+accepted by the public catalogue but are not eligible for evidence-
+package generation without a contemporaneous re-execution against
+the documented workload.
+
+## §23 Reader Tooling for Plasticity Logs
+
+Plasticity logs are large and require tooling to summarise for
+review. Programmes MAY publish plasticity-log summary tools that
+emit time-binned histograms of weight changes, projection-level
+heat maps, and rule-attribution breakdowns. Summary outputs are
+non-normative reader hints; the canonical record remains the
+plasticity-event log itself.
+
+## §24 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully with
+at least one SDK toolchain, at least one hardware vendor, at least
+one sensor front-end, and at least one system integrator, and has
+published at least one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-known discovery
+document at least 90 calendar days before removal; in-flight
+deployments that depend on the sunsetting integration are migrated
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-neuromorphic-chip
+- **Last Updated:** 2026-04-27

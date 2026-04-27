@@ -1,241 +1,278 @@
-# WIA-medical-imaging PHASE 3 — PROTOCOL Specification
+# WIA-medical-imaging PHASE 3 — Protocol Specification
 
 **Standard:** WIA-medical-imaging
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-medical-imaging (Medical Imaging).
+This PHASE specifies the protocols that bind the imaging data format
+(PHASE 1) to the API surface (PHASE 2): DICOM upper layer, DICOMweb
+transport, modality-to-PACS routing, image-display profiles, and the
+audit trail for imaging operations. Where a domain protocol exists
+(DICOM PS3.7, IHE Radiology integration profiles), this standard
+defers; gaps are specified here.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- DICOM PS3.7 — Message Exchange (DIMSE-C, DIMSE-N services)
+- DICOM PS3.8 — Network Communication Support for Message Exchange
+- DICOM PS3.15 — Security and System Management Profiles
+- DICOM PS3.18 — Web Services
+- DICOM PS3.20 — Imaging Reports using HL7 Clinical Document Architecture
+- IHE Radiology — Audit Trail and Node Authentication for Radiology, Consistent Presentation of Images, Cross-Enterprise Document Sharing for Imaging
+- IETF RFC 8446 (TLS 1.3), RFC 9293 (TCP)
 
 ---
 
-## §1 Scope
+## §1 Transport options
 
-This PHASE document is one of four that together define the WIA-medical-imaging
-standard. It addresses the protocol layer of the standard.
+A deployment supports both DICOM upper-layer (PS3.7/PS3.8) and
+DICOMweb (PS3.18) transports. The two have distinct strengths:
 
-## §2 Manifest
+| Property             | DICOM upper layer (DIMSE)      | DICOMweb (HTTP)                  |
+|----------------------|--------------------------------|----------------------------------|
+| Modality vendor support | Universal (all imaging devices) | Newer modalities                 |
+| Latency              | Single-association, persistent  | HTTP per call                    |
+| Firewall friendliness | Custom port (104, 11112)       | 443 (HTTPS)                      |
+| Cloud-native         | Awkward                        | Native                           |
+| Streaming            | Yes (C-STORE, C-MOVE)          | Bulk via DICOMweb chunked        |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-imaging"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Modality acquisition typically uses DIMSE; viewer/EHR retrieval
+typically uses DICOMweb. The boundary translates between them so
+that downstream callers see a single privacy-gated surface.
 
-## §3 Conformance Tiers
+## §2 DICOM upper-layer protocol
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Associations follow PS3.8: ACSE A-ASSOCIATE → presentation contexts
+→ DIMSE messages → A-RELEASE. The boundary enforces:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- TLS 1.3 on the upper-layer association (DICOM PS3.15 §B; the
+  legacy "Basic TLS Profile" using TLS 1.2 is permitted only on
+  legacy-modality associations explicitly listed in the deployment
+  policy)
+- Mutual authentication using X.509 certificates issued by the
+  deployment's PKI; the modality's Application Entity Title is
+  bound to its certificate so that AE-title spoofing fails the
+  TLS check
+- Per-association audit (DICOM PS3.15 §A) emitted to the
+  AuditEvent chain shared with the privacy boundary
 
-## §4 Discovery
+C-STORE, C-FIND, C-MOVE, and C-GET each carry the calling AE
+title; the boundary maps that to a SMART system principal so that
+the call appears in the audit chain with the same shape as a
+DICOMweb call.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-imaging`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 DICOMweb protocol
 
-## §5 Time and Identity
+DICOMweb (PS3.18) is HTTP/1.1 or HTTP/2 over TLS 1.3. The boundary:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Terminates TLS at its edge using a deployment-managed certificate
+- Validates the SMART access token (per WIA-medical-data-privacy
+  PHASE 3 §1) before forwarding to the backing service
+- Forwards privacy headers (`WIA-Purpose-Of-Use`, etc.) into the
+  DICOMweb context so that the downstream PACS sees the same
+  purpose declaration
 
-## §6 Versioning and Deprecation
+For cloud-hosted PACS the boundary additionally signs the
+forwarded request body with a backend-only signing key so that
+the PACS can verify the request originated from the boundary
+(defence in depth: stolen tokens cannot bypass the boundary).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Modality-to-PACS routing
 
-## §7 Privacy and Security
+A modality emits one or more series per acquisition and routes
+them to the PACS. The deployment's modality work-list (PHASE 2
+§6 UPS-RS) drives the destination — the modality knows where to
+route because the work-item carries the receiving AE.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Routing failures (network, AE rejection, transfer-syntax mismatch)
+are logged as IHE-RAD audit events and queued for retry. A modality
+that fails to deliver after the deployment's retry budget elevates
+to the imaging operations team; the boundary emits a structured
+incident record so that the trail is auditable.
 
-## §8 Open Governance
+## §5 Image display protocol
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-imaging` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Viewers retrieve images via WADO-RS. The boundary supports:
+
+- Window/level and pixel transformation hints in PS3.4 N-GET
+  responses
+- IHE Consistent Presentation of Images — the same instance
+  rendered by two viewers MUST produce the same pixel output
+  given the same presentation parameters
+- Hanging protocols (DICOM PS3.3 Hanging Protocol IOD) — preserved
+  as instances and retrievable like any other DICOM object
+
+Viewer side-effects (annotations, key images) are written back as
+new DICOM instances (Presentation State, Key Object Selection)
+referencing the source; the source instance is not modified.
+
+## §6 Imaging audit (PS3.15 + boundary)
+
+DICOM PS3.15 §A.5 defines a closed set of audit message schemas.
+This PHASE binds them onto the AuditEvent chain shared with
+WIA-medical-data-privacy PHASE 3 §4:
+
+| DICOM audit event           | FHIR AuditEvent type                |
+|-----------------------------|-------------------------------------|
+| Patient Record              | rest / read or update on Patient    |
+| Study used                  | rest / read on ImagingStudy         |
+| Begin transferring DICOM instances | rest / create on ImagingStudy.series |
+| DICOM instances accessed    | rest / read on Binary               |
+| Application activity (start/stop) | application activity event       |
+| Security alert              | security alert                      |
+| Audit log used              | audit log read                      |
+
+Mapping is handled at the boundary; the PACS continues to emit
+its native PS3.15 audit messages and the boundary projects them
+into the chain.
+
+## §7 Compression and trans-coding
+
+Trans-coding from one accepted transfer syntax to another (PHASE 1
+§5) preserves a derivation chain. The protocol:
+
+1. Source instance read via WADO-RS (or C-GET on DIMSE)
+2. Trans-code engine applies the target syntax
+3. New instance stored with `(0008,1110) ReferencedStudySequence`
+   pointing to the source and `(0008,9215) DerivationCodeSequence`
+   coded as PS3.16 CID 7203 "Code recoding"
+4. The trans-coded instance acquires a fresh `SOPInstanceUID`;
+   the source UID is preserved in the reference
+5. The original instance is not deleted unless the deployment's
+   retention policy explicitly allows lossless re-derivation
+
+Trans-coding is auditable; trans-coding to a lossy syntax for
+diagnostic intent is rejected.
+
+## §8 De-identification protocol
+
+The de-identification engine implements PHASE 1 §7. The protocol:
+
+1. Source instance retrieved with the requestor's purpose
+   (HRESCH, EDU, etc.)
+2. The configured PS3.15 profile is applied: tags are removed,
+   replaced, or generalised per the profile's action codes
+3. Pixel-level cleanup (overpaint of suspect text) runs against
+   the configured pixel-cleanup region (modality-specific defaults
+   are listed in the deployment policy)
+4. The de-identified instance is stored with a fresh UID under the
+   research store's UID root; the original UID is preserved in the
+   de-identification job record only (not on the instance itself)
+5. The de-identification job record (WIA-medical-data-privacy
+   PHASE 1 §7) references the configured profile, the pixel
+   cleanup algorithm, and the residual-risk band
+
+The PHI-bearing original is not altered; the de-identified copy
+is a new artefact.
+
+## §9 Failure modes
+
+| Failure                              | Behaviour                                            |
+|--------------------------------------|------------------------------------------------------|
+| Modality association rejected        | Modality retries per its routing rules; boundary logs|
+| TLS handshake failure with PACS      | Connection abandoned; IHE security alert emitted     |
+| Transfer-syntax negotiation failure  | Boundary returns 415; modality logs; ops team paged  |
+| UID collision on STOW-RS             | Original instance preserved; new instance rejected   |
+| Audit-chain write failure            | Imaging operation rejected (consistency w/ MDP §9)   |
+| De-identification engine unavailable | Research-purpose retrievals queued; clinical reads continue |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — IHE profile crosswalk (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| IHE Radiology profile | Mapping to this PHASE                                |
+|-----------------------|------------------------------------------------------|
+| Scheduled Workflow.b  | UPS-RS work-list flow (PHASE 2 §6)                   |
+| Cross-Enterprise XDS-I.b | Tele-radiology exchange (PHASE 4 §7)              |
+| Imaging Object Change Mgmt | IOCM corrections (PHASE 4 §8)                   |
+| Audit Trail and Node Auth | DICOM PS3.15 audit projection (PHASE 3 §6)       |
+| Consistent Presentation | Hanging protocols + grayscale display calibration |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Where an IHE profile already covers a behaviour, this PHASE does
+not redefine it; it specifies the privacy-gate overlay so that
+implementations can hold both the IHE conformance and the WIA
+conformance simultaneously.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex B — TLS profile choices (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Concern             | Default                              | Legacy permitted |
+|---------------------|--------------------------------------|------------------|
+| TLS version         | 1.3 (RFC 8446)                       | 1.2 explicit-list|
+| Cipher suite        | TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256 | as TLS 1.2 listed |
+| Mutual auth         | X.509 client cert mandatory          | n/a              |
+| Cert rotation       | every 365 days                       | every 730 days   |
 
-## Annex F — Adoption Roadmap
+Quantum-resistance is out of scope; a migration plan will be
+added in a future minor version after NIST PQ standards stabilise
+for healthcare HSM support.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — DIMSE service classes (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The boundary supports the following DIMSE-C service classes on
+the upper-layer port:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| SOP Class UID                            | Service                              |
+|------------------------------------------|--------------------------------------|
+| 1.2.840.10008.1.1                        | Verification (C-ECHO)                |
+| 1.2.840.10008.5.1.4.1.1.*                | Storage SOP classes (per modality)   |
+| 1.2.840.10008.5.1.4.31                   | Modality Worklist Information Model  |
+| 1.2.840.10008.5.1.4.1.2.1.1              | Patient Root Q/R — FIND              |
+| 1.2.840.10008.5.1.4.1.2.2.1              | Study Root Q/R — FIND                |
+| 1.2.840.10008.5.1.4.1.2.2.2              | Study Root Q/R — MOVE                |
+| 1.2.840.10008.5.1.4.1.2.2.3              | Study Root Q/R — GET                 |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+DIMSE-N services (N-CREATE, N-SET, N-EVENT-REPORT) are supported for
+storage commitment, modality performed procedure step, and unified
+procedure step. Each service emits the corresponding DICOM PS3.15
+audit message; the boundary projects each into the FHIR AuditEvent
+chain.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex D — Network resilience
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Modalities lose connectivity. The boundary tolerates this by:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- Buffering outbound C-MOVE jobs for retry
+- Holding storage commitments open until acknowledged
+- Surfacing a stable view of in-flight transfers to the imaging
+  operations team
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+A modality that has been offline for longer than the deployment's
+resilience window (typically 48 hours) is flagged for the operations
+team. The boundary continues to accept new associations from that
+modality but emits a structured incident record so that recovery
+work has a starting point.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex E — Vendor presentation-state interoperability (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+DICOM Presentation State (PS) IODs (Grayscale Softcopy PS, Color
+Softcopy PS, Pseudocolour Softcopy PS, Blending Softcopy PS,
+Advanced Blending PS) capture viewer-side rendering decisions.
+Vendor differences:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Some vendors persist PS instances under the original study; the
+  boundary follows that convention by default
+- Some vendors ship proprietary state alongside DICOM PS; the
+  boundary refuses to forward proprietary state, which keeps the
+  audit chain free of opaque vendor blobs
+- Hanging Protocol IOD instances (1.2.840.10008.5.1.4.38.1) describe
+  layout templates; the boundary preserves them as instances and
+  does not interpret them
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+A viewer that needs vendor-specific state SHOULD persist that state
+in a vendor-controlled side store and reference the DICOM source
+study by UID, not embed proprietary state into the DICOM stream.
 
-## Annex I — Interoperability Profiles
+## Annex F — Multi-tenant boundary topology (informative)
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Larger deployments host multiple controllers (multi-hospital health
+systems). The boundary topology supports tenant isolation:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- Each tenant has its own DICOM root UID, JWKS, and audit chain
+- Cross-tenant retrieval requires explicit tenant federation per
+  the deployment policy (typically a lateral consent grant)
+- A tenant that exits the federation has its data preserved in its
+  own audit chain segment; no cross-tenant audit collapse is
+  permitted
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Multi-tenant deployments document the federation rules in the
+deployment policy and audit federation events themselves.

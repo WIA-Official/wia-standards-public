@@ -5,237 +5,267 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-neuromorphic-chip (Neuromorphic Chip).
+This document defines the protocols that govern an accredited
+neuromorphic-chip programme: vendor accreditation, hardware-
+description publication, model-support declaration, compiler
+reproducibility, on-chip plasticity governance, characterisation
+laboratory protocols, deployment certification, energy and
+power-budget reporting, supply-chain provenance, and programme
+wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 17043:2010 (proficiency testing)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 9001:2015 (quality management systems)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- IEEE Std 754-2019 (floating-point arithmetic; cited only for
+  numerical-format definitions)
 
 ---
 
-## §1 Scope
+## §1 Vendor Accreditation
 
-This PHASE document is one of four that together define the WIA-neuromorphic-chip
-standard. It addresses the protocol layer of the standard.
+A neuromorphic-hardware vendor MAY claim conformance to
+WIA-neuromorphic-chip after a recognised accreditation body has
+issued a valid certificate against ISO 9001:2015 and against the
+foundry-related cleanroom and yield-management requirements that
+apply to the vendor's process. The accreditation register is exposed
+to the API as a read-only resource.
 
-## §2 Manifest
+A vendor whose accreditation is revoked deprecates all of its
+hardware descriptions; deployed mappings remain operational but new
+deployments cannot be compiled against the deprecated hardware.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "neuromorphic-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Hardware-Description Publication
 
-## §3 Conformance Tiers
+Hardware descriptions (PHASE-1 §4) are published with the vendor's
+release-key signature attached. Each release is content-addressed in
+the API and is reachable indefinitely so that compiled mappings
+remain reproducible against the description they were compiled
+against. Updates that change neuron or synapse model coverage emit a
+new description rather than overwriting the prior one.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Vendors publish a deprecation timeline for each description. After
+deprecation, the description remains addressable but new
+compilations against it require justification recorded in the
+mapping's metadata.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Compiler Reproducibility
 
-## §4 Discovery
+A compiled mapping is reproducible when an independent invocation of
+the compiler at the recorded version, given the same network
+description, the same hardware description, and the same compiler
+options, produces a mapping that is byte-identical or, where the
+compiler is not deterministic by construction, equivalent under a
+documented equivalence relation that the programme publishes.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/neuromorphic-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Compilers that are not deterministic in their default mode SHOULD
+provide a deterministic mode (typically by fixing the random seed)
+and SHOULD record the seed in the mapping. Compilers that fall back
+on a non-deterministic optimisation that the deterministic mode
+cannot reproduce MUST flag the mapping as `non-deterministic` so
+that downstream consumers can choose whether to consume it.
 
-## §5 Time and Identity
+## §4 Plasticity Governance
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Networks that learn online accumulate weight changes over their
+deployment. The plasticity-event log (PHASE-1 §7) is the trajectory
+of those changes. Programmes that publish externally cited learning
+results MUST emit the plasticity log so that the trajectory is
+auditable; aggregate-only emission is insufficient for citation.
 
-## §6 Versioning and Deprecation
+For deployments in regulated contexts (medical-device decision
+support, safety-critical robotics) the operating clinic or
+robot-safety authority MAY require that plasticity be locked at
+deployment time and unlocked only under controlled conditions; the
+mapping's metadata records the lock state and the unlock authority.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Characterisation Laboratory Protocols
 
-## §7 Privacy and Security
+Reference laboratories follow ISO/IEC 17025:2017 procedures with
+neuromorphic-specific extensions:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- **Voltage and current calibration** against traceable standards
+  before each campaign.
+- **Temperature control** of the device under test, recorded in
+  the characterisation conditions.
+- **Test pattern coverage** spanning the supported model parameter
+  ranges; the test pattern is published so that consumers can
+  reproduce the characterisation.
+- **Yield-aware reporting**: the characterisation reports per-core
+  variability statistics rather than chip-level averages so that
+  downstream mapping can avoid out-of-spec cores.
 
-## §8 Open Governance
+## §6 Inter-Laboratory Round-Robin
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `neuromorphic-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Programmes that publish externally cited characterisation results
+participate in inter-laboratory round-robin exercises at least once
+every two calendar years. The round-robin protocol follows
+ISO/IEC 17043:2010 expectations.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Energy and Power Budgets
 
+Neuromorphic accelerators are typically deployed for their energy
+efficiency. The programme records the deployed mapping's energy
+budget (energy per inference, energy per spike-event, idle-power
+floor) against the mapping. Programmes that publish externally
+cited energy results MUST report energy under named workloads with
+the workload definition published as a content-addressed artefact;
+abstract energy claims without a workload definition are not
+externally citable under this PHASE.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §8 Records Retention
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Programme records — every record defined in PHASE-1, the API audit
+logs, mapping artefacts, characterisation evidence, plasticity logs,
+and telemetry summaries — are retained for a minimum of seven
+calendar years from the last access of the deployment. Externally
+cited deployments retain indefinitely.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Time Synchronisation
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Programmes operate on synchronised time per RFC 5905 (NTPv4) so that
+events across vendor, laboratory, and integrator systems can be
+ordered unambiguously.
 
-## Annex F — Adoption Roadmap
+## §10 Cybersecurity and Software Updates
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Compiled mappings are signed by the SDK's release key and verified
+by the deployed accelerator's host before execution. Firmware
+updates to the host or the accelerator are signed by the
+manufacturer's release key. Failed verification leaves the
+deployment on the prior firmware and emits an alert through the
+streaming endpoint defined in PHASE-2 §13.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §11 Programme Wind-Down
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A programme that ceases operations transfers indefinite-retention
+records to a recognised long-term archive, notifies known external
+citers via the well-known discovery document, and publishes a
+sunset timeline for in-flight compilations. Externally pinned
+evidence packages remain accessible through the archive.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §12 Quality Dossier
 
-## Annex G — Test Vectors and Conformance Evidence
+The programme's quality dossier records the vendors it works with,
+the hardware descriptions it tracks, the compiler revisions it
+maintains, the round-robin exercises it has participated in, and the
+deprecation history of its mappings. The dossier is reviewed at
+least annually by the programme's quality manager.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §13 Cross-Border Programme Operation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programmes that operate across borders maintain a primary
+jurisdiction of registration and one or more operating
+jurisdictions. Cross-border data transfers honour the source-
+jurisdiction's data-protection law for any deployments that consume
+personal data (e.g. on-device learning over user-generated input).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §14 Workload Selection and Reproducibility
 
-## Annex H — Versioning and Deprecation Policy
+Programmes that publish externally cited results select workloads
+from a curated catalogue of community workloads or define new
+workloads with sufficient detail that an independent group can
+re-execute them. New workload definitions are content-addressed and
+registered against the programme's catalogue. Re-execution by an
+independent group on the same hardware-description version produces
+results within the published reproducibility tolerance, which is
+recorded in the workload definition.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A result that has not been re-executed by at least one independent
+group is flagged in the public catalogue as `single-execution`; the
+flag is removed when an independent re-execution is registered.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §15 Plasticity-State Persistence and Recovery
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Deployments that learn online persist plasticity state across power
+cycles. The persistence protocol writes plasticity state through a
+content-addressed snapshot whose digest is recorded against the
+deployment. Recovery from a power cycle re-loads the most recent
+verified snapshot; corruption of the snapshot triggers a fall-back
+to the prior verified snapshot and emits an alert through the
+streaming endpoint defined in PHASE-2 §13.
 
-## Annex I — Interoperability Profiles
+## §16 Energy-Reporting Honesty
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Energy claims tied to externally cited results carry the measurement
+method, the workload definition, and the laboratory or integrator
+that performed the measurement. Claims that omit any of these are
+not externally citable under this PHASE; the API enforces this by
+refusing to include the claim in an evidence package.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §17 Cybersecurity Threat Model
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Programmes publish a threat model that names the trust boundaries
+between the SDK, the host runtime, the accelerator, and the sensor
+front-ends. The threat model identifies the assets to be protected
+(plasticity state, weight matrices, AER traffic) and the controls
+that protect them. The threat model is reviewed at least annually
+by the programme's security officer.
+
+## §18 Adversarial Input Considerations
+
+Deployments that consume sensor input from unattended environments
+(always-on wake-word listeners, event-camera-driven security systems)
+are exposed to adversarial input. The deployment's risk file (PHASE-
+3 §10 of an adjacent standard, when applicable) documents the
+adversarial-input controls (rate limiting, statistical anomaly
+detection, dual-path classification) that the deployment relies on.
+
+## §19 Recipe Curation and Deprecation
+
+Encoder and decoder recipes (PHASE-1 §12) are curated by the
+operating programme. Each recipe is content-addressed at
+registration; subsequent revisions emit new recipe identifiers
+rather than overwriting prior ones, so that compiled mappings remain
+reproducible against the recipe versions they were compiled against.
+
+A recipe is deprecated through a published timeline (typically 12
+months from announcement). After deprecation, the recipe remains
+addressable but new compilations against it require justification
+recorded in the mapping's metadata.
+
+## §20 Cross-Vendor Compatibility Studies
+
+Programmes that publish externally cited results across multiple
+hardware platforms participate in cross-vendor compatibility studies.
+The study evaluates whether the same network description, when
+compiled and deployed across two or more vendor platforms, produces
+results that agree within published tolerance. Compatibility studies
+are coordinated by the certifying body or a community working group;
+their outcome is recorded in the programme's quality dossier.
+
+## §21 On-Device Learning and Privacy
+
+Deployments that learn online over user-generated input (always-on
+hearing aids that adapt to user environments, prosthetic controllers
+that personalise to user motion) handle personal data. The operating
+programme records the personal-data category at the deployment level
+and applies the relevant data-protection law's controls (lawful
+basis, retention bounds, subject rights). Plasticity events captured
+during on-device learning carry the personal-data flag so that
+exports honour the relevant constraints.
+
+## §22 Conformance and Auditing
+
+A programme conformant with WIA-neuromorphic-chip publishes its
+accreditation certificate, its programme code registration, its
+quality dossier, the catalogue of mappings it has compiled, and
+the catalogue of characterisations it has performed, and answers
+an annual self-assessment that maps each clause of this PHASE to
+the programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-neuromorphic-chip
+- **Last Updated:** 2026-04-27

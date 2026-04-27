@@ -5,237 +5,269 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-mars-mission (Mars Mission).
+This document defines the protocols that govern an accredited Mars-
+mission programme: spectrum coordination, mission-operations centre
+accreditation, navigation reproducibility, planetary-protection
+governance, ground-station coordination, anomaly investigation,
+science-data release policy, deep-space cybersecurity, archive
+deposit, and post-mission disposition. The PROTOCOL layer binds the
+data shapes of PHASE-1 and the API contract of PHASE-2 to the
+international and inter-agency frameworks under which Mars missions
+operate.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 9001:2015 (quality management systems)
+- ISO 8601 (date and time)
+- ITU Radio Regulations (deep-space band allocations)
+- COSPAR Planetary Protection Policy
+- CCSDS 132.0-B / 232.0-B (Space Data Link Protocols)
+- CCSDS 301.0-B (Time Code Formats)
+- CCSDS 633.0-B (Mission Operations Services)
+- CCSDS 727.0-B (CFDP)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
 
 ---
 
-## §1 Scope
+## §1 Spectrum Coordination
 
-This PHASE document is one of four that together define the WIA-mars-mission
-standard. It addresses the protocol layer of the standard.
+Every mission operates within ITU-R deep-space band allocations
+appropriate to its phase. The mission's spectrum file records the
+frequency assignments, the licensing authority, the bandwidth
+allocations, and the coordination agreements with ground stations
+that will support the mission. Spectrum-file revisions emit new
+records; prior records remain addressable for archival continuity.
 
-## §2 Manifest
+A mission whose spectrum file conflicts with a co-flying mission's
+spectrum file MUST resolve the conflict before the API accepts an
+observation request that would exercise the contested allocation;
+the conflict-resolution mechanism is the inter-agency coordination
+forum that the participating agencies recognise.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mars-mission"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Mission-Operations Centre Accreditation
 
-## §3 Conformance Tiers
+A Mission Operations Centre (MOC) MAY claim conformance to
+WIA-mars-mission only after a recognised accreditation body has
+issued a valid certificate against ISO 9001:2015 and an
+information-security certificate against ISO/IEC 27001:2022 covering
+the scopes the MOC exercises (TT&C, navigation, surface-ops planning,
+science-ops planning). The accreditation register is exposed to the
+API as a read-only resource.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Navigation Reproducibility
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Trajectory and state products (PHASE-1 §4) are reproducible when an
+independent navigation team using the same observation arc, the same
+gravity-field model, the same atmospheric drag model where
+applicable, and the same numerical-integrator settings produces a
+state vector whose components agree within the published
+uncertainty.
 
-## §4 Discovery
+Products MUST carry their generation process and the version of the
+process so that downstream consumers can reproduce or revise the
+estimate. Products produced under a deprecated process remain
+addressable but are not recommended for new operational decisions.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mars-mission`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Planetary Protection Governance
 
-## §5 Time and Identity
+Planetary-protection records (PHASE-1 §8) are governed by the
+COSPAR Planetary Protection Policy. The policy categorises mission
+targets and allowed activities; the operating mission's planetary-
+protection officer maintains the bioburden inventory, approves
+activities at sensitive targets, and issues the records that the API
+consumes.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Activities at "special regions" (per COSPAR) require additional
+approval cycles that the operating programme records as a chain of
+attestations against the mission's planetary-protection record.
 
-## §6 Versioning and Deprecation
+## §5 Ground-Station Coordination
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+TT&C packets traverse ground-station networks (the Deep Space
+Network, ESTRACK, the Chinese Deep Space Network, commercial
+deep-space providers). Ground-station coordination records carry
+the booked tracking passes, the actual passes that took place, and
+the per-pass quality metrics (carrier signal-to-noise ratio,
+ranging precision, command-link availability). Coordination records
+are signed by the providing agency.
 
-## §7 Privacy and Security
+## §6 Anomaly Investigation
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Anomalies — spacecraft safe modes, instrument fault detections, lost
+contact, unexpected science observations — trigger an anomaly
+investigation. The investigation record carries the timeline of the
+anomaly, the controlling team's response, the recovery actions, and
+the lessons-learned write-up that re-enters the programme's quality
+dossier.
 
-## §8 Open Governance
+Anomaly records that affect mission-critical activities (EDL,
+sample acquisition, sample return) propagate to inter-agency review
+boards that the participating agencies have established for the
+mission.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mars-mission` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Science-Data Release Policy
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Science products (PHASE-1 §7) move through a release sequence
+agreed at mission inception. Common sequences include immediate
+release for press-relevant Level-1 products, a calibration window
+during which Level-1b and Level-2 products remain restricted to
+the science working group, and a public release at the end of the
+calibration window. The release schedule is recorded against each
+mission and is exposed as part of the well-known discovery document
+(PHASE-4 §5).
 
+## §8 Deep-Space Cybersecurity
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Command links to deep-space spacecraft are authenticated and
+integrity-protected. The mission's cybersecurity protocol records
+the authentication scheme (typically a CCSDS-aligned authentication
+profile), the key management lifecycle, and the contingency
+procedures for compromise. Compromise events trigger an immediate
+re-key and a parallel anomaly-investigation cycle.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §9 Records Retention
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Mission records retain indefinitely. The default archival period for
+science products is "for the foreseeable lifetime of the host
+discipline"; in practice, programmes deposit science products at
+PDS-aligned archives that operate under multi-decade preservation
+commitments. TT&C catalogues, planetary-protection records, and
+anomaly investigations follow the same indefinite-retention regime.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Time Synchronisation
 
-## Annex F — Adoption Roadmap
+Ground-system clocks synchronise per RFC 5905 (NTPv4) against
+national-metrological-laboratory stratum-1 services. Spacecraft-
+event time is encoded per CCSDS 301.0-B and reconciled against
+ground time during routine ranging passes.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Mission Wind-Down
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A mission that ends operations transitions all open observation
+requests to `cancelled`, deposits the final science product set at
+the chosen archives, publishes a final mission report, and notifies
+inter-agency partners. Spacecraft disposal — controlled deorbit,
+graveyard-orbit insertion, surface decommissioning — follows the
+disposal plan negotiated at mission inception.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 Quality Dossier
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The programme's quality dossier records the agencies it partners
+with, the ground stations it uses, the planetary-protection
+category it operates under, the anomaly investigations it has
+conducted, and the release-policy compliance for each science
+product. The dossier is reviewed at least annually by the
+programme's quality manager.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Cross-Border Programme Operation
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Mars missions are inherently international. The programme maintains
+a primary jurisdiction of registration and operational MoUs with
+partner jurisdictions. Cross-jurisdictional data transfers honour
+the dual-use export controls of each participating jurisdiction;
+the operating programme records the dual-use determination for each
+exported record class.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §14 Sol Activity Plan Approval Chain
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Sol activity plans (PHASE-1 §10) move through a multi-stage approval
+chain: science representative, mission engineer, planetary-
+protection officer (where applicable), and the operations director.
+Each stage records its approval against the plan; missing approvals
+prevent uplink. The chain is configured at mission inception and is
+exposed in the well-known discovery document for partner agency
+visibility.
 
-## Annex H — Versioning and Deprecation Policy
+A plan that has been uplinked is locked: subsequent edits emit a new
+plan referencing the prior plan as predecessor, and the prior plan
+remains addressable as the historical record of the sol's
+operations.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §15 Sample-Return Quarantine
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Sample-return missions enforce a quarantine protocol at Earth
+recovery and during initial curation. The quarantine protocol is
+governed by the operating jurisdiction's biocontainment authority
+and is documented as a chain of records that this standard exposes
+in §11 of PHASE-1. The protocol's release criteria — when curated
+samples may move from the quarantine facility to general scientific
+distribution — are recorded against the mission and are signed by
+the responsible authority.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §16 Crewed-Mission Coordination
 
-## Annex I — Interoperability Profiles
+For crewed missions, the operating programme coordinates with the
+crew-medical, life-support, and EVA standards described in adjacent
+WIA standards. Coordination is record-level only; the mars-mission
+standard does not duplicate medical or life-support content.
+Cross-references are recorded against the mission and exposed in
+the evidence package's cross-standard linkage section (PHASE-4 §13).
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §17 Environmental Data Reuse
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Environmental observations (PHASE-1 §12) are reused by partner
+missions, by climate-modelling teams, and by future missions
+planning surface activities. The operating mission MUST publish the
+environmental data set on the mission's release schedule and MUST
+flag observations that are subject to embargo (a period of
+exclusive access for the originating instrument team).
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Partner missions consume environmental data through dedicated
+client certificates that are bound to the partner's mission record;
+the API verifies the partner's authorisation against the
+collaboration agreement before serving environmental queries.
+
+## §18 Mission-Critical-Activity Reviews
+
+Mission-critical activities (entry-descent-and-landing, primary
+sample acquisition, sample return, end-of-mission disposition) are
+reviewed by an inter-agency review board before execution. The
+review board's findings are recorded against the mission as a
+chain of attestations. Activities that proceed without a positive
+review board outcome are flagged in the public catalogue and are
+not externally citable as nominal operations.
+
+## §19 Mission-Lifecycle Review Cadence
+
+Mission programmes hold formal lifecycle reviews at major milestones
+(preliminary design, critical design, launch readiness, surface-
+operations transition, end-of-mission). Each review's outcome is
+recorded as a content-addressed report against the mission and is
+exposed under the well-known discovery document so that partner
+agencies and downstream archives can resolve the review chain
+without bespoke requests.
+
+## §20 Embargo Policy for Pre-Release Products
+
+Some science products carry an embargo window during which the
+originating science team retains exclusive analytical access. The
+embargo period is recorded against the science product and is
+honoured by the API: requests for embargoed products from
+non-originating teams return `403 Forbidden` with type
+`urn:wia:mars-mission:embargo-window-active`. The embargo expires
+automatically at the recorded date and the product transitions to
+the agreed public-release path.
+
+## §21 Conformance and Auditing
+
+A programme conformant with WIA-mars-mission publishes its
+accreditation certificate, its mission registration, its quality
+dossier, and the catalogue of science products it has released, and
+answers an annual self-assessment that maps each clause of this
+PHASE to the programme's implementation. The self-assessment is
+reviewed during the annual ISO 9001 / ISO 27001 surveillance audit
+appropriate to the operating MOC.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-mars-mission
+- **Last Updated:** 2026-04-27

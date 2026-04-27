@@ -5,237 +5,267 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-photonic-chip (Photonic Chip).
+This document defines the protocols that govern an accredited
+photonic-chip programme: foundry accreditation, design house
+qualification, PDK release-and-deprecation, tape-out submission and
+acceptance, wafer-level test reproducibility, packaging certification,
+deployed-module recall, laser-safety classification, supply-chain
+provenance, and programme wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 17043:2010 (proficiency testing)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO 9001:2015 (quality management systems)
+- ISO 14644 (cleanrooms — air cleanliness classification)
+- ISO 10110 (optics — preparation of drawings)
+- ISO 8601 (date and time)
+- IEC 60825-1 (laser safety — equipment classification)
+- IEC 62496-2 (optical circuit boards)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- BIPM JCGM 100 (Guide to the Expression of Uncertainty in Measurement;
+  cited normatively for terminology)
 
 ---
 
-## §1 Scope
+## §1 Foundry Accreditation
 
-This PHASE document is one of four that together define the WIA-photonic-chip
-standard. It addresses the protocol layer of the standard.
+A foundry MAY claim conformance to WIA-photonic-chip after a
+recognised accreditation body has issued a valid certificate against
+ISO 9001:2015 (quality management) and ISO 14644 (cleanroom class
+appropriate to the foundry's process). Each platform (silicon,
+silicon-nitride, indium-phosphide, lithium-niobate-thin-film, etc.)
+constitutes a distinct accreditation scope.
 
-## §2 Manifest
+The accreditation register is exposed to the API as a read-only
+resource and MUST be re-fetched at least once per calendar quarter.
+A revoked or expired accreditation halts new fabrication-run
+registrations from that foundry; runs already in-flight complete and
+their outputs remain addressable.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "photonic-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 PDK Release and Deprecation
 
-## §3 Conformance Tiers
+Foundries publish process-design kits (PDKs) at versioned releases.
+Each release is signed by the foundry's release key and is
+content-addressed in the API per PHASE-1 §3. A PDK update that
+changes a compact-model or a layout cell forces affected designs to
+be re-built against the new PDK version; the API exposes a "PDK
+diff" resource that lists affected designs so that design houses
+can plan re-tape-outs.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Deprecation of a PDK version follows a published timeline (typically
+12 to 24 months from the announcement). After deprecation, designs
+pinned to the deprecated version MAY not be tape-out-accepted; they
+are re-built against a supported PDK or marked as `deprecated`.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Tape-Out Submission and Acceptance
 
-## §4 Discovery
+A tape-out submission includes the layout, the DRC and LVS reports,
+the design's risk file (PHASE-3 §10), and the design house's QMS
+certificate. Foundries verify that DRC and LVS report cleanly, that
+the layout fits the reticle slot, and that the design house's QMS is
+current. Submissions that fail any check are rejected with a Problem
+Details (RFC 9457) response naming the check that failed.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/photonic-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Accepted submissions are scheduled into the foundry's wafer lot and
+the foundry registers the fabrication run via the API on completion.
 
-## §5 Time and Identity
+## §4 Wafer-Level Test Reproducibility
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Wafer-level testing follows ISO/IEC 17025 procedures with
+photonic-specific extensions:
 
-## §6 Versioning and Deprecation
+- **Wavelength reference**: the test station's wavelength reference is
+  calibrated against an iodine cell, an HCN gas cell, or an equivalent
+  traceable reference at the start of each campaign.
+- **Power calibration**: optical-power references are calibrated
+  against a national-metrology-laboratory traceable standard.
+- **Temperature control**: the device-under-test is held at a
+  controlled temperature recorded in the measurement conditions; ±0.1 K
+  is achievable on a Peltier-stabilised stage and is a reasonable
+  default for ring and MZI characterisation.
+- **Probe placement**: optical probes (fibre-array, grating-coupler
+  fibre, edge-coupler V-groove) carry alignment-loss budgets that the
+  measurement record reflects in its uncertainty contributions.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Inter-Laboratory Round-Robin
 
-## §7 Privacy and Security
+Programmes that publish externally cited per-component metrics
+participate in inter-laboratory round-robin exercises at least once
+every two calendar years per active platform. The round-robin
+protocol follows ISO/IEC 17043:2010 and emits a public report that
+the operating programme references in its quality dossier.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Packaging Certification
 
-## §8 Open Governance
+Packaging facilities operate under an ISO 9001-aligned QMS plus
+IEC 60825-1 laser-safety classification competence. Each packaged
+module's laser-safety class is verified against the module's optical
+output power envelope and is recorded against the package record
+(PHASE-1 §9). Packaged modules whose verification has not been
+completed cannot be released for shipping; the API's package
+endpoint refuses release and the facility's QMS records the
+exception.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `photonic-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Deployed-Module Recall
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+A safety-relevant defect (laser-safety regression, packaging
+delamination, fibre-attach reliability anomaly) triggers a recall
+process that follows the operating jurisdiction's rules. The API
+publishes a recall notice via the well-known discovery document
+(PHASE-4 §5) and notifies system-integrator subscribers via the
+streaming endpoint (PHASE-2 §13). System integrators acknowledge
+the recall through a signed receipt; recall reach is computed from
+the receipts.
 
+## §8 Records Retention
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Programme records — every record defined in PHASE-1, the API audit
+logs (PHASE-2), DRC/LVS reports, raw wafer-test archives, component
+measurements, and recall correspondence — are retained for a minimum
+of seven calendar years from the last access of the design.
+Externally cited designs retain indefinitely; on programme wind-down
+the indefinite-retention records are transferred to a recognised
+long-term archive.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §9 Time Synchronisation
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Programmes operate on synchronised time per RFC 5905 (NTPv4) so that
+fabrication, test, and packaging events can be ordered unambiguously
+across foundries, laboratories, and packaging facilities.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Risk and Hazard Files
 
-## Annex F — Adoption Roadmap
+Every design carries a risk file that documents the design's
+intended use, foreseeable misuse, and the controls that mitigate
+identified hazards. For modules whose deployed environments include
+human exposure (display backlights, wearable sensors, biomedical
+imaging), the risk file is more extensive and is reviewed by the
+operating programme's safety officer.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Supply-Chain Provenance
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Each fabrication run records the wafer lot's reticle source, the
+photoresist vendor and lot, the dopant vendor and lot, and the
+metallisation vendor and lot. Supply-chain provenance is preserved
+so that vendor-side excursions can be traced to affected fabrication
+runs and consequently to deployed modules.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 Cybersecurity for Connected Modules
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Photonic modules deployed in transceivers and sensors expose
+management interfaces over mutually-authenticated TLS 1.3. Firmware
+updates are signed by the manufacturer's release key and verified by
+the module before install. Failed verification leaves the module on
+the prior firmware and emits an alert.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Programme Wind-Down
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A programme that ceases operations transfers indefinite-retention
+records to a recognised long-term archive, notifies known external
+citers via the well-known discovery document, and publishes a
+sunset timeline for in-flight tape-outs. Externally pinned evidence
+packages remain accessible through the archive at the same
+content-addressed URLs.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §14 Quality Dossier
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The programme's quality dossier records the foundries it works with,
+the platforms it operates on, the PDK revisions it tracks, the
+round-robin exercises it has participated in, the recall history of
+its modules, and the deprecation history of its designs. The dossier
+is reviewed at least annually by the programme's quality manager
+and is read during the annual ISO 9001 surveillance audit.
 
-## Annex H — Versioning and Deprecation Policy
+## §15 Cross-Border Programme Operation
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Programmes that operate across borders maintain a primary jurisdiction
+of registration and one or more operating jurisdictions where
+fabrication, test, packaging, or deployment occurs. Cross-border
+data transfers honour the source-jurisdiction's data-protection law,
+which the operator records at fabrication-run registration time.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §16 Co-Packaged-Optics and Heterogeneous-Integration Considerations
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Modules that integrate photonic chips with electronic ICs in a single
+package (co-packaged optics) carry additional coordination overhead:
+synchronisation between photonic-chip yield and electronic-IC yield
+during binning, thermal-management constraints that bound the
+co-package's allowable operating temperature window, and reliability
+testing that covers both die families. The programme records the
+co-package family in the package record (PHASE-1 §9) and the
+co-package's reliability test plan in the quality dossier.
 
-## Annex I — Interoperability Profiles
+Heterogeneous-integration platforms (III-V on silicon, lithium-niobate
+thin-film bonded to silicon) follow the same conformance rules as
+single-platform designs but emit additional records for the bonded
+interface: bond-line topography, bond-strength characterisation, and
+thermal-cycling reliability are recorded as auxiliary measurement
+records.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §17 Reliability and Burn-In
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Photonic modules destined for high-reliability applications
+(submarine cable, satellite payload, biomedical implant) carry
+extended reliability and burn-in protocols beyond the foundry's
+default qualification. The programme records the extended protocol's
+identifier and the qualifying laboratory in the design's reliability
+record. Modules that have not completed extended reliability are
+flagged in the public catalogue so that high-reliability integrators
+do not consume them in error.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Burn-in cadence is bounded by the laser-source's expected end-of-life;
+burn-in conditions that accelerate end-of-life beyond the expected
+margin MUST be approved by the operating programme's reliability
+engineer before they are applied.
+
+## §18 Eye-Safety Re-Classification on Update
+
+Firmware or driver updates that change the module's optical output
+power envelope MAY re-classify the module under IEC 60825-1.
+Re-classification triggers a recall path under §7 if the new class
+exceeds the certified deployment context; the API enforces the
+recall path with type
+`urn:wia:photonic-chip:laser-class-mismatch`.
+
+## §19 Foundry Multi-Project-Wafer Coordination
+
+Multi-project-wafer (MPW) tape-outs share a reticle slot among
+multiple design houses. The MPW coordinator is the foundry; the
+coordinator emits a per-MPW manifest that names the participating
+designs and their reticle sub-slots. Per-MPW manifests are
+attached to each design's evidence package so that downstream
+auditors can verify that fabrication conditions were shared with
+the named co-tenants.
+
+## §20 Trade-Show and Demonstrator Releases
+
+Demonstrator units released for trade shows, customer evaluation, or
+third-party press review carry a `demonstrator` flag that disables
+public-catalogue inclusion and limits the unit's downstream
+integration to time-bounded evaluation. Demonstrators are recovered
+or decommissioned at the end of the evaluation window per the
+programme's quality dossier.
+
+## §21 Conformance and Auditing
+
+A programme conformant with WIA-photonic-chip publishes its
+accreditation certificate, its programme code registration, its
+quality dossier, the catalogue of designs it has fabricated, and the
+catalogue of recalls it has issued, and answers an annual
+self-assessment that maps each clause of this PHASE to the
+programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-photonic-chip
+- **Last Updated:** 2026-04-27

@@ -1,241 +1,262 @@
-# WIA-military-communication PHASE 3 — PROTOCOL Specification
+# WIA-military-communication PHASE 3 — Protocol Specification
 
 **Standard:** WIA-military-communication
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-military-communication (Military Communication).
+This PHASE specifies the protocols binding the data format (PHASE 1)
+to the API surface (PHASE 2): authentication of operators and
+terminals, the bandwidth-constrained tactical encoding, audit-chain
+construction, time discipline, classification handling integrity,
+and the cross-coalition release-authority handshake. Where an allied
+protocol (STANAG 5066, MMHS) already covers a behaviour, this
+standard defers; gaps and the privacy/audit overlay are specified
+here.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 4406 — Military Message Handling System
+- STANAG 5066 — bandwidth-constrained tactical data exchange
+- STANAG 4774 / 4778 — Confidentiality and Information labelling
+- MIL-STD-188-141C — interoperability and performance standards for ALE / HF
+- MIL-STD-188-110D — interoperability for HF radio modems
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK), RFC 9162 (Certificate Transparency 2.0 pattern)
+- ITU-R Recommendations for HF / VHF / UHF / SATCOM frequency planning
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-military-communication
-standard. It addresses the protocol layer of the standard.
+Operators and terminals authenticate using JWS-signed JWTs issued
+by the deployment's identity provider (KA). Identity assertions
+carry classification clearance and releasability scope so that a
+single token can be evaluated at message-origination time without
+extra round trips. Token claim layout:
 
-## §2 Manifest
+| Claim          | Source                                                            |
+|----------------|-------------------------------------------------------------------|
+| `iss`          | KA URL                                                            |
+| `aud`          | the boundary URL                                                  |
+| `sub`          | terminal URN, operator URN, service URN                           |
+| `iat` / `exp`  | issuance/expiry per RFC 7519                                      |
+| `wia_role`     | one of: terminal, operator, network-mgmt, gateway, c2             |
+| `wia_doctrine` | declared doctrine (NATO, KR, US, JP, FVEY, …)                     |
+| `wia_clearance`| classification clearance (e.g., `secret`)                          |
+| `wia_releasability[]` | coalition releasabilities the principal can act under       |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-communication"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A token presented to an endpoint whose declared classification
+exceeds `wia_clearance` is rejected with
+`urn:wia:milcomms:problem:clearance-insufficient`.
 
-## §3 Conformance Tiers
+## §2 Token format and signing
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Tokens are JWS-signed JWTs (RFC 7515 + RFC 7519). Default signature
+algorithm is ES256 (P-256 ECDSA); higher classification levels
+SHOULD use ES384 (P-384). Tactical token issuance MAY use Ed25519
+to reduce signature size on narrowband links.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Tokens are short-lived: ≤ 8 hours for operator sessions, ≤ 1 hour
+for terminals on tactical networks (modulated by drift budget and
+roaming requirements). Tokens carry the issuing KA's `kid` so the
+boundary can resolve the verification key against the KA's JWKS.
 
-## §4 Discovery
+## §3 Key management
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-communication`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The KA publishes a JWKS at a fixed well-known URI. Signing keys
+rotate at least every 90 days for routine traffic, every 30 days
+for tactical deployments, and on-demand after a personnel-change
+event in the issuing authority. Prior keys remain in the JWKS for
+≥ 180 days so that long-lived audit signatures remain verifiable.
 
-## §5 Time and Identity
+Cross-coalition deployments register peer KAs in a federation
+manifest signed by both parties. A peer's tokens are accepted only
+when the peer KA's JWKS resolves and the federation manifest is
+current; expired manifests suspend cross-coalition flow.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Private keys live in HSMs (FIPS 140-3 Level 2 or national
+equivalent — KCMVP for KR, CRYPTREC for JP, ANSSI for FR). Keys
+never leave the HSM; signing is a remote operation.
 
-## §6 Versioning and Deprecation
+## §4 Audit chain construction
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Every message-origination, classification-validation, addressing
+lookup, spectrum allocation, link-state observation aggregation,
+bridge event, and EMCON change emits an AuditEvent. AuditEvents
+form a per-deployment hash chain:
 
-## §7 Privacy and Security
+```
+chain_input  = SHA-256(prev_chain_root || canonical(event))
+chain_root_t = chain_input
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Canonicalisation uses RFC 8785 JSON Canonicalisation Scheme. The
+chain root is sealed once per UTC day by signing the root with the
+deployment's signing key. Sealed roots MAY be published to a
+transparency log following the RFC 9162 pattern when the deployment
+policy enables external auditability.
 
-## §8 Open Governance
+Reconstruction failure (proof mismatch, missing event, missing
+daily root) is itself a security incident triggering an incident-
+response workflow.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-communication` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Bandwidth-constrained tactical encoding
+
+Tactical narrowband links cannot carry the full JSON envelope of
+PHASE 2. The protocol defines constrained encodings:
+
+- **MMHS short message** — STANAG 4406 envelope with a fixed-size
+  classification block; suitable for narrowband HF
+- **VMF tactical message** — MIL-STD-2045-47001D Variable Message
+  Format with a hash reference back to the canonical record at the
+  boundary
+- **STANAG 5066 packet** — sub-network access with assured-delivery
+  service for short ack-required messages
+
+Constrained encodings are *projection only*; the canonical record
+remains the JSON record at the boundary. The constrained payload
+includes a hash reference back to the canonical record so the
+receiver can request the full record when bandwidth allows.
+
+Constrained payloads are signed using EdDSA Ed25519 (64-byte
+signature) so the air-time penalty stays acceptable.
+
+## §6 Time discipline
+
+Clocks synchronise to GNSS (multi-constellation receiver) where
+available and fall back to NTPv4 stratum-2 for fixed-installation
+terminals. Drift exceeding 500 ms is an operational incident; drift
+exceeding 5 s suspends new token issuance for affected terminals
+because token validity windows depend on agreed time.
+
+Tactical narrowband terminals carry an embedded time-of-day clock
+disciplined by GPS PPS (1 PPS pulse-per-second) where possible.
+Terminals without PPS may operate in degraded-time mode with a
+recorded warning.
+
+## §7 Classification handling integrity
+
+The boundary enforces classification handling at every operation:
+
+- A message addressed to an endpoint outside the message's
+  releasability is refused; no partial delivery
+- A bridge between waveforms of different classification ceilings
+  is refused unless the bridge has an explicit downgrade
+  authorisation signed by the release authority and visible in the
+  audit chain
+- A read of an audit entry referencing a classified message uses
+  the same gate; auditors above the message's classification level
+  see the full record, auditors below see a redacted record showing
+  only the metadata permitted at their level
+
+The boundary records every classification-gate decision with the
+input clearance, the message marking, the gate result, and the
+deciding policy version so that auditors can reproduce the
+decision.
+
+## §8 Release-authority handshake
+
+Cross-coalition release of military communications follows a
+handshake mirroring WIA-nbc-defense PHASE 3 §8:
+
+1. Requesting organisation submits a release request naming
+   the records, the receiving organisation, the purpose, and
+   the release authority's signature
+2. Originating organisation's release officer signs the request
+3. Both signatures are recorded in the audit chain
+4. The boundary releases the records under the named purpose
+
+A release without both signatures is refused with
+`urn:wia:milcomms:problem:release-not-authorised`. Coalition
+operations delegate release authority per the standing federation
+manifest; ad-hoc release outside the manifest requires both nations'
+release officers to sign individually.
+
+## §9 Failure modes
+
+| Failure                              | Behaviour                                         |
+|--------------------------------------|---------------------------------------------------|
+| KA JWKS unreachable                  | Cached keys honoured until cache expiry           |
+| Tactical link drops mid-MMHS packet  | Sender retries; no duplicate event created        |
+| Audit chain write failure            | Operation rejected (consistency w/ medical-data-privacy §9) |
+| Time drift > 5 s                     | Token issuance suspended for affected terminal    |
+| Federation manifest expired          | Peer tokens refused; manual renewal required      |
+| Spectrum allocation conflict         | Allocation rejected; conflict surfaced            |
+| Classification gate mismatch         | Operation rejected with structured reason         |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Algorithm choices (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| Concern                     | Default                            | Legacy permitted                |
+|-----------------------------|------------------------------------|---------------------------------|
+| Token signing               | ES256                              | RS256                           |
+| Daily-root signing          | ES384                              | RS256                           |
+| Tactical packet signing     | EdDSA Ed25519 (64-byte)            | n/a                             |
+| Audit hash                  | SHA-256 (RFC 6234)                 | n/a                             |
+| TLS                         | 1.3 (RFC 8446)                     | 1.2 explicit-list               |
+| Symmetric at rest (audit)   | AES-256-GCM                        | AES-128-GCM                     |
+| HF voice crypto suite       | per national crypto plan           | per national legacy plan         |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Quantum-resistance migration is tracked separately as new NIST
+PQ standards reach deployment-grade tactical HSM support.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex B — Federation manifest shape (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```yaml
+federation:
+  parties:
+    - {orgRef: "urn:wia:org:nation-A.signal-cmd", kid: "ka-A-2026"}
+    - {orgRef: "urn:wia:org:nation-B.signal-cmd", kid: "ka-B-2026"}
+  flows:
+    - {from: "nation-A", to: "nation-B", purposes: ["operational"], records: ["messages", "spectrum", "links"]}
+    - {from: "nation-B", to: "nation-A", purposes: ["operational"], records: ["messages"]}
+  bridgePolicy:
+    - {sourceWaveform: "link-16-ja", destWaveform: "link-22-bridged", lossy: false}
+  expiry: "2027-04-27"
+  signatures: [<JWS-by-A>, <JWS-by-B>]
+```
 
-## Annex F — Adoption Roadmap
+## Annex C — Cross-domain release-handshake worked example (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A coalition partner requests release of a milcomms message that
+references an NBC validated event:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+1. Partner's release officer signs a request naming both the
+   milcomms message ID and the underlying NBC event ID
+2. Originating organisation's release officer signs the request,
+   acknowledging both the milcomms-side releasability and the
+   NBC-side release authority
+3. The milcomms boundary verifies the NBC boundary's signature
+   on the underlying event before releasing the wrapping message
+4. Both signatures are recorded in the audit chain; the cross-
+   referenced NBC event's chain is also updated with a release
+   notification
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The handshake guarantees that a release of a wrapping message
+implicitly verifies the underlying-domain release; partners cannot
+exfiltrate underlying-domain content by wrapping it in a milcomms
+message.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex D — Tactical narrowband budget (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+Approximate air-time budget for a 96-byte NBC-1 packet over
+STANAG 5066 at 2400 bps:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- payload + signature: 96 + 64 = 160 bytes = 1280 bits → 0.53 s
+- ARQ acknowledgement: ~16 bits → ~7 ms
+- propagation: variable per HF skywave path
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A handful of such packets per minute are operationally feasible;
+high-rate streaming is not. Voice-grade waveforms (e.g., MELP at
+2400 bps) coexist on the same band by ALE-driven channel selection.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## Annex E — Time discipline summary (informative)
 
-## Annex H — Versioning and Deprecation Policy
+| Source                | Drift target        | Notes                                |
+|-----------------------|---------------------|--------------------------------------|
+| GNSS multi-constellation | ± 100 ns (PPS)   | preferred for tactical               |
+| NTPv4 stratum-2        | ≤ 50 ms              | preferred for fixed installations    |
+| Local oscillator only  | < 5 s rated         | degraded mode, recorded warning      |
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A terminal that lacks any time source MUST not originate timestamps;
+its messages are quarantined at the boundary until time is re-acquired.

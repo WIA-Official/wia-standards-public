@@ -1,241 +1,275 @@
-# WIA-medical-data-privacy PHASE 1 — DATA-FORMAT Specification
+# WIA-medical-data-privacy PHASE 1 — Data Format Specification
 
 **Standard:** WIA-medical-data-privacy
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-medical-data-privacy (Medical Data Privacy).
+This document defines the canonical data format for medical data privacy
+artefacts: consent receipts, purpose-of-use declarations, minimum-necessary
+filters, de-identification job records, breach notifications, and the
+audit trail that binds them together. The shape is interoperable with
+HL7 FHIR R5 Consent and AuditEvent resources so that an implementation
+already publishing FHIR can adopt this PHASE without inventing parallel
+data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Consent (R5/consent.html), AuditEvent (R5/auditevent.html), Provenance (R5/provenance.html)
+- ISO/IEC 27001:2022 — information security management
+- ISO/IEC 27018:2019 — PII protection in public cloud (processor)
+- ISO/IEC 29100:2011 — privacy framework (controller/processor/data subject roles)
+- ISO/IEC 29184:2020 — online privacy notices and consent
+- ISO/IEC 27701:2019 — privacy information management (extends 27001)
+- IETF RFC 8259 (JSON), RFC 9457 (Problem Details), RFC 7515 (JWS), RFC 7519 (JWT)
+- W3C XML Signature 1.1 (for legacy CDA / interoperability with prior-era data)
+- Kantara Initiative Consent Receipt Specification 1.1 (prior-art mapping only)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-medical-data-privacy
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that handle Protected Health Information
+(PHI) or its national equivalents (KR 민감정보 / 건강정보 under PIPA;
+EU "data concerning health" under GDPR Art. 9; US PHI under 45 CFR §160.103).
+It standardises the *shape* of privacy-relevant artefacts. Storage,
+key management, and transport are addressed in PHASE 3 (Protocol)
+and PHASE 4 (Integration).
 
-## §2 Manifest
+The standard is jurisdiction-aware: a single implementation MUST be
+able to declare which legal regime its records fall under (one of
+HIPAA / GDPR / K-PIPA / LGPD / PIPL / PDPA-SG / NDB-AU) so that
+downstream auditors can select the correct interpretation of
+"minimum necessary", "purpose limitation", and "retention". A record
+without a declared regime MUST be rejected at the edge.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-data-privacy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Subject identifier model
 
-## §3 Conformance Tiers
+PHI records carry a *pseudonymous* subject identifier (`subjectRef`).
+Direct identifiers (name, contact, government ID) are stored separately
+under a key that the privacy boundary controls. The cross-reference
+between `subjectRef` and direct identifier is the *re-identification
+key* and is itself in scope as PHI.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+`subjectRef` is a URN of form `urn:wia:mdp:subject:<opaque>` where the
+opaque part is at least 128 bits of entropy. Implementations MUST NOT
+encode personal data into the opaque segment (no birth-year prefix,
+no initials, no MRN). The mapping between MRN/EHR identifier and
+`subjectRef` is held in a separate domain (the *identity broker*) and
+is rotated per PHASE 3 §6.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Subject identifiers are *per-purpose* by default: a research dataset
+and a clinical-care dataset MUST use different `subjectRef` values
+for the same individual unless an active linkage authorisation
+(see §5) is in force. This forces re-identification attempts to
+go through the identity broker, which logs every linkage as an
+AuditEvent.
 
-## §4 Discovery
+## §3 Consent receipt (FHIR-aligned)
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-data-privacy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Every disclosure of PHI is gated by a consent record. Consent receipts
+follow HL7 FHIR R5 Consent profile with the following fixed bindings:
 
-## §5 Time and Identity
+| FHIR field          | Binding                                                                |
+|---------------------|------------------------------------------------------------------------|
+| `status`            | active / inactive / draft / entered-in-error                           |
+| `category`          | from FHIR ConsentCategoryCodes (RESEARCH, NORMAL, etc.)                |
+| `subject`           | Reference to the pseudonymous patient (`subjectRef`)                   |
+| `dateTime`          | RFC 3339 timestamp; MUST include offset                                |
+| `grantee`           | the recipient organisation (Practitioner / Organization)               |
+| `controller`        | the data controller declaring jurisdiction (per §1)                    |
+| `provision.purpose` | from v3-PurposeOfUse value set (TREAT, HRESCH, HPAYMT, etc.)           |
+| `provision.action`  | one or more of access, collect, disclose, correct, delete              |
+| `provision.period`  | start MUST be present; end SHOULD be present (open-ended is auditable) |
+| `policy.uri`        | URL pointing to the human-readable privacy notice (per ISO 29184)      |
+| `verification`      | identity-verification evidence (idType, verifiedWith, verifiedBy)      |
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The receipt is signed using JSON Web Signature (RFC 7515) with the
+controller's signing key. The detached signature is stored alongside
+the receipt to keep the FHIR JSON canonical for downstream FHIR-aware
+consumers.
 
-## §6 Versioning and Deprecation
+## §4 Purpose-of-use vocabulary
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The `provision.purpose` field draws from a closed value set so that
+"minimum necessary" enforcement is deterministic. The closed set is
+the v3-PurposeOfUse from the HL7 v3 vocabulary:
 
-## §7 Privacy and Security
+- `TREAT` — direct patient care
+- `HPAYMT` — payment for healthcare
+- `HOPERAT` — healthcare operations (quality assurance, training, audit)
+- `HRESCH` — research, with secondary scope (`CLINTRCH`, `BIORCH`, `POPHLTH`)
+- `PUBHLTH` — public health surveillance and reporting
+- `EDU` — education
+- `ETREAT` — emergency treatment override (gated by §6)
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Purposes outside this list are rejected. Mapping a domain-specific
+purpose to one of these eight values is the integration team's
+responsibility (PHASE 4).
 
-## §8 Open Governance
+## §5 Linkage authorisation
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-data-privacy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Re-identification or cross-purpose linkage requires a separate
+*linkage authorisation* record, distinct from the disclosure consent.
+Linkage authorisations name the two `subjectRef` values being
+linked, the purpose of the linkage, the requesting party, the
+broker that will mint the linked identifier, and the period for
+which the link is valid. A linkage authorisation can authorise
+*one* link only — it does not extend to subsequent links derived
+from the linked identifier.
+
+Every minted linkage emits a Provenance resource (FHIR R5 Provenance)
+so that auditors can see, for any record downstream, which linkage
+authorisation produced its `subjectRef`.
+
+## §6 Emergency-treatment override (break-glass)
+
+When a clinician asserts `ETREAT` purpose on a disclosure that
+lacks active consent, the system accepts the disclosure but
+records:
+
+- the asserting clinician's authenticated identity
+- the patient's `subjectRef`
+- the data scope disclosed (FHIR resource types and IDs)
+- the timestamp and elapsed time since assertion
+- the reason text (mandatory free-text, ≥20 characters)
+
+The override is *post-hoc auditable* — the clinician's organisation
+MUST review every break-glass event within 72 hours. A break-glass
+event without a recorded review at +72h escalates to the data
+protection officer per the deployment policy.
+
+## §7 De-identification job record
+
+When PHI is transformed into a de-identified extract (for research,
+secondary use, or external publication), the job emits a record
+containing:
+
+- input scope (FHIR resource types, date range, cohort selector)
+- transformation pipeline (k-anonymity, l-diversity, differential
+  privacy ε, date-shift offsets, generalisation hierarchies)
+- residual re-identification risk band (very low / low / moderate /
+  not assessed; numeric scoring is out of scope because no method
+  is universally agreed)
+- output dataset hash (SHA-256 of the manifest)
+- expiry date (after which the dataset MUST be re-evaluated or
+  destroyed)
+
+The job record is signed using the same JWS mechanism as consent
+receipts. Datasets without a current job record cannot be retained
+beyond a 90-day grace window.
+
+## §8 Breach notification record
+
+A suspected or confirmed breach of PHI emits a structured
+notification with the fields required by the controlling
+jurisdiction:
+
+| Jurisdiction | Required field set                                                       |
+|--------------|--------------------------------------------------------------------------|
+| HIPAA        | breach description, PHI types affected, individuals affected, date range |
+| GDPR Art. 33 | nature, categories of data subjects, likely consequences, mitigation     |
+| K-PIPA       | item types, count, cause, response, contact for affected subject         |
+
+The record is created within 24 hours of detection. Notification to
+the regulator follows the jurisdiction's clock (HIPAA ≤60 days; GDPR
+≤72 hours; K-PIPA 사실 인지 후 지체 없이). The record carries
+provenance back to the AuditEvent that first surfaced the suspicion.
+
+## §9 AuditEvent envelope
+
+Every read, write, disclosure, override, linkage, de-identification
+job, and breach event emits a FHIR AuditEvent. AuditEvents are
+append-only, hash-chained (each event references the prior event's
+hash), and signed using the controller's signing key on a daily
+rollup. The chain root is published to a transparency log if and
+only if the deployment policy enables it; otherwise the chain is
+held in a controller-internal append-only store (PHASE 3 §4).
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Field-level mapping table (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+The following mapping documents how concrete record fields used by
+common EHR vendors map onto this PHASE's data model. This annex is
+informative; the normative shape is defined in §2–§9 above.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+| EHR field                         | PHASE 1 §       | Notes                                            |
+|-----------------------------------|-----------------|--------------------------------------------------|
+| MRN / patient ID                  | §2 (subjectRef) | held only at the identity broker; never on record|
+| Encounter / visit number          | §3 (Consent)    | encounter is the resource subject of `provision` |
+| Reason-for-visit text             | §6 (ETREAT)     | only when override is asserted; otherwise out of scope |
+| Allergy list                      | §3 (Consent)    | minimum-necessary scope under TREAT              |
+| Insurance member ID               | §3 (HPAYMT)     | scoped to billing purpose                        |
+| Research-cohort flag              | §5 (Linkage)    | provenance back to linkage authorisation         |
+| De-identified extract identifier  | §7 (Job record) | extracted dataset hash, not subject identity     |
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The mapping is not exhaustive; vendor field names differ. The
+deployment SHOULD maintain a mapping document under change control
+so that auditors can reproduce the field-to-§ binding without
+reading vendor-specific schema.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Jurisdiction-specific extensions (informative)
 
-## Annex F — Adoption Roadmap
+Some jurisdictions require fields beyond the minimum set defined here.
+Deployments add fields under a controller-scoped extension namespace
+(`urn:wia:mdp:ext:<controller>:<field>`) so that the core record
+remains portable across jurisdictions.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- KR PIPA — 본인확인 결과(CI) is held at the identity broker, never
+  on disclosure-side records; CI rotation policy follows
+  §3.6 (identity rotation).
+- EU GDPR — special-category-data flag (`Art9Basis`) is required
+  on every record where the FHIR resource carries health data;
+  permitted bases are enumerated in deployment policy.
+- US HIPAA — the 18 HIPAA Safe Harbor identifiers are removed
+  from de-identified extracts per PHASE 1 §7; the residual
+  re-identification risk band reflects what remains after the
+  Safe Harbor pass.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Worked example: research consent receipt (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The following is a fully populated FHIR R5 Consent resource that
+satisfies this PHASE for a research disclosure. The example is
+illustrative; production deployments substitute their own URNs,
+controller IDs, and signing keys.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```json
+{
+  "resourceType": "Consent",
+  "status": "active",
+  "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/consentcategorycodes", "code": "RESEARCH"}]}],
+  "subject": {"reference": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e"},
+  "dateTime": "2026-04-27T09:30:00+09:00",
+  "grantee": [{"reference": "Organization/research-consortium-A"}],
+  "controller": [{"reference": "Organization/hospital-K-controller"}],
+  "policy": [{"uri": "https://hospital-k.example/privacy/research-2026"}],
+  "provision": {
+    "type": "permit",
+    "period": {"start": "2026-04-27", "end": "2029-04-27"},
+    "purpose": [{"system": "http://terminology.hl7.org/CodeSystem/v3-PurposeOfUse", "code": "HRESCH"}],
+    "action": [{"coding": [{"code": "access"}, {"code": "disclose"}]}],
+    "data": [{"meaning": "related", "reference": {"reference": "Group/research-cohort-2026Q2"}}]
+  },
+  "verification": [{"verified": true, "verifiedWith": "Practitioner/research-coordinator-12", "verificationDate": "2026-04-27T09:25:00+09:00"}],
+  "extension": [
+    {"url": "urn:wia:mdp:ext:jurisdiction", "valueCode": "K-PIPA"},
+    {"url": "urn:wia:mdp:ext:dataMinimisationPlan", "valueUri": "Document/dmp-2026Q2-v3"}
+  ]
+}
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+The detached JWS signature is held alongside this resource at the
+controller's signing endpoint and is verifiable against the JWKS at
+`https://hospital-k.example/.well-known/jwks.json` (kid in the JWS
+header matches a current `use: sig` key in the JWKS).
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex D — Conformance disclosure
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations declare per-section conformance in their published
+Capability Statement (PHASE 2 Annex A). Sections marked `partial`
+reference the deployment policy explaining the gap. Sections marked
+`excluded` carry a reason citing the controlling jurisdiction's
+allowance for that exclusion. An implementation that is `partial`
+or `excluded` on §3 (Consent receipt), §4 (Purpose-of-use), §6
+(Break-glass), or §9 (AuditEvent envelope) is non-conformant overall
+and cannot claim Deep v3 status.

@@ -1,241 +1,282 @@
-# WIA-missile-defense PHASE 4 — INTEGRATION Specification
+# WIA-missile-defense PHASE 4 — Integration Specification
 
 **Standard:** WIA-missile-defense
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-missile-defense (Missile Defense).
+This PHASE describes how a deployment integrates the data, APIs, and
+protocols from PHASEs 1–3 with the operational picture: sensor-fleet
+management, fusion-engine deployment, command-and-control consoles,
+weapon systems, civil-airspace overlap, casualty-coordination, and
+coalition exchange. It is non-prescriptive about specific vendor
+products; it specifies the integration *contracts* a deployment
+must satisfy.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 5516 — Tactical Data Link 16
+- STANAG 5522 — Link 22
+- ICAO Doc 4444 — air-traffic management procedures
+- WIA-military-communication — for cross-domain transport
+- WIA-medical-data-privacy — for casualty integration
+- WIA-medical-imaging — for imaging-driven medical-evacuation coordination
 
 ---
 
-## §1 Scope
+## §1 Operational SLAs
 
-This PHASE document is one of four that together define the WIA-missile-defense
-standard. It addresses the integration layer of the standard.
+| Concern                                          | Default SLA              |
+|--------------------------------------------------|--------------------------|
+| Sensor observation ingest p95 added latency      | ≤ 50 ms                  |
+| Track update propagation to fusion               | ≤ 100 ms                 |
+| Threat assessment to engagement-authority queue  | ≤ 200 ms                 |
+| Engagement decision to weapon system             | ≤ 250 ms                 |
+| Audit chain entry available after operation      | ≤ 1 s                    |
+| Federation manifest expiry alert lead time       | ≥ 30 days                |
 
-## §2 Manifest
+These SLAs are tight because fire-control timelines for hypersonic
+or short-range tactical threats compress engagement windows to
+seconds. Tighter SLAs are negotiable per deployment; loosening them
+requires operational-command sign-off.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "missile-defense"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Sensor fleet registry
 
-## §3 Conformance Tiers
+The deployment maintains a registry of every fielded sensor:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- `sensorRef` — URN
+- vendor, model, serial number
+- modality (radar, IR/EO, space-based, distributed)
+- firmware version, last firmware update
+- calibration status — date, calibrating laboratory
+- TLS client certificate fingerprint and expiry
+- operating-area policy (where the sensor is permitted to ingest)
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A sensor not in the registry, or with expired calibration or
+expired certificate, is refused at PHASE 2 §1 ingest.
 
-## §4 Discovery
+## §3 Fusion-engine deployment
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/missile-defense`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Fusion engines correlate observations across the sensor fleet.
+The integration contract:
 
-## §5 Time and Identity
+- Each fusion engine has a unique authority URN; authority
+  collisions are rejected at registration
+- Engines subscribe to observation streams from sensors in their
+  operating area
+- Engines publish fused tracks; track-correlation events
+  (PHASE 2 §7) link tracks across engines
+- Multi-engine deployments use a federated authority for tracks
+  correlated across engines, named explicitly in the federation
+  manifest
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+A fusion engine that fails to keep up with observation arrival
+rate degrades gracefully (drops oldest pending observations,
+records dropped count) rather than crashing.
 
-## §6 Versioning and Deprecation
+## §4 Weapon-system integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Weapon systems are addressable endpoints with their own signing
+keys. The integration contract:
 
-## §7 Privacy and Security
+- Each weapon system registers its readiness state and operating-
+  area scope; engagement decisions refusing weapons outside scope
+  are emitted automatically
+- Weapon systems acknowledge engagement decisions before status
+  reporting begins; an unacknowledged decision past the deployment's
+  acknowledgement SLA escalates to operational command
+- Weapon systems persist their own status records locally so that
+  audit recovery is possible after network outage
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+A weapon system that loses connectivity continues persisting
+status locally and reconciles with the boundary on reconnection.
 
-## §8 Open Governance
+## §5 Civil-airspace overlap
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `missile-defense` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Many missile-defence operating areas overlap civil airspace. The
+integration contract:
+
+- Civil flight plans (ICAO Doc 4444 format) are correlated against
+  tracks at fusion time; identification is biased toward `friend`
+  for tracks within a registered flight plan
+- Engagement decisions on tracks correlated to a civil flight plan
+  require an explicit override authorisation flagged in the
+  decision record
+- Coordination with civil air-traffic services is recorded as a
+  cross-system reference; the WIA-military-communication boundary
+  carries the coordination message
+
+The deployment's standing operating procedure documents the
+civil-correlation policy so that engagement decisions can be
+audited against doctrine.
+
+## §6 Casualty coordination
+
+Successful intercepts can produce debris fields with civilian
+casualty risk; failed intercepts produce impact damage assessments
+that drive casualty response. The integration contract:
+
+- Outcome records (PHASE 1 §8) reference any debris-field model
+  output and any predicted casualty area
+- Casualty-response coordination flows through WIA-medical-data-
+  privacy and WIA-medical-imaging via the WIA-military-communication
+  boundary; identifiers preserve pseudonymity across the medical
+  boundary
+
+This standard does not duplicate the medical standards' clinical
+records; it references them so the missile-defence audit chain
+ties to the medical audit chain across the incident.
+
+## §7 Coalition exchange
+
+Multi-national coalition deployments exchange tracks, threat
+assessments, and (where authorised) engagement decisions
+bilaterally under a federation manifest:
+
+- Each pair of nations signs a federation manifest enumerating
+  which records flow which direction, which weapon systems each
+  party may task on the other's tracks, and the release authorities
+- The boundary honours the manifest at every cross-national
+  release request
+- Manifest expiry suspends cross-national flows; manifest renewal
+  is signed and recorded as an AuditEvent
+
+Ad-hoc cross-coalition tasking outside the manifest requires both
+nations' release officers to sign individually; the boundary
+refuses ad-hoc release without dual signatures.
+
+## §8 Quarterly compliance report
+
+The boundary emits a quarterly compliance report covering:
+
+- Total observations ingested by sensor and modality
+- Fusion-engine track creation rate, federation correlation rate
+- Threat assessments by level and confidence band
+- Engagement decisions by type and weapon system
+- Weapon-system state-transition completeness
+- Outcomes by category and confidence
+- Cross-coalition exchanges by federation peer
+- Federation manifest health (active, expiring, expired)
+- Sensor calibration health (current, expiring, expired)
+- Audit-chain integrity check results
+
+The report is signed and is itself in scope for the audit chain
+so that report tampering would surface in the chain.
+
+## §9 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every fielded sensor and weapon system is in its respective
+   registry with current calibration and current certificate
+2. Every observation, decision, and outcome in the past quarter
+   has a matching audit chain entry with verifiable inclusion proof
+3. Every cross-coalition release in the past quarter has both
+   release-authority signatures on file
+4. Civil-flight-plan correlation is in effect for all tracks in
+   civil-airspace-overlap operating areas
+5. Engagement-authority scopes are current and match the
+   doctrine on file
+6. Quarterly compliance report has no integrity-check failures
+
+A deployment failing any of these reports the gap in its compliance
+package rather than concealing it.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Common pitfalls (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+- **Track-ID drift after fusion-engine restart** — engines that
+  reset `seq` to 0 after restart create UID collisions; deployments
+  SHOULD persist the last-issued `seq` across restarts
+- **Civil-flight-plan staleness** — flight plans change in real
+  time; a stale flight-plan cache can mis-identify a friendly
+  airliner as `unknown`. The civil-correlation cache MUST refresh
+  at least every 5 minutes during active operations
+- **Federation manifest renewal lag** — coalition exercises often
+  reveal expired manifests at the worst moment; deployments SHOULD
+  schedule renewal a calendar quarter before operational need
+- **Engagement-authority scope drift** — operating areas shift over
+  time; engagement-authority scope claims SHOULD be reviewed at
+  every doctrine update
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — Decommissioning (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+When a deployment is decommissioned, the final daily root is
+sealed, outstanding decisions are either resolved or cancelled,
+weapon systems are returned to safed state, and the chain is
+exported to the receiving custodian. The decommissioning manifest
+is itself an audit event in the final chain root, signed by both
+outgoing and incoming custodians so coalition partners can trace
+continuity across the handover.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Federation manifest worked example (informative)
 
-## Annex F — Adoption Roadmap
+```yaml
+federation:
+  parties:
+    - {orgRef: "urn:wia:org:rok-army.adcc", kid: "ka-rok-2026"}
+    - {orgRef: "urn:wia:org:us-army.380adabde", kid: "ka-us-2026"}
+  flows:
+    - {from: "rok", to: "us", purposes: ["operational"], records: ["tracks", "assessments"]}
+    - {from: "us", to: "rok", purposes: ["operational"], records: ["tracks", "assessments", "decisions-on-rok-airspace"]}
+  trackCorrelation:
+    federatedAuthority: "urn:wia:md:fusion:rok-us-fed-01"
+    correlationPolicy: "kinematic-co-track + iff-mode-5 cross-validate"
+  weaponTaskingScope:
+    - {fromParty: "us", toWeaponSystem: "urn:wia:md:ws:rok-thaad-bty-1", scope: "tactical-ballistic in joint-aor"}
+  expiry: "2027-04-27"
+  signatures: [<JWS-by-rok>, <JWS-by-us>]
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+A manifest with one signature missing is rejected by both peers;
+the manifest is the live agreement, not a draft.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Operational lessons-learned register (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Recurring operational lessons-learned across exercises:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- **Identification latency** — NCTR + IFF correlation take time;
+  short-range threats may transition friend → hostile inside the
+  engagement decision window. The deployment SHOULD run periodic
+  drills with hostile-only simulators to keep latency tight
+- **Weapon-system cross-tasking** — coalition partners with
+  different weapon mixes often have different optimal target
+  classes; the federation manifest's weapon-tasking scope SHOULD
+  be reviewed quarterly against the threat-mix forecast
+- **Civil flight plan failure mode** — when civil ATC data feeds
+  go offline, default identification falls back to `unknown`;
+  engagement decisions on `unknown` tracks SHOULD require an
+  additional review step in this state
+- **Audit-chain reconciliation drift** — weapon systems' local
+  buffers occasionally accumulate during long-duration outages;
+  exercises SHOULD include reconciliation-after-outage drills
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Decommissioning (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+When a deployment is decommissioned:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+1. Outstanding engagement decisions are either resolved (success,
+   miss, aborted) or cancelled with structured reasons recorded
+2. Weapon systems are returned to safed state; their final state
+   transition is recorded as a decommissioning event
+3. Active spectrum coordinations are released back to the
+   coordinating authorities
+4. Final daily root is sealed and the chain is exported to the
+   receiving custodian
+5. Coalition partners are notified via the WIA-military-communication
+   boundary so the federation manifest can be retired or
+   re-pointed at a successor deployment
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+The decommissioning manifest is itself an audit event in the final
+chain root, signed by both outgoing and incoming custodians so
+coalition partners can trace continuity across the handover.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Versioning and deprecation (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Versioning follows Semantic Versioning 2.0.0. Coalition operations
+prefer staged migration: a major-version bump rolls out at one
+deployment per quarter so partners adapt incrementally. Deprecated
+versions enter a 12-month sunset window during which the registry
+marks them deprecated and surfaces migration notes in the audit
+chain. Patch-level errata are issued without a deprecation window
+because they do not change normative behaviour.

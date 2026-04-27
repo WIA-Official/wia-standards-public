@@ -1,241 +1,292 @@
-# WIA-medical-imaging PHASE 1 — DATA-FORMAT Specification
+# WIA-medical-imaging PHASE 1 — Data Format Specification
 
 **Standard:** WIA-medical-imaging
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-medical-imaging (Medical Imaging).
+This PHASE defines the canonical data format for medical-imaging
+artefacts: study identifiers, series and instance metadata,
+acquisition device descriptors, structured report bindings,
+de-identified extracts, and the cross-references that bind imaging
+records to clinical context. The shape is interoperable with DICOM
+PS3.3 (information object definitions) and HL7 FHIR R5 ImagingStudy
+so that an existing PACS or VNA can adopt this PHASE without
+inventing parallel data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- DICOM PS3.3 — Information Object Definitions (NEMA PS3.3)
+- DICOM PS3.4 — Service Class Specifications
+- DICOM PS3.6 — Data Dictionary
+- DICOM PS3.10 — Media Storage and File Format
+- DICOM PS3.15 — Security and System Management Profiles
+- DICOM PS3.18 — Web Services (DICOMweb: WADO-RS, QIDO-RS, STOW-RS)
+- HL7 FHIR R5 — ImagingStudy (R5/imagingstudy.html), DiagnosticReport (R5/diagnosticreport.html)
+- IHE Radiology Technical Framework — Scheduled Workflow (SWF.b), Cross-Enterprise Document Sharing for Imaging (XDS-I.b)
+- ISO 12052:2017 — Health informatics: DICOM
+- IETF RFC 7515 (JWS), RFC 7519 (JWT) — for non-DICOM signing layers
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-medical-imaging
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that acquire, store, route, display,
+or analyse medical images and the associated structured reports.
+It addresses the imaging-specific shape of data; cross-cutting
+privacy concerns (consent, audit, retention) defer to
+WIA-medical-data-privacy. The two standards are complementary —
+this one names the imaging artefacts; the privacy standard names
+the consent gates that surround disclosure of those artefacts.
 
-## §2 Manifest
+In scope: cross-sectional (CT, MR), nuclear (PT, NM), projection
+(CR, DX, MG), ultrasound (US), fluoroscopy (XA, RF), endoscopy
+(ES), pathology whole-slide imaging (SM), and ophthalmic imaging
+(OP, OPT). Out of scope: vendor-proprietary streaming protocols
+that do not yield DICOM-conformant artefacts at rest.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-imaging"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Identifier hierarchy
 
-## §3 Conformance Tiers
+DICOM models imaging as a four-level hierarchy. This PHASE
+preserves that hierarchy and binds it to the privacy boundary's
+pseudonymous subject identifier:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+| Level    | DICOM identifier         | Binding                                   |
+|----------|--------------------------|-------------------------------------------|
+| Patient  | (0010,0020) PatientID    | mapped to `subjectRef` per §3 below       |
+| Study    | (0020,000D) StudyInstanceUID | one per imaging encounter             |
+| Series   | (0020,000E) SeriesInstanceUID | one per acquisition protocol         |
+| Instance | (0008,0018) SOPInstanceUID  | one per stored object                  |
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+UIDs are ISO/IEC 9834-3 OIDs in DICOM dotted-decimal form, root-
+allocated under the deployment's DICOM root UID (registered with
+the controlling jurisdiction's medical-device registrar). UIDs are
+*globally unique and never reused* — even after deletion the UID
+is retained so that audit trails referencing it remain meaningful.
 
-## §4 Discovery
+## §3 Patient identifier mapping
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-imaging`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The DICOM `PatientID` element (0010,0020) holds the deployment's
+internal medical-record number (MRN). In every disclosure outside
+the controller's boundary, this element is replaced with the
+pseudonymous `subjectRef` defined in WIA-medical-data-privacy
+PHASE 1 §2. The original `PatientID` is preserved only inside the
+controller's identity broker.
 
-## §5 Time and Identity
+`PatientName` (0010,0010) and `PatientBirthDate` (0010,0030) are
+direct identifiers and follow the same boundary rule. In de-identified
+extracts the `PatientName` is set to a synthetic stable token and
+the `PatientBirthDate` is generalised (year-only by default; per-
+study date offsets are applied uniformly across that subject's
+studies to preserve temporal relationships).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Acquisition metadata
 
-## §6 Versioning and Deprecation
+Each Series carries acquisition metadata describing how the
+image was obtained:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- Modality (0008,0060) — closed value set per DICOM PS3.16 CID 29
+- Manufacturer (0008,0070), Model Name (0008,1090), Software Versions (0018,1020)
+- Acquisition geometry — slice thickness (0018,0050), spacing between
+  slices (0018,0088), pixel spacing (0028,0030), rows/columns (0028,0010/11)
+- Acquisition technique — for CT: KVP (0018,0060), exposure (0018,1152),
+  CTDIvol (0018,9345); for MR: scanning sequence (0018,0020), TR/TE
+  (0018,0080/81), magnetic field strength (0018,0087)
+- Contrast administration — agent (0018,0010), volume, route, timing
+- Time stamps — acquisition date (0008,0022), acquisition time
+  (0008,0032), all in UTC with offset; series time and study time
+  consistent with the patient encounter
 
-## §7 Privacy and Security
+Acquisition metadata is read-only post-storage. Corrections require
+issuing a new instance referencing the prior with a corrigenda
+relationship; the prior instance remains in the store for audit.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Pixel data and transfer syntax
 
-## §8 Open Governance
+Pixel data lives at (7FE0,0010) and is encoded by a Transfer Syntax
+UID (0002,0010 in the file meta). The standard accepts these
+transfer syntaxes for new acquisitions:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-imaging` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+| UID                            | Encoding                                  |
+|--------------------------------|-------------------------------------------|
+| 1.2.840.10008.1.2.1            | Explicit VR Little Endian (uncompressed)  |
+| 1.2.840.10008.1.2.4.70         | JPEG Lossless, hierarchical (SV1)         |
+| 1.2.840.10008.1.2.4.90         | JPEG 2000 Lossless                        |
+| 1.2.840.10008.1.2.4.91         | JPEG 2000 (lossy, primary capture only)   |
+| 1.2.840.10008.1.2.4.81         | JPEG-LS Lossless                          |
+| 1.2.840.10008.1.2.4.92/93      | JPEG 2000 Multi-component                 |
+| 1.2.840.10008.1.2.4.110        | Deflated Explicit VR Little Endian        |
+
+Lossy compression for diagnostic intent is rejected; primary
+capture lossy is permitted only when the modality emits no
+lossless option. Trans-coding from one accepted syntax to
+another preserves the original UID in (0008,1110) ReferencedStudy
+so that auditors can confirm the lineage.
+
+## §6 Structured reports
+
+Structured reports use DICOM SR (Modality SR, IOD = Basic Text
+or Enhanced SR). The report references the imaging study, the
+interpreting physician, the report's verification state, and
+the codified findings. Reports are also represented in HL7 FHIR
+R5 DiagnosticReport for non-DICOM consumers; the DICOM SR remains
+the source of truth, the FHIR resource is a projection.
+
+Codified findings draw from RadLex and SNOMED CT. The FHIR
+DiagnosticReport's `code` and `conclusionCode` reference the same
+codes; mismatch between the SR and the FHIR projection is treated
+as a data-integrity incident.
+
+## §7 Imaging-specific de-identification
+
+De-identification in DICOM follows PS3.15 Annex E "Application
+Confidentiality Profiles". This PHASE binds:
+
+- Default profile: PS3.15 Basic Profile + Clean Pixel Data Option
+  (suspect text in pixel rows 0–N is overpainted)
+- Clean Descriptors Option for free-text comments (0008,4000),
+  derivation description (0008,2111), and patient comments
+  (0010,4000)
+- Retain Patient Characteristics for sex (0010,0040) and patient
+  weight (0010,1030) only when the study type requires them for
+  dosimetry (CT, NM, PT)
+- Retain Longitudinal Temporal Information with Date Modification
+  (uniform per-subject offset)
+
+The de-identification job record from WIA-medical-data-privacy
+PHASE 1 §7 references the PS3.15 profile in use, the pixel-cleanup
+algorithm, and the residual-risk band.
+
+## §8 Linkage to clinical context
+
+An ImagingStudy (FHIR R5) references one or more DiagnosticReport
+resources, an Encounter, and a Patient. Linking imaging to clinical
+context is gated by the privacy boundary's purpose check. A research
+extract that requires linking imaging to outcomes (e.g., cancer
+recurrence) MUST hold a linkage authorisation per WIA-medical-data-
+privacy PHASE 1 §5; the linkage authorisation names the imaging
+study, the clinical resource, and the linked subject.
+
+## §9 Provenance for derived images
+
+Derived images (reformats, MIP/MPR, segmentation masks, AI-generated
+annotations) carry a Provenance reference to the source instance(s)
+and the algorithm that produced them:
+
+- (0008,2111) Derivation Description
+- (0008,9215) Derivation Code Sequence (DICOM PS3.16 CID 7203)
+- (0040,A124) UID of the derivation step
+
+For AI-generated outputs, the algorithm identifier (0066,002F),
+the algorithm version, and the model's regulatory clearance ID
+(when applicable) are recorded so that downstream readers can
+audit which model produced which annotation.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Modality-specific obligations (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Different modalities carry distinct PHI risk profiles in pixel
+data and metadata.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+- **CT, MR, PT, NM** — burned-in patient identifiers are rare in
+  modern modalities but can appear in scout/topogram images;
+  the deployment's pixel-cleanup region covers these
+- **CR, DX, MG** — burn-in is more common (annotations, technique
+  labels); cleanup covers the configured rows
+- **US** — burn-in routine (institution name, patient name);
+  cleanup covers a larger header region per probe type
+- **OP, OPT** — burn-in occasional; check scanning-laser
+  ophthalmoscope outputs specifically
+- **SM (whole-slide)** — large file sizes (gigapixels) require
+  pixel-cleanup at acquisition rather than at de-identification
+  time
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The deployment's modality-fleet configuration declares the cleanup
+region per modality model so that the de-identification engine can
+apply it deterministically.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Multi-frame and enhanced IODs (informative)
 
-## Annex F — Adoption Roadmap
+Enhanced multi-frame IODs (Enhanced CT, Enhanced MR, Enhanced PT,
+Multi-frame Grayscale Word) consolidate per-frame metadata into a
+shared functional groups sequence (5200,9229) and per-frame
+sequence (5200,9230). The deployment SHOULD prefer enhanced IODs
+where modality firmware supports them; legacy single-frame IODs
+remain valid but each frame stored as a separate SOP instance has
+audit-chain implications (more events, more storage, more cross-
+references).
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Cross-references between standards (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The medical-imaging standard references several other WIA
+standards by intent:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Reference                    | Use site                                              |
+|------------------------------|-------------------------------------------------------|
+| WIA-medical-data-privacy     | consent gate, audit chain, retention enforcement       |
+| WIA-medical-iot              | modality fleet device telemetry (planned in v1.1)      |
+| WIA-medical-ai-ethics        | AI inference governance (PHASE 4 §5)                  |
+| WIA-prosthetic-control       | imaging-derived prosthetic fitting workflows           |
+| WIA-medical-alert-system     | imaging-finding-driven alerts                          |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Each cross-reference is non-normative for this PHASE and points
+to the canonical source of the cross-cutting concern. A deployment
+SHOULD claim conformance with the cross-referenced standards
+together with this one when the deployment touches both domains.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex D — Conformance disclosure
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Implementations declare per-section conformance in their published
+DICOMweb conformance statement (PHASE 2 §9 Annex B). Sections marked
+`partial` reference the deployment policy explaining the gap.
+Sections marked `excluded` carry a reason citing the controlling
+jurisdiction's allowance for that exclusion. An implementation that
+is `partial` or `excluded` on §3 (Patient identifier mapping),
+§7 (De-identification), or §9 (Provenance for derived images) is
+non-conformant overall and cannot claim Deep v3 status.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex E — Pixel-cleanup region examples (informative)
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+The pixel-cleanup region is modality-specific and modality-version-
+specific. Examples below illustrate the shape of the configuration;
+production deployments tune the region per their actual modality
+fleet output.
 
-## Annex H — Versioning and Deprecation Policy
+```yaml
+modality_cleanup:
+  CT:
+    "Siemens Somatom go.Top":
+      regions: [{rows: [0, 60], description: "vendor banner with patient name"}]
+    "GE Revolution":
+      regions: [{rows: [0, 80], description: "patient banner"}]
+  MR:
+    "Philips Ingenia":
+      regions: [{rows: [0, 70], description: "study label and patient name"}]
+  US:
+    "GE Voluson E10":
+      regions: [{rows: [0, 100], description: "header with hospital and patient name"}]
+      probe_specific:
+        cardiac: {rows: [0, 120], description: "extended header for echo"}
+  DX:
+    generic: {rows: [0, 50], cols: [0, 200], description: "left-corner annotation block"}
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+A study from a modality model not present in the configuration
+fails the de-identification gate; a configuration entry must exist
+before research extraction is permitted on that modality model. The
+deployment SHOULD validate new modality firmware against the
+configured cleanup region before production traffic.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex F — Pathology and ophthalmic notes (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Whole-slide imaging (SM) and ophthalmic imaging (OP, OPT) have
+data-format quirks worth calling out:
 
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Whole-slide** — gigapixel images stored as tiled multi-resolution
+  pyramids; transfer-syntax UID typically 1.2.840.10008.1.2.4.50
+  (JPEG Baseline) per tile; cleanup at acquisition is preferred
+  because de-identification at extraction time scales poorly
+- **Ophthalmic 3D OCT** — Enhanced OPT IODs have per-frame functional
+  groups; the deployment SHOULD prefer Enhanced over legacy OPT
+- **Stereoscopic** — paired left/right images use Stereoscopic
+  IODs; both pair members share a series and a study identifier

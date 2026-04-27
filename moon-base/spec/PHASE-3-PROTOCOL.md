@@ -5,237 +5,290 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-moon-base (Moon Base).
+This document defines the protocols that govern an accredited
+moon-base programme: site-coordination among neighbouring missions,
+crew safety frameworks, life-support and consumables governance,
+EVA authorisation, ISRU operating regimes, power-budget governance,
+surface-network spectrum coordination, supply chain and crew
+rotation, anomaly investigation, planetary protection (Earth-bound
+contamination), and base wind-down. The PROTOCOL layer binds the
+data shapes of PHASE-1 and the API contract of PHASE-2 to the
+inter-agency frameworks under which moon bases operate.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 9001:2015 (quality management systems)
+- ISO 8601 (date and time)
+- ITU Radio Regulations (lunar surface and cislunar band allocations)
+- COSPAR Planetary Protection Policy (Category II / VI for Earth-
+  bound contamination paths)
+- CCSDS 132.0-B / 232.0-B (Space Data Link Protocols for the relay
+  link)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
 
 ---
 
-## §1 Scope
+## §1 Site Coordination
 
-This PHASE document is one of four that together define the WIA-moon-base
-standard. It addresses the protocol layer of the standard.
+A moon-base programme registers its landing site, exclusion zones,
+and operating envelopes with the inter-agency coordination forum
+that the participating agencies recognise. Registration captures
+expected dust-plume directions during landing operations, regions
+of scientific interest the base will respect, and the boundaries
+beyond which the base will not extend infrastructure without
+further coordination.
 
-## §2 Manifest
+Neighbouring missions consume the registration through dedicated
+client certificates and emit acknowledgements that the API records
+against the base. Conflicts (overlap with another mission's
+exclusion zone, intrusion into a heritage site) are resolved through
+the coordination forum before the API accepts a configuration that
+would extend into the contested area.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "moon-base"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Crew Safety Framework
 
-## §3 Conformance Tiers
+A moon-base hosting crewed operations operates under a crew safety
+framework that names the operating organisation, the crew-medical
+authority, the safety officer of record, and the contingency plans
+for emergencies (depressurisation, fire, life-support failure,
+medical emergency, lost EVA crew). The framework is reviewed at
+least annually and is referenced from every EVA record (PHASE-1 §8)
+and every life-support telemetry alert.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Life-Support and Consumables Governance
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Life-support consumables (oxygen, water, CO2 scrubber capacity,
+nitrogen for atmospheric balance, food) are governed under the
+operating organisation's logistics protocol. The protocol records
+the consumption-rate model the operating organisation uses, the
+re-supply cadence the base depends on, and the contingency
+consumables window that the base maintains for unplanned
+re-supply delays.
 
-## §4 Discovery
+Programmes MUST refuse to advance a base from `commissioning` to
+`occupied` until the contingency consumables window meets the
+operating organisation's agreed minimum (typically 90 to 180 days
+of full crew loading). The API enforces this via the phase-
+transition endpoint with type
+`urn:wia:moon-base:contingency-window-insufficient`.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/moon-base`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 EVA Authorisation
 
-## §5 Time and Identity
+Every EVA is authorised by the surface-operations director, the
+crew-medical officer, and the EVA officer prior to airlock egress.
+Authorisation records are signed by the responsible officers'
+client certificates and are attached to the EVA record. EVAs
+executed under emergency conditions (immediate-life-threat
+contingency) follow an abbreviated authorisation that the
+operating organisation has pre-approved; emergency EVAs are flagged
+in the record so that retrospective review captures the abbreviated
+path.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 ISRU Operating Regimes
 
-## §6 Versioning and Deprecation
+ISRU plants operate in regimes appropriate to the surface
+environment and the power budget. The plant's operating regime is
+recorded in its quality dossier and is approved by the surface
+operations director. Regime transitions (e.g. from
+`hydrogen-reduction` to `molten-regolith-electrolysis`) require
+re-approval and a parallel update to the consumables-input model.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Power-Budget Governance
 
-## §7 Privacy and Security
+The base's power microgrid is governed under a budget that names
+generation capacity, storage capacity, allowed loads in each
+microgrid state (normal, load-shedding, islanded, emergency), and
+the load-shedding priority. The budget is exposed as a
+content-addressed bundle in the base's quality dossier.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Programmes MUST refuse to commission a microgrid configuration
+whose load-shedding priority does not preserve life-support and
+EVA-recovery loads under all generation-shortfall scenarios.
 
-## §8 Open Governance
+## §7 Surface Spectrum Coordination
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `moon-base` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Surface communications operate under ITU Radio Regulations
+allocations for lunar surface and cislunar links. The base's
+spectrum file records the allocations, the licensing authority,
+and the coordination agreements with neighbouring operations and
+the relay-network operator.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §8 Supply Chain and Crew Rotation
 
+Cargo supply and crew rotation flow through the supply-chain
+protocol the operating organisation maintains. The protocol records
+the launch cadence, the manifest of every supply launch, the
+inventory delta on every cargo arrival, and the crew-rotation
+schedule. The API exposes the supply chain as a series of records
+that link to the on-base consumables inventory.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §9 Anomaly Investigation
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Base-anomaly investigations follow the same record shape as
+mars-mission anomaly investigations (see WIA-mars-mission PHASE-3).
+Anomalies that affect life-support, EVA, or supply-chain operations
+escalate through inter-agency review boards.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Earth-Bound Contamination Control
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Surface samples returning to Earth follow the COSPAR Planetary
+Protection Policy's Earth-bound categorisation (Category II for
+Moon material under current science consensus, Category VI for
+samples that derive from environments where the policy applies
+otherwise). The base records the relevant approvals against each
+sample export.
 
-## Annex F — Adoption Roadmap
+## §11 Records Retention
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Base records — every record defined in PHASE-1, the API audit
+logs, life-support telemetry archives, EVA records, and anomaly
+investigations — retain indefinitely. Externally cited base records
+are deposited in a long-term archive on a quarterly cadence.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 Time Synchronisation
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Surface clocks synchronise per RFC 5905 (NTPv4) against the relay
+network's reference time service or, in disconnected operation, an
+on-base GPS-like surface positioning service. Time-of-record on
+all telemetry is recorded with the synchronisation source so that
+ground operations can verify that the recorded time is anchored.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Cybersecurity
 
-## Annex G — Test Vectors and Conformance Evidence
+Surface network connections are authenticated and integrity-
+protected per TLS 1.3 (RFC 8446) where the surface-network
+infrastructure supports IP-style protocols, and via CCSDS-aligned
+authentication profiles for the cislunar relay link. Compromise
+events trigger an immediate re-key and a parallel anomaly
+investigation.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Programme Wind-Down
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A base that ends operations transitions to `unoccupied-caretaker`
+or `decommissioned`. Caretaker bases retain monitoring telemetry
+under reduced crew loading; decommissioned bases follow the
+disposal plan negotiated at base inception (cap, abandon-in-place,
+deconstruct).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §15 Quality Dossier
 
-## Annex H — Versioning and Deprecation Policy
+The programme's quality dossier records the agencies it partners
+with, the supply-chain providers it uses, the crew-medical
+authority, the spectrum file revisions, and the anomaly
+investigations conducted. The dossier is reviewed at least annually
+by the programme's quality manager.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Cross-Border Programme Operation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Moon bases are inherently international. The programme maintains a
+primary jurisdiction of registration and operational MoUs with
+partner jurisdictions. Cross-jurisdictional data transfers honour
+the dual-use export controls of each participating jurisdiction.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Heritage and Exclusion Zone Governance
 
-## Annex I — Interoperability Profiles
+Heritage sites (prior crewed-mission landing zones, scientifically
+reserved areas) and active-operations exclusion zones are governed
+through a registry that the operating organisation maintains and
+that the inter-agency coordination forum acknowledges. Zone
+boundaries are content-addressed; revisions emit new records and
+prior records remain addressable as the historical regulatory
+state.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+A traverse plan that breaches an exclusion zone returns a Problem-
+Details (RFC 9457) response of type
+`urn:wia:moon-base:exclusion-breach` from the mobility task-queue
+endpoint. Emergency-services breaches (response to an EVA medical
+event, fire suppression, life-support recovery) follow a pre-
+authorised emergency exception that the operating organisation has
+agreed to with the inter-agency forum.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §18 Crew-Health Continuity
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Crew health observations are captured by adjacent crew-medical
+standards. The moon-base programme records the integration point
+with the crew-medical standard, the consent regime under which crew
+data flows from the base to the crew-medical operations centre, and
+the contingency procedures when the relay link to the crew-medical
+operations centre is unavailable.
+
+## §19 Long-Term Habitability Studies
+
+Bases that operate over long durations participate in habitability
+studies that aggregate atmospheric, radiation-environment, and
+psychosocial observations across multiple operating intervals. The
+study coordinator is the inter-agency forum or a body the forum
+nominates. The study's protocol is content-addressed and is
+referenced by the participating bases.
+
+## §20 Cislunar-Relay Failover
+
+The cislunar relay network is a single point of failure for many
+base operations; the operating organisation maintains a failover
+protocol that defines the base's degraded-operation mode when the
+relay is unavailable. The failover protocol limits non-essential
+loads, prioritises consumables conservation, and records all
+activity locally for transmission once the relay returns.
+
+## §21 Radiation Exposure Governance
+
+Crew radiation exposure is governed under the operating
+organisation's exposure policy. The policy specifies cumulative
+limits, time-window limits, and emergency-shelter triggers in the
+event of a solar particle event. Crew-dose ledger entries are
+audited at every crew-rotation event and at every major
+mission-critical-activity review.
+
+## §22 Solar Particle Event Response
+
+Solar particle events trigger a graduated response: monitoring,
+non-essential-load reduction, EVA suspension, and full retreat to
+deep-shelter pressurised volumes. The response is documented in the
+operating organisation's safety framework and is exercised at
+least annually under simulated conditions.
+
+## §23 EVA Suit Telemetry Custody
+
+EVA suit telemetry (suit pressure, temperature, consumables status,
+biomedical observations) is captured by the EVA crew member's suit
+and uploaded to the base when the crew member returns to the
+airlock. The custody chain from the suit's on-board store to the
+base's archive is recorded with the suit identifier, the upload
+event, and the integrity check that the upload performed.
+
+Suit-telemetry archives that fail integrity check are quarantined
+pending forensic review; the API exposes the quarantine state via
+the streaming endpoint so that ground teams know when telemetry
+gaps reflect a data-integrity issue rather than a sensor failure.
+
+## §24 Cryogenic Volatile Handling
+
+Bases sited near permanently shadowed regions handle cryogenic
+volatiles (water ice, methane) extracted by ISRU operations. The
+operating organisation maintains a cryogenic-handling protocol that
+specifies thermal-management constraints, pressure-vessel ratings,
+and the contamination controls that prevent cross-mixing between
+volatile feedstocks. The protocol is reviewed at least annually and
+is referenced from the ISRU plant record.
+
+## §25 Conformance and Auditing
+
+A programme conformant with WIA-moon-base publishes its
+accreditation certificate, its base registration, its quality
+dossier, and the catalogue of base records it has released, and
+answers an annual self-assessment that maps each clause of this
+PHASE to the programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-moon-base
+- **Last Updated:** 2026-04-27

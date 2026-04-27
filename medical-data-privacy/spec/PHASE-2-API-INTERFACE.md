@@ -1,241 +1,278 @@
-# WIA-medical-data-privacy PHASE 2 — API-INTERFACE Specification
+# WIA-medical-data-privacy PHASE 2 — API Interface Specification
 
 **Standard:** WIA-medical-data-privacy
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-medical-data-privacy (Medical Data Privacy).
+This PHASE defines the HTTP API surface a privacy-aware system exposes to
+clinical applications, research pipelines, regulators, and data subjects.
+The shape is FHIR R5 RESTful, layered with this standard's privacy
+extensions: every read or disclosure carries an explicit purpose, every
+purpose is gated by an active consent or break-glass override, and every
+event emits a hash-chained AuditEvent.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — RESTful API (R5/http.html), Bundle, OperationOutcome
+- HL7 SMART App Launch 2.2 (smarthealthit.org/specification) — for app authentication and scope strings
+- IETF RFC 9457 (Problem Details), RFC 7807 (legacy Problem Details for FHIR-pre-R5 clients)
+- IETF RFC 7515 (JWS), RFC 7519 (JWT) — receipt and audit signature
+- IETF RFC 8615 (well-known URIs)
+- ISO 8601 (timestamps)
+- Open Banking-style mTLS profile is *not* required by this PHASE
 
 ---
 
-## §1 Scope
+## §1 Purpose-bearing requests
 
-This PHASE document is one of four that together define the WIA-medical-data-privacy
-standard. It addresses the api-interface layer of the standard.
+Every request that touches PHI carries a purpose. The purpose is
+conveyed by the SMART scope string and a request header that reflects
+the actual purpose for the call (a single SMART grant can authorise
+multiple purposes; the call must declare which is in use).
 
-## §2 Manifest
+```
+GET /Patient/<id>
+Authorization: Bearer <jwt>
+WIA-Purpose-Of-Use: TREAT
+WIA-Justification: routine encounter, scheduled 2026-04-27
+Accept: application/fhir+json
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-data-privacy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The server validates that:
+1. The JWT carries an active consent grant whose `provision.purpose`
+   includes `TREAT`.
+2. The header purpose matches one of the granted purposes.
+3. The grantee in the consent matches the principal in the JWT.
+4. The current time is inside the consent's `provision.period`.
 
-## §3 Conformance Tiers
+If any check fails, the server returns `403 Forbidden` with an
+RFC 9457 Problem Details body whose `type` URI is one of the
+errors enumerated in §6.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Resource endpoints
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The following FHIR R5 endpoints are exposed:
 
-## §4 Discovery
+| Endpoint              | Methods               | Privacy gate                                      |
+|-----------------------|-----------------------|---------------------------------------------------|
+| `/Consent`            | GET, POST, PUT        | controller-only for write; subject-or-grantee-readable |
+| `/AuditEvent`         | GET                   | controller, regulator, or subject (own events)    |
+| `/Provenance`         | GET                   | piggybacks on the resource it traces              |
+| `/Patient/<id>`       | GET, PATCH            | requires active consent for the declared purpose  |
+| `/<R>/<id>`           | GET                   | requires active consent for the declared purpose  |
+| `/<R>?<search>`       | GET                   | results filtered to consented subset (§3)         |
+| `/Bundle/$transaction`| POST                  | each entry independently gated                    |
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-data-privacy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Resources outside this set inherit the `<R>/<id>` rules.
 
-## §5 Time and Identity
+## §3 Search filtering (minimum necessary)
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+A search query returns *only* the subset of resources consented for
+the declared purpose. Filtering is applied server-side, not client-side.
+The server MUST NOT leak the existence of records the requester is
+not authorised to see — the response body and the count both reflect
+only the authorised subset.
 
-## §6 Versioning and Deprecation
+If the search would return resources that exist but are filtered
+out, the server adds a `link` of `relation: prohibited` whose `url`
+is the URI of the consent record explaining why those records are
+excluded. This is auditable but does not leak record content or count.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Consent management
 
-## §7 Privacy and Security
+```
+POST /Consent
+Content-Type: application/fhir+json
+WIA-Purpose-Of-Use: HOPERAT
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Body is a FHIR R5 Consent resource conforming to PHASE 1 §3.
+The server signs the resource (JWS detached) and returns:
 
-## §8 Open Governance
+```
+201 Created
+Location: /Consent/<id>
+WIA-Consent-Receipt-Sig: eyJhbGciOiJFUzI1NiJ9..<sig>
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-data-privacy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Updates to consent (`PUT /Consent/<id>`) preserve the prior version
+in version history. Withdrawing consent is a `PUT` that flips
+`status` to `inactive`; it does not delete the resource because
+audit history must reference the prior consent that authorised the
+disclosure.
+
+## §5 Break-glass override
+
+```
+POST /Patient/<id>/$emergency-access
+Content-Type: application/json
+WIA-Purpose-Of-Use: ETREAT
+
+{
+  "reason": "patient unconscious, anaphylaxis suspected, need allergen list",
+  "scope": ["AllergyIntolerance", "MedicationRequest", "Condition"],
+  "expectedDuration": "PT4H"
+}
+```
+
+The server accepts the override (`200 OK`) only if the asserting
+principal has the `ETREAT` capability in their SMART grant. The
+override creates an active short-lived consent record (with `status:
+active`, `provision.purpose: ETREAT`, period bounded by
+`expectedDuration`) and emits an AuditEvent with `severity: notice`
+that is delivered to the controller's review queue.
+
+## §6 Error model (Problem Details)
+
+All non-2xx responses use RFC 9457 Problem Details. The following
+`type` URIs are reserved:
+
+| URI                                              | Status | Meaning                                              |
+|--------------------------------------------------|-------:|------------------------------------------------------|
+| `urn:wia:mdp:problem:no-active-consent`          | 403    | No consent matches the declared purpose              |
+| `urn:wia:mdp:problem:wrong-jurisdiction`         | 403    | Record is in a jurisdiction the requester cannot reach |
+| `urn:wia:mdp:problem:purpose-mismatch`           | 403    | Header purpose differs from JWT scope                |
+| `urn:wia:mdp:problem:break-glass-not-authorised` | 403    | Principal lacks `ETREAT` capability                  |
+| `urn:wia:mdp:problem:linkage-not-authorised`     | 403    | Cross-purpose linkage has no active authorisation    |
+| `urn:wia:mdp:problem:retention-expired`          | 410    | Record retention has lapsed; cannot be served        |
+
+Body example:
+
+```json
+{
+  "type": "urn:wia:mdp:problem:no-active-consent",
+  "title": "No active consent matches purpose TREAT for this patient",
+  "status": 403,
+  "detail": "Patient consent #c-91a7 expired 2025-12-31; renewal not on file.",
+  "instance": "/Patient/abc-123"
+}
+```
+
+## §7 Bulk export
+
+The FHIR R5 Bulk Data Access (Flat FHIR) operations are supported
+with privacy extensions:
+
+- `GET /$export?_type=Patient,Observation&purpose=HRESCH&consentBundle=<id>`
+
+The export is allowed only if the *consent bundle* listed names every
+subject in the export's cohort. The server resolves the cohort against
+the bundle and excludes any subject without an active consent for the
+declared purpose. The exported NDJSON is signed and the manifest
+references PHASE 1 §7 (de-identification job record) so that the
+recipient can verify the dataset's residual-risk band.
+
+## §8 Subject self-service
+
+A data subject MAY query their own records:
+
+- `GET /AuditEvent?agent-name=<self>` — returns events about the subject
+- `GET /Consent?subject=<self>` — returns consents about the subject
+- `POST /$rectification` — request correction of an erroneous record
+- `POST /$erasure` — request erasure (subject to legal-hold rules)
+
+Self-service endpoints authenticate the subject through the deployment's
+identity provider. The server still emits AuditEvents for self-service
+calls so that a subject's access pattern is itself observable to the
+controller (this prevents impersonation from going unnoticed).
+
+## §9 Conformance and discovery
+
+The capabilities of this PHASE are advertised at the FHIR
+`/metadata` endpoint, with WIA extensions describing the
+purpose-of-use vocabulary, the consent profile, and the
+break-glass policy. A privacy-aware client SHOULD read
+`/metadata` once per session and cache the resulting capability
+statement for the session lifetime.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Capability Statement (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+The FHIR `/metadata` endpoint advertises this PHASE's capabilities
+through the standard CapabilityStatement resource with the following
+WIA-specific extensions:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+- `wia.purposeOfUse.valueSet` — URI of the closed PoU set (PHASE 1 §4)
+- `wia.consent.profile` — URI of the Consent profile this PHASE binds
+- `wia.breakGlass.policy` — URI of the deployment's break-glass policy
+- `wia.audit.publicRoot` — URI of the daily-root transparency log if enabled
+- `wia.jurisdiction` — declared jurisdiction code (PHASE 1 §1)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Clients SHOULD discover capabilities once per session; the cache
+expiry SHOULD match the SMART access-token lifetime.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Common request patterns (informative)
 
-## Annex F — Adoption Roadmap
+The following patterns are typical clinical-application calls and
+their expected privacy-gate behaviour:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- **Routine encounter open** — `GET /Patient/<id>?_revinclude=Encounter:patient`
+  with `purpose:TREAT`; succeeds when the clinician is in the consent
+  grantee list and the encounter is in the consent's period.
+- **Refer-out** — `POST /Bundle/$transaction` with referral document;
+  each Bundle entry is independently gated; the receiving organisation
+  appears as a new grantee in a follow-on Consent created by the
+  referral itself.
+- **Research extract** — `GET /$export?_type=Observation&purpose=HRESCH`
+  with consent bundle naming each subject; resource set returned
+  intersected with consent set.
+- **Subject access request** — `GET /AuditEvent?agent-name=<self>`;
+  returns events about the authenticated subject only; emits its own
+  AuditEvent recording the self-access.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Worked request/response example (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The following exchange demonstrates a consent-gated read of an
+Observation resource:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+**Request:**
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+GET /Observation/obs-7e2-bp HTTP/1.1
+Host: fhir.hospital-k.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImsxIn0...
+WIA-Purpose-Of-Use: TREAT
+WIA-Justification: routine outpatient encounter, scheduled visit
+Accept: application/fhir+json
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+**Response (success):**
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+HTTP/1.1 200 OK
+Content-Type: application/fhir+json
+WIA-Audit-Event-Id: urn:wia:mdp:audit:2026-04-27T09:31:14+09:00:7f2a
+WIA-Consent-Receipt: urn:wia:mdp:consent:c-91a7
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+{ "resourceType": "Observation", "id": "obs-7e2-bp", ... }
+```
 
-## Annex H — Versioning and Deprecation Policy
+**Response (no active consent):**
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+HTTP/1.1 403 Forbidden
+Content-Type: application/problem+json
+WIA-Audit-Event-Id: urn:wia:mdp:audit:2026-04-27T09:31:14+09:00:7f2b
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+{
+  "type": "urn:wia:mdp:problem:no-active-consent",
+  "title": "No active consent matches purpose TREAT for this patient",
+  "status": 403,
+  "detail": "Patient consent c-91a7 expired 2025-12-31; renewal not on file.",
+  "instance": "/Observation/obs-7e2-bp"
+}
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Both the success and the failure emit AuditEvents into the chain.
+The failure is auditable evidence that the consent gate worked, not
+an unrecorded denial.
 
-## Annex I — Interoperability Profiles
+## Annex D — Negotiation of FHIR profile version
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Clients SHOULD send `Accept: application/fhir+json; fhirVersion=5.0`.
+Servers default to FHIR R5; prior FHIR versions are reachable only
+via the `/R4` and `/STU3` legacy bases when the deployment policy
+enables them. Cross-version translation is the responsibility of the
+boundary, not of clients; clients see a single consistent profile
+per session.

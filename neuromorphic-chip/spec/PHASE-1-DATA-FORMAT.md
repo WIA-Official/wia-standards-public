@@ -5,237 +5,370 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-neuromorphic-chip (Neuromorphic Chip).
+This document defines the canonical data-format layer for
+WIA-neuromorphic-chip. The standard covers spiking-neural-network
+hardware accelerators that implement biologically-inspired event-driven
+computation through silicon neurons, plastic synapses, and
+address-event packet networks. The format captures the network
+topology and parameters, the neuron and synapse model parameters, the
+mapping from network to physical hardware, the address-event traffic,
+the on-chip plasticity events, the per-die characterisation evidence,
+and the operational telemetry that supports reproducibility and
+external citation of neuromorphic-compute results.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 11578 (UUID)
+- ISO 8601 (date and time)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IEEE Std 754-2019 (floating-point arithmetic; cited only for
+  numerical-format definitions where parameters are stored in
+  non-fixed-point representations)
+- W3C XML Schema Definition 1.1 (legacy NIDM-style provenance import)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-neuromorphic-chip
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines the persistent shapes for the records that
+flow across the life of a neuromorphic deployment: design-time
+network description, mapping to physical chip resources, on-chip
+operation traffic, learning and plasticity events, characterisation
+evidence, and field telemetry. It is intended for use by:
 
-## §2 Manifest
+- Neuromorphic SDK developers that compile networks for deployment.
+- Hardware vendors that publish device descriptions and consume
+  compiled networks.
+- Reference laboratories that characterise neuron and synapse
+  responses against the published model parameters.
+- System integrators that deploy neuromorphic accelerators in
+  always-on sensing, robotics, low-power inference, and on-device
+  learning contexts.
+- Citation tools that resolve a published neuromorphic-compute
+  result to its underlying records.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "neuromorphic-chip"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Conventional clocked digital accelerators that do not implement
+event-driven spiking computation are out of scope; they are covered
+by adjacent WIA standards.
 
-## §3 Conformance Tiers
+## §2 Network Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+networkId         : string (uuidv7)
+networkCreatedAt  : string (ISO 8601 / RFC 3339)
+networkAuthor     : string (institutional author identifier)
+networkPurpose    : enum  ("inference-only" | "online-learning" |
+                       "sensorimotor-loop" | "research" |
+                       "always-on-sensing")
+neuronModel       : enum  ("lif" | "lif-with-refractory" | "adex" |
+                       "izhikevich" | "hh-reduced" | "custom")
+synapseModel      : enum  ("static" | "stdp" | "triplet-stdp" |
+                       "voltage-dependent" | "neuromodulated" |
+                       "biologically-inspired-other")
+networkStatus     : enum ("draft" | "compiled" | "deployed" |
+                       "deprecated")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A network's `neuronModel` and `synapseModel` define the contract that
+the underlying hardware must support; networks compiled for a chip
+that does not support the model return a Problem-Details (RFC 9457)
+response of type
+`urn:wia:neuromorphic-chip:model-unsupported` at compile time.
 
-## §4 Discovery
+## §3 Network Description
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/neuromorphic-chip`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+networkDescription:
+  networkId       : string (uuidv7)
+  artefactRef     : string (content-addressed URI of the network
+                       description; common formats are NIR, NeuroML2,
+                       or a vendor-neutral graph format)
+  populations     : array of NeuronPopulation
+  projections     : array of SynapseProjection
+  inputSources    : array of InputSource
+  outputProbes    : array of OutputProbe
 
-## §5 Time and Identity
+NeuronPopulation:
+  populationId    : string
+  size            : integer
+  parameters      : object (model-specific: vReset, vThresh, tauM,
+                       refractoryMs, ...)
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+SynapseProjection:
+  projectionId    : string
+  preId           : string (population identifier)
+  postId          : string
+  connectivity    : enum ("dense" | "sparse-fixed-fan-in" |
+                       "sparse-fixed-fan-out" | "from-list")
+  weightInit      : object (initialisation distribution parameters)
+  plasticity      : object (synapse-model-specific parameters)
 
-## §6 Versioning and Deprecation
+InputSource:
+  sourceId        : string
+  modality        : enum ("dvs-event-camera" | "spiking-cochlea" |
+                       "tactile-event" | "rate-code-injection" |
+                       "poisson-noise" | "user-defined")
+  encodingRef     : string (encoding-recipe content-address)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+OutputProbe:
+  probeId         : string
+  populationId    : string
+  metric          : enum ("spike-times" | "membrane-voltage" |
+                       "weight-snapshot" | "rate-window")
+```
 
-## §7 Privacy and Security
+## §4 Hardware Description
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+hardware:
+  hardwareId      : string (uuidv7)
+  vendorClassRef  : string (URI of the vendor's published class
+                       description; vendor-specific identifiers are
+                       opaque to this standard)
+  cores           : integer (number of physical cores)
+  neuronsPerCore  : integer
+  synapsesPerCore : integer
+  fanInLimit      : integer (per-neuron upper bound)
+  fanOutLimit     : integer
+  weightBitsTotal : integer
+  weightBitsTrained: integer (some platforms reserve part of the
+                       weight word for plasticity state)
+  modelSupport    : array of enum (neuron and synapse models the
+                       hardware natively supports)
+  numericalNotes  : object (e.g. dynamic-range constraints, IEEE 754
+                       partial support)
+```
 
-## §8 Open Governance
+Hardware description records are emitted by the vendor and consumed
+by the SDK at compile time; they are signed by the vendor's release
+key so that the SDK refuses to compile against a tampered description.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `neuromorphic-chip` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Mapping Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+The compiler emits a mapping that places populations onto cores,
+projections onto routing fabric, and per-neuron parameters into
+on-chip memory. The mapping is deterministic given the network, the
+hardware, and the compiler version.
 
+```
+mapping:
+  mappingId       : string (uuidv7)
+  networkId       : string (uuidv7)
+  hardwareId      : string (uuidv7)
+  compilerVersion : string (Semantic Versioning 2.0.0)
+  perCoreLoad     : array of CoreAssignment
+  routingPlan     : array of RoutingEntry
+  utilisation:
+    neuronsUsed   : integer
+    synapsesUsed  : integer
+    routingHopsP95: integer
+  fallbackEvents  : array of FallbackEvent (cases where the compiler
+                       relaxed a network-side preference because the
+                       hardware could not satisfy it)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Mappings whose `fallbackEvents` are non-empty are flagged in the
+public catalogue so that downstream consumers know when the deployed
+network differs from the original specification.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §6 Address-Event Traffic Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The hardware publishes a stream of address-events (AER spikes) during
+operation. The traffic record carries either the full event stream
+(for short experiments) or summary statistics over windows (for
+long-running deployments).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+aerStream:
+  streamId        : string (uuidv7)
+  mappingId       : string (uuidv7)
+  startedAt       : string (ISO 8601 / RFC 3339)
+  durationS       : number
+  encoding        : enum ("aedat4" | "binary-flat" | "csv" |
+                       "summary-windowed")
+  artefactRef     : string (content-addressed URI of the stream archive)
+  windowedSummary : array of WindowSummary (present iff encoding =
+                       "summary-windowed")
 
-## Annex F — Adoption Roadmap
+WindowSummary:
+  windowStart     : string (ISO 8601 / RFC 3339)
+  windowDurationMs: integer
+  perPopulationRateHz : object (rate per population identifier)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §7 Plasticity Event Record
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Networks that learn online emit plasticity events that update synaptic
+weights. The plasticity-event record carries the trigger conditions
+and the resulting weight change so that the trajectory of the network
+can be reconstructed during audit.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+plasticityEvent:
+  eventId         : string (uuidv7)
+  streamId        : string (uuidv7)
+  occurredAt      : string (ISO 8601 / RFC 3339)
+  projectionId    : string
+  rule            : enum ("stdp" | "triplet-stdp" | "neuromodulated" |
+                       "supervised-bp-through-time" | "vendor-rule")
+  preTraceValue   : number
+  postTraceValue  : number
+  deltaWeight     : number
+  modulator       : number (present for neuromodulated rules)
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §8 Characterisation Record
 
-## Annex G — Test Vectors and Conformance Evidence
+Per-die characterisation captures the deviation of the physical
+hardware from its published model. Neurons in analogue or
+mixed-signal implementations show device mismatch; synapses with
+emerging memory technologies show variability and drift. The
+characterisation record captures the measured deviation and the
+calibration applied to mitigate it.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+characterisation:
+  characterisationId : string (uuidv7)
+  hardwareId      : string (uuidv7)
+  laboratoryId    : string (ISO/IEC 17025-accredited laboratory ID)
+  performedAt     : string (ISO 8601)
+  perCoreNeuronStats : array of NeuronStats
+  perCoreSynapseStats: array of SynapseStats
+  calibrationApplied : boolean
+  calibrationArtefactRef : string (content-addressed URI of the
+                       calibration table)
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §9 Field Telemetry Record
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Deployed accelerators emit field telemetry covering operational
+metrics: average and peak event rates, on-chip thermal observations,
+power consumption per inference, error-correction rates on routing
+links, and watchdog events. Telemetry is summary-only; raw AER traffic
+is not appended to telemetry to avoid bandwidth explosion.
 
-## Annex H — Versioning and Deprecation Policy
+## §10 Workload Definition Record
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Externally cited deployments report performance and energy under named
+workloads. The workload-definition record carries the input stimulus,
+the expected output behaviour, and the metrics under which the
+deployment is evaluated.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+workloadDefinition:
+  workloadId      : string (uuidv7)
+  artefactRef     : string (content-addressed URI of the workload bundle)
+  domain          : enum ("event-camera-classification" |
+                       "spiking-cochlea-keyword-spotting" |
+                       "tactile-anomaly-detection" |
+                       "always-on-wakeword" |
+                       "robotics-sensorimotor-loop" |
+                       "research-benchmark-suite" |
+                       "user-defined")
+  inputs          : array of WorkloadInput
+  metrics         : array of WorkloadMetric
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+WorkloadInput:
+  modality        : enum (matches PHASE-1 §3 inputSources.modality)
+  dataDescription : object (timing, format, source dataset)
+  preprocessing   : string (encoder recipe identifier)
 
-## Annex I — Interoperability Profiles
+WorkloadMetric:
+  metric          : enum ("classification-accuracy" |
+                       "false-positive-rate" |
+                       "energy-per-inference-uj" |
+                       "latency-to-first-spike-ms" |
+                       "average-event-rate-hz" |
+                       "weight-update-count")
+  unit            : string
+  expectedRangeLo : number (optional lower bound)
+  expectedRangeHi : number (optional upper bound)
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Workload definitions are content-addressed so that consumers can
+re-execute the same workload against alternate hardware or alternate
+mappings.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §11 Energy Account Record
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```
+energyAccount:
+  accountId       : string (uuidv7)
+  mappingId       : string (uuidv7)
+  workloadId      : string (uuidv7)
+  measuredAt      : string (ISO 8601)
+  perInferenceMicroJ  : number
+  perSpikeNanoJ       : number
+  idlePowerWatts      : number
+  measurementMethod   : enum ("on-chip-current-shunt" |
+                       "off-chip-power-monitor" |
+                       "gpib-supply-meter")
+  uncertainty         : Uncertainty (type-A and type-B per JCGM 100)
+```
+
+Energy claims that lack a corresponding energy-account record return
+`409 Conflict` from the API at evidence-package time with type
+`urn:wia:neuromorphic-chip:energy-claim-unsupported`.
+
+## §12 Encoder and Decoder Recipes
+
+Networks consume input through encoders that translate analog or
+digital data into spike trains and emit output through decoders
+that translate spike trains into actionable values. Encoder and
+decoder recipes are content-addressed records that describe the
+conversion function, the parameter range, and the canonical test
+vectors that any implementation MUST pass to claim conformance.
+
+```
+encoderRecipe:
+  recipeId        : string (uuidv7)
+  family          : enum ("rate-coding" | "temporal-coding" |
+                       "phase-coding" | "rank-order-coding" |
+                       "delta-modulation" | "user-defined")
+  parameterSchema : string (JSON Schema 2020-12 URI)
+  testVectorRef   : string (content-addressed URI of canonical
+                       input/output pairs)
+  versionedAs     : string (Semantic Versioning 2.0.0)
+
+decoderRecipe:
+  recipeId        : string (uuidv7)
+  family          : enum ("rate-decode" | "first-spike-decode" |
+                       "winner-take-all" | "spike-time-population" |
+                       "user-defined")
+  parameterSchema : string (JSON Schema 2020-12 URI)
+  testVectorRef   : string (content-addressed URI)
+  versionedAs     : string
+```
+
+## §13 Provenance Record
+
+Every record described in this PHASE carries a provenance entry that
+names the entity that produced the record (vendor, SDK developer,
+laboratory, integrator), the time of production, the cryptographic
+signature, and the parent records that the record derives from. The
+provenance record is the audit anchor that lets downstream consumers
+trace a deployed mapping back to the network description, the
+hardware description, the encoder recipes, and the workload that
+together justified the deployment.
+
+## §14 Conformance
+
+Implementations claiming PHASE-1 conformance emit each of the records
+defined above for every deployed network, honour the immutability and
+content-addressing rules in §3-§8, and fail validation cleanly with
+Problem Details (RFC 9457) responses when an export is requested for
+a deployment that contains incomplete records.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-neuromorphic-chip
+- **Last Updated:** 2026-04-27

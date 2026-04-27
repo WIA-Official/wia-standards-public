@@ -5,237 +5,262 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-prosthetic-control (Prosthetic Control).
+This document defines how an accredited prosthetic-control programme
+integrates with the systems that surround it: clinic electronic health
+records that hold the user's clinical record; manufacturer post-market
+surveillance systems; clinical-trial sponsors that aggregate device-use
+data; national medical-device authorities that consume adverse-event
+reports; insurance carriers that price and underwrite assistive-device
+benefits; rehabilitation outcome registries; and long-term archives
+that preserve evidence packages beyond programme wind-down. It also
+defines the evidence-package format that bundles a fitted device's
+complete record for external audit.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 8615 (well-known URIs)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO 13485:2016 (medical-device QMS)
+- ISO 14971:2019 (risk management)
+- ISO 14155:2020 (clinical investigation)
+- IEC 60601-1 (medical electrical safety)
+- IEC 62304 (medical device software life cycle)
+- IEC 62366-1 (usability engineering)
+- ISO 8601 (date and time)
+- HL7 FHIR R5 (Patient, Device, DeviceUseStatement, Observation,
+  ClinicalImpression)
 
 ---
 
-## §1 Scope
+## §1 Clinic EHR Integration
 
-This PHASE document is one of four that together define the WIA-prosthetic-control
-standard. It addresses the integration layer of the standard.
+The clinic's electronic health record holds the user's clinical
+identity. Integration with the EHR is achieved through a thin adapter
+that maps WIA-native subject records to FHIR R5 resources. The adapter
+is owned by the operating programme and is exercised against the
+clinic's FHIR test endpoint at least once per quarter so that EHR
+upgrades do not silently break the binding.
 
-## §2 Manifest
+The adapter exposes the FHIR bridge documented in PHASE-2 §9 as a
+read-only facade for the clinic; the clinic's writes flow through the
+WIA-native endpoints, never through FHIR write APIs.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "prosthetic-control"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Manufacturer Post-Market Surveillance
 
-## §3 Conformance Tiers
+Manufacturers operate post-market surveillance systems that aggregate
+device-use, motor-command, and adverse-event data across the user
+population. Integration is achieved through a one-way push from the
+operating programme to the manufacturer's system, scoped to the
+manufacturer's devices only. The push is authenticated with mutually-
+authenticated TLS and the manufacturer's surveillance team's client
+certificate.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Aggregated data is de-identified at the programme boundary; individual
+subject identifiers are replaced with pseudonyms that are reversible
+only at the operating programme. Manufacturers see population-level
+trends and individual-device performance under the manufacturer's
+warranty terms.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Evidence Package Format
 
-## §4 Discovery
+The evidence package is the externally citable artefact for a fitted
+device. The package is a tarball with the following layout:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/prosthetic-control`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+evidence/
+  manifest.json                — package manifest (signed, see §4)
+  subject.json                 — subject record (PHASE-1 §2)
+  device.json                  — device record
+  acquisitions/                — per-acquisition records
+  decoders/                    — decoder records and adaptation logs
+  motor-commands/              — motor-command streams
+  calibrations/                — calibration session records
+  feedback/                    — feedback session records
+  adverse-events/              — adverse-event reports and follow-up
+  risk-file/                   — content-addressed risk-file references
+  software-lifecycle/          — IEC 62304 artefact references
+  audit/                       — API audit log excerpts
+```
 
-## §5 Time and Identity
+The package is content-addressable; the manifest carries the SHA-256
+of every file. The manifest is signed by the operating programme's
+HTTP-message-signature key (RFC 9421) and counter-signed by the
+manufacturer when the package is consumed for warranty or
+post-market-surveillance purposes.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Manifest and Signatures
 
-## §6 Versioning and Deprecation
+Verification tools that follow this PHASE recompute the file digests,
+compare them to the manifest, and reject the package on any mismatch
+with type `urn:wia:prosthetic-control:evidence-mismatch`.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 well-known URI Discovery
 
-## §7 Privacy and Security
+A conformant programme exposes a discovery document at
+`/.well-known/wia-prosthetic-control` (RFC 8615) that links to the
+API root, the public ISO 13485 certificate, the published risk-file
+catalogue, and the post-market-surveillance reporting cadence.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Subject Identity Mediation
 
-## §8 Open Governance
+The user's clinical identity is held only in the clinic EHR. The
+DATA-FORMAT layer carries opaque tokens (PHASE-1 §2). When an
+external consumer (an insurance carrier, a research collaborator)
+requests identity-bound data, the request is mediated by the EHR
+through a subject-access workflow that produces a redacted export
+suitable for the consumer's authorisation scope.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `prosthetic-control` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+A subject-access request from a user returns the user's own subject
+record, calibration history, and adverse-event reports in a
+human-readable form alongside the machine-readable evidence package
+manifest digest.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Insurance Carrier Integration
 
+Insurance carriers that underwrite assistive-device benefits consume
+selected sections of the evidence package: the calibration history
+(for benefit eligibility), the adverse-event report set (for liability
+analysis), and the device-use cadence (for benefit utilisation).
+Programmes SHOULD publish a profile of evidence sections shareable
+with carriers under a standard data-sharing agreement; carriers
+SHOULD limit requests to that profile. Out-of-profile requests return
+`403 Forbidden` with type
+`urn:wia:prosthetic-control:evidence-profile`.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §8 Rehabilitation Outcome Registries
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Rehabilitation outcome registries aggregate user-reported outcomes
+(e.g. PROMIS measures), functional benchmarks (e.g. Box-and-Block,
+6-minute walk), and device satisfaction surveys. Programmes that
+participate in a registry register through the registry's onboarding
+process and emit registry-formatted exports on a schedule the
+registry defines.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The registry export does not carry clinical identifiers; the
+registry maintains its own pseudonym scheme. The operating programme
+records the export schedule and the registry's identifier in its
+quality dossier.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Clinical-Trial Sponsor Integration
 
-## Annex F — Adoption Roadmap
+Clinical-trial sponsors that operate ISO 14155-aligned investigations
+consume per-subject acquisition and motor-command data scoped to the
+trial cohort. Integration is mediated by the operating clinic's IRB-
+approved data-sharing plan; the sponsor's client certificate is bound
+to the trial cohort code and cannot retrieve data outside the cohort.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 National Medical-Device Authority Integration
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+National medical-device authorities consume adverse-event reports
+through the integration documented in PHASE-2 §11 and PHASE-3 §10.
+The authority's intake endpoint is published in the programme's
+quality dossier; the operating programme refreshes the integration
+configuration whenever the authority republishes its endpoint or its
+report schema.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §11 Long-Term Archive Integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Each programme designates a long-term archive that holds evidence
+packages beyond programme wind-down. Evidence packages are deposited
+on a quarterly cadence; the deposit is verified by re-pinning the
+content-addresses on each deposit. On wind-down, remaining packages
+transfer to the archive with content-addresses preserved.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §12 Worked Example: Adverse-Event Reporting Flow
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+1. A serious adverse event occurs during home use; the clinic
+   detects the event via the device's safety log on the next sync.
+2. The clinic's clinical reviewer confirms the event and POSTs an
+   adverse-event record (PHASE-2 §11).
+3. The API forwards the report to the configured national authority
+   over mutually-authenticated TLS within the authority's required
+   window.
+4. The authority returns a report reference, which the API appends
+   to the event record.
+5. The manufacturer's post-market surveillance team is notified
+   through the §2 push and opens an investigation.
+6. Follow-up visits, device modifications, and corrective actions
+   are appended to the event record over time.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A conformant tool completes the technical portion of this flow
+(steps 2-4 and 6) without further input from the clinic.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §13 Migration from Pre-Standard Records
 
-## Annex H — Versioning and Deprecation Policy
+Programmes that operated before WIA-prosthetic-control reached
+version 1.0 MAY migrate historical fittings by emitting a synthetic
+subject record that carries the original fitting's identifying
+information plus a `legacyImport` flag. Synthetic subjects are
+accepted by the rehabilitation registry and clinic EHR profiles but
+are not eligible for adverse-event reporting back-fill without a
+contemporaneous clinical re-evaluation.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §14 Public Catalogue and Aggregator Feeds
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Programmes that publish a public catalogue of fitted-device counts and
+adverse-event statistics emit an Atom or JSON Feed listing the
+aggregate counts by device class, indication, and quarter. The feed
+does not carry subject identifiers and does not list per-event detail;
+it is intended for transparency and policy analysis, not clinical
+review.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §15 Cross-Standard Linkage
 
-## Annex I — Interoperability Profiles
+A prosthetic-control programme that participates in adjacent WIA
+standards (a peripheral-nerve interface that ships under
+WIA-neural-interface, a BCI front-end that ships under WIA-bci) emits
+a cross-standard linkage record that names the consuming standard,
+the version under which the linkage is claimed, and the assertion
+that the prosthetic-control implementation satisfies the consuming
+standard's interface requirements. Linkages are not transitive;
+consumers verify each consuming standard's evidence directly.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §16 Reader Tooling and Accessibility
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Evidence-package consumers include screen-reader-driven clinical
+reviewers, low-bandwidth deployments at remote clinics, and offline
+auditors at certifying bodies. A programme MAY publish supplementary
+reader hints (compressed plain-text summaries, accessibility-friendly
+HTML renderings, paginated PDF exports) alongside the canonical
+evidence package; supplementary hints are non-normative and are
+clearly labelled as such in the manifest so that readers do not
+confuse them with authoritative records.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §17 Backwards-Compatibility Guarantee
+
+PHASE-4 minor revisions remain backwards-compatible with PHASE-4
+clients of the prior minor version: integration adapters, evidence-
+package consumers, and FHIR-bridge consumers continue to function
+without modification across minor revisions. Major-revision changes
+go through a deprecation window that lasts at least one full
+device-fitting cohort cycle.
+
+## §18 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully with
+at least one clinic EHR, at least one manufacturer post-market
+surveillance system, the relevant national medical-device authority,
+and at least one rehabilitation outcome registry, and has published
+at least one externally citable evidence package. The integration
+dossier records the integrations and the test runs that confirmed
+each.
+
+Sunsetting an integration is announced via the well-known discovery
+document at least 90 calendar days before removal; in-flight
+fittings that depend on the sunsetting integration are migrated
+before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-prosthetic-control
+- **Last Updated:** 2026-04-27

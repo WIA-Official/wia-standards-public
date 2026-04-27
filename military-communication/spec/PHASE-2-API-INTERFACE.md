@@ -1,241 +1,338 @@
-# WIA-military-communication PHASE 2 — API-INTERFACE Specification
+# WIA-military-communication PHASE 2 — API Interface Specification
 
 **Standard:** WIA-military-communication
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-military-communication (Military Communication).
+This PHASE defines the API surface a military-communications boundary
+exposes for message origination, addressing lookup, classification
+validation, spectrum coordination, link health query, and cross-link
+bridging. The shape is HTTP/JSON for command-and-control planes; for
+tactical narrowband links, a constrained-binary form is described in
+PHASE 3.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS), RFC 8259 (JSON)
+- STANAG 4406 — Military Message Handling System
+- STANAG 5066 — bandwidth-constrained tactical data exchange
+- STANAG 4774 / 4778 — Confidentiality and Information labelling
+- MIL-STD-2045-47001D — Variable Message Format
+- ITU-R Recommendations for spectrum coordination
+- WIA-medical-data-privacy / WIA-nbc-defense (referenced for
+  cross-domain integration)
 
 ---
 
-## §1 Scope
+## §1 Message origination
 
-This PHASE document is one of four that together define the WIA-military-communication
-standard. It addresses the api-interface layer of the standard.
+```
+POST /messages HTTP/1.1
+Host: milcomms.coalition-c2.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImsxIn0...
+Content-Type: application/wia-milcomms+json
+WIA-Doctrine: NATO-AAP-15
 
-## §2 Manifest
+{
+  "originator": "urn:wia:milcomms:ep:platform:nato-ramcis:awacs-tail-12",
+  "addressees": [
+    {"to": "urn:wia:milcomms:ep:unit:rok-army:roa-2-bde-3-bn", "role": "To"},
+    {"to": "urn:wia:milcomms:ep:unit:us-army:1id", "role": "Cc"}
+  ],
+  "precedence": "immediate",
+  "classification": {
+    "level": "secret",
+    "releasability": ["NATO", "ROK"]
+  },
+  "releaseAuthority": "urn:wia:org:nato.cao.j2",
+  "subject": "FRAGO 27-04 — see attached",
+  "body": {"contentType": "text/plain; charset=utf-8", "value": "..."},
+  "references": []
+}
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-communication"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The boundary validates classification, addresses, releasability,
+spectrum availability for the chosen waveform, and the originator's
+authority to release at the declared classification. Failure modes
+return RFC 9457 Problem Details with the URI namespace
+`urn:wia:milcomms:problem:*`.
 
-## §3 Conformance Tiers
+## §2 Addressing lookup
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /endpoints?scope=unit&authority=rok-army&pattern=roa-2-bde-* HTTP/1.1
+Authorization: Bearer ...
+WIA-Doctrine: NATO-AAP-15
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Returns matching endpoints as JSON. The boundary filters results
+by the requester's coalition releasability — endpoints in catalogues
+the requester cannot reach (releasability mismatch) are silently
+omitted. Each result emits a single combined AuditEvent so that
+catalog-scraping is observable to the deployment's security
+operations team.
 
-## §4 Discovery
+## §3 Classification validation
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-communication`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+POST /messages/$validate HTTP/1.1
+{
+  "originator": "...",
+  "addressees": [...],
+  "classification": {...},
+  "body": {...}
+}
+```
 
-## §5 Time and Identity
+Performs the classification + addressee + releasability check
+without committing the message. Useful for clients that want to
+warn an operator about a classification mismatch before send. The
+response carries the boundary's would-be decision and a list of
+caveats that would apply.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Spectrum coordination
 
-## §6 Versioning and Deprecation
+```
+POST /spectrum/allocations HTTP/1.1
+{
+  "frequencyRange": {"start": 30000000, "end": 30500000},
+  "geoArea": {...},
+  "period": {"start": "...", "end": "..."},
+  "users": [...],
+  "coordinationAuthority": "urn:wia:org:hostnation-c-fmt"
+}
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The boundary checks for conflicts with existing allocations in the
+same geo area and period and refuses overlapping allocations with
+`urn:wia:milcomms:problem:spectrum-conflict`. On acceptance, the
+allocation is signed by the coordination authority and visible to
+all operators authorised to read the deployment's spectrum
+register.
 
-## §7 Privacy and Security
+## §5 Link health query
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+GET /links?terminalRef=urn:wia:milcomms:ep:terminal:...
+           &since=2026-04-27T00:00:00Z
+           &state=degraded,lost
+HTTP/1.1
+Authorization: Bearer ...
+```
 
-## §8 Open Governance
+Returns link-quality observations. The boundary applies the same
+release-authority gate as message endpoints; observations on links
+the requester cannot reach (mismatch on releasability) are filtered
+out. Aggregated views (per-link health summary, per-area summary)
+are available at `/links/$summary` with the same gate.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-communication` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Cross-link bridging
+
+```
+POST /bridges HTTP/1.1
+{
+  "sourceMessageRef": "urn:wia:milcomms:msg:...",
+  "destinationWaveform": "urn:wia:milcomms:wf:link-22-bridged",
+  "translationPolicy": "lossless"
+}
+```
+
+The boundary applies the bridge classification check, ensures the
+destination waveform is compatible with the source's classification
+markings, and records the bridge event (PHASE 1 §8). Lossy bridges
+require an explicit `translationPolicy: "lossy-acknowledged"` flag
+plus a recorded justification and a release-authority signature.
+
+## §7 EMCON status
+
+Radio-silence postures (EMCON) are posted as control records:
+
+```
+POST /emcon HTTP/1.1
+{
+  "area": {...},
+  "level": "alpha",
+  "period": {...},
+  "issuedBy": "urn:wia:org:..."
+}
+```
+
+Active EMCON suspends transmission API endpoints (`POST /messages`)
+for affected endpoints unless the message bears a `precedence:
+flash` and a release authority overriding EMCON. Override events
+are themselves AuditEvents.
+
+## §8 ALE channel scan
+
+ALE-capable terminals report scan results:
+
+```
+POST /ale/scans HTTP/1.1
+{
+  "terminalRef": "urn:wia:milcomms:ep:terminal:...",
+  "scanWindow": {"start": "...", "end": "..."},
+  "channelsTested": [...],
+  "reachablePeers": [...]
+}
+```
+
+The boundary aggregates scans across the deployment's ALE network
+to support automatic link establishment decisions. Scan records
+are themselves classified at the level appropriate to the listed
+channels and peers.
+
+## §9 Errors and warnings
+
+| URI                                                | Status | Meaning                                  |
+|----------------------------------------------------|-------:|------------------------------------------|
+| `urn:wia:milcomms:problem:classification-invalid`  | 400    | classification marking malformed         |
+| `urn:wia:milcomms:problem:releasability-mismatch`  | 403    | addressee outside releasability          |
+| `urn:wia:milcomms:problem:release-not-authorised`  | 403    | originator lacks release authority       |
+| `urn:wia:milcomms:problem:emcon-active`            | 423    | EMCON forbids transmission               |
+| `urn:wia:milcomms:problem:spectrum-conflict`       | 409    | requested spectrum overlaps existing     |
+| `urn:wia:milcomms:problem:waveform-incompatible`   | 422    | destination waveform cannot carry source |
+| `urn:wia:milcomms:problem:catalog-not-found`       | 404    | addressing catalogue offline             |
+| `urn:wia:milcomms:problem:audit-unavailable`       | 503    | audit chain write failed                 |
+
+Warnings (200-OK with content caveats) use `Warning:` headers per
+RFC 7234 §5.5 with codes namespaced under `wia-milcomms-`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked spectrum-coordination example (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST /spectrum/allocations HTTP/1.1
+Host: milcomms.coalition-c2.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiJ9...
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+{
+  "frequencyRange": {"start": 30000000, "end": 30500000},
+  "geoArea": {"type": "Polygon", "coordinates": [[[126.5,37.4],[126.7,37.4],[126.7,37.6],[126.5,37.6],[126.5,37.4]]]},
+  "period": {"start": "2026-04-27T00:00:00+09:00", "end": "2026-04-30T23:59:59+09:00"},
+  "users": ["urn:wia:milcomms:ep:unit:rok-army:roa-2-bde"],
+  "coordinationAuthority": "urn:wia:org:rok-mof.fmt",
+  "priority": "operational"
+}
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Response on success:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+201 Created
+Location: /spectrum/allocations/a-91a7
+WIA-Audit-Event-Id: urn:wia:milcomms:audit:2026-04-27T08:00:00+09:00:9c11
+```
 
-## Annex F — Adoption Roadmap
+Response on conflict:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+409 Conflict
+Content-Type: application/problem+json
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+{
+  "type": "urn:wia:milcomms:problem:spectrum-conflict",
+  "title": "Spectrum overlaps existing allocation in same area and period",
+  "status": 409,
+  "detail": "Allocation a-7d12 (priority: mission-critical) covers 30000000-30200000 Hz in the requested area through 2026-05-01.",
+  "instance": "/spectrum/allocations"
+}
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex B — Catalogue refresh schedule (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Catalogues for endpoint URNs (PHASE 1 §2) are refreshed at
+intervals declared by the issuing authority. The boundary caches
+catalogue entries for the cache lifetime declared in the
+deployment policy and refreshes asynchronously to avoid blocking
+calls. A catalogue offline beyond the cache lifetime suspends
+new endpoint additions but allows existing endpoints to continue
+operating.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex C — Worked link-health subscription (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+GET /links/$subscribe?terminalRef=urn:wia:milcomms:ep:terminal:...
+                       &states=degraded,lost
+HTTP/1.1
+Authorization: Bearer ...
+Accept: text/event-stream
+WIA-Doctrine: NATO-AAP-15
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The boundary streams Server-Sent Events as link state transitions
+on the listed terminal occur. Each event carries the WIA-Audit-Event-Id
+so subscribers can replay the audit chain. Subscriptions inherit
+the same release-authority gate as one-shot queries; events on
+links the subscriber's grant does not cover are silently filtered.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## Annex D — Releasability filter examples (informative)
 
-## Annex H — Versioning and Deprecation Policy
+| Caller's `wia_releasability[]` | Endpoint releasability set | Visible? |
+|---------------------------------|----------------------------|----------|
+| `["NATO"]`                       | `["NATO"]`                  | yes      |
+| `["NATO"]`                       | `["NATO","ROK"]`            | yes (intersection non-empty) |
+| `["FVEY"]`                       | `["NATO"]`                  | no       |
+| `["NATO","NOFORN"]`              | `["NATO"]`                  | no (NOFORN caveat applies) |
+| `["NATO","KR-US"]`               | `["KR-US"]`                 | yes      |
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Boundary precomputes the visibility decision per call so latency
+remains predictable; the decision is part of the AuditEvent.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex E — Pagination and rate limiting (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Endpoint queries paginate at ≤ 1000 results per page. Per-token
+rate limit defaults: 100 message-origination calls per minute,
+500 lookup calls per minute. Rate-limit refusals carry
+`urn:wia:milcomms:problem:rate-limited` and are themselves audit
+events.
 
-## Annex I — Interoperability Profiles
+## Annex F — Capability discovery (informative)
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+GET /.well-known/wia/military-communication/capabilities HTTP/1.1
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Response carries the deployment's doctrine, supported waveforms,
+federation peers, and conformance level. Cached capability documents
+expire on the deployment's session-token lifetime.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex G — EMCON override worked example (informative)
+
+```
+POST /messages HTTP/1.1
+Host: milcomms.coalition-c2.example
+Authorization: Bearer ...
+WIA-Doctrine: NATO-AAP-15
+WIA-Emcon-Override: yes
+WIA-Emcon-Override-Authority: urn:wia:org:rok-army.cdr-2-bde
+WIA-Justification: TIC release confirmed at FOB-Echo, mass-casualty advisory inbound
+
+{
+  "originator": "urn:wia:milcomms:ep:platform:rok-army:fob-echo-cmd",
+  "addressees": [
+    {"to": "urn:wia:milcomms:ep:unit:rok-army:roa-2-bde", "role": "To"},
+    {"to": "urn:wia:milcomms:ep:unit:nato-c2:cao-j2", "role": "Cc"}
+  ],
+  "precedence": "flash",
+  "classification": {"level": "secret", "releasability": ["NATO","ROK"]},
+  "releaseAuthority": "urn:wia:org:rok-army.cdr-2-bde",
+  "subject": "TIC RELEASE CONFIRMED — IMMEDIATE EVAC",
+  "body": {"contentType": "text/plain", "value": "..."}
+}
+```
+
+Successful response carries the EMCON-override audit ID and the
+original EMCON posture ID so the override appears in both records:
+
+```
+201 Created
+Location: /messages/m-91a7
+WIA-Audit-Event-Id: urn:wia:milcomms:audit:override:7f2c
+WIA-Emcon-Posture-Override-Id: urn:wia:milcomms:emcon:override:e-91a7
+WIA-Emcon-Posture-Ref: urn:wia:milcomms:emcon:p-7f00
+```
+
+The override review backlog (PHASE 4 §5) clocks from this audit
+event; failure to review within 24 hours surfaces as an operational
+incident.
