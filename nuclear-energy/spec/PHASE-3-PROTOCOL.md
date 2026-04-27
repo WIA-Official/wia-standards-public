@@ -5,237 +5,259 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-nuclear-energy (Nuclear Energy).
+This document defines the protocols that govern an accredited
+nuclear-energy programme: regulator authorisation, safeguards
+agreement compliance, defence-in-depth governance, fuel-cycle
+custody, radiation-protection governance, environmental
+surveillance, emergency preparedness, cybersecurity for safety-
+related systems, decommissioning custody, and end-state release.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 14001:2015 (environmental management)
+- ISO 45001:2018 (occupational health and safety management)
+- ISO 19443:2018 (quality management for nuclear-supplier organisations)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- IAEA Safety Standards Series (SSR-2/1, SSR-2/2, GSR Part 3, etc.;
+  cited normatively for terminology)
+- IAEA Safeguards Agreements and Additional Protocol
+- ICRP Publications 60, 103, and successors
 
 ---
 
-## §1 Scope
+## §1 Regulator Authorisation
 
-This PHASE document is one of four that together define the WIA-nuclear-energy
-standard. It addresses the protocol layer of the standard.
+A nuclear-energy programme MAY claim conformance to WIA-nuclear-energy
+only after the national nuclear regulator has issued a valid licence
+or operating authorisation for each plant the programme operates.
+Plant licensing follows the regulator's published process and is
+recorded against the plant. The API enforces the authorisation
+requirement at phase-transition endpoints (PHASE-2 §3): plants
+without a current authorisation cannot transition to `operating`.
 
-## §2 Manifest
+Operating licences are amended through the regulator's amendment
+procedure; amendments are content-addressed and the prior
+authorisation remains addressable as the historical regulatory
+state.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "nuclear-energy"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Safeguards Agreement Compliance
 
-## §3 Conformance Tiers
+Plants subject to safeguards agreements (typically all civil plants
+in non-nuclear-weapon states under IAEA Comprehensive Safeguards
+and the Additional Protocol) submit material balance reports and
+host inspector visits according to the agreement's schedule. The
+operating programme records the safeguards agreement reference,
+the inspectorate point of contact, and the inspection cadence
+against each plant.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Safeguards-relevant records (fuel assembly serial numbers,
+spent-fuel inventory snapshots, material balance areas) are
+exposed to the inspectorate via the dedicated endpoints in PHASE-2
+§4 and §8 under the inspectorate's client certificate. Other
+clients receive `403 Forbidden` with type
+`urn:wia:nuclear-energy:safeguards-scope`.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Defence-in-Depth Governance
 
-## §4 Discovery
+Plants operate under defence-in-depth: independent layers of
+prevention, detection, and mitigation that protect public and
+worker safety even when individual layers fail. The operating
+organisation documents its defence-in-depth architecture in the
+plant's quality dossier and references it from each safety-event
+record (PHASE-1 §10). Defence-in-depth modifications (new safety
+systems, modified credit for existing systems) require regulator
+approval before implementation.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/nuclear-energy`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Fuel-Cycle Custody
 
-## §5 Time and Identity
+Each fuel assembly carries a custody chain from fabrication through
+final disposition. Custody events emit records that link to the
+PHASE-1 §4 fuel-assembly record and to the operating programme's
+shipment, receipt, and inventory records. The chain is auditable
+end-to-end so that safeguards inspectors and regulators can
+reconstruct the assembly's history without recourse to vendor or
+operator-internal systems.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Radiation-Protection Governance
 
-## §6 Versioning and Deprecation
+Worker dose limits follow the regulator's adoption of ICRP
+Publication 103 (or its successor). The operating organisation
+records its dose-management programme: the dose limits it applies,
+the as-low-as-reasonably-achievable (ALARA) practices it has adopted,
+the dosimetry system it operates, and the personnel dose-ledger
+review cadence.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Programmes MUST refuse to dispatch a worker whose annual cumulative
+dose has reached the regulator-set limit; the API's dose-policy
+breach endpoint returns `403 Forbidden` with type
+`urn:wia:nuclear-energy:dose-policy-breach`.
 
-## §7 Privacy and Security
+## §6 Environmental Surveillance
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Environmental-release reports (PHASE-1 §9) are filed at the cadence
+the regulator requires (typically quarterly or annually) and are
+verified against environmental monitoring data from on-site and
+off-site monitoring stations. The operating programme records its
+monitoring network in its quality dossier and republishes annual
+environmental-impact reports.
 
-## §8 Open Governance
+Releases above regulator-defined notification thresholds trigger an
+expedited report to the regulator within the regulator's required
+window (typically hours to days, depending on the radionuclide and
+the release pathway).
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `nuclear-energy` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Emergency Preparedness
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Plants operate under an emergency-preparedness plan that names the
+on-site emergency director, the off-site authority, the
+notification chain, the public-protection actions (sheltering,
+evacuation, prophylaxis), and the exercise schedule (table-top,
+walk-through, full-scale). Emergency exercises are recorded against
+the plant; regulators audit the exercises during routine
+inspections.
 
+## §8 Cybersecurity for Safety-Related Systems
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Safety-related instrumentation and control systems are isolated
+from external networks per the regulator's defence-in-depth
+cybersecurity expectations. The operating programme records the
+network architecture, the trust boundaries between safety-related
+and balance-of-plant systems, and the access-control and audit-log
+configuration. Cybersecurity-related safety events are classified
+under PHASE-1 §10 with category `cybersecurity` and follow the
+same notification timelines as physical events.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §9 Records Retention
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Plant records — every record defined in PHASE-1, the API audit
+logs (PHASE-2), regulator submissions, safeguards reports,
+emergency exercises, and safety-event investigations — retain
+indefinitely. Decommissioning records retain through the post-
+release period the regulator defines.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §10 Time Synchronisation
 
-## Annex F — Adoption Roadmap
+Plant clocks synchronise per RFC 5905 (NTPv4) against a national-
+metrological-laboratory stratum-1 service or an equivalent
+recognised service. The synchronised time anchors all timestamped
+records so that retrospective audits can correlate plant events
+with off-site observations.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §11 Decommissioning Custody
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Decommissioning programmes maintain custody of plant systems,
+spent fuel, radioactive waste, and the contaminated site itself
+through the decommissioning timeline. Custody events emit records
+that link to the decommissioning plan (PHASE-1 §11) and to the
+relevant waste categorisation entries. Decommissioning is concluded
+when the regulator releases the site to its agreed end state.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §12 End-State Release
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Site release follows the regulator's process: residual contamination
+surveys, occupant exposure modelling for the agreed end use, and
+the regulator's release decision. The API records the release
+decision and the surveys that supported it; downstream consumers
+(local authorities, prospective land users) consume the records
+through the read-only profile.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §13 Quality Dossier
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The programme's quality dossier records the regulators it works
+with, the safeguards inspectorate, the suppliers it has qualified
+under ISO 19443, the emergency-preparedness exercises it has
+conducted, and the operational events it has experienced. The
+dossier is reviewed at least annually by the operating
+organisation's quality manager.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §14 Cross-Border Programme Operation
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+Multi-jurisdiction programmes (transboundary nuclear cooperatives,
+international fuel-cycle initiatives) honour each participating
+jurisdiction's regulator authorisations and safeguards agreements.
+Cross-jurisdictional data transfers honour both source and
+destination jurisdictions' export-control rules.
 
-## Annex H — Versioning and Deprecation Policy
+## §15 Configuration Management and Plant-State Documents
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The Final Safety Analysis Report (FSAR), Technical Specifications,
+Quality Assurance Manual, Emergency Plan, Security Plan, and
+Decommissioning Plan together define the plant's licensed
+configuration. Modifications to any of these documents follow a
+configuration-management process under regulator oversight: proposed
+amendment, safety review, regulator approval, document update,
+training rollout, and effective-date publication.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The operating programme records every approved amendment as a
+plant-state document (PHASE-1 §12) and references the in-force
+document set from operating, outage, and safety-event records so
+that retrospective audits resolve unambiguously to the licensed
+configuration of the plant at the time.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §16 Operating Experience Sharing
 
-## Annex I — Interoperability Profiles
+Operational events of broad interest are shared with the
+international operating-experience community (the World Association
+of Nuclear Operators, the IAEA Incident Reporting System, and
+similar fora) through the channels the operating organisation
+participates in. Event-sharing records are signed by the operating
+organisation and reference the underlying safety-event record.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §17 Periodic Safety Review
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Operating plants undergo a periodic safety review (typically every
+ten calendar years) that re-assesses the plant against current
+regulatory expectations and operating experience. The review's
+findings, the corrective actions identified, and the regulator's
+acceptance are recorded as a chain of attestations against the
+plant. Plants whose periodic review identifies open corrective
+actions remain operational under interim measures recorded in the
+quality dossier.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §18 Lifetime Extension Governance
+
+A plant whose operating organisation seeks to extend operation
+beyond the original licence term submits a lifetime-extension case
+to the regulator. The submission documents the plant's component
+ageing assessments, the equipment-qualification programme, the
+results of in-service inspection, the forecast environmental impact
+through the extension period, and the proposed end-of-extension
+disposition. Extension approvals are recorded as licence amendments
+under §1.
+
+## §19 Maintenance and Surveillance Programme
+
+The plant's maintenance and surveillance programme implements the
+Technical Specifications' surveillance requirements: routine
+testing of safety-related components at the cadence the
+specifications require, post-maintenance testing after corrective
+work, and periodic equipment qualification re-assessment. The
+programme records each surveillance against the relevant component
+and against the operating cycle, so that surveillance compliance
+is auditable end-to-end.
+
+## §20 Conformance and Auditing
+
+A programme conformant with WIA-nuclear-energy publishes its
+operating authorisations, its safeguards agreement references, its
+quality dossier, the catalogue of safety events at INES-1 and above,
+and the catalogue of environmental releases, and answers an annual
+self-assessment that maps each clause of this PHASE to the
+programme's implementation. The self-assessment is reviewed during
+routine regulator inspections.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-nuclear-energy
+- **Last Updated:** 2026-04-27

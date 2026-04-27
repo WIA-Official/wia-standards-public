@@ -5,237 +5,312 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-protein-structure (Protein Structure).
+This document defines the HTTP API contract that an accredited
+protein-structure programme exposes for the records defined in
+PHASE-1. Consumers include depositing laboratories, structure-
+prediction service operators, archive consortia, downstream
+consumers (drug-discovery, enzyme-engineering, vaccine-design),
+similarity-search services, citation tools, and journals that
+ingest structural records during peer review.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details)
+- IETF RFC 6901 (JSON Pointer)
+- IETF RFC 6902 (JSON Patch)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- HL7 FHIR R5 (`MolecularSequence`)
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-protein-structure
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the operating
+programme. Versioning uses `/v1/` path segments. The OpenAPI 3.1
+document at `/v1/openapi.json` is canonical. Coordinate payloads
+are content-addressed CIF or BCIF artefacts; the API exposes
+references to those artefacts rather than inlining them in JSON.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "protein-structure"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-protein-structure",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "structures":         "/v1/structures",
+    "coordinates":        "/v1/coordinates",
+    "chains":             "/v1/chains",
+    "ligands":            "/v1/ligands",
+    "experimentalEvidence": "/v1/experimental-evidence",
+    "predictionConfidence": "/v1/prediction-confidence",
+    "validations":        "/v1/validations",
+    "similarities":       "/v1/similarities",
+    "crossRefs":          "/v1/cross-refs",
+    "evidence":           "/v1/evidence",
+    "openapi":            "/v1/openapi.json"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Structures
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST   /v1/structures                  — register a structure
+GET    /v1/structures/{sid}            — retrieve structure record
+PATCH  /v1/structures/{sid}            — update mutable fields
+GET    /v1/structures?provenance={p}   — list by provenance class
+GET    /v1/structures?uniprot={acc}    — list structures covering
+                                         a UniProt accession
+```
 
-## §4 Discovery
+A new structure submission MUST include either an
+`experimentalMethod` or a `predictionEngine` consistent with its
+provenance class; submissions whose provenance metadata is missing
+return `422` with type
+`urn:wia:protein-structure:provenance-incomplete`.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/protein-structure`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Coordinates
 
-## §5 Time and Identity
+```
+POST   /v1/structures/{sid}/coordinates   — register a coordinate
+                                              artefact reference
+GET    /v1/coordinates/{cid}              — retrieve metadata
+GET    /v1/coordinates/{cid}/artefact     — fetch CIF or BCIF
+                                              archive
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The artefact endpoint is content-addressed and immutable; the
+metadata endpoint may be patched only to add validation references
+under §7.
 
-## §6 Versioning and Deprecation
+## §5 Chains, Ligands, and Sequence Cross-Reference
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/structures/{sid}/chains       — register a chain
+GET    /v1/chains/{cid}                  — retrieve chain record
+POST   /v1/structures/{sid}/ligands      — register a ligand
+GET    /v1/ligands/{lid}                 — retrieve ligand record
+GET    /v1/chains/{cid}/sequence-fhir    — fetch FHIR
+                                              MolecularSequence
+                                              representation
+```
 
-## §7 Privacy and Security
+The FHIR endpoint serves the chain's sequence as a FHIR R5
+`MolecularSequence` resource for clinical-genomics consumers; raw
+CIF sequences flow through the coordinate artefact.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Experimental Evidence
 
-## §8 Open Governance
+```
+POST   /v1/structures/{sid}/experimental-evidence  — register
+                                                       evidence
+GET    /v1/experimental-evidence/{eid}             — retrieve
+                                                       evidence
+GET    /v1/experimental-evidence/{eid}/raw         — fetch raw
+                                                       data archive
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `protein-structure` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Raw data archives are immutable resources delivered with content-
+addressed URLs and `Cache-Control: max-age=31536000, immutable`.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Prediction Confidence and Validation
 
+```
+POST   /v1/structures/{sid}/prediction-confidence  — register
+                                                       confidence
+GET    /v1/prediction-confidence/{cid}             — retrieve
+GET    /v1/prediction-confidence/{cid}/per-residue — fetch per-
+                                                       residue
+                                                       confidence
+GET    /v1/prediction-confidence/{cid}/pairwise    — fetch pairwise
+                                                       confidence
+POST   /v1/structures/{sid}/validations            — register
+                                                       validation
+                                                       report
+GET    /v1/validations/{vid}                       — retrieve
+                                                       report
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+## §8 Similarity and Cross-References
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+POST   /v1/structures/{sid}/similarities    — register a similarity
+                                               search result
+GET    /v1/similarities/{sid}               — retrieve search result
+POST   /v1/cross-refs                       — register a cross-
+                                               reference
+GET    /v1/structures/{sid}/cross-refs      — list cross-references
+                                               for a structure
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Similarity searches MUST cite the search tool, the version, and
+the query parameters; submissions whose tool and version do not
+resolve in the API's tool register return `422` with type
+`urn:wia:protein-structure:similarity-tool-unregistered`.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Evidence Package
 
-## Annex F — Adoption Roadmap
+```
+POST   /v1/structures/{sid}/evidence    — request package generation
+GET    /v1/evidence/{packageId}         — retrieve a package
+GET    /v1/evidence/{packageId}/manifest — manifest only
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The evidence package contains the structure record, the coordinate
+artefact (for in-place packages) or its content-address (for
+reference-only packages), the chains and ligands, the experimental
+evidence or the prediction confidence, the validation report, the
+cross-references, and the signed manifest.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §10 Errors
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+All error responses are `application/problem+json` per RFC 9457.
+Defined types include:
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+- `urn:wia:protein-structure:provenance-incomplete`
+- `urn:wia:protein-structure:cif-parse-failure`
+- `urn:wia:protein-structure:similarity-tool-unregistered`
+- `urn:wia:protein-structure:ccd-version-mismatch`
+- `urn:wia:protein-structure:dictionary-version-mismatch`
+- `urn:wia:protein-structure:evidence-mismatch`
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Authentication
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The API uses mutually-authenticated TLS for laboratory, prediction-
+service, and archive-consortium connections. Public read-only
+endpoints (released structures, the OpenAPI document) are reachable
+without a client certificate.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 Caching
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Stable resources (released structures, signed validations, evidence
+packages) are cacheable with `Cache-Control: max-age=31536000,
+immutable`. Mutable resources (draft structures awaiting validation)
+are cacheable for 60 seconds.
 
-## Annex H — Versioning and Deprecation Policy
+## §13 Streaming Subscriptions
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Consumers subscribe via Server-Sent Events at
+`/v1/structures/{sid}/events`. Topics include validation
+completions, prediction-confidence updates, similarity-search
+results, and cross-reference additions.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §14 Worked Example: Predicted-of-Experimental Citation
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+1. Laboratory deposits an experimental structure with mmCIF
+   coordinates and validation report.
+2. Prediction-service operator predicts the same UniProt sequence
+   and registers the predicted structure.
+3. Programme registers a `predicted-of-experimental` cross-reference
+   linking the two.
+4. Citation tool receives a paper that cites the predicted
+   structure; the tool walks the cross-reference back to the
+   experimental structure for downstream readers.
 
-## Annex I — Interoperability Profiles
+## §15 PTM and Quaternary Assembly Endpoints
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+```
+POST   /v1/structures/{sid}/ptms          — register a PTM record
+GET    /v1/ptms/{pid}                     — retrieve PTM record
+POST   /v1/structures/{sid}/quaternary-assemblies
+                                          — register an assembly
+GET    /v1/quaternary-assemblies/{qid}    — retrieve assembly
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+PTM records that cite a `provisional-ccd-` identifier flag the
+structure for downstream consumers as containing pending CCD
+content; the flag is cleared automatically when the CCD entry is
+finalised.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §16 Bulk and Pagination
+
+Bulk endpoints accept arrays of structures for high-volume
+prediction-service deposits:
+
+```
+POST   /v1/bulk/structures        — submit a batched prediction set
+GET    /v1/bulk/{operationId}     — operation status
+```
+
+Cursor-based pagination uses the `cursor` query parameter and
+`Link` headers (RFC 8288); cursors are opaque and persist for at
+least 24 hours.
+
+## §17 Audit and Observability
+
+Every endpoint emits structured logs with `structureId`, `traceId`,
+the issuing client certificate's subject, and the laboratory or
+prediction-service clock skew vs the reference NTP source.
+
+## §18 Annotation Endpoints
+
+```
+POST   /v1/structures/{sid}/annotations    — register an annotation
+GET    /v1/annotations/{aid}               — retrieve annotation
+GET    /v1/structures/{sid}/annotations?source={s}
+                                            — list annotations by
+                                              source
+```
+
+Annotation submissions cite the annotation source (SCOP, CATH,
+ECOD, GO, InterPro, UniProt-feature) and the source version so
+that downstream consumers can pin annotations against a specific
+revision.
+
+## §19 Privacy-Preserving Aggregation
+
+Aggregate consumers (research-grant agencies, public-health
+analysts, structure-prediction benchmark coordinators) fetch
+population-level statistics through aggregation endpoints that
+emit counts, means, and dispersions:
+
+```
+GET    /v1/aggregate/structures-by-method?period=...
+GET    /v1/aggregate/predicted-confidence-distribution?engine=...
+GET    /v1/aggregate/uniprot-coverage?period=...
+```
+
+Out-of-policy queries return `403 Forbidden` with type
+`urn:wia:protein-structure:cohort-too-small`.
+
+## §20 Provenance Endpoint
+
+```
+GET    /v1/provenance/{recordId}    — retrieve provenance entry
+                                       for any PHASE-1 record
+```
+
+Provenance entries trace a structure to its parents (laboratory
+deposit, prediction engine, MSA inputs, template inputs, CCD
+version, mmCIF dictionary version) so that a citing reader can
+walk the chain end-to-end.
+
+## §21 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI 3.1
+document, signs evidence packages per RFC 9421, and rejects
+coordinate payloads that fail CIF parsing.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-protein-structure
+- **Last Updated:** 2026-04-27
