@@ -408,7 +408,6 @@ interface ProductionRLSystem {
 
 ## References
 
-1. 선행 연구. Constrained Policy Optimization
 2. Ray RLlib Documentation
 3. TensorFlow Serving Guide
 4. Production Machine Learning Best Practices
@@ -416,5 +415,25 @@ interface ProductionRLSystem {
 ---
 
 **Previous:** [PHASE 3 - Advanced Deep RL](./PHASE-3.md)
+
+## Appendix — Integration Implementation Notes
+
+### Conformance test suite
+
+A black-box test suite is published at `https://github.com/WIA-Official/wia-reinforcement-learning-conformance` and walks the public surface of this Phase. Hosts publishing `bridge_profile=Full` SHOULD additionally pass the suite extension tests for at least one supported third-party RL framework (Stable-Baselines3, RLlib, CleanRL, Tianshou, Acme).
+
+### Reference container
+
+The `wia/reinforcement-learning-host:1.0.0` container image implements every endpoint specified in this Phase with mock environments and pre-trained checkpoints. The container ships with built-in OpenAI Gymnasium environment compatibility shim suitable for development and testing.
+
+### Operational considerations
+
+Reinforcement-learning infrastructure has three operational concerns that integrators consistently underestimate. First, checkpoint storage scales aggressively with experiment frequency — a typical research lab generates 100 GB of checkpoints per week from active hyperparameter sweeps. Second, environment determinism is a property of the environment + the framework + the GPU driver stack; the standard's environment_descriptor envelope captures all three so reproducibility studies can pin the exact stack. Third, reward hacking detection — agents trained against poorly-specified reward functions exhibit pathological behaviour that the standard's evaluation_run envelope helps surface via the documented `safety_metrics` block.
+
+### Backwards-compatibility promise
+
+Within the 1.x line every endpoint and envelope listed in this Phase MUST remain reachable and MUST continue to honour the documented status codes and content shapes. Hosts MAY add optional query parameters, response fields, new endpoints, or media types. Hosts MUST NOT remove or repurpose existing ones. Breaking changes ride a major version bump and MUST be preceded by a 12-month deprecation window per IETF RFC 8594 and RFC 9745.
+
+---
 
 © 2025 SmileStory Inc. / WIA · 弘益人間 (홍익인간) · Benefit All Humanity

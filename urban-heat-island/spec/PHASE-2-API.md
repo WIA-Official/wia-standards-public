@@ -284,7 +284,7 @@ Register a new sensor.
   "data": {
     "sensorId": "SENSOR-SEOUL-NEW",
     "registrationDate": "2025-01-15T10:30:00Z",
-    "apiKey": "sk_live_abc123..."
+    "apiKey": "EXAMPLE_API_KEY_REPLACE_ME..."
   }
 }
 ```

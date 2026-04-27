@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 05: Phase 2 — API Interface — WIA-UNI-008 Transportation Network</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #3b82f6; }
+h1 { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #3b82f6; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🚆 [transportation-network] Standard Ebook</a> | Chapter 05 (of 8)</nav>
+
+<h1>Chapter 05: Phase 2 — API Interface</h1>
+
+<h2>5.1 Phase 2 in one paragraph</h2>
+<p>Phase 2 specifies the HTTPS surface for transportation network data. Transport is TLS 1.3 (IETF RFC 8446) only.</p>
+
+<h2>5.2 Discovery</h2>
+<p>Every host publishes a discovery document at <code>/.well-known/wia-transportation-network</code>.</p>
+
+<h2>5.3 Route + schedule endpoints</h2>
+<pre><code>POST /tn/route                   (signed; agency authority)
+GET  /tn/route/{route_id}
+GET  /tn/route?agency_id={id}&mode={m}
+POST /tn/schedule                (signed; agency authority)
+GET  /tn/schedule/{schedule_id}</code></pre>
+
+<h2>5.4 Real-time endpoints</h2>
+<pre><code>POST /tn/vehicle-position        (signed; agency authority; high frequency)
+GET  /tn/vehicle-position/stream?agency_id={id}    (Server-Sent Events)
+POST /tn/trip-update             (signed; agency authority)
+GET  /tn/trip-update/stream?route_id={id}    (Server-Sent Events)</code></pre>
+
+<h2>5.5 Service alert + fare endpoints</h2>
+<pre><code>POST /tn/service-alert           (signed; agency authority)
+GET  /tn/service-alert?affected_route={id}
+POST /tn/fare-product            (signed; agency authority)
+GET  /tn/fare-product?agency_id={id}</code></pre>
+
+<h2>5.6 Shared vehicle endpoints</h2>
+<pre><code>POST /tn/shared-vehicle          (signed; operator authority)
+GET  /tn/shared-vehicle/stream?bbox={...}    (Server-Sent Events)</code></pre>
+
+<h2>5.7 Rider trip endpoints</h2>
+<pre><code>POST /tn/rider-trip              (signed; rider consent envelope required)
+GET  /tn/rider-trip?rider_id={id}    (rider only; full audit log)</code></pre>
+
+<h2>5.8 Authentication</h2>
+<p>Writes require HTTP Message Signatures per IETF RFC 9421. Public reads (route, schedule, real-time, service alerts, fare products, shared vehicle availability) are anonymous; rider trip reads require rider authentication or explicit research consent envelope.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA-UNI-008 8-chapter survey. The conformance test suite at <code>https://github.com/WIA-Official/wia-transportation-network-conformance</code> is the source of truth. The reference container <code>wia/transportation-network-host:1.0.0</code> implements every Phase 2 endpoint with mock urban transit data.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1-DATA-FORMAT.md</code></li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2-API.md</code></li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3-PROTOCOL.md</code></li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4-INTEGRATION.md</code></li>
+<li><strong>GTFS / GTFS-Realtime</strong> for the de-facto static + real-time transit data formats Phase 4 §7.2-7.3 bridges to.</li>
+<li><strong>NeTEx (CEN/TS 16614)</strong> + <strong>SIRI (CEN/TS 15531)</strong> for European transit standards.</li>
+<li><strong>GBFS (NABSA)</strong> for micromobility availability.</li>
+<li><strong>MDS (Open Mobility Foundation)</strong> for city-side mobility data exchange.</li>
+<li><strong>WIA Time-Series Data</strong> sister standard for high-cadence vehicle telemetry.</li>
+<li><strong>WIA-OMNI-API</strong> for agency, operator, rider credential storage.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur in transportation network infrastructure and are baked into the standard. First, vehicle_position update frequency: most US transit agencies emit every 15-30 seconds; high-frequency rail systems emit every second. Hosts MUST provision sufficient throughput. Second, rider trip consent revocation: when a rider revokes consent, the data must stop flowing within minutes; the consent envelope MUST carry an explicit revocation timestamp. Third, GTFS feed updates: agencies typically publish weekly GTFS updates; the standard\x27s schedule envelope versioning lets downstream consumers detect new feeds without polling.</p>
+
+<h2>Multi-Modal Trip Planning Pattern</h2>
+<p>The standard's core use case is multi-modal trip planning: a traveller wants to go from point A to point B and the planner needs to combine bus, rail, micromobility, and walking. The standard makes this possible without per-vendor integration: the traveller's app subscribes to one WIA-UNI-008 host that aggregates feeds from all participating providers in the city. Trip search returns multi-modal options ranked by total time, total cost, or carbon footprint. The traveller selects an option and the app initiates rider_trip envelopes with explicit consent for the trip duration only.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-UNI-008 Transportation Network Standard v1.0.0</p></footer>
+</body>
+</html>

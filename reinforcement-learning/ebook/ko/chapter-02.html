@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02장: RL 기초: MDP·가치 vs 정책 — WIA-AI-025 강화학습</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #a855f7; }
+h1 { border-bottom: 2px solid #a855f7; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🎮 [reinforcement-learning] 표준 전자책</a> | 02장 (총 8장)</nav>
+
+<h1>02장: RL 기초: MDP·가치 vs 정책</h1>
+
+<h2>이 장의 한국어 안내</h2>
+<p>이 장은 WIA-AI-025 강화학습 표준 v1.0.0의 한국어 학습용 자료입니다. 표준 본문은 4개 페이즈로 구성되며 영문판이 정본 (canonical) 입니다. 번역상 모호한 부분이 있으면 항상 영문판 (<code>../en/chapter-02.html</code> "RL Fundamentals: MDPs, Value vs Policy Methods")을 우선합니다.</p>
+
+<h2>WIA-AI-025가 다루는 핵심</h2>
+<p>WIA-AI-025는 강화학습 데이터 교환을 위한 개방형 표준입니다 — 환경 디스크립터·훈련 실행·평가 실행·체크포인트·에이전트 정책·배포 기록. 4-페이즈 아키텍처: Phase 1(데이터 형식)은 6개 객체 가족의 JSON 봉투를 정의합니다. Phase 2(API 인터페이스)는 발행·조회·스트림·페더레이션을 위한 HTTP 표면을 명세합니다. Phase 3(페더레이션 프로토콜)은 조직 간 데이터 흐름을 처리합니다. Phase 4(통합)는 OpenAI Gymnasium API, RLlib, Stable-Baselines3, MLflow tracking, WIA 패밀리 표준과 연결됩니다.</p>
+
+<h2>한국 환경에서의 적용 노트</h2>
+<p>한국 RL 연구는 KAIST·서울대·POSTECH 등 학술 연구실과 NCSOFT·카카오엔터프라이즈·LG AI 연구원 등 산업 R&D 그룹에 분산되어 있습니다. WIA-AI-025의 페더레이션 프로토콜(Phase 3)은 학술-산업 협력에 표준화된 형식을 제공합니다 — 학술 연구실은 자기 환경 디스크립터와 평가 실행을 발행하고, 산업 그룹은 체크포인트와 안전 메트릭을 검증할 수 있습니다. 한국 AI 윤리 가이드라인은 WIA-AI-025의 safety_metrics 블록과 정렬되어 자동화된 보고를 가능하게 합니다.</p>
+
+<h2>핵심 객체 가족</h2>
+<ul>
+<li><strong>environment_descriptor</strong> — MDP 튜플 (S, A, P, R, γ) + 프레임워크·버전·시드·결정성</li>
+<li><strong>training_run</strong> — 알고리즘·하이퍼파라미터·환경 ID·훈련 단계 궤적·총 wall time·GPU 사용량</li>
+<li><strong>evaluation_run</strong> — 환경 ID·에이전트 정책 ID·에피소드·반환 분포·safety_metrics 블록</li>
+<li><strong>checkpoint</strong> — 모델 파라미터·옵티마이저 상태·무결성 해시·프레임워크 버전·재생 버퍼 참조</li>
+<li><strong>agent_policy</strong> — 환경 ID 핀과 평가 참조가 있는 최종 정책 파라미터</li>
+<li><strong>deployment_record</strong> — 모니터링 스트림이 있는 대상 환경에 배포된 에이전트 정책 ID</li>
+</ul>
+
+<h2>안전 우선 설계</h2>
+<p>표준은 RL 에이전트 안전을 Phase 1 핵심 원리로 다룹니다. 모든 evaluation_run 봉투의 safety_metrics 블록은 보상 분산·행동 분포 엔트로피·관측 커버리지 엔트로피·선언된 제약 위반을 포착합니다. 다운스트림 컨슈머는 처음부터 재평가하지 않고도 보상 해킹 시그니처(낮은 관측 커버리지·높은 보상 분산)를 감지할 수 있습니다. 안전-중요 배포(자율 주행·임상 의사결정 지원·산업 제어)의 경우, 표준의 frozen agent_policy 메커니즘이 평가 후 우발적 정책 수정을 방지합니다.</p>
+
+<h2>다음에 볼 곳</h2>
+<ul>
+<li><strong>Phase 1 사양</strong> <code>spec/PHASE-1.md</code></li>
+<li><strong>Phase 2 사양</strong> <code>spec/PHASE-2.md</code></li>
+<li><strong>Phase 3 사양</strong> <code>spec/PHASE-3.md</code></li>
+<li><strong>Phase 4 사양</strong> <code>spec/PHASE-4.md</code></li>
+<li><strong>OpenAI Gymnasium</strong> — Phase 4 §7.2가 브리지하는 표준 환경 API</li>
+<li><strong>RLlib (Ray)</strong> — 프로덕션 RL 인프라</li>
+<li><strong>Stable-Baselines3</strong> — 학술 연구 프레임워크 통합</li>
+<li><strong>MLflow</strong> — ML 실험 추적 통합</li>
+<li><strong>WIA Time-Series Data</strong> — 고주기 훈련 지표용 자매 표준</li>
+</ul>
+
+<h2>구현자 노트</h2>
+<p>RL 인프라에서 반복되는 세 가지 운영 관심사가 표준에 박혀 있습니다. 첫째, 환경 결정성은 환경 + 프레임워크 + GPU 드라이버 스택의 속성입니다. 표준의 environment_descriptor 봉투는 세 가지 모두를 포착하므로 재현성 연구가 정확한 스택을 핀할 수 있습니다. 둘째, 체크포인트 저장은 실험 빈도에 따라 공격적으로 확장됩니다 — 전형적인 연구실은 활성 하이퍼파라미터 스윕에서 주당 100 GB의 체크포인트를 생성합니다. 표준의 체크포인트 봉투는 바이트를 임베드하지 않고 model_url + sha256을 참조하므로 저장 백엔드 선택이 미뤄집니다. 셋째, 오프라인 RL의 재생 버퍼 크기 — 체크포인트 봉투의 replay_buffer_url 필드는 선택적이지만 버퍼 크기가 디스크 사용을 지배할 수 있는 오프라인 RL 워크플로우에 강력히 권장됩니다.</p>
+
+<h2>안전-우선 설계</h2>
+<p>이 표준의 모든 결정은 다음 질문을 거칩니다: <em>이것이 다운스트림 컨슈머가 보상 해킹과 안전하지 않은 배포를 감지할 충분한 증거를 노출하는가, 아니면 단지 헤드라인 벤치마크 숫자에 최적화하는가?</em> 두 가지가 충돌하면 안전 노출이 이깁니다.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-AI-025 강화학습 표준 v1.0.0</p></footer>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Phase 1 — Data Format — WIA-AI-025 Reinforcement Learning</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #a855f7; }
+h1 { border-bottom: 2px solid #a855f7; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #a855f7; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🎮 [reinforcement-learning] Standard Ebook</a> | Chapter 04 (of 8)</nav>
+
+<h1>Chapter 04: Phase 1 — Data Format</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies JSON envelopes for RL data. Every envelope is signed with Ed25519 (IETF RFC 8032).</p>
+
+<h2>4.2 Environment descriptor envelope</h2>
+<pre><code>{
+  "wia_reinforcement_learning_version": "1.0.0",
+  "type": "environment_descriptor",
+  "environment_id": "env_cartpole_v1_seed_42",
+  "framework": "gymnasium",
+  "framework_version": "1.0.0",
+  "env_name": "CartPole-v1",
+  "observation_space": { "type": "Box", "shape": [4], "low": [-4.8, -inf, -0.42, -inf], "high": [4.8, inf, 0.42, inf] },
+  "action_space": { "type": "Discrete", "n": 2 },
+  "discount_factor": 0.99,
+  "max_episode_steps": 500,
+  "seed": 42,
+  "deterministic": true,
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+
+<h2>4.3 Training run envelope</h2>
+<p>Required: environment_id, algorithm, algorithm_family, hyperparameters, started_at, ended_at, total_steps, total_wall_seconds, gpu_hours. Hyperparameters are framework-specific but the envelope preserves them verbatim for reproducibility.</p>
+
+<h2>4.4 Evaluation run envelope</h2>
+<p>Required: environment_id, agent_policy_id, episodes, return distribution (mean, std, percentiles 25/50/75/95), safety_metrics block (reward_variance, action_distribution_entropy, observation_coverage_entropy, constraint_violations).</p>
+
+<h2>4.5 Checkpoint envelope</h2>
+<p>Required: training_run_id, step_index, model_url, model_sha256, optimizer_state_url, replay_buffer_url (optional). The model_url + sha256 pair lets downstream consumers fetch and verify the parameters; the replay_buffer_url enables continuation training.</p>
+
+<h2>4.6 Agent policy envelope</h2>
+<p>Required: training_run_id, environment_id, model_url, model_sha256, evaluation_run_id, parameter_count, frozen (boolean). Frozen=true means the policy is locked for production deployment; further training would invalidate the policy_id.</p>
+
+<h2>4.7 Deployment record envelope</h2>
+<p>Required: agent_policy_id, target_environment_id, deployed_at, monitoring_stream_url, rollback_policy_id (optional). The monitoring_stream_url references a Phase 2 stream endpoint where post-deployment metrics flow.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA-AI-025 8-chapter survey. The conformance test suite at <code>https://github.com/WIA-Official/wia-reinforcement-learning-conformance</code> is the source of truth. The reference container <code>wia/reinforcement-learning-host:1.0.0</code> implements every Phase 2 endpoint with mock CartPole training data.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1.md</code></li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2.md</code></li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3.md</code></li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4.md</code></li>
+<li><strong>OpenAI Gymnasium</strong> for the de-facto environment API that Phase 4 §7.2 bridges to.</li>
+<li><strong>RLlib (Ray)</strong> for production RL infrastructure.</li>
+<li><strong>Stable-Baselines3</strong> for academic research framework integration.</li>
+<li><strong>MLflow</strong> for ML experiment tracking integration.</li>
+<li><strong>WIA Time-Series Data</strong> sister standard for high-cadence training metrics.</li>
+<li><strong>WIA-OMNI-API</strong> for researcher credential storage.</li>
+</ul>
+
+<h2>Safety-First Design</h2>
+<p>Every choice in this standard is filtered through: <em>does this surface enough evidence for downstream consumers to detect reward hacking and unsafe deployment, or just optimize for headline benchmark numbers?</em> When the two conflict, safety surfacing wins. That is why the standard mandates safety_metrics on every evaluation_run, refuses to allow frozen agent_policy modification post-evaluation, and requires implementations to surface checkpoint provenance so downstream consumers can verify what model is actually deployed.</p>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur in RL infrastructure and are baked into the standard. First, environment determinism is property of the environment + the framework + the GPU driver stack — the standard's environment_descriptor envelope captures all three so reproducibility studies can pin the exact stack. Second, checkpoint storage scales aggressively with experiment frequency; a typical research lab generates 100 GB of checkpoints per week from active hyperparameter sweeps. The standard's checkpoint envelope references model_url + sha256 rather than embedding bytes, so storage backend choices are deferred. Third, replay buffer size for offline RL — the replay_buffer_url field in the checkpoint envelope is optional but strongly recommended for offline RL workflows where buffer size can dominate disk usage.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-AI-025 Reinforcement Learning Standard v1.0.0</p></footer>
+</body>
+</html>

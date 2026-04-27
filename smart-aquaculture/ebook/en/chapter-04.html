@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Phase 1 — Data Format — WIA Smart Aquaculture</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #06b6d4; }
+h1 { border-bottom: 2px solid #06b6d4; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #06b6d4; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🐟 [smart-aquaculture] Standard Ebook</a> | Chapter 04 (of 8)</nav>
+
+<h1>Chapter 04: Phase 1 — Data Format</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies JSON envelopes for aquaculture data. Every envelope is signed with Ed25519 (IETF RFC 8032).</p>
+
+<h2>4.2 Farm envelope</h2>
+<pre><code>{
+  "wia_smart_aquaculture_version": "1.0.0",
+  "type": "farm",
+  "farm_id": "did:wia:farm:salmar-rauma-01",
+  "operator_id": "did:wia:operator:salmar-asa",
+  "boundary": { "type": "Polygon", "coordinates": [...] },
+  "system_kind": "marine_cage",
+  "primary_species": "salmo_salar",
+  "certifications": ["asc", "global_gap"],
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<p>Reserved system_kind tokens: marine_cage, freshwater_pond, RAS (recirculating aquaculture system), brackish_pond, IMTA (integrated multi-trophic aquaculture).</p>
+
+<h2>4.3 Water quality reading envelope</h2>
+<p>Required: farm_id, captured_at, temperature_c, salinity_ppt, dissolved_oxygen_mg_per_l, ph, ammonia_mg_per_l, sensor_id, calibration_chain_id. Optional: turbidity_ntu, alkalinity_mg_per_l_caco3, nitrite_mg_per_l, depth_m.</p>
+
+<h2>4.4 Fish health observation envelope</h2>
+<p>Required: farm_id, observed_at, cohort_id, average_weight_g, mortality_count. Reserved disease_indicator tokens: none, sea_lice, bacterial_gill, amoebic_gill, ihn (infectious haematopoietic necrosis), isav (infectious salmon anaemia virus), eus (epizootic ulcerative syndrome).</p>
+
+<h2>4.5 Feeding event envelope</h2>
+<p>Required: farm_id, fed_at, feed_type, feed_kg, cohort_id. Optional: feed_conversion_ratio (computed), feed_supplier_id, feed_lot_id (for traceability).</p>
+
+<h2>4.6 Harvest record envelope</h2>
+<p>Required: farm_id, harvested_at, cohort_id, species, total_weight_kg, average_weight_g. Optional: destination (processor DID), traceability_chain_id (for retail traceability), carbon_intensity_kg_co2e_per_kg.</p>
+
+<h2>4.7 Traceability chain envelope</h2>
+<p>Tracks the farm → processor → distributor → retail handoff chain with signed events at each step. Compatible with Global GAP and ASC chain-of-custody requirements.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA Smart Aquaculture 8-chapter survey. The conformance test suite at <code>https://github.com/WIA-Official/wia-smart-aquaculture-conformance</code> is the source of truth.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1-4 specifications</strong> at <code>spec/PHASE-*.md</code></li>
+<li><strong>FAO ALDFI</strong> vocabularies for species and gear</li>
+<li><strong>ASC (Aquaculture Stewardship Council)</strong> certification framework</li>
+<li><strong>BAP (Best Aquaculture Practices)</strong> alternate certification</li>
+<li><strong>Global GAP IFA Aquaculture</strong> for supply-chain traceability</li>
+<li><strong>WIA-OMNI-API</strong> for operator + veterinarian + certification body credentials</li>
+<li><strong>WIA Water Scarcity Response</strong> sister standard for freshwater aquaculture</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur in aquaculture infrastructure and are baked into the standard. First, water quality sensor drift: sensors drift over weeks-to-months and require regular calibration. The standard\x27s calibration_chain_id field links to the most recent calibration so downstream analytics can detect overdue sensors. Second, mortality reporting timeliness: regulators require mortality reporting within 24 hours of observation; the standard\x27s fish_health_observation envelope supports this via the observed_at timestamp + immediate POST. Third, traceability chain handoffs: retailer audit requirements mean every handoff (farm → processor → distributor → retail) must be signed; the traceability_chain envelope structure forces this.</p>
+
+<h2>Operator-First Design</h2>
+<p>Every choice in this standard is filtered through: <em>does this give the farm operator more leverage with feed suppliers and certification bodies, or does it just make farm data more accessible to outside actors?</em> When the two conflict, operator leverage wins. That is why the standard mandates explicit operator consent for cross-organisation data sharing, refuses to allow vendor terms-of-service to bypass the consent envelope, and requires all certification audit data flows to ride through operator-controlled audience scopes.</p>
+
+<h2>Korea-Specific Application Note</h2>
+<p>Korea's aquaculture industry — flatfish (광어), rockfish (우럭), abalone (전복), oyster (굴), seaweed (김·다시마·미역) — concentrates along the southern coast (Geoje, Tongyeong, Namhae, Wando). The Korea Fisheries Resources Agency (FIRA) and National Institute of Fisheries Science (NIFS) coordinate aquaculture data; the Korean seafood traceability scheme (KFTS) provides retail-side chain-of-custody. The standard's Phase 4 traceability_chain envelope maps cleanly onto KFTS via the destination + handoff_event fields, and Korea's eco-friendly aquaculture certification (HACCP / 친환경 인증) maps via the certifications array on the farm envelope.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA Smart Aquaculture Standard v1.0.0</p></footer>
+</body>
+</html>

@@ -5,277 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the protocols that govern an accredited
-protein-structure programme: laboratory accreditation, deposit
-acceptance, mmCIF dictionary and Chemical Component Dictionary
-versioning, prediction-service governance, validation procedures,
-records retention, similarity-tool registration, citation
-hygiene, and programme wind-down.
+This document defines the canonical PROTOCOL layer for WIA-protein-structure (Protein Structure).
 
 References (CITATION-POLICY ALLOW only):
-
-- ISO/IEC 17025:2017 (testing and calibration laboratories)
-- ISO/IEC 17043:2010 (proficiency testing)
-- ISO/IEC 27001:2022 (information security management)
-- ISO 9001:2015 (quality management systems)
-- ISO 8601 (date and time)
-- IETF RFC 5905 (NTPv4)
-- IETF RFC 8446 (TLS 1.3)
-- IETF RFC 9457 (Problem Details)
-- HL7 FHIR R5 (`MolecularSequence`)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Laboratory Accreditation
+## §1 Scope
 
-A structural-biology laboratory MAY claim conformance to
-WIA-protein-structure only after a recognised accreditation body
-has issued a valid certificate against ISO/IEC 17025:2017 for the
-methods the laboratory exercises (X-ray crystallography, cryo-EM,
-solution NMR, etc.). The accreditation register is exposed to the
-API as a read-only resource and MUST be re-fetched at least once
-per calendar quarter.
+This PHASE document is one of four that together define the WIA-protein-structure
+standard. It addresses the protocol layer of the standard.
 
-A laboratory whose accreditation is revoked has its open deposits
-flagged in the public catalogue; deposits already cited externally
-remain addressable but are flagged with the accreditation lapse.
+## §2 Manifest
 
-## §2 Deposit Acceptance
+Implementations publish a signed manifest containing standardSlug
+(constant value: "protein-structure"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-Deposits flow through an acceptance pipeline that validates the
-mmCIF coordinate file against the in-force dictionary, runs
-geometric and stereochemical checks, generates a wwPDB-style
-validation report, and assigns the structure an external archive
-accession when the deposit is mirrored externally. Deposits that
-fail validation enter a remediation cycle with the depositor; the
-record stays in the operator's draft state until the validation
-issues are resolved.
+## §3 Conformance Tiers
 
-## §3 mmCIF Dictionary Versioning
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-The mmCIF / PDBx dictionary evolves with revisions to data
-categories and items. Programmes pin the dictionary version each
-deposit conforms to in the coordinate record (PHASE-1 §3) and
-preserve historical deposits at their original dictionary version
-so that downstream consumers can re-parse without surprise.
-Dictionary upgrades are announced through the well-known discovery
-document with a deprecation timeline for prior versions.
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-## §4 Chemical Component Dictionary Governance
+## §4 Discovery
 
-The Chemical Component Dictionary (CCD) catalogues canonical
-ligand and modified-residue identifiers. New CCD entries are
-registered through the wwPDB-led process; the operating programme
-records the CCD version in force at deposit time and re-validates
-historical deposits when CCD entries are subsequently revised.
-Revisions that change ligand connectivity emit cross-reference
-records (PHASE-1 §9) so that downstream consumers can navigate
-the change.
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/protein-structure`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-## §5 Prediction-Service Governance
+## §5 Time and Identity
 
-Prediction services that publish records into the API register
-their engine family, version, and the input pipelines that produce
-predictions. Records are signed by the service operator's release
-key. Service operators MUST publish per-residue confidence
-(pLDDT-style) and pairwise confidence (PAE-style) when the engine
-emits them; predictions without confidence metadata are rejected
-with `urn:wia:protein-structure:prediction-confidence-missing`.
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-A prediction service that ceases operation transitions its records
-to `archived` status; the records remain addressable through the
-long-term archive integration (PHASE-4 §10).
+## §6 Versioning and Deprecation
 
-## §6 Validation Procedures
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Validation reports follow the wwPDB-aligned procedures:
-geometric/stereochemical checks (bond lengths, bond angles,
-chirality, planarity), Ramachandran-plot occupancy review,
-ligand-validation (ideal-vs-observed conformation), and method-
-specific checks (resolution-vs-clash-score for crystallography,
-local map quality for cryo-EM, NOE-violation analysis for NMR).
-Validation reports are signed by the operating programme and
-referenced from the structure record.
+## §7 Privacy and Security
 
-## §7 Records Retention
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Deposited structures retain indefinitely; the wwPDB and equivalent
-archives have multi-decade preservation commitments and the
-operating programme deposits each release into the archive on the
-agreed cadence. Validation reports, raw experimental data
-archives, and prediction-confidence artefacts retain for at least
-the operating programme's records-management baseline (typically
-seven calendar years from last access, longer for externally cited
-records).
+## §8 Open Governance
 
-## §8 Time Synchronisation
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `protein-structure` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-Programme clocks synchronise per RFC 5905 (NTPv4) so that deposit,
-validation, and citation events can be ordered unambiguously
-across laboratories, archives, and consumers.
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## §9 Similarity-Tool Registration
 
-Similarity-search tools (Foldseek, DALI, TM-align, and successors)
-are registered with the operating programme so that similarity
-records (PHASE-1 §8) can be re-executed against the same tool and
-version. Tool registrations record the tool's identifier, the
-version, the citation reference for the underlying algorithm, and
-the recommended scoring conventions. Tool revisions emit new
-registration entries; prior registrations remain addressable.
+## Annex E — Implementation Notes for PHASE-3-PROTOCOL
 
-## §10 Citation Hygiene
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-3-PROTOCOL.
 
-Programmes are responsible for the integrity of citations to their
-structures. When an external publication cites a structure that
-the programme has subsequently superseded (a revised refinement,
-a corrected sequence, an improved prediction), the programme
-keeps the originally cited record addressable at its content-
-addressed URL and publishes a successor relationship through the
-discovery document so that downstream readers can navigate from
-the cited record to its current revision.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## §11 Inter-Laboratory Round-Robin
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-Programmes that publish externally cited validation results
-participate in inter-laboratory round-robin exercises at least
-once every two calendar years. The round-robin protocol follows
-ISO/IEC 17043:2010 expectations and is coordinated by the
-certifying body.
+## Annex F — Adoption Roadmap
 
-## §12 Cybersecurity and Software Updates
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-Coordinate uploads are authenticated and integrity-protected over
-TLS 1.3 (RFC 8446). Validation pipelines are signed by the
-operating programme's release key; failed signature verification
-on a pipeline component blocks deposits from running through that
-component until the issue is resolved.
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## §13 Cross-Border Programme Operation
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-Multi-jurisdiction programmes (international cooperatives,
-mirrored archive consortia) honour each participating
-jurisdiction's data-protection law for any sequence record that
-cross-links to clinical-genomics data via FHIR.
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## §14 Programme Wind-Down
+## Annex G — Test Vectors and Conformance Evidence
 
-A programme that ceases operations transfers indefinite-retention
-records to a recognised long-term archive, notifies known external
-citers via the well-known discovery document, and publishes a
-sunset timeline for in-flight deposits. Externally pinned records
-remain accessible through the archive at the same content-
-addressed URLs.
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-## §15 Quality Dossier
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-3-PROTOCOL with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-The programme's quality dossier records the laboratories it works
-with, the prediction services it integrates with, the dictionary
-and CCD versions it tracks, the round-robin exercises it has
-participated in, and the deprecation history of its records. The
-dossier is reviewed at least annually by the operating
-organisation's quality manager.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
+auditor tooling.
 
-## §16 Provisional CCD Process
+## Annex H — Versioning and Deprecation Policy
 
-Modifications observed in experimental data that lack a CCD entry
-follow a provisional-CCD process: the depositor flags the
-modification as `provisional-ccd-<requestId>` (PHASE-1 §10), the
-operating programme forwards the request to the CCD maintainer, and
-the deposit is accepted with the provisional flag pending CCD
-adjudication. Once the CCD entry is finalised, the operating
-programme rewrites the PTM record to reference the canonical
-identifier and emits a cross-reference recording the rewrite.
+This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-## §17 Predicted Structure Confidence Reporting
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-Predicted structures emit per-residue confidence (pLDDT-style
-zero-to-one quality) and, where the engine supports it, pairwise
-confidence (PAE-style residue-pair distance error). Programmes
-publishing externally cited predictions MUST emit both when the
-engine supports them; the API rejects predictions missing required
-confidence fields.
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-Predicted structures that fall below the engine's recommended
-confidence threshold for cited use are flagged in the public
-catalogue so that downstream consumers do not consume low-
-confidence predictions as if they were experimentally validated.
+## Annex I — Interoperability Profiles
 
-## §18 Embargo and Release Schedule
+This annex describes how implementations declare interoperability profiles
+for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-Deposits associated with a manuscript under journal review are
-held under embargo until the manuscript publication date or the
-embargo expiry, whichever is sooner. The operating programme
-records the embargo holder, the expected release date, and the
-notification list for embargo-lift events. Premature release of
-embargoed records returns a Problem-Details (RFC 9457) response of
-type `urn:wia:protein-structure:embargo-active` and is logged as
-an audit event for retrospective review.
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-## §19 Annotation Source Versioning
-
-Annotation sources (SCOP, CATH, ECOD, GO, InterPro, UniProt
-feature tables) emit periodic releases. The operating programme
-pins the source version each annotation conforms to so that a
-re-fetch of the same annotation against a later source release
-returns the historical pinning rather than the latest source.
-Source-revision events emit cross-references when the revised
-source materially changes a previously published annotation.
-
-## §20 Coverage-Tracking and UniProt Synchronisation
-
-Programmes track structural coverage of UniProt accessions over
-time so that gaps in the experimental and predicted-structure
-landscape are visible to consumers. Coverage records are
-content-addressed and refresh on a cadence the operating programme
-declares (typically monthly). A UniProt accession that loses
-coverage (e.g. a structure is withdrawn) is flagged in the
-streaming subscription so that downstream consumers can re-run
-queries that depended on that coverage.
-
-## §21 Cross-Method Reconciliation
-
-Programmes that publish both experimental and predicted structures
-for the same UniProt accession reconcile the records through
-cross-references (PHASE-1 §9). When the predicted and experimental
-structures disagree beyond the engine's published confidence
-envelope, the operating programme records a reconciliation note
-that explains the disagreement and points to follow-up records
-(re-refinement, alternate conformation, prediction with updated
-inputs). Reconciliation notes are content-addressed.
-
-## §22 Programme Wind-Down
-
-A programme that ceases operations transfers indefinite-retention
-records to the wwPDB or an equivalent recognised archive,
-notifies known external citers via the well-known discovery
-document, and publishes a sunset timeline for in-flight deposits.
-
-## §23 Withdrawal and Supersession Governance
-
-Withdrawal and supersession (PHASE-1 §13) are governed under a
-process that protects citation integrity. The operating programme
-publishes a public notice naming the affected structure, the
-reason, and the successor (when one exists). Subsequent consumers
-that retrieve the affected structure receive the public notice
-alongside the canonical record so that downstream readers see the
-withdrawal context without bespoke checks.
-
-## §24 Conformance and Auditing
-
-A programme conformant with WIA-protein-structure publishes its
-laboratory accreditation references, its programme code
-registration, its quality dossier, the catalogue of structures it
-has released, and the catalogue of cross-references it has
-published, and answers an annual self-assessment that maps each
-clause of this PHASE to the programme's implementation.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 3 — PROTOCOL
-- **Status:** Stable
-- **Standard:** WIA-protein-structure
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

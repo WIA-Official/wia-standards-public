@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Phase 1 — Data Format — WIA Urban Heat Island</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #f59e0b; }
+h1 { border-bottom: 2px solid #f59e0b; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #f59e0b; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🏙️ [urban-heat-island] Standard Ebook</a> | Chapter 04 (of 8)</nav>
+
+<h1>Chapter 04: Phase 1 — Data Format</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies JSON envelopes for UHI data. Every envelope is signed with Ed25519 (IETF RFC 8032).</p>
+
+<h2>4.2 Surface temperature observation envelope</h2>
+<pre><code>{
+  "wia_urban_heat_island_version": "1.0.0",
+  "type": "surface_temperature_observation",
+  "city_id": "did:wia:city:portland-or",
+  "captured_at": "2026-04-27T14:00:00Z",
+  "location": { "type": "Point", "coordinates": [-122.6, 45.5], "crs": "EPSG:4326" },
+  "land_surface_temperature_c": 42.5,
+  "ambient_air_temperature_c": 36.2,
+  "uhi_intensity_c": 6.3,
+  "data_source": "landsat_9_band_10",
+  "scene_id": "LC09_L1TP_046028_20260427_...",
+  "paired_rural_observation_id": "obs_rural_paired_001",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+
+<h2>4.3 Canopy assessment envelope</h2>
+<p>Required: city_id, assessed_at, boundary (GeoJSON polygon), tree_canopy_pct, impervious_surface_pct, data_source. Reserved data_source tokens: usgs_nlcd_2021, usgs_nlcd_2019, eu_corine_2018, planet_labs_basemap, maxar_imagery.</p>
+
+<h2>4.4 Mitigation intervention envelope</h2>
+<p>Required: city_id, intervention_id, kind, started_at, area_hectares. Reserved kind tokens: cool_roof, urban_forestry, green_infrastructure, cool_pavement, water_feature, building_shading, vegetated_walls. Optional: estimated_lst_reduction_c (modelled), measured_lst_reduction_c (post-intervention measurement).</p>
+
+<h2>4.5 Heat health event envelope</h2>
+<p>Required: city_id, captured_at, advisory_level, max_heat_index_c, data_source. Reserved advisory_level tokens (NOAA NWS aligned): heat_advisory, excessive_heat_watch, excessive_heat_warning. Optional: vulnerable_population_alerts_sent (count), cooling_centers_activated (count).</p>
+
+<h2>4.6 Vulnerable population area envelope</h2>
+<p>Aggregate neighbourhood-level vulnerability index. Required: city_id, area_id, boundary, vulnerability_score (0-1), assessed_at, data_source. The envelope carries no individual identifiers; only neighbourhood-level aggregates.</p>
+
+<h2>4.7 Reserved tokens</h2>
+<p>Future minor versions add tokens but never remove them. Implementations MUST treat unknown tokens as `unrecognised` rather than fail the envelope.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA Urban Heat Island 8-chapter survey. The conformance test suite at <code>https://github.com/WIA-Official/wia-urban-heat-island-conformance</code> is the source of truth. The reference container <code>wia/urban-heat-island-host:1.0.0</code> implements every Phase 2 endpoint with mock data.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1-4 specifications</strong> at <code>spec/PHASE-*.md</code></li>
+<li><strong>Landsat / Sentinel-3</strong> thermal IR products for satellite-based LST</li>
+<li><strong>NOAA NWS heat advisories</strong> for the US heat-emergency framework</li>
+<li><strong>EU Copernicus C3S</strong> for European climate data</li>
+<li><strong>USGS NLCD</strong> for US landcover and impervious surface mapping</li>
+<li><strong>WIA Water Scarcity Response</strong> sister standard for drought + heat compounding</li>
+<li><strong>WIA-OMNI-API</strong> for city agency credential storage</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur in UHI infrastructure and are baked into the standard. First, satellite revisit cadence: Landsat revisits any spot every 16 days; Sentinel-3 daily but 1-km resolution; ECOSTRESS sub-daily but ISS orbital coverage variable. Hosts MUST document data-source revisit characteristics in the discovery document. Second, vulnerable population data: aggregate-only by Phase 1 §4.6 design; downstream consumers requesting individual identification MUST be refused. Third, heat advisory latency: the gap between NWS issuance and public dissemination is critical; the standard\x27s heat_health_event stream targets &lt; 5 minute latency from issuance to subscriber receipt.</p>
+
+<h2>Korea-Specific Application Note</h2>
+<p>Korea's 2018 and 2024 heat waves drove formal heat-emergency response across municipal and national agencies. KMA (Korea Meteorological Administration) issues heat advisories aligned with NOAA NWS's structure but adapted for Korean climate; the Ministry of the Interior and Safety coordinates muders-shelter (무더위 쉼터) activation across cities. The standard's heat_health_event envelope maps cleanly onto KMA advisories via the data_source field, and the Korean municipal climate offices in Seoul, Daejeon, Daegu, and Gwangju have published municipal climate adaptation plans that align with the standard's mitigation_intervention vocabulary.</p>
+
+<h2>Vulnerable-Population-First Design</h2>
+<p>Every choice in this standard is filtered through: <em>does this protect the people most at risk during heat events while supporting effective outreach, or does it build identification infrastructure that outlasts the emergency?</em> When the two conflict, vulnerable-population data sovereignty wins. That is why the standard mandates aggregate-only vulnerable_population_area envelopes, refuses to allow individual identification even in emergency mode, and requires emergency-management workflows to operate on neighbourhood counts rather than personal lists.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA Urban Heat Island Standard v1.0.0</p></footer>
+</body>
+</html>

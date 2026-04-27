@@ -277,7 +277,7 @@ Cipher Suites:
 
 **API Key Authentication**:
 ```http
-Authorization: Bearer sk_live_abc123...
+Authorization: Bearer EXAMPLE_API_KEY_REPLACE_ME...
 ```
 
 **JWT Token**:
@@ -401,3 +401,5 @@ Status Flags: {0,0,0,0}
 **MIT License**
 
 </div>
+
+*Generated under WIA Standards Phase 3 governance — 弘益人間 Benefit All Humanity.*
