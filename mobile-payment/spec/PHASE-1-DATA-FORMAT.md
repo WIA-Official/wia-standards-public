@@ -1,301 +1,241 @@
-# WIA-mobile-payment PHASE 1 — Data Format Specification
+# WIA-mobile-payment PHASE 1 — DATA-FORMAT Specification
 
 **Standard:** WIA-mobile-payment
-**Phase:** 1 — Data Format
+**Phase:** 1 — DATA-FORMAT
 **Version:** 1.0
 **Status:** Stable
 
-This PHASE defines the canonical data format for mobile-payment
-records: wallet provisioning records, tokenised PAN bindings, NFC
-contactless transaction records, HCE-emulation card data, QR-code
-payment payloads, FIDO2 device attestations, transaction receipts,
-and the cross-references that bind these together. The shape
-interoperates with EMVCo Tokenisation, NFC Forum, and FIDO2 so
-existing wallet implementations adopt this PHASE without rebuilding
-data models.
+This document defines the canonical DATA-FORMAT layer for WIA-mobile-payment (Mobile Payment).
 
 References (CITATION-POLICY ALLOW only):
-- EMVCo Tokenisation Framework v2.x — token request, provisioning, lifecycle
-- EMVCo Contactless Specifications for Payment Systems Book A/B/C/D
-- EMVCo Cloud-Based Payments / EMVCo Mobile Payments
-- ISO/IEC 14443 — proximity card air-interface (NFC contactless)
-- ISO/IEC 7816 — smart-card command/response APDU
-- NFC Forum NDEF (NFC Data Exchange Format), Type 4 Tag Operation
-- FIDO Alliance Universal Authentication Framework / FIDO2 (CTAP2 + WebAuthn)
-- W3C Payment Request API; W3C Web Payments
-- EMVCo QR Code Specification (Merchant-Presented Mode / Consumer-Presented Mode)
-- ISO 20022 (referenced via WIA-payment-system for downstream clearing)
-- IETF RFC 7515 (JWS), RFC 7517 (JWK), RFC 9162 (Certificate Transparency 2.0 pattern)
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
 ## §1 Scope
 
-This PHASE applies to systems that originate or accept mobile
-payments: wallet apps (Apple Pay, Google Wallet, Samsung Pay,
-Naver Pay, Kakao Pay, J-Coin, Alipay+, etc.), Host Card Emulation
-(HCE) wallets, NFC contactless POS terminals, QR-code merchant
-acceptance, and FIDO2-secured device-bound payment authorisation.
+This PHASE document is one of four that together define the WIA-mobile-payment
+standard. It addresses the data-format layer of the standard.
 
-In scope: wallet token lifecycle, contactless EMV transaction
-records, HCE cryptogram records, QR-code payment payloads, FIDO2
-device attestation evidence, on-device CDCVM (consumer device
-cardholder verification method) records, transaction receipts.
-Out of scope: clearing and settlement (handled by WIA-payment-system),
-PSD2/FAPI flow (handled by WIA-open-banking), card-issuance and
-card-network internals (handled by EMVCo specs).
+## §2 Manifest
 
-The standard is wallet-platform-aware: a single implementation
-MUST declare which wallet-platform certification scheme it
-honours (Apple Pay, Google Pay, Samsung Wallet, KFTC Mobile FastPay,
-JBA J-Coin, etc.) so downstream consumers know which trust roots
-apply.
+Implementations publish a signed manifest containing standardSlug
+(constant value: "mobile-payment"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 Wallet-account identifier model
+## §3 Conformance Tiers
 
-A wallet account carries:
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-| Identifier kind   | Source / Binding                                                |
-|-------------------|-----------------------------------------------------------------|
-| `walletAccountRef`| URN of form `urn:wia:mp:wallet:<provider>:<opaque>` (≥ 128 bit entropy) |
-| `tokenisedPAN`    | EMVCo token (Domain Restriction Controls bound to wallet)      |
-| `panSuffix`       | last four digits of underlying PAN, permitted in clear         |
-| `cardScheme`      | Visa, Mastercard, AmEx, JCB, BC카드, KEB하나카드, etc.          |
-| `deviceRef`       | URN of the bound device (FIDO2 attestation key reference)      |
-| `walletProvider`  | Apple, Google, Samsung, Naver, Kakao, J-Coin, etc.             |
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-Full PAN never crosses the boundary into the wallet's runtime
-environment; the wallet holds the EMVCo token plus the per-device
-domain restrictions. Re-binding (the cardholder receives a re-issued
-card) issues a new token under EMVCo Tokenisation Framework §
-"Token Lifecycle Management".
+## §4 Discovery
 
-## §3 Wallet provisioning record
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/mobile-payment`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-Wallet provisioning binds a card to a wallet on a specific device:
+## §5 Time and Identity
 
-- `provisioningId` — URN
-- `walletAccountRef` — wallet-account URN
-- `tokenisedPAN` — EMVCo token issued by the network's TSP
-- `tokenRequestor` — TR ID assigned by the network to the wallet
-  provider (per EMVCo Tokenisation Framework §3.2)
-- `deviceRef` — bound device URN
-- `provisioningChannel` — one of `in-app-issuer`, `manual-pan-entry`,
-  `push-from-issuer`, `network-pull`
-- `idAndVbinding` — issuer's identification-and-verification (ID&V)
-  result band: `green` (low risk, frictionless), `yellow` (challenge
-  required), `red` (declined)
-- `cardholderConsent` — signed consent record naming the wallet,
-  the device, and the card
-- `provisioningTimestamp` — RFC 3339 with offset
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Each provisioning emits an audit record. Re-provisioning (token
-rotation, device replacement) creates a new provisioning record
-referencing the prior; the prior is preserved for audit.
+## §6 Versioning and Deprecation
 
-## §4 Contactless EMV transaction record
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-NFC contactless transactions follow EMVCo Contactless Specifications:
+## §7 Privacy and Security
 
-- `transactionId` — URN
-- `walletAccountRef` — issuing wallet
-- `tokenisedPAN` — token used
-- `cryptogram` — Application Cryptogram (ARQC for online, TC for
-  offline-approved); Cryptogram Information Data (CID) per EMV Book 3
-- `atc` — Application Transaction Counter (per EMV Book 3 §6.5.5);
-  monotonically increasing per token
-- `terminalEntryMode` — `contactless-emv-chip` (the only one this
-  PHASE recognises for tokenised flows)
-- `transactionType` — 00 (purchase), 09 (purchase-with-cashback),
-  20 (refund) per ISO 8583
-- `cvm` — `cdcvm` (on-device biometric/PIN), `no-cvm` (low-value),
-  `signature` (rare on contactless), or `online-pin` (for ATM)
-- `terminalRef` — POS terminal URN
-- `merchantId` — acquirer-assigned MID
-- `mcc` — ISO 18245 Merchant Category Code
-- `amount` — ISO 4217 currency + amount
-- `transactionTimestamp` — RFC 3339 with offset
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Cryptogram + ATC together prove transaction freshness; replay
-attempts (ATC reuse) are rejected at the issuer.
+## §8 Open Governance
 
-## §5 Host Card Emulation (HCE) record
-
-HCE wallets emulate a payment card in software on the mobile
-device. HCE-specific fields:
-
-- `hceMode` — `cloud-based` (per EMVCo CBP) or `device-resident`
-- `tokenDomainRestriction` — `single-token` (one token per
-  transaction) or `limited-use-key` (a key valid for a small
-  number of transactions before refresh)
-- `keyRefreshRef` — URN of the most recent key-refresh event from
-  the TSP
-- `appletId` — for SE-resident applets, the applet's AID; for HCE,
-  the routing AID
-
-HCE flows that exhaust their limited-use-key budget without
-refresh from the TSP are refused; the wallet surfaces a
-"refresh-required" state to the cardholder.
-
-## §6 QR-code payment payload (EMVCo QRCPS)
-
-QR-code payments use the EMVCo Merchant-Presented Mode (MPM) or
-Consumer-Presented Mode (CPM) format:
-
-- **MPM**: merchant displays a static or dynamic QR; the wallet
-  scans, builds a transaction, and submits to the acquirer
-- **CPM**: wallet displays a one-time QR containing the tokenised
-  PAN + cryptogram; merchant scans and submits
-
-The payload follows EMVCo QR Code Specification with TLV (tag-
-length-value) encoding. Mandatory tags: 00 (Payload Format
-Indicator), 52 (Merchant Category Code), 53 (Currency), 54
-(Amount, optional for static QR), 58 (Country Code), 59 (Merchant
-Name), 60 (Merchant City), 63 (CRC checksum). Dynamic QRs include
-tag 62 (Additional Data Field Template) for transaction-specific
-fields.
-
-CRC is CCITT-CRC16 over the TLV bytes excluding the CRC tag itself.
-A QR with incorrect CRC is refused at the wallet.
-
-## §7 FIDO2 device attestation record
-
-Device attestation binds a wallet account to a specific device:
-
-- `attestationId` — URN
-- `walletAccountRef` — wallet account
-- `deviceRef` — device URN
-- `attestationFormat` — one of `packed`, `tpm`, `android-key`,
-  `android-safetynet`, `apple`, `apple-app-attest` (per W3C
-  WebAuthn / FIDO2 attestation statement formats)
-- `aaguid` — Authenticator Attestation GUID (per WebAuthn)
-- `publicKey` — COSE-encoded public key
-- `signature` — attestation signature over the wallet+device binding
-- `attestationCertChain[]` — X.509 chain to a recognised root
-  (Apple, Google, Microsoft, vendor)
-- `attestationTimestamp` — RFC 3339 with offset
-
-Re-attestation (device firmware update, jailbreak/root remediation)
-issues a new attestation referencing the prior. An attestation
-chain that fails verification fails the wallet binding; the wallet
-account is suspended pending review.
-
-## §8 CDCVM (on-device verification) record
-
-CDCVM (Consumer Device Cardholder Verification Method) — biometric
-or device-PIN performed on-device — produces a record:
-
-- `cdcvmId` — URN
-- `walletAccountRef` — wallet account
-- `cdcvmMethod` — one of `face`, `fingerprint`, `iris`, `device-pin`,
-  `device-passcode`
-- `liveness` — boolean (whether liveness check passed; required for
-  biometric methods on supported platforms)
-- `cdcvmTimestamp` — RFC 3339 with offset
-
-CDCVM records are device-resident only; the boundary records that
-CDCVM occurred (with method and result) but never receives the
-biometric template.
-
-## §9 Transaction receipt
-
-Each completed transaction emits a receipt for the cardholder:
-
-- `receiptId` — URN
-- `transactionRef` — transaction URN
-- `merchantName`, `merchantCity`
-- `amount` — currency + amount
-- `panSuffix` — last four digits in clear (PCI DSS-permitted)
-- `transactionTimestamp` — RFC 3339 with offset
-- `acquirerReference` — RRN from the network
-- `signature` — JWS by the wallet provider
-
-Receipts are derived projections; the canonical record is the
-transaction (PHASE 1 §4). Receipt forgery would not match the
-canonical record, so audit reconstruction surfaces forgery.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `mobile-payment` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## Annex A — Worked example: Apple Pay contactless transaction (informative)
 
-```json
-{
-  "transactionId": "urn:wia:mp:tx:apple:91a7-2026-04-27",
-  "walletAccountRef": "urn:wia:mp:wallet:apple:opaque-7e2c-...",
-  "tokenisedPAN": "TOK-VTS-V-...",
-  "panSuffix": "4242",
-  "cardScheme": "visa",
-  "cryptogram": "3F8A21B0E40C2D9E",
-  "cid": "80",
-  "atc": 1234,
-  "terminalEntryMode": "contactless-emv-chip",
-  "transactionType": "00",
-  "cvm": "cdcvm",
-  "amount": {"currency": "KRW", "amount": "12000"},
-  "merchantId": "M-7e2c",
-  "terminalRef": "urn:wia:mp:terminal:t-91a7",
-  "transactionTimestamp": "2026-04-27T09:31:14+09:00",
-  "metadata": {
-    "wallet": "apple-pay",
-    "deviceModel": "iPhone (Secure Enclave)",
-    "tspNetwork": "Visa Token Service",
-    "cdcvmMethod": "face"
-  }
-}
-```
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
 
-The cryptogram is derived from the tokenised PAN (DPAN), the
-limited-use key, the ATC, and the transaction-context inputs per
-EMVCo Book 2 cryptogram derivation. The issuer verifies on receipt;
-replay (ATC reuse) is rejected.
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
 
-## Annex B — Conformance disclosure
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-Implementations declare per-section conformance in their published
-capability document. Sections marked `partial` reference the
-deployment policy explaining the gap; `excluded` carries a
-justification citing the wallet platform's allowance. A deployment
-that is `partial` or `excluded` on §3 (Provisioning), §4
-(Contactless EMV), §7 (FIDO2 attestation), or §9 (Receipt) is
-non-conformant overall and cannot claim Deep v3 status.
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-## Annex C — Cross-domain references (informative)
+## Annex F — Adoption Roadmap
 
-| Reference                      | Use site                                                     |
-|--------------------------------|--------------------------------------------------------------|
-| WIA-payment-system             | clearing handoff post-authorisation (PHASE 4 §7)              |
-| WIA-open-banking               | PSD2 Payment Initiation invoking wallet authentication        |
-| WIA-medical-data-privacy       | health-FSA / HSA card-bound mobile payments                   |
-| WIA-public-transportation      | transit-pass binding to wallet (Korea T-money in wallet)      |
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-The boundary verifies the cross-domain reference exists at the
-referenced standard's boundary before delivery so downstream readers
-do not see dangling references.
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## Annex D — Versioning and deprecation (informative)
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-Versioning follows Semantic Versioning 2.0.0. EMVCo specifications
-bump independently from this PHASE; the deployment policy maps each
-PHASE version to the EMVCo Books / Tokenisation Framework version
-it honours. Deprecated PHASE versions enter a 12-month sunset
-window with migration notes recorded in the audit chain. Legacy
-tokens issued under deprecated versions remain verifiable through
-the prior key in the JWKS for the full token lifecycle window.
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## Annex E — Platform-specific notes (informative)
+## Annex G — Test Vectors and Conformance Evidence
 
-- **Apple Pay** stores tokens in the Secure Enclave; CDCVM is Touch
-  ID, Face ID, or device passcode; cryptograms are generated by
-  Apple's Secure Element pathway
-- **Google Wallet** stores tokens in StrongBox where available
-  (Android 9+) or Keystore otherwise; CDCVM is fingerprint, face,
-  or device PIN
-- **Samsung Wallet** stores tokens in Knox-protected storage; CDCVM
-  is fingerprint, face, iris (where available), or device PIN
-- **Naver / Kakao Pay** use platform-specific HCE wallets gated by
-  KISA-recognised attestation roots; CDCVM follows the platform's
-  biometric stack
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-## Annex F — Receipt fidelity
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-Receipts SHOULD reproduce all consumer-visible transaction details. A receipt that diverges from the canonical record (PHASE 1 §4) indicates either a wallet-side bug or a forgery; reconciliation surfaces such divergence.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.
