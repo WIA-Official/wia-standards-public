@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>05장: Phase 2 — API 인터페이스 — WIA 물 부족 대응</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #06b6d4; }
+h1 { border-bottom: 2px solid #06b6d4; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #06b6d4; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">💧 [water-scarcity-response] 표준 전자책</a> | 05장 (총 8장)</nav>
+
+<h1>05장: Phase 2 — API 인터페이스</h1>
+
+<h2>5.1 한 단락으로 보는 Phase 2</h2>
+<p>Phase 2는 물 부족 데이터를 위한 HTTPS 표면을 명세합니다 — 발행, 조회, 스트림, 페더레이션 핸드셰이크. 전송은 TLS 1.3(IETF RFC 8446) 전용. HTTP/2 권장.</p>
+
+<h2>5.2 디스커버리</h2>
+<p>모든 호스트는 <code>/.well-known/wia-water-scarcity-response</code>에 디스커버리 문서를 발행합니다.</p>
+
+<h2>5.3 가뭄 지수 엔드포인트</h2>
+<pre><code>POST /wsr/drought                       (서명)
+GET  /wsr/drought?basin_id={id}&from={ts}&to={ts}
+GET  /wsr/drought/stream?basin_id={id}  (Server-Sent Events)</code></pre>
+
+<h2>5.4 할당 엔드포인트</h2>
+<pre><code>POST /wsr/allocation                    (서명; 관할 권한 필요)
+GET  /wsr/allocation/{allocation_id}
+GET  /wsr/allocation?basin_id={id}&year={n}</code></pre>
+
+<h2>5.5 제한 엔드포인트</h2>
+<pre><code>POST /wsr/restriction                   (서명; 관할 권한 필요)
+GET  /wsr/restriction/{restriction_id}
+GET  /wsr/restriction?jurisdiction_id={id}&active=true</code></pre>
+
+<h2>5.6 비상 엔드포인트</h2>
+<pre><code>POST /wsr/emergency                     (서명; 비상 선언 권한 필요)
+GET  /wsr/emergency/{emergency_id}
+GET  /wsr/emergency/stream?basin_id={id}</code></pre>
+
+<p>비상 스트림은 관할권 간 조기 경보의 주요 메커니즘입니다.</p>
+
+<h2>5.7 인증</h2>
+<p>쓰기는 IETF RFC 9421에 따른 HTTP 메시지 서명 필요. 공공 읽기는 익명(투명성). 관할권 세부 읽기(특정 물 권리 보유자, 개별 제한 대상)는 인증 필요.</p>
+
+<h2>다음에 볼 곳</h2>
+<ul>
+<li><strong>Phase 1 사양</strong> <code>spec/PHASE-1-DATA-FORMAT.md</code></li>
+<li><strong>Phase 2 사양</strong> <code>spec/PHASE-2-API.md</code></li>
+<li><strong>Phase 3 사양</strong> <code>spec/PHASE-3-PROTOCOL.md</code></li>
+<li><strong>Phase 4 사양</strong> <code>spec/PHASE-4-INTEGRATION.md</code></li>
+<li><strong>WMO 가뭄 모니터링 출판물</strong> — Phase 1 봉투가 구조화하는 표준화된 SPI/SPEI/PDSI 계산 방법</li>
+<li><strong>UNECE 물 협약</strong> — Phase 3 페더레이션 원리가 직접 지원하는 국제 협력 프레임워크</li>
+<li><strong>UN 지속가능 개발 목표 6</strong> — WIA 집계 데이터가 기여하는 정책 프레임워크</li>
+<li><strong>WIA-OMNI-API</strong> — 관할권 기관·유역 조정자·공급자·규제 기관 자격증 보관</li>
+<li><strong>WIA-AIR-SHIELD</strong> — 관할권 간 페더레이션을 위한 전송 강화</li>
+<li><strong>WIA-ACCESSIBILITY</strong> — 시골 공동체 접근을 위한 저대역폭 모드를 포함한 공공 대시보드 편의 사항</li>
+</ul>
+
+<h2>구현자 노트</h2>
+<p>물 부족 인프라에서 반복되는 운영 관심사 세 가지가 표준에 박혀 있습니다. 첫째, 관할 권한 검증: 할당/제한/비상 엔드포인트 쓰기는 작성자가 관할권 권한을 입증해야 함(WIA-OMNI-API jurisdictional_authority 클레임으로 검증). 둘째, 비상 엔드포인트 리플레이 방어: 중복 비상 선언은 중복 대응 활성화를 트리거하므로 본 nonce 캐시는 호스트 재시작에 걸쳐 영구적이어야 함. 셋째, 공공 대시보드 속도 제한: 가뭄 지수 스트림은 건기에 대시보드 트래픽을 끌어모으므로 호스트는 인제스트 경로 응답성을 유지하기 위해 읽기 복제본을 프로비저닝해야 함.</p>
+
+<h2>유역 우선 설계</h2>
+<p>이 표준의 모든 결정은 다음 질문을 거칩니다: <em>이것이 유역 인구가 자기 유역의 물 부족 상황을 더 잘 볼 수 있게 하는가, 아니면 단지 관료 중앙에 더 접근 가능하게 만드는가?</em> 두 가지가 충돌하면 유역 인구 가시성이 이깁니다. 그래서 표준은 집계 유역 데이터에 대한 공공 읽기를 의무화하고, 데이터를 단일 조정자로 중앙집중화하기를 거부하며, 모든 관할권 간 읽기를 감사 로그로 남겨 유역 인구가 자기 물 데이터가 무엇을 하는지 검증할 수 있게 합니다.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA 물 부족 대응 표준 v1.0.0</p></footer>
+</body>
+</html>

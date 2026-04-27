@@ -532,6 +532,29 @@ curl -X POST https://api.wia.rainforest.org/v1/satellite/analyze \
   }'
 ```
 
+## Appendix — Operational Telemetry & CORS
+
+A conformant host SHOULD expose Prometheus-style metrics on a separate
+port (default 9091): `wia_rfc_observations_received_total{forest_class}`,
+`wia_rfc_deforestation_alerts_emitted_total`,
+`wia_rfc_consent_violations_total`, `wia_rfc_request_duration_seconds`.
+Telemetry MUST NOT include high-cardinality label values (per-observation
+IDs, custodian identifiers, raw coordinates).
+
+Public read endpoints MUST send `Access-Control-Allow-Origin: *` so
+unauthenticated map-dashboard tooling can fetch them cross-origin.
+Authenticated write endpoints MUST validate the request `Origin` against
+an allow-list configured by the host operator. Pre-flight responses
+MUST cache for 600 seconds via `Access-Control-Max-Age`.
+
+## Appendix — Health Probes
+
+A conformant host SHOULD expose three liveness signals on a separate
+port: `/healthz` (`{"status":"ok"}`), `/readyz` (with deps map), and
+`/startupz` (with phase + ready_at). These MUST NOT be advertised in
+`/.well-known/wia-rainforest-conservation` and MUST NOT be subject to
+public rate limits.
+
 ---
 
 **© 2025 WIA (World Certification Industry Association)**

@@ -444,6 +444,41 @@ Protocol versions follow semantic versioning:
 - Parallel support: 12 months
 - Old version sunset: After 12 months
 
+## Appendix — Indigenous Community Custodian Verification
+
+The community custodian DID is the legal authority that signs consent
+envelopes governing data flow within community-claimed territory. The
+custodian is typically a designated community council, traditional
+leader, or recognised representative entity rather than an individual.
+
+WIA-OMNI-API issues `community_custodian_link` claims that bind a
+custodian DID to a community-claim DID with documented authority
+sources (traditional law recognition by national government, registered
+indigenous organisation membership, etc.). Hosts MUST verify the
+custodian_link claim before accepting a consent envelope, and MUST
+refuse consent envelopes signed by an expired or revoked custodian.
+
+Custodian succession (when a community changes its representative
+council) follows a chain-of-trust pattern: the prior custodian signs
+a transition envelope endorsing the new custodian, OR the community's
+authority source (traditional law body or registered organisation)
+signs a fresh custodian_link claim for the new custodian. Either path
+preserves continuity of the consent envelopes; previously-issued
+consent envelopes remain valid until their declared `valid_until`.
+
+## Appendix — Replay Cache Sizing
+
+For a typical satellite vendor cloud receiving 100 deforestation alert
+envelopes per second across all customers (peak during dry-season
+fire activity), the seen-nonce cache must hold roughly
+`100 × 600 = 60 000` entries. With 16-byte nonce keys plus a 4-byte
+timestamp, the strict cache footprint is approximately
+`60 000 × 24 ≈ 1.5 MiB`. Hosts SHOULD provision at least double this
+to absorb fire-season bursts. Persistent caches across restart are
+RECOMMENDED for hosts that page on critical alerts; volatile caches
+risk re-emitting alerts after a failover and triggering duplicate
+clinician/policy-maker pages.
+
 ---
 
 **© 2025 WIA (World Certification Industry Association)**

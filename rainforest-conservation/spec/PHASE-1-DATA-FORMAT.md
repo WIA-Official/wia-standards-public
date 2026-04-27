@@ -354,6 +354,40 @@ ISO 8601: `2025-01-15T14:30:00Z`
 
 ---
 
+## Appendix — Conformance Notes
+
+A black-box conformance test suite is published at
+`https://github.com/WIA-Official/wia-rainforest-conservation-conformance`.
+The suite walks every Phase 1 envelope shape against representative
+inputs (degraded-forest classification edges, FAO Global Forest
+Resources Assessment vocabulary alignment, indigenous community
+consent token validation) and verifies round-trip preservation
+through encode/decode.
+
+Reference implementations exist under:
+
+* `api/typescript/` — TypeScript SDK targeting browser and Node.js
+  consumers (Phase 2 HTTP client + envelope validation helpers).
+* `cli/rainforest-conservation.sh` — POSIX shell CLI for envelope
+  generation, validation, and operator scripting.
+* `simulator/index.html` — interactive simulator demonstrating Phase 1
+  envelope construction and Phase 2 endpoint exploration.
+
+A conformant implementation MUST round-trip every envelope family
+byte-identically through encode/decode, MUST refuse envelopes missing
+required fields per the JSON Schemas at
+`https://wiastandards.com/rainforest-conservation/schemas/`, MUST
+treat unknown optional fields as non-fatal extensions, and MUST
+honour the indigenous-community-consent gating defined in Phase 3.
+
+The schema documents are versioned in step with the spec: a major-version
+spec change ships a parallel major-version schema bump. Implementations
+SHOULD pin to a specific minor-version schema in production rather than
+following `latest`, so a community-published schema patch cannot
+accidentally tighten validation against in-flight workloads.
+
+---
+
 **© 2025 WIA (World Certification Industry Association)**
 **License**: MIT
 **Philosophy**: 弘益人間 (Hongik Ingan) - Benefit All Humanity

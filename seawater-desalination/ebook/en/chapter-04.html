@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 04: Phase 1 — Data Format — WIA-ENE-052 Seawater Desalination</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #06b6d4; }
+h1 { border-bottom: 2px solid #06b6d4; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #06b6d4; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🚰 [seawater-desalination] Standard Ebook</a> | Chapter 04 (of 8)</nav>
+
+<h1>Chapter 04: Phase 1 — Data Format</h1>
+
+<h2>4.1 Phase 1 in one paragraph</h2>
+<p>Phase 1 specifies JSON envelopes for desalination plant operations. Every envelope is signed with Ed25519 (IETF RFC 8032) and round-trips byte-identically.</p>
+
+<h2>4.2 Plant operations envelope</h2>
+<pre><code>{
+  "wia_ene_052_version": "1.0.0",
+  "type": "plant_operations",
+  "plant_id": "did:wia:plant:carlsbad-swro-1",
+  "captured_at": "2026-04-27T10:00:00Z",
+  "production_m3_per_hour": 4500,
+  "recovery_rate_pct": 45,
+  "specific_energy_consumption_kwh_per_m3": 3.2,
+  "membrane_status": "nominal",
+  "pre_treatment_dp_kpa": 25,
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+
+<h2>4.3 Energy consumption envelope</h2>
+<p>Required fields: plant_id, captured_at, kwh_consumed, source_mix (grid / solar / wind / cogeneration percentages), carbon_intensity_g_co2_per_kwh. The source_mix tracks what powered the desalination during the reporting interval.</p>
+
+<h2>4.4 Brine discharge envelope</h2>
+<p>Required fields: plant_id, captured_at, discharge_volume_m3, brine_salinity_ppt, brine_temperature_c, ambient_salinity_ppt, ambient_temperature_c, dispersion_zone_id, permit_limit_id. The permit_limit_id references the regulatory permit terms; downstream audit consumers can verify the discharge against those terms in real time.</p>
+
+<h2>4.5 Water quality envelope</h2>
+<p>Required fields: plant_id, captured_at, tds_mg_per_l, conductivity_us_per_cm, chloride_mg_per_l, hardness_mg_per_l_caco3, boron_mg_per_l, free_chlorine_mg_per_l, ph. Boron is particularly important for agricultural reuse — boron above 1.0 mg/L damages many crop species.</p>
+
+<h2>4.6 Maintenance record envelope</h2>
+<p>Membrane cleaning, replacement, pump overhaul, instrument calibration. Each carries date, performed_by, cost, downstream impact (production loss in m³ during downtime).</p>
+
+<h2>4.7 Environmental impact assessment envelope</h2>
+<p>Periodic compliance report tied to permit terms. Includes brine discharge cumulative summary, energy consumption summary, ecological impact monitoring data (if any), and the regulator\x27s acceptance receipt.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA-ENE-052 8-chapter survey. The conformance test suite at <code>https://github.com/WIA-Official/wia-ene-052-conformance</code> is the source of truth. The reference container <code>wia/seawater-desalination-host:1.0.0</code> implements every Phase 2 endpoint with mock data. The companion CLI at <code>cli/seawater-desalination.sh</code> ships sample envelope generators.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1-DATA-FORMAT.md</code></li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2-API.md</code></li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3-PROTOCOL.md</code></li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4-INTEGRATION.md</code></li>
+<li><strong>ISO 50001</strong> energy management system standard for the energy management framework that Phase 4 §7.2 bridges to.</li>
+<li><strong>ISO 14001</strong> environmental management system standard for the environmental aspects framework that Phase 4 §7.3 bridges to.</li>
+<li><strong>International Desalination Association (IDA)</strong> publications for industry benchmarking standards.</li>
+<li><strong>WIA Water Scarcity Response</strong> sister standard for basin-level supply augmentation tracking.</li>
+<li><strong>WIA-OMNI-API</strong> for operator and regulator credential storage.</li>
+</ul>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur in desalination plant infrastructure and are baked into the standard. First, brine discharge audit latency: environmental regulators historically receive monthly compliance reports; the standard's real-time brine_discharge stream collapses this latency to minutes, but plants MUST provision the regulator-feed endpoint with sufficient throughput to handle aggregated jurisdiction-wide subscriptions. Second, energy consumption volatility: SWRO plants modulate production within minutes for grid demand response; the energy_consumption envelope must be published frequently enough (typically 1-minute cadence) for grid operators to use the data for balancing. Third, membrane fouling cascade: pre-treatment failures cascade quickly into membrane fouling; the standard's plant_operations envelope MUST include pre_treatment_dp_kpa so downstream consumers can detect early warning of cascade failures.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA-ENE-052 Seawater Desalination Standard v1.0.0</p></footer>
+</body>
+</html>

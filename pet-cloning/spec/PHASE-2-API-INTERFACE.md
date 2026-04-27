@@ -5,237 +5,277 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-pet-cloning (Pet Cloning).
+This document defines the HTTP API contract that an accredited pet-cloning
+programme exposes for the records defined in PHASE-1 (DATA-FORMAT). The
+contract is consumed by reference laboratories, breed registries, regulators,
+and post-natal verification services. It is not intended for owner-facing
+consumer applications; consumer access flows through the operator's CRM,
+which mediates between the owner and this API.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics)
+- IETF RFC 9111 (HTTP Caching)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IETF RFC 7807 (Predecessor — kept here only because some legacy auditor
+  tools still emit RFC 7807; emitting RFC 9457 is REQUIRED for new
+  implementations)
+- IETF RFC 6901 (JSON Pointer)
+- IETF RFC 6902 (JSON Patch)
+- IETF RFC 7234 (originally defined cache semantics, now superseded by 9111)
+- IETF RFC 8288 (Web Linking)
+- IETF RFC 8259 (JSON)
+- IETF RFC 5789 (PATCH method)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context (correlation propagation)
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-pet-cloning
-standard. It addresses the api-interface layer of the standard.
+The API is a JSON-over-HTTPS interface served on a domain published by the
+operating programme. Versioning uses URL path segments (`/v1/`) and follows
+Semantic Versioning 2.0.0 at the major-version level: a non-additive change
+to a resource shape MUST trigger a new major path segment. Additive changes
+(new optional fields, new enum values that do not displace existing ones) are
+permitted in-place.
 
-## §2 Manifest
+All response bodies are RFC 8259 JSON in UTF-8 with `application/json`
+content type; problem responses use `application/problem+json` per RFC 9457.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pet-cloning"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Base URL and Root Discovery
 
-## §3 Conformance Tiers
+The API root publishes machine-readable discovery as a single JSON document.
+A conformant client SHOULD bootstrap from this document rather than hard-
+coding URLs.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /v1/
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Response (abbreviated):
 
-## §4 Discovery
+```json
+{
+  "standard": "WIA-pet-cloning",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "cases": "/v1/cases",
+    "donors": "/v1/donors",
+    "samples": "/v1/samples",
+    "oocytes": "/v1/oocytes",
+    "reconstructions": "/v1/reconstructions",
+    "embryos": "/v1/embryos",
+    "recipients": "/v1/recipients",
+    "verifications": "/v1/verifications",
+    "evidence": "/v1/evidence",
+    "openapi": "/v1/openapi.json"
+  }
+}
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pet-cloning`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Servers MUST expose `/v1/openapi.json` as the canonical OpenAPI 3.1 document.
 
-## §5 Time and Identity
+## §3 Cases
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/cases                       — create a case
+GET    /v1/cases/{caseId}              — retrieve a case
+PATCH  /v1/cases/{caseId}              — update mutable fields (status,
+                                          programme, crossSpecies)
+GET    /v1/cases?status={status}&since={ts}  — list cases (cursor pagination)
+```
 
-## §6 Versioning and Deprecation
+`POST /v1/cases` accepts the case-shaped body from PHASE-1 §2. Servers MUST
+generate `caseId` server-side as a UUIDv7 and MUST reject client-provided
+identifiers with `409 Conflict`. The response carries the canonical case
+record and the location header points to the case URL.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Status transitions are gated server-side. A case MAY move from `draft` to
+`active`, from `active` to `transferred` or `ceased`, and from `transferred`
+to `verified`. All other transitions return `422 Unprocessable Entity` with a
+problem document whose `type` is `urn:wia:pet-cloning:status-transition`.
 
-## §7 Privacy and Security
+## §4 Donors and Samples
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+POST   /v1/cases/{caseId}/donors            — register a donor
+GET    /v1/donors/{donorId}                 — retrieve donor record
+POST   /v1/donors/{donorId}/samples         — record a tissue sample
+GET    /v1/samples/{sampleId}               — retrieve sample record
+POST   /v1/samples/{sampleId}/custody       — append a custody event
+```
 
-## §8 Open Governance
+Donor records are append-only with respect to identity fields. The
+`euthanasiaStatus` field MAY change from `alive` to `post-mortem` exactly
+once; subsequent attempts return `409 Conflict`.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pet-cloning` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The custody-event endpoint accepts a single CustodyEvent (PHASE-1 §9).
+Servers MUST persist the event with monotonically increasing sequence
+numbers per resource and MUST publish the sequence in the response so that
+clients can detect lost events on reconnection.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §5 Oocytes, Reconstruction, and Embryos
 
+```
+POST   /v1/cases/{caseId}/oocytes           — register an oocyte
+POST   /v1/cases/{caseId}/reconstructions   — record an SCNT event
+POST   /v1/reconstructions/{rid}/embryos    — record a derived embryo
+PATCH  /v1/embryos/{embryoId}               — update fate or culture log
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Reconstruction submissions reference an existing `sampleId` and an existing
+`oocyteId`; the server validates referential integrity and enforces that
+both belong to the same case. Cross-case combinations return `422` with a
+problem document whose `type` is `urn:wia:pet-cloning:cross-case-reference`.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §6 Recipients and Pregnancy Updates
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/cases/{caseId}/recipients              — register a recipient
+PATCH  /v1/recipients/{rid}/pregnancy             — update pregnancy diagnosis
+PATCH  /v1/recipients/{rid}/parturition           — record parturition outcome
+GET    /v1/recipients/{rid}                       — retrieve recipient record
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Pregnancy updates use RFC 6902 JSON Patch documents so that incremental
+veterinary observations can be applied without race conditions. Servers MUST
+require `If-Match` against the recipient ETag to apply a patch.
 
-## Annex F — Adoption Roadmap
+## §7 Post-Natal Verification
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The verification resource carries the genetic identity confirmation for a
+live offspring. It is the keystone of the standard: registries and regulators
+treat the verification report as the externally-citable artefact for the
+case.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST   /v1/cases/{caseId}/verifications      — submit a verification report
+GET    /v1/verifications/{vid}               — retrieve a verification report
+GET    /v1/verifications/{vid}/witnesses     — list independent witness labs
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A verification report references the donor sample, the recipient, the live
+offspring's RFID, and a list of STR (short tandem repeat) loci comparison
+results. The report is signed by the issuing reference laboratory and by at
+least one independent witness laboratory. Servers MUST refuse to publish a
+verification with fewer than the configured minimum number of witnesses for
+the operating jurisdiction (default: one witness; programmes that elect to
+publish externally citable reports SHOULD configure two or more).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §8 Evidence Package
 
-## Annex G — Test Vectors and Conformance Evidence
+The evidence package endpoint produces an exportable archive containing all
+records, custody logs, instrument register entries, signed manifests, and
+the verification report for a case. The package format is governed by
+PHASE-4.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+POST   /v1/cases/{caseId}/evidence            — request package generation
+GET    /v1/evidence/{packageId}               — retrieve a package
+GET    /v1/evidence/{packageId}/manifest      — retrieve manifest only
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Evidence package generation is asynchronous; the POST response carries a
+`202 Accepted` and a `Location` header pointing to the package resource,
+which transitions through `pending` → `building` → `ready` (or `failed`).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §9 Authentication and Authorization
 
-## Annex H — Versioning and Deprecation Policy
+The API uses mutually-authenticated TLS for laboratory-to-laboratory and
+laboratory-to-registry connections, with client certificates issued by an
+accreditation root that is operated by the certifying body. Owner-facing CRM
+intermediaries use their own session model; the CRM is the only consumer
+that translates owner identity into the opaque `ownerReference` defined in
+PHASE-1 §3.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Programmes MUST configure rate limits per client certificate and SHOULD
+publish the resulting limits in `Retry-After` headers when the limit is
+reached.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §10 Errors and Problem Details
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+All error responses are `application/problem+json` per RFC 9457. The `type`
+field is a URN under the `urn:wia:pet-cloning` namespace. The defined types
+are listed in the catalogue at PHASE-2 Annex A and include:
 
-## Annex I — Interoperability Profiles
+- `urn:wia:pet-cloning:status-transition` — invalid status change.
+- `urn:wia:pet-cloning:cross-case-reference` — referencing across cases.
+- `urn:wia:pet-cloning:custody-gap` — custody log has a missing event.
+- `urn:wia:pet-cloning:viability-window` — sample exceeds species window.
+- `urn:wia:pet-cloning:incomplete-evidence` — evidence build aborted.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Each problem response carries `traceId` (W3C Trace Context propagation)
+and `evidenceLink` pointing to the evidence package URL when one exists.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §11 Caching, Concurrency, and ETag Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+GET responses are cacheable per RFC 9111 with `Cache-Control: max-age=60`
+unless the resource is a verification or evidence package, in which case
+the response is immutable and carries `Cache-Control: max-age=31536000,
+immutable`. ETags are mandatory on every PATCH endpoint; conditional
+requests use `If-Match`. Servers MUST return `412 Precondition Failed`
+when ETags do not match, with a problem document containing the current
+ETag in the `serverETag` extension.
+
+## §12 Audit and Observability
+
+Every endpoint emits structured logs with `caseId`, `traceId`, the issuing
+client certificate's subject, and the operator's clock skew vs the reference
+NTP source. Audit logs are retained for at least seven calendar years from
+the last access of the case (PHASE-3 §7), in line with ISO/IEC 27001:2022
+A.5.33 expectations for the records concerned.
+
+## §13 Worked Example: From Sample Registration to Verification
+
+The following sequence illustrates the canonical flow for a single case as
+exercised against a conformant server. Identifiers are abbreviated for
+readability.
+
+1. **Open a case.** A `POST /v1/cases` with `caseAcquiredAt` set to the
+   moment the donor consent was countersigned returns the new case in
+   `draft` status with a server-assigned `caseId` such as
+   `01913a7b-...`. The Location header points to `/v1/cases/01913a7b-...`.
+2. **Register the donor.** `POST /v1/cases/{caseId}/donors` with the donor
+   record from PHASE-1 §3 transitions the case to `active` if the
+   donor's `consentHash` resolves and the regulatory authorisation is
+   present (jurisdictions vary, see PHASE-3 §3).
+3. **Record the biopsy and freeze.** `POST /v1/donors/{donorId}/samples`
+   with the sample shape from PHASE-1 §4 captures the biopsy. A custody
+   event is appended via `POST /v1/samples/{sampleId}/custody` for each
+   shipment, thaw, and re-freeze.
+4. **Source oocytes and reconstruct.** Oocyte records are posted under
+   the case; reconstruction events reference the chosen sample and
+   oocyte. The server validates referential integrity per §5.
+5. **Cleavage and transfer.** Embryo records are appended with cleavage
+   stage observations; the recipient's pregnancy and parturition
+   updates are applied with JSON Patch under the recipient resource per
+   §6.
+6. **Verify and publish.** The verification report is signed by the
+   issuing reference laboratory and the witness laboratory under §7,
+   the case advances to `verified`, and the evidence package is
+   produced under §8.
+
+A conformant server completes this flow without error for the canonical
+positive vector under `tests/phase-vectors/phase-2-api-interface/`.
+
+## §14 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/` and emits an OpenAPI document
+that round-trips the documented resource shapes. The test vectors include
+positive and negative cases for every endpoint listed in this document and
+for every problem type listed in §10. Conformance is evidenced by the test
+matrix submitted as part of the PHASE-4 evidence package.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-pet-cloning
+- **Last Updated:** 2026-04-27

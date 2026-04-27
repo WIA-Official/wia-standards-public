@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 05: Phase 2 — API Interface — WIA Smart Farm</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+h1, h2 { color: #84cc16; }
+h1 { border-bottom: 2px solid #84cc16; padding-bottom: 10px; }
+pre, code { background: #1e293b; }
+pre { padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.9em; color: #cbd5e1; }
+code { padding: 2px 6px; border-radius: 4px; color: #fbbf24; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+th { background: #1e293b; color: #84cc16; }
+nav { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #334155; text-align: center; color: #94a3b8; }
+.philosophy { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<nav><a href="index.html" style="color:#60a5fa;">🌾 [smart-farm] Standard Ebook</a> | Chapter 05 (of 8)</nav>
+
+<h1>Chapter 05: Phase 2 — API Interface</h1>
+
+<h2>5.1 Phase 2 in one paragraph</h2>
+<p>Phase 2 specifies the HTTPS surface for smart farm data: field/parcel publish, sensor stream, event publish, query.</p>
+
+<h2>5.2 Discovery</h2>
+<p>Every host publishes a discovery document at <code>/.well-known/wia-smart-farm</code>.</p>
+
+<h2>5.3 Field endpoints</h2>
+<pre><code>POST /sf/field                    (signed; farmer authority)
+GET  /sf/field/{field_id}
+GET  /sf/field?farm_id={id}</code></pre>
+
+<h2>5.4 Sensor endpoints</h2>
+<pre><code>POST /sf/sensor                   (signed; sensor vendor authority)
+GET  /sf/sensor/stream?field_id={id}    (Server-Sent Events, typical 5-min cadence)
+GET  /sf/sensor?field_id={id}&kind={k}&from={ts}&to={ts}</code></pre>
+
+<h2>5.5 Event endpoints (irrigation, fertilisation, harvest, scouting)</h2>
+<p>Each family follows the same shape: POST/GET on <code>/sf/{family}/{id}</code>. Events with high volume (sensor readings during peak season) MAY use bulk submission via array payloads.</p>
+
+<h2>5.6 Authentication</h2>
+<p>Writes require HTTP Message Signatures per IETF RFC 9421. Farmer authority over field/parcel envelopes verified via WIA-OMNI-API farm_ownership claims; sensor vendor authority verified via vendor service-account claims under explicit farmer consent.</p>
+
+<h2>Cross-Chapter Anchors</h2>
+<p>This chapter participates in the WIA Smart Farm 8-chapter survey. The conformance test suite at <code>https://github.com/WIA-Official/wia-smart-farm-conformance</code> is the source of truth. The reference container <code>wia/smart-farm-host:1.0.0</code> implements every Phase 2 endpoint with mock data. The companion CLI at <code>cli/smart-farm.sh</code> ships sample envelope generators.</p>
+
+<h2>Where to Look Next</h2>
+<ul>
+<li><strong>Phase 1 specification</strong> at <code>spec/PHASE-1-DATA-FORMAT.md</code></li>
+<li><strong>Phase 2 specification</strong> at <code>spec/PHASE-2-API.md</code></li>
+<li><strong>Phase 3 specification</strong> at <code>spec/PHASE-3-PROTOCOL.md</code></li>
+<li><strong>Phase 4 specification</strong> at <code>spec/PHASE-4-INTEGRATION.md</code></li>
+<li><strong>ISO 19156</strong> Observations and Measurements for the conceptual foundation Phase 4 §7.2 bridges to.</li>
+<li><strong>AgGateway ADAPT</strong> for the precision-agriculture data exchange specification.</li>
+<li><strong>ISOBUS (ISO 11783)</strong> for tractor-implement electronics integration.</li>
+<li><strong>FAO AgroVoc</strong> for the multilingual crop concept vocabulary.</li>
+<li><strong>USDA Soil Taxonomy</strong> for the soil classification vocabulary.</li>
+<li><strong>WIA Water Scarcity Response</strong> sister standard; irrigation events flow as supply augmentation data.</li>
+</ul>
+
+<h2>Farmer-First Design</h2>
+<p>Every choice in this standard is filtered through: <em>does this make farm data more useful to the farmer who collected it, or just more accessible to the vendor who sold the equipment?</em> When the two conflict, farmer sovereignty wins. That is why the standard mandates explicit farmer consent for cross-vendor data sharing, refuses to allow vendor terms-of-service to bypass the consent envelope, and requires implementations to surface vendor data flows so farmers can verify what their data is doing.</p>
+
+<h2>Implementer Notes</h2>
+<p>Three operational concerns recur in smart-farm infrastructure and are baked into the standard. First, sensor data volume during peak season: a 100-hectare farm with 20 soil sensors per hectare emitting at 5-minute cadence produces ~500 000 sensor readings per day. Hosts MUST provision for this peak load and SHOULD downsample to hourly aggregates after 30 days. Second, farmer consent revocation: when a farmer revokes consent, the data must stop flowing within minutes; the consent envelope MUST carry an explicit revocation timestamp and downstream consumers MUST honour it. Third, ISOBUS Task XML round-trip: variable-rate prescription maps emitted as ISOBUS Task XML must round-trip through WIA envelopes without losing the per-cell prescription rates; the harvest_record envelope embeds GeoJSON yield maps that are convertible back to ISOBUS Task XML for the next planting cycle.</p>
+
+<footer><p class="philosophy">弘益人間 · Benefit All Humanity</p><p>WIA Smart Farm Standard v1.0.0</p></footer>
+</body>
+</html>
