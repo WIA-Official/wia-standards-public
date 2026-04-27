@@ -5,237 +5,280 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-industrial-iot (Industrial Iot).
+This document defines the protocols that govern an accredited
+industrial-IoT programme: operator accreditation, asset-vendor
+qualification (ISO 19443-aligned for nuclear-related supply,
+otherwise operator-defined), zone and conduit governance per IEC
+62443, alarm-management discipline per ISA-18.2, control-loop
+change control, calibration cadence, records retention,
+historian time-synchronisation, decommissioning custody,
+incident response, and programme wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 14001:2015 (environmental management systems)
+- ISO 45001:2018 (occupational health and safety management)
+- ISO 14224:2016 (reliability and maintenance data exchange)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27019:2024 (IS controls for energy utilities)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8915 (NTS for NTP — Network Time Security)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- IEC 61131-3 (PLC programming languages)
+- IEC 62264 (ISA-95)
+- IEC 62443 (industrial automation security)
+- ANSI/ISA-18.2 (alarm management)
+- ANSI/ISA-101 (HMI design conventions; non-citable IEC mirror
+  pending — operator may adopt the operator's national mirror)
+- OPC Unified Architecture (UA)
 
 ---
 
-## §1 Scope
+## §1 Operator Accreditation
 
-This PHASE document is one of four that together define the WIA-industrial-iot
-standard. It addresses the protocol layer of the standard.
+An industrial-IoT operator MAY claim conformance to
+WIA-industrial-iot only after a recognised accreditation body has
+issued a valid certificate against ISO 9001:2015 and against the
+operator's information security management posture (ISO/IEC
+27001:2022 with the IEC 62443 cybersecurity controls in scope of
+the deployment). Operators that ship product to safety-critical
+markets (nuclear, aerospace, medical) carry additional sector-
+specific certifications.
 
-## §2 Manifest
+## §2 Vendor Qualification
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "industrial-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Asset vendors are qualified per the operator's vendor-management
+programme: factory-acceptance test evidence, IEC 62443-aligned
+secure-development declarations, firmware update signing keys,
+and the vendor's incident-response playbook. Qualification is
+recorded against the asset's `manufacturerRef` and is reviewed at
+least annually.
 
-## §3 Conformance Tiers
+## §3 Zone and Conduit Governance
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The site's IEC 62443 zone architecture is documented in the
+cyber-posture record (PHASE-1 §8). Zone boundaries are revised
+through a controlled process: proposed change, security-engineer
+review, IEC 62443 risk re-assessment, change-board approval, and
+deployment with conduit re-verification. Submissions that
+violate a zone or conduit (e.g. attempting to write into a
+higher-security-level zone from a lower-level zone) return a
+Problem-Details response of type
+`urn:wia:industrial-iot:zone-conduit-violation`.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Alarm Management Discipline
 
-## §4 Discovery
+Alarms follow ANSI/ISA-18.2 lifecycle expectations:
+identification, rationalisation, design, implementation,
+operation, monitoring & assessment, management of change, and
+audit. The operating programme records the rationalisation
+report for every priority-1 and priority-2 alarm and reviews
+the alarm performance metrics (alarm rate per operator, peak
+flooding rates, top-10 chronic alarms) at least monthly.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/industrial-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Alarm rate budgets typical of mature deployments are recorded in
+the operator's quality dossier and serve as the operator's
+internal performance target; the standard does not prescribe a
+single numeric target because operating context varies.
 
-## §5 Time and Identity
+## §5 Control-Loop Change Control
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Loop tuning revisions follow change control: proposed change,
+loop-performance impact assessment (overshoot, settling-time,
+robustness), supervisor approval, controlled commissioning,
+post-implementation verification. The verification's outcome is
+appended to the loop's tuning history (PHASE-1 §5).
 
-## §6 Versioning and Deprecation
+Changes to safety-related loops (loops that directly affect a
+safety-instrumented function) require additional approvals from
+the safety officer and follow the operator's IEC 61511-aligned
+functional-safety governance.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 Calibration Cadence
 
-## §7 Privacy and Security
+Sensors and instruments calibrated under ISO/IEC 17025 follow a
+cadence appropriate to their service tier and the operating
+environment: process-critical instruments typically every 6 to 12
+months, custody-transfer instruments per the regulator's required
+frequency, and non-critical sensors at the operator's defined
+cadence. The cadence is recorded in the operator's quality
+dossier; deviations trigger an alert on the asset's maintenance
+schedule.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Records Retention
 
-## §8 Open Governance
+Programme records — every record defined in PHASE-1, the API
+audit logs, alarm and event history, maintenance records, and
+production-order traces — retain for the longer of (a) the
+operating jurisdiction's regulatory requirement, or (b) the
+product's expected service life plus the recall window. Safety-
+related alarm and event history retains indefinitely.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `industrial-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 Historian Time Synchronisation
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Historians, edge gateways, PLCs, and SCADA front-ends
+synchronise per RFC 5905 (NTPv4) or RFC 8915 (NTS for NTP) where
+the operator's network supports it. Time synchronisation is
+verified at every commissioning and at every major firmware
+update; clock-drift events that exceed the operator's threshold
+trigger an alert through the streaming subscription.
 
+## §9 Cybersecurity Operations
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Cybersecurity events (suspected intrusion, failed authentication
+clusters, anomalous control-bus traffic) are reported under
+PHASE-1 §6 with category `security-alarm`. Events of priority 1
+or 2 escalate to the operator's CSIRT under the operator's
+incident-response playbook; CSIRT's actions are recorded against
+the event for post-incident review.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Programmes operating in jurisdictions with critical-infrastructure
+disclosure requirements (CISA / ENISA NIS 2 / KISA / equivalent)
+record the regulatory disclosure reference in the event record.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §10 Decommissioning Custody
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Asset decommissioning follows a documented workflow: removal-of-
+service date, data export from historians and CMMS, secure
+erasure of any sensitive configuration on the asset, physical
+disposition (re-deployment, recycling, or destruction), and a
+disposition certificate. The certificate is appended to the
+asset record per PHASE-1 §3.
 
-## Annex F — Adoption Roadmap
+## §11 Records of Material Traceability
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Production-order material-traceability records (PHASE-1 §9)
+preserve input-lot to output-lot bindings for the period the
+operating jurisdiction's product-liability law requires.
+Programmes that operate under FDA, EMA, FSC, or comparable
+regulatory authority encode the regulator's expected retention
+in their quality dossier and on the production-order's
+`status=complete` transition.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 Time Synchronisation Audit
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Sites synchronise per §8; audit cycles re-verify clock drift
+budgets at the operator's defined cadence. Failed audits emit
+remediation actions and are recorded in the operator's quality
+dossier.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Cross-Site Federation
 
-## Annex G — Test Vectors and Conformance Evidence
+Operators that run multiple sites with shared APM, MES, or
+historian services federate per-site records through the API.
+Federation is mutually authenticated; cross-site queries are
+gated by the consuming client's authorisation scope and return
+`403 Forbidden` with type
+`urn:wia:industrial-iot:cross-site-scope-violation` when the
+scope does not include the queried site.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Programme Wind-Down
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A programme that ceases operations transfers historian archives
+to a recognised long-term archive, exports CMMS history to the
+operator's records-management system, and notifies regulators
+and certifying bodies of the cessation. Indefinite-retention
+records (safety-related alarms, custody-transfer telemetry)
+transfer to the long-term archive with content-addresses
+preserved.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §15 Quality Dossier
 
-## Annex H — Versioning and Deprecation Policy
+The programme's quality dossier records the vendors qualified,
+the IEC 62443 architecture in force, the alarm-rationalisation
+methodology, the calibration cadence policy, the cybersecurity
+incident-response playbook, and the deprecation history of
+asset firmware. The dossier is reviewed at least annually by
+the operator's quality manager and is read during the annual
+ISO 9001 / ISO/IEC 27001 surveillance audits.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Operating Personnel Health and Safety
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operating personnel (control-room operators, field technicians)
+work under the operator's ISO 45001-aligned occupational-health
+and safety governance. Shift-change handover events that affect
+control authority are recorded at the alarm-event level so that
+retrospective analyses can verify operator continuity at the
+time of an incident.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Anti-Tamper Protections
 
-## Annex I — Interoperability Profiles
+Critical-asset configurations (control-loop tunings, IEC 62443
+zone definitions, cybersecurity controls) are protected against
+unauthorised modification through the operator's change-board
+process and through cryptographic signing of configuration
+exports. Tamper-detection events emit security-category alarms
+under PHASE-1 §6 and escalate to CSIRT per §9.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Sustainability Reporting
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Operators that publish sustainability disclosures (CSRD-aligned,
+GRI, SASB, or equivalent) consume the energy / emissions
+telemetry (PHASE-1 §10) and aggregate it into the disclosure
+period the regulator requires. The aggregation methodology is
+recorded in the operator's quality dossier and is reviewed at
+the same cadence as the disclosure cycle.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 Cross-Border Programme Operation
+
+Multi-jurisdiction industrial-IoT operators honour each
+participating jurisdiction's industrial-cybersecurity disclosure
+rules (NIS 2, CIRCIA, KISA-equivalent). Cross-border telemetry
+flows honour the source-jurisdiction's data-protection law for
+operator-personnel data; only opaque references flow through the
+WIA API.
+
+## §20 Functional-Safety Coordination
+
+Industrial deployments that include safety-instrumented
+functions (per IEC 61511) coordinate the WIA-industrial-iot
+records with the operator's functional-safety dossier. The
+coordination is one-way: the WIA programme records reference
+the SIS dossier identifiers but does not duplicate the SIS
+proof-test or trip-history detail, which lives in the
+functional-safety system of record.
+
+Loops that affect a safety-instrumented function (PHASE-1 §5)
+carry the SIF reference so that change-control reviews can
+escalate to the operator's safety officer when a tuning or mode
+change has the potential to affect the SIF.
+
+## §21 Programme Wind-Down and Decommissioning
+
+A programme that ceases operations transfers historian archives
+to a recognised long-term archive, exports CMMS history to the
+operator's records-management system, and notifies regulators
+and certifying bodies of the cessation. Indefinite-retention
+records (safety-related alarms, custody-transfer telemetry,
+recall-relevant production-order traces) transfer to the long-
+term archive with content-addresses preserved.
+
+When a programme transitions to a successor operator (acquisition,
+divestiture, joint-venture restructuring), the programme records
+the successor's identifier and the date of effective handover.
+The operator's quality dossier captures the handover audit so
+that downstream consumers can trace records across the transition
+without ambiguity.
+
+## §22 Conformance and Auditing
+
+A programme conformant with WIA-industrial-iot publishes its
+operator accreditation references, its programme code
+registration, its quality dossier, the catalogue of sites it
+operates, and the cyber-posture summary, and answers an annual
+self-assessment that maps each clause of this PHASE to the
+programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-industrial-iot
+- **Last Updated:** 2026-04-27

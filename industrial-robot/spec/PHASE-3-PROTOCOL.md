@@ -5,237 +5,280 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-industrial-robot (Industrial Robot).
+This document defines the protocols that govern an accredited
+industrial-robot programme: integrator and operator accreditation,
+robot-vendor qualification, ISO 10218 task-based risk assessment,
+ISO/TS 15066 collaborative-mode commissioning, ISO 9283 baseline
+testing, change-control for safety configuration, calibration
+cadence, incident response, occupational-safety reporting,
+records retention, decommissioning custody, and programme
+wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 14001:2015 (environmental management systems)
+- ISO 45001:2018 (occupational health and safety management)
+- ISO 9283:1998 (robot performance test methods)
+- ISO 9787:2013 (robot coordinate systems)
+- ISO 10218-1 / ISO 10218-2 (robot safety)
+- ISO/TS 15066:2016 (collaborative robots)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC TR 22100-5 (cybersecurity for industrial machinery)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- IEC 61131-3 (PLC programming languages)
+- IEC 61784-3 (functional-safety field-bus profiles)
+- IEC 62061 (functional safety of E/E/PE control systems)
+- ISO 13849-1 (safety-related parts of control systems)
 
 ---
 
-## §1 Scope
+## §1 Operator and Integrator Accreditation
 
-This PHASE document is one of four that together define the WIA-industrial-robot
-standard. It addresses the protocol layer of the standard.
+An operator MAY claim conformance to WIA-industrial-robot only
+after a recognised accreditation body has issued a valid
+certificate against ISO 9001:2015 and ISO 45001:2018 (occupational
+health and safety) covering the deployment scope. Integrators
+that commission collaborative-robot cells additionally maintain
+ISO 10218 / ISO/TS 15066 competence documented in their quality
+dossier.
 
-## §2 Manifest
+## §2 Vendor Qualification
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "industrial-robot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Robot vendors are qualified per the operator's vendor-management
+programme: ISO 10218-1 type-certification evidence, vendor's
+ISO/TS 15066 collaborative-operation declarations where relevant,
+firmware update signing keys, and the vendor's incident-response
+playbook. Vendors whose firmware has been the subject of a
+recall or a safety advisory carry the resolved-status record so
+that integrators can verify the deployed firmware's safety
+status.
 
-## §3 Conformance Tiers
+## §3 Task-Based Risk Assessment
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Every robotic task (PHASE-1 §4) follows the ISO 10218-1 §5 task-
+based risk assessment process: identification of hazardous
+situations, risk-estimation, risk evaluation, and risk-reduction
+measure selection. The assessment is recorded as a content-
+addressed artefact and referenced from the task record. Risk
+assessment is repeated at every material change to the task
+(new tooling, new workspace, new program flow).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Collaborative-Mode Commissioning
 
-## §4 Discovery
+Cells operating under collaborative modes (PHASE-1 §3
+`iso10218SafetyClass` ∈ {hand-guiding, speed-and-separation-
+monitoring, power-and-force-limiting}) are commissioned with
+ISO/TS 15066 procedures: biomechanical-limit determination,
+separation-monitoring sensor commissioning (light curtains, area
+scanners, time-of-flight cameras), and validation runs that
+exercise the worst-case approach scenarios at the cell's
+expected operating speeds. Commissioning evidence is appended to
+the safety-configuration record.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/industrial-robot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 Safety Configuration Change Control
 
-## §5 Time and Identity
+Changes to safety configuration (zones, speed limits,
+biomechanical-limit profiles, fieldbus parameters) follow change
+control: proposed change → safety-engineer review → re-validation
+under §3 task-based risk assessment → safety officer approval →
+controlled deployment → post-implementation verification. The
+verification's outcome appends to the safety-configuration
+record.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 ISO 9283 Baseline Testing
 
-## §6 Versioning and Deprecation
+Each robot is baseline-tested per ISO 9283 at commissioning:
+position repeatability (RP), pose repeatability (PR), distance
+accuracy (AT), path accuracy, velocity accuracy. Baseline
+results are recorded against the robot record and re-evaluated
+at calibration cadence. Drift beyond the operator's defined
+threshold triggers a maintenance work order.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §7 Calibration Cadence
 
-## §7 Privacy and Security
+TCP and joint calibrations are performed under ISO/IEC 17025
+procedures at the cadence the operator declares. Routine TCP
+re-verification typically follows tool-change events; full ISO
+9283 re-testing typically follows major firmware updates and
+component replacements (harmonic-drive, joint-encoder, motor).
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §8 Incident Response
 
-## §8 Open Governance
+Safety incidents (PHASE-1 §7) trigger the operator's incident-
+response playbook: e-stop verification, witness interviews,
+review of the reconstruction motion-sample window, root-cause
+investigation, corrective action plan, and reporting to the
+relevant occupational-safety authority for incidents of
+`major-injury` severity or above.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `industrial-robot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The reconstruction motion-sample window is the critical artefact
+for retrospective analysis; programmes MUST configure the window
+duration to be at least long enough to capture the prior
+motion that contributed to the incident (typically 1000-5000 ms).
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Occupational-Safety Reporting
 
+Programmes report safety incidents to the operating
+jurisdiction's occupational-safety authority within the period
+the authority requires. The report carries the incident record,
+the reconstruction window, and the root-cause investigation. The
+authority's report reference is recorded against the incident
+record.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §10 Cybersecurity Operations
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Cybersecurity events affecting the robot controller (firmware
+update verification failures, anomalous fieldbus traffic,
+unexpected configuration changes) follow PHASE-1 §6 of the
+adjacent industrial-IoT standard's category mapping (security-
+alarm). Events of priority 1 or 2 escalate to the operator's
+CSIRT under the operator's incident-response playbook.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Records Retention
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Programme records — every record defined in PHASE-1, the API
+audit logs, safety incidents, maintenance records, and safety
+configurations — retain for a minimum of seven calendar years
+from the last access of the cell. Safety-incident records of
+`major-injury` severity or above retain indefinitely.
 
-## Annex F — Adoption Roadmap
+## §12 Time Synchronisation
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Robot controllers, edge gateways, historian, and SCADA front-
+ends synchronise per RFC 5905 (NTPv4). Sub-millisecond
+synchronisation is preserved on the safety-fieldbus per IEC
+61784-3 expectations independent of the WIA programme; the WIA
+programme only consumes the historian's synchronised time.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §13 Decommissioning Custody
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Robot decommissioning follows a documented workflow: removal of
+service date, secure erasure of any sensitive configuration on
+the controller, physical disposition (re-deployment, refurbish,
+recycle, destruction), and a disposition certificate appended to
+the robot record per PHASE-1 §2.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §14 Programme Wind-Down
 
-## Annex G — Test Vectors and Conformance Evidence
+A programme that ceases operations transfers historian archives
+to a recognised long-term archive, exports CMMS history to the
+operator's records-management system, and notifies regulators
+and certifying bodies of the cessation. Indefinite-retention
+records (major-injury safety incidents) transfer with content-
+addresses preserved.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §15 Quality Dossier
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The programme's quality dossier records the vendors qualified,
+the integrators contracted, the ISO 10218 / ISO/TS 15066
+competence framework, the safety-configuration change-control
+authority, and the deprecation history of robot firmware. The
+dossier is reviewed at least annually by the operator's quality
+manager.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §16 Cross-Border Programme Operation
 
-## Annex H — Versioning and Deprecation Policy
+Multi-jurisdiction operators honour each participating
+jurisdiction's occupational-safety reporting rules and product-
+safety regulations applicable to the robot vendor's exports.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §17 End-Effector Swap Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+End-effector swaps (PHASE-1 §10) are governed under change
+control because the swap may shift the dynamic load envelope of
+the robot, the biomechanical-limit profile in collaborative
+modes, and the cycle-time budgeting of the affected tasks.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+A swap event triggers (a) re-validation of the safety
+configuration if the cell is collaborative, (b) update of the
+TCP calibration if the new effector has a different geometry,
+and (c) re-baselining of cycle-time budgets for tasks that
+depend on the new effector. The operator's quality dossier
+records the swap-discipline workflow.
 
-## Annex I — Interoperability Profiles
+## §18 Cybersecurity for Robot Controllers
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Robot controllers operate under the IEC 62443 zone classification
+of the cell (PHASE-1 §9). Firmware updates are signed by the
+vendor's release key and verified by the controller before
+install; failed verification leaves the controller on the prior
+firmware and emits a security-category alarm event.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Controllers exposed to plant networks (for OPC UA Robotics
+companion-spec endpoints, MES integration, or remote diagnostics)
+restrict ingress through the operator's industrial-security
+broker; direct external access from the public internet is not
+permitted under this PHASE.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 Operator Training and Authorisation
+
+Operators interacting with the cell (programmers, machine
+tenders, maintenance technicians) carry training and
+authorisation records held in the operator's HR system. The
+WIA-industrial-robot programme records the authorised-operator
+list per cell at a level appropriate to safety-relevant
+operations: who is authorised to run the cell in production
+mode, who can place the cell into teach mode, who can update
+safety configuration. The list is referenced from the safety
+configuration record so that any change to safety-relevant
+operation requires a re-binding to authorised operators.
+
+## §20 Programme Wind-Down and Successor Handover
+
+A programme that ceases operations transfers historian archives
+to a recognised long-term archive, exports CMMS history to the
+operator's records-management system, and notifies regulators
+and certifying bodies of the cessation. Indefinite-retention
+records (major-injury safety incidents) transfer with content-
+addresses preserved.
+
+When a cell transitions to a successor operator (acquisition,
+divestiture), the programme records the successor's identifier
+and the date of effective handover so that downstream consumers
+can trace records across the transition.
+
+## §21 Cross-Border Programme Operation Detail
+
+Multi-jurisdiction operators that ship robots across borders
+honour each participating jurisdiction's product-safety
+regulations applicable to the vendor's exports (CE marking under
+the EU Machinery Directive 2006/42/EC, OSHA-aligned hazard
+controls in the United States, KC certification in the Republic
+of Korea, equivalent regimes in other operating jurisdictions).
+The operator's compliance lead records the applicable regimes
+per cell so that downstream consumers see which authority's
+requirements the cell honours.
+
+## §22 Quality Dossier Annual Review
+
+The operator's quality dossier (PHASE-3 §15) is reviewed at
+least annually by the operator's quality manager and is read
+during the annual ISO 9001 / ISO 45001 surveillance audits. The
+review's outcomes are recorded as content-addressed minutes that
+the public catalogue references; programmes that publish
+externally cited cells attach the most recent review reference
+to the evidence package's audit section.
+
+## §23 Conformance and Auditing
+
+A programme conformant with WIA-industrial-robot publishes its
+operator and integrator accreditation references, its programme
+code registration, its quality dossier, the catalogue of cells
+it operates, and the cyber-posture summary, and answers an
+annual self-assessment that maps each clause of this PHASE to
+the programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-industrial-robot
+- **Last Updated:** 2026-04-27

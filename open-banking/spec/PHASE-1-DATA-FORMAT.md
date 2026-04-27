@@ -1,241 +1,307 @@
-# WIA-open-banking PHASE 1 — DATA-FORMAT Specification
+# WIA-open-banking PHASE 1 — Data Format Specification
 
 **Standard:** WIA-open-banking
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-open-banking (Open Banking).
+This PHASE defines the canonical data format for open-banking
+records: customer consent records, account-information access
+profiles, payment-initiation records, fund-confirmation records,
+strong-customer-authentication evidence, third-party-provider (TPP)
+identity records, and the cross-references that bind these
+together. The shape interoperates with PSD2 RTS, OBIE Open Banking
+UK, KR 마이데이터 표준 API, and Berlin Group NextGenPSD2 so existing
+TPP and ASPSP implementations adopt this PHASE without inventing
+parallel data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- EU PSD2 (Directive 2015/2366) and the EBA Regulatory Technical Standards on SCA and CSC
+- OpenID Foundation FAPI 2.0 (Financial-grade API Security Profile, Baseline + Advanced)
+- OpenID Connect Core 1.0
+- IETF OAuth 2.0 (RFC 6749), OAuth 2.1 draft, RFC 7515 (JWS), RFC 7519 (JWT), RFC 7636 (PKCE), RFC 9101 (JAR), RFC 9126 (PAR), RFC 8705 (mTLS), RFC 8628 (Device Auth)
+- OBIE Open Banking UK — Read/Write API Specification v3.x
+- Berlin Group NextGenPSD2 XS2A Framework
+- KR 금융위원회·금융보안원 마이데이터 표준 API v1.x (KFSC MyData Standard API)
+- ISO 20022 — payment-initiation pacs profiles for downstream clearing
+- ISO 13616 (IBAN), ISO 9362 (BIC), ISO 4217 (currency)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-open-banking
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that participate in regulated open-
+banking flows: account-information service providers (AISPs),
+payment-initiation service providers (PISPs), card-based payment-
+instrument-issuer service providers (CBPIIs / equivalent),
+account-servicing payment-service providers (ASPSPs), and the
+identity and consent infrastructure that connects them.
 
-## §2 Manifest
+The standard is jurisdiction-aware: an implementation MUST declare
+which open-banking regime its records originate under (EU PSD2,
+UK OBIE, KR 마이데이터, BR Open Finance, AU CDR, JP 全銀協 JBA Standard
+API, etc.) so downstream consumers apply the correct interpretation
+of consent windows, SCA exemptions, and dispute pathways.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "open-banking"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: TPP registration, consent records, account-information
+flow records, payment-initiation records, fund-confirmation, SCA
+evidence, decoupled-authentication evidence, fraud-flag interaction
+with consent. Out of scope: clearing / settlement (handled by
+WIA-payment-system), card-side flows (handled by WIA-mobile-payment),
+non-PSD2 banking APIs (out of regulatory regime).
 
-## §3 Conformance Tiers
+## §2 TPP identity record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+A TPP carries:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field                   | Source / Binding                                           |
+|-------------------------|------------------------------------------------------------|
+| `tppId`                 | URN of form `urn:wia:ob:tpp:<authority>:<id>`              |
+| `legalName`             | TPP's registered legal name                                 |
+| `licenceAuthority`      | issuing authority URN (e.g., FCA UK, BaFin DE, FSC KR)     |
+| `licenceNumber`         | the regulator-issued licence ID                             |
+| `licenceRoles[]`        | subset of {AISP, PISP, CBPII} authorised by the licence     |
+| `eIDASCertificate`      | (EU/UK) PSD2-eIDAS Qualified Web Authentication Certificate (QWAC) and/or Qualified Seal Certificate (QSealC) per RTS Article 34 |
+| `clientCertificateFp`   | mTLS client certificate fingerprint                         |
+| `redirectURIs[]`        | allowed redirect URIs (validated at authorisation time)     |
+| `softwareStatement`     | OIDC software-statement JWT (per OBIE Dynamic Client Registration) |
+| `notificationEndpoints[]`| TPP's webhooks for asynchronous events (e.g., consent-revoked) |
 
-## §4 Discovery
+A TPP whose licence is suspended or revoked has all its consents
+suspended at the boundary; existing in-flight calls complete but
+new operations are refused. The licence-status check is performed
+at every call (cached at the deployment's policy interval).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/open-banking`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Consent record
 
-## §5 Time and Identity
+Every access to a customer's account flows under a consent. Consent
+records carry:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `consentId` — URN
+- `customerRef` — pseudonymous customer identifier
+- `tppRef` — TPP URN
+- `aspsRef` — ASPSP URN (the bank holding the account)
+- `consentScope` — closed enum: `account-information`,
+  `payment-initiation`, `funds-confirmation`, `card-based-payment-
+  instrument` (per PSD2 / OBIE)
+- `permissions[]` — per-scope permissions (for AIS:
+  `ReadAccountsBasic`, `ReadAccountsDetail`, `ReadBalances`,
+  `ReadTransactionsBasic`, `ReadTransactionsDetail`,
+  `ReadTransactionsCredits`, `ReadTransactionsDebits`,
+  `ReadStandingOrdersBasic`, `ReadStatementsBasic`,
+  `ReadDirectDebits`, `ReadProducts`, `ReadOffers`,
+  `ReadPartyPSU`, `ReadParty`, `ReadParties`, `ReadScheduledPayments`)
+- `transactionFromDateTime` / `transactionToDateTime` (AIS only) —
+  consent window for transaction history
+- `expirationDateTime` — consent expiry (PSD2 RTS Article 36(3): max 180 days for AIS without explicit re-confirmation)
+- `authorisedAt` — RFC 3339 SCA completion timestamp
+- `policy` — URI of the consent's privacy policy (per ISO 29184)
 
-## §6 Versioning and Deprecation
+Consents are signed by the customer's SCA-bound credential; the
+ASPSP records the signature alongside the consent so that audit
+reconstruction confirms the customer authorised exactly the
+declared scope and permissions.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Strong Customer Authentication evidence
 
-## §7 Privacy and Security
+Per PSD2 RTS, every payment-initiation and (every 180 days) every
+account-information access flows under SCA evidence:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- `scaId` — URN
+- `consentRef` — consent that this SCA authorised
+- `customerRef` — customer identifier
+- `factors[]` — the two factors used; closed enum drawn from PSD2
+  RTS Article 4: `knowledge` (password, PIN, secret answer),
+  `possession` (mobile device, hardware token, SIM-bound),
+  `inherence` (biometric)
+- `factorEvidence[]` — per factor: factor type, evidence reference
+  (e.g., FIDO2 assertion ID for inherence/possession, OTP submission
+  hash for possession-via-OTP)
+- `dynamicLinking` — per Article 5: structured fields binding the
+  authentication to the specific transaction (amount, payee) so a
+  replay against a different transaction fails
+- `scaTimestamp` — RFC 3339 with offset
 
-## §8 Open Governance
+Decoupled-authentication evidence (the customer authenticates on a
+separate channel, e.g., banking app push notification) carries a
+`decoupledChannelRef` field naming the channel.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `open-banking` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Account-information access record
+
+For each AIS API call:
+
+- `accessId` — URN
+- `consentRef` — consent
+- `tppRef` — TPP making the call
+- `requestedResources[]` — per-resource access (Account,
+  Transaction, Balance, etc.)
+- `accessTimestamp` — RFC 3339 with offset
+
+The boundary applies the consent's permission gate before
+returning data; resources outside the consent's permissions are
+silently filtered (the ASPSP MUST NOT signal the existence of
+unconsented data).
+
+## §6 Payment-initiation record
+
+A payment initiation carries:
+
+- `pisId` — URN
+- `consentRef` — consent (PIS scope)
+- `paymentInstruction` — the underlying payment in ISO 20022 pain
+  format (or OBIE OBWriteDomesticConsent / OBWriteDomesticScheduledConsent
+  / OBWriteInternationalConsent for UK)
+- `risk` — risk-information block (per OBIE: PaymentContextCode,
+  MerchantCategoryCode, MerchantCustomerIdentification,
+  DeliveryAddress for goods-delivery)
+- `confirmationOfFundsRef` — (optional) reference to a CoF response
+- `executionDateTime` — RFC 3339 with offset
+
+The ASPSP routes the underlying instruction into the relevant
+clearing rail (WIA-payment-system) and returns the resulting UETR
+back to the PISP for status query.
+
+## §7 Funds-confirmation record
+
+A CBPII (or PISP performing pre-execution check) requests funds
+confirmation:
+
+- `cofId` — URN
+- `consentRef` — consent (CoF scope)
+- `instructedAmount` — currency + amount
+- `availability` — `available` or `not-available`
+- `cofTimestamp` — RFC 3339 with offset
+
+CoF responses are *binary*: the ASPSP MUST NOT return the actual
+balance. PSD2 RTS limits CoF responses to a yes/no answer.
+
+## §8 Korean MyData specifics
+
+For KR 마이데이터 deployments, the consent record carries
+KFSC MyData-specific fields:
+
+- `transmissionPurpose` — closed enum per KFSC Standard API
+  (e.g., `이체-마이데이터`, `자산조회-마이데이터`, `종합자산관리`)
+- `dataItems[]` — per-data-item permissions drawn from KFSC's
+  data-item catalogue
+- `dataPeriod` — per-data-item period (e.g., 1 year for transaction
+  history)
+- `정보주체동의서명` — customer's signed consent receipt per KFSC
+  template
+- `상호인증서` — cross-authentication certificate per KFSC PKI
+
+KR consents have shorter default expiry windows (90 days) than EU
+(180 days) per FSC guidance.
+
+## §9 Notification record
+
+Asynchronous notifications (consent revoked, transaction status
+updated, fraud-flag promoted) flow as signed records to the TPP's
+webhook:
+
+- `notificationId` — URN
+- `notificationType` — closed enum
+- `subjectRef` — the consent / transaction / flag the notification
+  is about
+- `notificationTimestamp` — RFC 3339 with offset
+- `signature` — JWS by the ASPSP
+
+The TPP acknowledges receipt; un-acknowledged notifications retry
+per the deployment's retry budget. Notifications are a one-way
+event stream from ASPSP to TPP; the TPP does not write back over
+the notification channel.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked example: AIS consent (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+A fully populated UK OBIE-style AIS consent record:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+```json
+{
+  "consentId": "urn:wia:ob:consent:aspsp-bank-uk:c-91a7-2026-04-27",
+  "customerRef": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e",
+  "tppRef": "urn:wia:ob:tpp:fca-uk:tpp-7e2c",
+  "aspsRef": "urn:wia:ob:aspsp:obie:bank-uk-001",
+  "consentScope": "account-information",
+  "permissions": [
+    "ReadAccountsBasic", "ReadAccountsDetail",
+    "ReadBalances",
+    "ReadTransactionsBasic", "ReadTransactionsDetail", "ReadTransactionsCredits", "ReadTransactionsDebits",
+    "ReadStandingOrdersBasic", "ReadDirectDebits"
+  ],
+  "transactionFromDateTime": "2025-10-27T00:00:00Z",
+  "transactionToDateTime": "2026-04-27T23:59:59Z",
+  "expirationDateTime": "2026-10-24T23:59:59Z",
+  "authorisedAt": "2026-04-27T09:15:00+01:00",
+  "policy": "https://bank-uk.example/privacy/openbanking-2026",
+  "regime": "UK-OBIE-v3.1.10"
+}
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The consent is signed by the customer's SCA-bound credential (FIDO2
+inherence + possession). The signature is held alongside the
+consent record so audit reconstruction confirms exactly which
+permissions were authorised at which time.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Conformance disclosure
 
-## Annex F — Adoption Roadmap
+Implementations declare per-section conformance in their published
+capability document. Sections marked `partial` reference the
+deployment policy explaining the gap; `excluded` carries a
+justification citing the controlling jurisdiction's allowance. A
+deployment that is `partial` or `excluded` on §3 (Consent), §4
+(SCA), §6 (Payment initiation), §7 (Funds confirmation), or §8
+(Korean MyData specifics, when applicable) is non-conformant
+overall.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Cross-domain references (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Reference                 | Use site                                                    |
+|---------------------------|-------------------------------------------------------------|
+| WIA-payment-system        | clearing handoff for PIS-initiated payments                 |
+| WIA-mobile-payment        | wallet-bound SCA via FIDO2/WebAuthn                          |
+| WIA-medical-data-privacy  | medical-bill PIS payments referencing patient consent        |
+| WIA-insurtech             | insurance-premium PIS subscription payments                  |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The boundary verifies the cross-domain reference exists at the
+referenced standard's boundary before delivery.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex D — Versioning and deprecation (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+Versioning follows Semantic Versioning 2.0.0. Each regime's API
+profile (OBIE v3.1.x, Berlin Group XS2A, KFSC MyData v1.x) bumps
+independently from this PHASE; the deployment policy maps each
+PHASE version to the regime profile it honours so TPPs know
+what to expect. Deprecation enters a 12-month sunset window with
+migration notes recorded in the audit chain.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex E — Per-regime consent windows (informative)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+| Regime               | AIS consent default expiry | PIS authorisation lifetime           | Re-confirmation cadence      |
+|----------------------|----------------------------|--------------------------------------|------------------------------|
+| EU PSD2              | 180 days max (RTS 36(3))   | per-instruction (single-use unless multi-PIS) | every 180 days for AIS |
+| UK OBIE              | 90 days SCA cycle           | per-instruction or recurring         | every 90 days SCA-renewal    |
+| KR 마이데이터         | 90 days default             | per-instruction                      | every 90 days re-consent     |
+| BR Open Finance      | 12 months max               | per-instruction                      | per-instruction SCA          |
+| AU CDR               | 12 months max               | n/a (data sharing only)              | per-CDR rules                |
+| JP JBA Standard API  | per scheme                  | per-instruction                      | per JBA guideline             |
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Deployments operating in multiple regimes hold separate consent
+records per regime; cross-regime consent merging is explicitly
+out of scope.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Cross-regime mapping (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+| WIA term              | EU PSD2 / Berlin Group       | UK OBIE                              | KR 마이데이터              |
+|-----------------------|------------------------------|--------------------------------------|----------------------------|
+| TPP                   | TPP (AISP/PISP/CBPII)        | TPP (AISP/PISP/CBPII)                | 본인신용정보관리회사       |
+| ASPSP                 | ASPSP                        | ASPSP                                | 정보제공자 (financial institution) |
+| Consent               | Consent                      | Consent (OBWriteConsent)             | 본인동의서                 |
+| SCA                   | SCA (RTS Art. 4)             | SCA                                  | 강한 인증 (간편인증 / 공동인증서) |
+| eIDAS QWAC            | required for mTLS            | required for mTLS                    | 상호인증서                 |
+| eIDAS QSealC          | required for body-signing    | required for body-signing            | n/a (별도 서명체계)         |
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex G — Notification fidelity
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Notification records reflect the ASPSP's view of the subject (consent or transaction). Discrepancies between notification and canonical record indicate either an ASPSP-side bug or a delivery-injection attack; reconciliation surfaces the divergence.

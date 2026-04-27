@@ -5,237 +5,356 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-industrial-iot (Industrial Iot).
+This document defines the canonical data-format layer for
+WIA-industrial-iot. The standard covers data exchange among the
+entities that operate Industrial Internet of Things (IIoT)
+deployments: shop-floor sensors and actuators, edge gateways,
+historians, supervisory control and data acquisition (SCADA)
+systems, manufacturing execution systems (MES), enterprise
+resource planning (ERP) systems, asset performance management
+(APM) services, and the regulators and certifying bodies that
+inspect industrial deployments. The format captures device
+identity and capability descriptions, time-series telemetry,
+asset hierarchies, control-loop configuration, alarm and event
+records, lifecycle and maintenance evidence, and the
+cybersecurity posture of the deployment.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 17025:2017 (testing and calibration laboratories — used
+  for instrument calibration)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27019:2024 (information security controls for energy
+  utilities)
+- ISO/IEC 11578 (UUID)
+- ISO 14224:2016 (petroleum, petrochemical and natural-gas
+  industries — collection and exchange of reliability and
+  maintenance data; cited normatively for asset reliability data
+  dictionary)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IEC 61131-3 (programmable controllers — programming languages;
+  cited normatively for control-language data types)
+- IEC 62264 (enterprise-control system integration — ISA-95;
+  cited normatively for asset-hierarchy and operations data
+  exchange)
+- IEC 62443 (security for industrial automation and control
+  systems; cited normatively for cybersecurity zones, conduits,
+  and security levels)
+- IEC 61850 (communication networks for substation automation;
+  cited normatively for power-utility data envelope)
+- OPC Unified Architecture (UA) Specification (OPC 10000-1 et
+  seq.; cited normatively as the dominant industrial data-
+  exchange envelope)
+- W3C XML Schema Definition 1.1 (legacy industrial XML imports)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-industrial-iot
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines persistent shapes for the records that
+flow across the operating life of an IIoT deployment:
+commissioning, run-time telemetry, control-loop tuning,
+alarm/event reporting, maintenance, and decommissioning.
+Implementations covered include:
 
-## §2 Manifest
+- Edge-gateway firmware that aggregates field-bus traffic.
+- Historians and time-series databases that store telemetry.
+- SCADA front-ends that present operator displays.
+- MES and APM services that consume aggregated telemetry.
+- Asset-performance and reliability-engineering teams that
+  produce KPIs from the deployment.
+- ERP integrations that consume material-flow events from the
+  shop floor.
+- Regulators and certifying bodies that audit deployments under
+  IEC 62443 / ISO/IEC 27019 expectations.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "industrial-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Real-time motion-control loops (sub-millisecond closed-loop
+trajectories) and safety-instrumented-system (SIS) bus protocols
+are out of scope; they are covered by adjacent WIA standards.
 
-## §3 Conformance Tiers
+## §2 Site and Asset Hierarchy
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Asset hierarchies follow the IEC 62264 (ISA-95) Site / Area /
+Production-Unit / Work-Cell / Equipment-Module model.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+site:
+  siteId          : string (uuidv7)
+  operatorRef     : string (institutional identifier of the
+                       operating organisation)
+  location        : object (ISO 3166 country code + plant code)
+  isa95Level      : enum ("enterprise" | "site" | "area" |
+                       "production-unit" | "work-cell" |
+                       "equipment-module")
+  parentSiteId    : string (uuidv7; absent for top-level)
+  iec62443Zone    : string (zone identifier per the operator's
+                       IEC 62443 architecture)
+  securityLevel   : enum ("SL-1" | "SL-2" | "SL-3" | "SL-4")
+```
 
-## §4 Discovery
+Sites carry the IEC 62443 zone classification so that downstream
+consumers (regulators, audit tooling, anomaly-detection services)
+know which security level applies to data flowing from the site.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/industrial-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Asset / Device Record
 
-## §5 Time and Identity
+```
+asset:
+  assetId         : string (uuidv7)
+  siteId          : string (uuidv7)
+  assetClass      : enum ("sensor" | "actuator" | "controller-plc" |
+                       "controller-rtu" | "drive" | "motor" |
+                       "valve" | "pump" | "compressor" |
+                       "heat-exchanger" | "robot" |
+                       "vision-system" | "edge-gateway" |
+                       "historian" | "user-defined")
+  manufacturerRef : string (institutional identifier)
+  modelName       : string
+  serialNumber    : string (manufacturer-assigned)
+  firmwareVersion : string (Semantic Versioning 2.0.0)
+  capabilityProfileRef : string (content-addressed URI of the OPC
+                       UA companion-spec or vendor capability
+                       descriptor)
+  iec14224Class   : string (asset class per ISO 14224 dictionary
+                       when applicable; e.g. "centrifugal pump",
+                       "electric-driven compressor")
+  installedAt     : string (ISO 8601 date)
+  decommissionAt  : string (ISO 8601 date; absent for active
+                       assets)
+  serviceTier     : enum ("safety-related" | "production-critical" |
+                       "process-support" | "non-critical")
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Asset records carry both the vendor-supplied identifier (model +
+serial) and the operator-assigned `assetId`; the binding is the
+operator's responsibility and is preserved across vendor handoffs.
 
-## §6 Versioning and Deprecation
+## §4 Telemetry Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+telemetrySample:
+  sampleId        : string (uuidv7)
+  assetId         : string (uuidv7)
+  capturedAt      : string (ISO 8601 / RFC 3339, sub-second
+                       precision)
+  capturedAtSource: enum ("plc-clock" | "edge-gateway-clock" |
+                       "historian-clock" | "synced-time-source")
+  signalRef       : string (signal identifier per the asset's
+                       capability profile)
+  value           : number
+  unit            : string (UCUM-compliant unit code where
+                       available)
+  qualityCode     : enum ("good" | "uncertain-non-specific" |
+                       "uncertain-last-usable-value" |
+                       "bad-not-connected" | "bad-device-failure" |
+                       "bad-out-of-service")
+  serverTimestamp : string (ISO 8601, when the sample reached
+                       the historian)
+```
 
-## §7 Privacy and Security
+Telemetry samples follow OPC UA quality-code semantics so that
+downstream consumers can distinguish good values from values
+emitted under sensor fault. Samples whose `qualityCode` is in the
+`bad-*` family are accepted into the historian for forensic
+reasons but are excluded from KPI computation by default.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Control-Loop Record
 
-## §8 Open Governance
+```
+controlLoop:
+  loopId          : string (uuidv7)
+  siteId          : string (uuidv7)
+  controllerAssetId : string (uuidv7)
+  controlledVariable : string (signal identifier; the process
+                       variable being regulated)
+  manipulatedVariable : string (signal identifier of the
+                       actuator output)
+  setpointSource  : enum ("operator-manual" | "scheduled" |
+                       "cascade-from-supervisor" |
+                       "model-predictive-control" |
+                       "user-defined")
+  controlMode     : enum ("manual" | "auto" | "cascade" |
+                       "remote-output" | "out-of-service")
+  tuningRef       : string (content-addressed URI of the tuning
+                       record; PID gains, deadband, output
+                       limits)
+  iec61131Language : enum ("LD" | "FBD" | "ST" | "IL" | "SFC")
+                       (when the loop is implemented in IEC
+                       61131-3 logic)
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `industrial-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Tuning revisions emit new tuning records; prior tunings remain
+addressable so that retrospective analyses (post-incident review,
+performance benchmarking) can reproduce the loop's behaviour at
+the time of interest.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Alarm and Event Record
 
+```
+alarmEvent:
+  eventId         : string (uuidv7)
+  assetId         : string (uuidv7)
+  occurredAt      : string (ISO 8601 / RFC 3339)
+  category        : enum ("process-alarm" | "diagnostic-alarm" |
+                       "communication-alarm" | "security-alarm" |
+                       "operator-action" | "system-event")
+  priority        : integer (1-4 per ISA-18.2 priority levels;
+                       1 highest)
+  description     : string (operator-readable text)
+  relatedSignalRef: string (signal identifier when applicable)
+  acknowledgedAt  : string (ISO 8601; absent until acknowledged)
+  clearedAt       : string (ISO 8601; absent until cleared)
+  operatorRef     : string (acknowledging operator's institutional
+                       identifier; absent until acknowledged)
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Alarm and event records retain indefinitely for safety-related
+assets per the operator's records-retention policy in PHASE-3.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §7 Maintenance and Reliability Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+maintenance:
+  recordId        : string (uuidv7)
+  assetId         : string (uuidv7)
+  performedAt     : string (ISO 8601)
+  category        : enum ("preventive-scheduled" |
+                       "predictive-condition-based" |
+                       "corrective-emergency" |
+                       "corrective-deferred" |
+                       "calibration-iso-17025")
+  iec14224Failure : string (ISO 14224 failure-mechanism code when
+                       category is corrective-emergency or
+                       corrective-deferred)
+  technicianRef   : string (institutional identifier; PII held
+                       in operator HR system)
+  workOrderRef    : string (CMMS work-order reference)
+  partsConsumed   : array of PartConsumption
+  durationMinutes : integer
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Cybersecurity Posture Record
 
-## Annex F — Adoption Roadmap
+The site's cybersecurity posture is recorded at the level the
+IEC 62443 architecture dictates: zone definitions, conduit
+definitions between zones, security levels, and the controls in
+force.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+cyberPosture:
+  postureId       : string (uuidv7)
+  siteId          : string (uuidv7)
+  zones           : array of ZoneDefinition (per IEC 62443)
+  conduits        : array of ConduitDefinition
+  controlsInForce : array of string (control identifiers from
+                       IEC 62443-3-3)
+  lastReviewedAt  : string (ISO 8601)
+  reviewerRef     : string (operator security officer or external
+                       certifying body identifier)
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Production Order and Material Traceability Record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+ERP integrations consume production orders that link enterprise-
+level demand to shop-floor execution. Material traceability binds
+input-lot identifiers to output-lot identifiers so that recall
+events can resolve from finished goods back to source material.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+productionOrder:
+  orderId         : string (uuidv7)
+  siteId          : string (uuidv7)
+  erpReference    : string (ERP-side order identifier)
+  releasedAt      : string (ISO 8601)
+  scheduledStart  : string (ISO 8601)
+  workCellAssetId : string (uuidv7; references the work cell)
+  recipeRef       : string (content-addressed URI of the master
+                       batch recipe)
+  inputLots       : array of LotReference
+  outputLots      : array of LotReference
+  status          : enum ("released" | "started" | "in-progress" |
+                       "complete" | "scrapped" | "on-hold")
 
-## Annex G — Test Vectors and Conformance Evidence
+LotReference:
+  lotId           : string
+  materialCode    : string
+  quantity        : number
+  unit            : string (UCUM)
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Material traceability records preserve the binding from input lot
+to output lot for the period the operating jurisdiction's product-
+liability law requires (typically the longer of product expected
+service life plus 10 years, or the regulator's required window).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Energy and Sustainability Telemetry
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Many industrial deployments report energy consumption and
+emissions telemetry alongside production telemetry to support the
+operator's ISO 14001-aligned environmental management and any
+applicable greenhouse-gas reporting obligations.
 
-## Annex H — Versioning and Deprecation Policy
+```
+energySample:
+  sampleId        : string (uuidv7)
+  siteId          : string (uuidv7)
+  capturedAt      : string (ISO 8601)
+  intervalDurationS : integer
+  electricityKwh  : number
+  thermalEnergyKwh : number (heating / cooling consumption when
+                       metered)
+  fuelConsumption : object (per-fuel volumes; e.g. natural gas in
+                       cubic metres, diesel in litres)
+  scope1Tco2e     : number (direct emissions, when reportable)
+  scope2Tco2e     : number (indirect electricity emissions)
+  meterRef        : string (asset identifier of the meter that
+                       produced the reading)
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Energy and sustainability records are subject to the same
+historian retention and time-synchronisation rules as process
+telemetry.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §11 Configuration Snapshot Record
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Per-asset configuration snapshots capture the full configurable
+state of a controller, drive, or edge gateway at a point in
+time. Snapshots are content-addressed so that configuration
+changes can be audited end-to-end.
 
-## Annex I — Interoperability Profiles
+```
+configurationSnapshot:
+  snapshotId      : string (uuidv7)
+  assetId         : string (uuidv7)
+  capturedAt      : string (ISO 8601 / RFC 3339)
+  artefactRef     : string (content-addressed URI of the
+                       configuration export)
+  artefactDigest  : string (SHA-256)
+  changedFromSnapshotId : string (uuidv7; absent for the first
+                       snapshot)
+  changeReasonRef : string (URI of the change-control record)
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Snapshots are emitted at every commissioning, every firmware
+update, every loop tuning revision, and on a calendar cadence
+(typically weekly or monthly) so that drift between intentional
+changes is observable.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §12 Conformance
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every operating site and honour the
+content-addressing rules in §3-§9.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-industrial-iot
+- **Last Updated:** 2026-04-27

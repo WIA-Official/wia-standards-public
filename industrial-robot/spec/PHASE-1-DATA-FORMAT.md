@@ -5,237 +5,357 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-industrial-robot (Industrial Robot).
+This document defines the canonical data-format layer for
+WIA-industrial-robot. The standard covers data exchange among
+the entities that operate articulated, SCARA, parallel, gantry,
+and collaborative industrial robots: robot vendors, system
+integrators, operating organisations (factory, warehouse,
+laboratory), safety-engineering teams, and the regulators and
+certifying bodies that inspect robotic deployments. The format
+captures robot identity and kinematic configuration, work-cell
+layout, programmed task definition, motion telemetry, safety
+configuration (functional-safety zones, speed and separation
+monitoring), safety incidents, maintenance, and the
+cybersecurity posture appropriate to ISO/IEC TR 22100-5 and
+ISO 10218 expectations.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 17025:2017 (testing and calibration laboratories — for
+  joint repeatability, accuracy, and TCP calibration)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 11578 (UUID)
+- ISO 9283:1998 (manipulating industrial robots — performance
+  criteria and related test methods)
+- ISO 9787:2013 (manipulating industrial robots — coordinate
+  systems and motion nomenclatures)
+- ISO 10218-1:2011 / ISO 10218-2:2011 (robots and robotic devices
+  — safety requirements; cited normatively)
+- ISO/TS 15066:2016 (robots and robotic devices — collaborative
+  robots; cited normatively for collaborative-operation
+  requirements including biomechanical limits)
+- ISO 8373:2021 (robotics — vocabulary)
+- ISO/IEC TR 22100-5 (cybersecurity considerations for industrial
+  machinery; cited normatively)
+- ISO 13482:2014 (robots and robotic devices — safety
+  requirements for personal-care robots; cited normatively when
+  the deployment crosses into personal-care contexts)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- IEC 61131-3 (PLC programming languages)
+- IEC 61784-3 (functional-safety field-bus profiles)
+- IEC 62061 (functional safety of safety-related electrical /
+  electronic / programmable electronic control systems)
+- OPC UA Robotics Companion Specification (cited as the
+  preferred OPC UA envelope for industrial-robot data)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-industrial-robot
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines persistent shapes for the records that
+flow across the operating life of an industrial-robot deployment:
+from kinematic identification at commissioning, through programmed
+task execution and motion telemetry, to incident response,
+maintenance, and decommissioning. Implementations covered include:
 
-## §2 Manifest
+- Robot controllers running vendor firmware.
+- Work-cell PLCs that orchestrate robot, conveyor, and
+  peripheral equipment.
+- Collaborative-robot deployments where humans and robots share
+  workspace under ISO/TS 15066 expectations.
+- Robotic-cell programmers and integrators.
+- Safety-engineering teams that perform task-based risk
+  assessments and configure safety functions.
+- Maintenance and reliability engineers.
+- Regulators and certifying bodies that audit deployments under
+  ISO 10218 / ISO/TS 15066.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "industrial-robot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Surgical robots, autonomous mobile robots (AMRs) operating in
+unstructured environments, and exoskeletons fall under adjacent
+WIA standards.
 
-## §3 Conformance Tiers
+## §2 Robot Identity Record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Each industrial robot carries a stable identifier and the
+kinematic, dynamic, and reach descriptors needed by integrators
+and safety engineers.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+robot:
+  robotId         : string (uuidv7)
+  siteRef         : string (operating site identifier; references
+                       the deployment site)
+  vendorRef       : string (institutional identifier of the
+                       robot vendor)
+  modelName       : string
+  serialNumber    : string (manufacturer-assigned)
+  controllerFirmwareVersion : string (Semantic Versioning 2.0.0)
+  iso8373Class    : enum ("articulated" | "SCARA" |
+                       "parallel-delta" | "cartesian-gantry" |
+                       "cylindrical" | "spherical" |
+                       "collaborative-articulated" |
+                       "collaborative-SCARA")
+  payloadKg       : number (rated payload at full reach)
+  reachMillimetres : integer (maximum reach to wrist)
+  axesCount       : integer (degrees of freedom; typically 6 for
+                       articulated, 4 for SCARA)
+  repeatabilityMm : number (per ISO 9283 RP test conditions)
+  protectionRating : string (IP code per the relevant IEC
+                       protection-class standard)
+```
 
-## §4 Discovery
+The kinematic descriptor is published by the vendor as a
+content-addressed companion document referenced from the robot
+record; integrators consume the kinematic descriptor when
+programming the robot's offline path planning.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/industrial-robot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Work-Cell Layout
 
-## §5 Time and Identity
+```
+workCell:
+  cellId          : string (uuidv7)
+  siteRef         : string
+  robotRefs       : array of string (robotId list)
+  peripheralAssetRefs : array of string (conveyors, vision
+                       systems, end-effectors, tool changers)
+  cellLayoutRef   : string (content-addressed URI of the layout
+                       drawing — typically a STEP / SAT / IGES
+                       file with workspace boundaries)
+  iso10218SafetyClass : enum ("supervised-stop" |
+                       "hand-guiding" |
+                       "speed-and-separation-monitoring" |
+                       "power-and-force-limiting")
+  collaborativeOperation : boolean (true when the cell operates
+                       under ISO/TS 15066 collaborative modes)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+`iso10218SafetyClass` selects the collaborative mode the cell is
+allowed to use; transitions between modes follow the safety-
+engineering matrix defined in PHASE-3.
 
-## §6 Versioning and Deprecation
+## §4 Programmed Task Record
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+task:
+  taskId          : string (uuidv7)
+  cellId          : string (uuidv7)
+  taskKind        : enum ("pick-and-place" | "welding" |
+                       "painting" | "assembly" | "machine-
+                       tending" | "palletising" | "deburring" |
+                       "vision-guided-pick" | "force-controlled-
+                       insertion" | "human-collaboration" |
+                       "user-defined")
+  programArtefactRef : string (content-addressed URI of the
+                       programmed task file in the vendor's
+                       native format)
+  cycleTimeBudgetSec : number (planned cycle-time budget per
+                       task instance)
+  toolingRef      : string (end-effector identifier)
+```
 
-## §7 Privacy and Security
+Programmed tasks carry their content-address so that retrospective
+review can reproduce the program that was running at any given
+time.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Motion Telemetry Record
 
-## §8 Open Governance
+Motion telemetry samples the joint-space and Cartesian-space
+state at the operator's chosen cadence. The cadence is bounded
+above by the controller's bus rate and below by the operator's
+forensic-history requirement.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `industrial-robot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+motionSample:
+  sampleId        : string (uuidv7)
+  robotId         : string (uuidv7)
+  capturedAt      : string (ISO 8601 / RFC 3339, sub-millisecond
+                       precision)
+  jointPositionsRad : array of number (per-axis position in
+                       radians, ordered per ISO 9787 base-to-
+                       wrist convention)
+  jointVelocitiesRadPerS : array of number
+  jointTorquesNm  : array of number
+  tcpPositionMm   : array of number (X, Y, Z in millimetres,
+                       cell-frame)
+  tcpOrientationQuat : array of number (quaternion W X Y Z)
+  tcpForceN       : array of number (Fx, Fy, Fz when force-torque
+                       sensing is fitted)
+  tcpTorqueNm     : array of number (Tx, Ty, Tz)
+  taskRef         : string (taskId; absent during teach-mode)
+  programLine     : integer (current line in the programmed task)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Programmes that publish externally cited motion-quality KPIs
+include the underlying motion samples in the evidence package so
+that downstream consumers can recompute the KPIs.
 
+## §6 Safety Configuration Record
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+safetyConfiguration:
+  configId        : string (uuidv7)
+  cellId          : string (uuidv7)
+  safetyZones     : array of SafetyZone
+  speedLimits     : array of SpeedLimit
+  separationMonitoring : object (per ISO/TS 15066 §5.5.4
+                       speed-and-separation thresholds)
+  powerForceLimits : object (per ISO/TS 15066 Annex A
+                       biomechanical limits)
+  fieldBusProfile : enum ("PROFISafe" | "FSoE" | "CIPSafety" |
+                       "SafetyOverEthernet-equivalent" |
+                       "user-defined")
+  iec62061SilLevel : enum ("SIL-1" | "SIL-2" | "SIL-3")
+  iso13849PerformanceLevel : enum ("PL-a" | "PL-b" | "PL-c" |
+                       "PL-d" | "PL-e")
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+Safety configurations are revised through controlled change
+(PHASE-3 §5); prior configurations remain addressable.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Safety Incident Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Collisions, e-stops, light-curtain breaches, and collaborative-
+mode biomechanical-limit exceedances are recorded as safety
+incidents. Records carry the reconstruction window of motion
+samples that surround the incident so that retrospective analyses
+can recover the joint trajectory.
 
-## Annex F — Adoption Roadmap
+```
+safetyIncident:
+  incidentId      : string (uuidv7)
+  cellId          : string (uuidv7)
+  occurredAt      : string (ISO 8601 / RFC 3339)
+  category        : enum ("e-stop-press" | "light-curtain-breach"
+                       | "speed-limit-exceedance" |
+                       "force-limit-exceedance" |
+                       "separation-violation" |
+                       "operator-injury" |
+                       "robot-self-collision" |
+                       "external-collision" |
+                       "tool-failure")
+  severity        : enum ("near-miss" | "minor-injury" |
+                       "major-injury" | "fatality")
+  reconstructionWindowMs : integer (motion-sample window captured
+                       for the incident, typically 1000-5000 ms
+                       around `occurredAt`)
+  reportedToAuthorityRef : string (regulator report reference;
+                       opaque)
+  rootCauseRef    : string (URI of the root-cause investigation)
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Incidents of `severity` ≥ `major-injury` MUST be reported to the
+relevant occupational-safety authority within the period the
+authority requires.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Maintenance Record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+maintenance:
+  recordId        : string (uuidv7)
+  robotId         : string (uuidv7)
+  performedAt     : string (ISO 8601)
+  category        : enum ("preventive-scheduled" |
+                       "predictive-condition-based" |
+                       "corrective-emergency" |
+                       "calibration-tcp" |
+                       "calibration-iso-9283" |
+                       "joint-encoder-replacement" |
+                       "harmonic-drive-replacement" |
+                       "controller-firmware-update")
+  technicianRef   : string (institutional identifier)
+  workOrderRef    : string (CMMS work-order reference)
+  partsConsumed   : array of PartConsumption
+  durationMinutes : integer
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Cybersecurity Posture Record
 
-## Annex G — Test Vectors and Conformance Evidence
+The work-cell's cybersecurity posture per ISO/IEC TR 22100-5 and
+IEC 62443 is recorded so that downstream consumers can verify the
+deployment's security level alongside its safety configuration.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+cyberPosture:
+  postureId       : string (uuidv7)
+  cellId          : string (uuidv7)
+  iec62443Zone    : string
+  controlsInForce : array of string
+  lastReviewedAt  : string (ISO 8601)
+  reviewerRef     : string
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 End-Effector and Tool Record
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+End-effectors (grippers, welding torches, paint applicators,
+force-torque-wrist sensors, screwdriver tools, vacuum cups) are
+catalogued separately from the robot record because end-
+effectors swap independently of the host robot.
 
-## Annex H — Versioning and Deprecation Policy
+```
+endEffector:
+  effectorId      : string (uuidv7)
+  vendorRef       : string (institutional identifier)
+  modelName       : string
+  serialNumber    : string
+  effectorClass   : enum ("two-finger-gripper" |
+                       "three-finger-gripper" |
+                       "vacuum-cup" | "magnetic" |
+                       "welding-torch" | "paint-applicator" |
+                       "force-torque-wrist" | "screwdriver" |
+                       "deburring-tool" | "tool-changer" |
+                       "user-defined")
+  payloadKgAtTcp  : number (rated payload referenced to the TCP
+                       offset)
+  toolCenterPointMm : array of number (X, Y, Z offset from the
+                       robot wrist mounting flange)
+  toolCenterPointOrientationDeg : array of number (RX, RY, RZ
+                       Euler angles relative to the wrist frame)
+  payloadInertiaKgm2 : array of number (Ixx, Iyy, Izz, Ixy,
+                       Ixz, Iyz)
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+End-effector swap events are recorded under maintenance (PHASE-1
+§8) so that cycle-time and incident records can be correlated to
+the active end-effector at the time.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §11 Vision-System Binding (Optional)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Cells that include vision-guided tasks bind a vision-system
+asset to the robot record so that the calibration between
+camera frame and robot base frame is auditable.
 
-## Annex I — Interoperability Profiles
+```
+visionBinding:
+  bindingId       : string (uuidv7)
+  robotId         : string (uuidv7)
+  visionAssetId   : string (uuidv7)
+  calibrationRef  : string (content-addressed URI of the hand-
+                       eye / hand-camera calibration result)
+  reprojectionErrorPx : number (RMS reprojection error per the
+                       calibration report)
+  validatedAt     : string (ISO 8601 / RFC 3339)
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Vision-system recalibration events (after camera replacement,
+camera-bracket impact, or scheduled cadence) emit new bindings;
+prior bindings remain addressable for retrospective analysis of
+vision-related incidents.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §12 Conformance
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every operating cell and honour the
+content-addressing rules in §3-§9.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-industrial-robot
+- **Last Updated:** 2026-04-27
