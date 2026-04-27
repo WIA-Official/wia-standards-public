@@ -5,237 +5,314 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-infrastructure-monitoring (Infrastructure Monitoring).
+This document defines the HTTP API contract that an accredited
+infrastructure-monitoring operator exposes for the records defined
+in PHASE-1. Consumers include asset owners receiving monitoring
+status, SHM contractors authoring sensor and analysis records,
+calibration laboratories binding ISO/IEC 17025 certificates to
+sensors, post-event responders pulling captured windows, regulators
+reviewing dam-safety or bridge-safety monitoring evidence, and
+citation tools that resolve published monitoring reports to their
+underlying records.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics) / 9111 (HTTP Caching) /
+  9457 (Problem Details) / 6901 / 6902 / 8288 (Web Linking) /
+  8259 (JSON) / 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO 13822 (assessment of existing structures)
+- ISO 16587 (SHM performance parameters)
+- ISO 4866 (vibration of fixed structures)
+- IEEE 1451 (smart-transducer interface)
+- OGC SensorThings API 1.1
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-infrastructure-monitoring
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the operator.
+Versioning uses `/v1/` path segments and Semantic Versioning
+2.0.0. The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical.
 
-## §2 Manifest
+The API is a control-plane and metadata facade; bulk raw-sample
+data flows over the operator's archive (referenced by the
+`archivalContentAddress` field in PHASE-1 §6) — the API
+*describes* the sample windows but does not stream the bulk
+samples themselves.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "infrastructure-monitoring"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-infrastructure-monitoring",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "sensors":           "/v1/sensors",
+    "mountings":         "/v1/mountings",
+    "calibrations":      "/v1/calibrations",
+    "timeSyncs":         "/v1/time-syncs",
+    "sampleWindows":     "/v1/sample-windows",
+    "derivedMetrics":    "/v1/derived-metrics",
+    "thresholdBreaches": "/v1/threshold-breaches",
+    "alerts":            "/v1/alerts",
+    "postEventCaptures": "/v1/post-event-captures",
+    "evidence":          "/v1/evidence",
+    "openapi":           "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Sensor Endpoints
 
-## §4 Discovery
+```
+POST   /v1/sensors                  — register a sensor
+GET    /v1/sensors/{sid}            — retrieve sensor record
+PATCH  /v1/sensors/{sid}/sensitivity — replace sensitivity (must
+                                       cite calibrationId)
+DELETE /v1/sensors/{sid}            — initiate decommissioning
+GET    /v1/sensors/{sid}/timeline   — chronological timeline of
+                                       commissioning, calibration,
+                                       remount, post-event capture,
+                                       decommissioning
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/infrastructure-monitoring`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Sensor sensitivity updates that do not cite a calibration record
+return `422` with type
+`urn:wia:infrastructure-monitoring:calibration-required`.
 
-## §5 Time and Identity
+## §4 Mounting Endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/sensors/{sid}/mountings   — register a mounting
+GET    /v1/mountings/{mid}           — retrieve mounting record
+PATCH  /v1/mountings/{mid}/remount   — replace mounting; emits
+                                        successor record
+GET    /v1/sensors/{sid}/mountings?at={iso8601}
+                                     — resolve mounting as of a
+                                       given date
+```
 
-## §6 Versioning and Deprecation
+The "as-of" query is critical for historical sample windows:
+samples that were recorded before a remount must resolve to the
+mounting that produced them.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Calibration Endpoints
 
-## §7 Privacy and Security
+```
+POST   /v1/sensors/{sid}/calibrations    — register a calibration
+GET    /v1/calibrations/{cid}             — retrieve calibration
+PATCH  /v1/calibrations/{cid}/revoke      — revoke calibration;
+                                            emits successor with
+                                            stated revocation
+                                            reason
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Calibration submissions whose `traceabilityRef` does not resolve
+to a recognised national metrology institute (KRISS, NIST, NPL,
+PTB, or BIPM-equivalent) return `422` with type
+`urn:wia:infrastructure-monitoring:traceability-unresolved`.
 
-## §8 Open Governance
+## §6 Time-Sync Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `infrastructure-monitoring` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/sensors/{sid}/time-syncs        — register a sync
+                                              binding observation
+GET    /v1/time-syncs/{tsid}                — retrieve binding
+GET    /v1/sensors/{sid}/time-syncs?from={iso8601}
+                                            — query a sync history
+                                              window
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Time-sync observations whose `observedSkewMs` exceeds the per-
+sensor budget (operator-declared in the procedure register) emit
+priority-1 events on the operator's event stream.
 
+## §7 Sample-Window Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/sensors/{sid}/sample-windows   — register a sample
+                                             window envelope
+GET    /v1/sample-windows/{wid}           — retrieve envelope
+GET    /v1/sample-windows/{wid}/archive   — resolve to the bulk-
+                                             sample archive
+                                             content-address
+PATCH  /v1/sample-windows/{wid}/correction — register a clock-
+                                             skew correction or
+                                             re-windowing; emits
+                                             successor envelope
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Sample-window submissions whose `samplingRateHz` is below the
+sensor's procedure-register minimum (e.g. an accelerometer
+sampled below 100 Hz when the procedure mandates 1 kHz) return
+`422` with type
+`urn:wia:infrastructure-monitoring:sampling-rate-below-procedure`.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Derived-Metric Endpoints
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/derived-metrics                 — register a derived
+                                              metric value
+GET    /v1/derived-metrics/{dmid}          — retrieve metric
+GET    /v1/derived-metrics?sensorId={sid}&from={iso8601}
+                                            — query a metric
+                                              series for a sensor
+```
 
-## Annex F — Adoption Roadmap
+Re-derivation of a metric (e.g. the natural-frequency estimate
+re-computed under an updated modal-analysis pipeline) emits a
+successor metric record with `predecessor` set; the prior
+record remains addressable for citation purposes.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Threshold-Breach and Alert Endpoints
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST   /v1/threshold-breaches              — register a breach
+GET    /v1/threshold-breaches/{bid}        — retrieve breach
+PATCH  /v1/threshold-breaches/{bid}/end    — record breach end
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+POST   /v1/alerts                          — register an alert
+GET    /v1/alerts/{aid}                    — retrieve alert
+PATCH  /v1/alerts/{aid}/acknowledge        — acknowledge
+PATCH  /v1/alerts/{aid}/resolve            — resolve
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Alert acknowledgement and resolution emit audit events; the
+operator's incident-response procedure register specifies the
+maximum acknowledgement latency per severity class, and the API
+emits priority-1 events when acknowledgement deadlines lapse.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Post-Event Capture Endpoints
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+POST   /v1/post-event-captures             — register a capture
+GET    /v1/post-event-captures/{cid}       — retrieve capture
+GET    /v1/post-event-captures?eventRef={ref}
+                                            — find captures by
+                                              triggering event
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Post-event captures bind a triggering event reference (national
+seismic-network event ID, NWS storm ID, owner incident ID) to
+the set of sensor windows captured during the response so that
+post-event analyses resolve to the canonical captured set.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §11 Evidence Package
 
-## Annex H — Versioning and Deprecation Policy
+```
+POST   /v1/sensors/{sid}/evidence          — request evidence
+                                              package generation
+GET    /v1/evidence/{packageId}            — retrieve package
+GET    /v1/evidence/{packageId}/manifest   — manifest only
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The evidence-package format is governed by PHASE-4 §3 and contains
+the sensor record, the mounting history, the calibration chain,
+the time-sync history, sample-window envelopes, derived-metric
+series, threshold breaches and alerts, post-event captures, and
+the signed manifest.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §12 Errors
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+All error responses are `application/problem+json` per RFC 9457.
+Defined types include:
 
-## Annex I — Interoperability Profiles
+- `urn:wia:infrastructure-monitoring:calibration-required`
+- `urn:wia:infrastructure-monitoring:traceability-unresolved`
+- `urn:wia:infrastructure-monitoring:sampling-rate-below-procedure`
+- `urn:wia:infrastructure-monitoring:mounting-not-found`
+- `urn:wia:infrastructure-monitoring:evidence-mismatch`
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §13 Authentication
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Mutually-authenticated TLS for all write operations; client
+certificates are scoped to the sensor populations the contractor
+or laboratory operates. Public read-only endpoints (sensor
+catalogue summaries, regulator-published monitoring indices) are
+reachable without a client certificate.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §14 Caching
+
+Stable resources (signed calibrations, completed sample-window
+envelopes, resolved alerts) are cacheable with `Cache-Control:
+max-age=31536000, immutable`. Mutable resources (open alerts,
+in-flight breaches) are cacheable for 60 seconds; ETags are
+mandatory on every PATCH endpoint with `If-Match` conditional
+requests.
+
+## §15 Streaming Subscriptions
+
+Consumers subscribe via Server-Sent Events at
+`/v1/sensors/{sid}/events`. Topics include sample-window
+publication, threshold-breach onset, alert state change, and
+post-event capture publication. Heartbeats every 30 seconds with
+`Last-Event-ID` resume support.
+
+## §16 Bulk Operations
+
+```
+POST   /v1/bulk/sample-windows         — submit envelopes for many
+                                          sensors and windows
+POST   /v1/bulk/derived-metrics        — submit derived metrics
+                                          for a campaign
+GET    /v1/bulk/{operationId}          — operation status
+```
+
+## §17 Provenance
+
+```
+GET    /v1/provenance/{recordId}    — retrieve provenance entry
+                                       for any PHASE-1 record
+```
+
+## §18 Worked Example: Capture and Notify after a Seismic Event
+
+1. Regional seismic network publishes a magnitude-4.6 event near
+   a monitored long-span bridge.
+2. The operator's acquisition system pre-buffers windows for
+   accelerometers and tilt-meters on the bridge; on receipt of
+   the event ID it materialises a post-event capture (PHASE-1
+   §10) covering 30 s pre-event to 5 min post-event.
+3. The acquisition system computes ISO 4866 vibration-severity
+   metrics on the captured windows and registers a derived-
+   metric record per accelerometer.
+4. Threshold breaches at severity `alert` automatically emit
+   alert records and notify the on-call rota.
+5. The asset programme's post-event inspector pulls the
+   captured windows via §10, performs an in-depth inspection
+   per WIA-infrastructure PHASE-1 §5, and records the finding.
+6. The operator's regulator notification intake receives the
+   threshold-breach notification within the regulator's
+   declared latency budget.
+
+## §19 Audit and Observability
+
+Every endpoint emits structured logs with `assetId`, `sensorId`,
+`traceId`, the issuing client certificate's subject, and the
+acquisition unit's clock skew vs the reference sync source.
+Audit logs are immutable and sealed daily into the operator's
+transparency log.
+
+## §20 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI
+3.1 document, and signs evidence packages per RFC 9421.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-infrastructure-monitoring
+- **Last Updated:** 2026-04-28

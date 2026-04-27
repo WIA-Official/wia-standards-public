@@ -5,237 +5,291 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-insurtech (Insurtech).
+This document defines how an accredited insurtech operator
+integrates with the systems that surround it: the prudential
+regulator and the market-conduct regulator; tax authorities
+collecting insurance-premium tax and policyholder protection
+levies; KYC and sanctions-list providers; reinsurer cession
+ledgers; broker and MGA distribution platforms; embedded-
+insurance partners; payment processors; healthcare networks
+(for health and disability lines); telematics providers (for
+auto and freight); fraud bureaux; complaint and ombudsman
+bodies; and long-term archives that hold records beyond the
+operator's wind-down horizon. It also defines the evidence-
+package format that bundles a programme's record set for
+external audit.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- ACORD Reference Architecture (insurance industry data model)
+- IFRS 17 (Insurance Contracts)
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 Prudential Regulator Integration
 
-This PHASE document is one of four that together define the WIA-insurtech
-standard. It addresses the integration layer of the standard.
+The prudential regulator (PRA in the UK, BaFin in Germany, FSC
+in Korea, NAIC-coordinated state regulators in the US, FSC in
+Japan, CIRC in China, and equivalent authorities elsewhere)
+consumes solvency QRTs, capital reports, and ad-hoc supervisory
+data requests. Integration carries the regulator's identifier,
+the per-template submission cadence, the digital-signature
+requirements the regulator applies, and the supervisory
+contact-of-record.
 
-## §2 Manifest
+## §2 Market-Conduct Regulator Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "insurtech"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Market-conduct regulators (FCA in the UK, state insurance
+departments in the US, FSA in Japan, KFSC in Korea, CONSAR in
+Mexico, equivalent bodies elsewhere) consume product filings,
+complaint statistics, and TCF-aligned outcome reports. The
+integration record carries the per-report cadence and the
+prescribed templates that the operator emits.
 
-## §3 Conformance Tiers
+## §3 Tax Authority Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Insurance-premium tax (IPT), state-level surcharges, and
+policyholder protection levies are remitted to tax authorities
+on a periodic basis. The integration carries the authority's
+identifier, the remittance cadence, and the per-line-of-business
+rate schedule that the operator applies at premium-receipt time
+(PHASE-1 §11).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 KYC and Sanctions Provider Integration
 
-## §4 Discovery
+KYC vendors (Onfido, Trulioo, Jumio, Refinitiv, equivalent
+providers) emit signed identity-verification outcomes that the
+operator binds to the party record's KYC state (PHASE-1 §3 /
+PHASE-2 §3). Sanctions-list providers emit periodic list
+refreshes; the operator's sanctions screening sweep runs at the
+cadence the operator declares and emits screening events that
+update the party record's `sanctionsScreenAt`.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/insurtech`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 Reinsurer Ledger Integration
 
-## §5 Time and Identity
+Reinsurer ledgers consume bordereaux at the agreed reporting
+cadence (typically monthly for proportional treaties, quarterly
+for non-proportional treaties, per-event for catastrophe
+treaties). The integration carries the reinsurer's identifier,
+the treaty-side ledger account, and the bordereau dispute-
+resolution path when the reinsurer's reconciliation flags
+discrepancies.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 Distribution Partner Integration (Broker, MGA,
+   Embedded-Insurance, Affinity)
 
-## §6 Versioning and Deprecation
+Distribution partners produce business through the operator's
+quote-and-bind APIs. The integration carries the partner's
+identifier, the per-product binding authority delegated to the
+partner, the commission schedule, and the per-partner consumer-
+disclosure obligations.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Embedded-insurance partners (e.g. retailers selling extended-
+warranty cover at point of sale, mobility platforms selling
+per-trip cover) follow the same integration pattern; the
+embedded context is recorded against each policy so that
+consumer disclosures meet the embedded regulator's enhanced
+expectations where they apply.
 
-## §7 Privacy and Security
+## §7 Payment Processor Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Premium and claim-payment processors (card processors, bank-
+direct-debit operators, payment-rails operators) integrate
+through the operator's treasury system. Integration carries the
+processor's identifier, the per-channel settlement cadence, and
+the chargeback / dispute workflow that the processor honours.
 
-## §8 Open Governance
+## §8 Healthcare Network Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `insurtech` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Health and disability lines integrate with healthcare networks
+(provider directories, claim-adjudication services, EHR
+gateways). The integration follows the local healthcare-data-
+exchange standard (HL7 FHIR R4 / R5 in most jurisdictions) and
+honours the local healthcare-data-protection regime (HIPAA in
+the US, the Personal Health Information Act equivalents
+elsewhere).
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Telematics Provider Integration
 
+Telematics providers (auto-telematics for usage-based insurance,
+freight telematics for cargo cover, IoT-sensor telematics for
+property cover) emit observation feeds that the operator's
+underwriting and claims systems consume. The integration record
+carries the provider's identifier, the per-policy consent the
+consumer has granted, and the operator's data-minimisation
+filter that strips raw observations to the underwriting-relevant
+features.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §10 Fraud Bureau Integration
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+Fraud bureaux (IFB in the UK, NICB and CLUE in the US,
+equivalent bodies elsewhere) consume confirmed-fraud
+notifications and emit fraud-intelligence feeds that the
+operator's SIU consumes. The integration record carries the
+bureau's identifier, the per-record-class submission template,
+and the operator's appeal workflow when a consumer disputes a
+bureau-recorded entry.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Ombudsman and Dispute Resolution Body Integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+External dispute resolution bodies (Financial Ombudsman Service
+in the UK, equivalent bodies in other jurisdictions) consume
+escalated complaints and emit determinations. The integration
+carries the body's identifier, the per-complaint case reference,
+and the operator's compliance workflow when a determination
+requires remediation.
 
-## Annex F — Adoption Roadmap
+## §12 Evidence Package Format
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+evidence/
+  manifest.json                 — package manifest (signed)
+  programme.json                — programme record
+  policies/                     — per-policy record sets,
+                                   including endorsement chains
+  underwriting-decisions/       — decision records and
+                                   rationales
+  claims/                       — per-claim record sets,
+                                   including reserves and
+                                   payment history
+  cessions/                     — per-treaty cession records
+                                   and bordereaux
+  consumer-disclosures/         — per-policy disclosure
+                                   artefacts
+  premium-receipts/             — per-policy receipts and
+                                   IFRS 17 contract-group
+                                   allocations
+  sanctions-screens/            — sanctions-screening sweep
+                                   summaries (no list contents
+                                   reproduced)
+  complaints/                   — complaint records and
+                                   resolutions
+  audit/                        — API audit log excerpts
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The package is content-addressable; the manifest is signed by
+the operator's HTTP-message-signature key (RFC 9421) and
+counter-signed by the operator's chief actuary when the
+package supports a regulator submission.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §13 Manifest and Signatures
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Verification tools recompute file digests, compare to the
+manifest, and reject the package on mismatch with type
+`urn:wia:insurtech:evidence-mismatch`.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §14 well-known URI Discovery
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A conformant operator exposes a discovery document at
+`/.well-known/wia-insurtech` that links to the API root, the
+public licensing summary, the published quality dossier, the
+product register, the consumer claim-service standards, and
+the complaint statistics.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §15 Long-Term Archive Integration
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+Operators designate a long-term archive that holds records
+beyond run-off completion. Quarterly deposits round-trip
+content-addresses; on wind-down completion, remaining records
+transfer to the archive with content-addresses preserved.
 
-## Annex H — Versioning and Deprecation Policy
+## §16 Cross-Standard Linkage
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Operators that consume adjacent WIA standards (clinical-genomics
+for life-underwriting genomic disclosures, intelligent-
+transportation for telematics-driven auto cover, climate-risk
+for catastrophe-bond exposure mapping) emit cross-standard
+linkage records that name the consuming standard and the
+version under which the linkage is claimed.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §17 Verifiable-Credential Re-Issuance (optional)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Operators that wish to expose attestations (regulator licence
+status, ISO 9001 conformance, ISO 22301 business-continuity
+attestation, ISO/IEC 27001 certification) to consumers of W3C
+Verifiable Credentials MAY re-issue the attestations as
+Verifiable Credentials under the Data Model 2.0 specification.
+Re-issuance is optional; the canonical record remains the JSON
+evidence-package manifest.
 
-## Annex I — Interoperability Profiles
+## §18 Streaming Heartbeat
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+SSE subscribers receive a heartbeat every 30 seconds with
+`Last-Event-ID` resume support. Subscribers that disconnect
+during long claim-investigation windows resume from the last
+seen event identifier without losing visibility of priority-1
+events.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §19 Backwards-Compatibility Guarantee
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+PHASE-4 minor revisions remain backwards-compatible with prior-
+minor clients. Major revisions go through a deprecation window
+of at least one full annual reporting cycle so that reinsurer,
+regulator, and broker integrations have time to migrate without
+disrupting in-flight policies.
+
+## §20 Reader Tooling
+
+Operators MAY publish supplementary reader tools (claim-
+timeline views, reserve-development triangles for actuarial
+consumers, complaint-theme dashboards for TCF consumers)
+alongside the canonical evidence package; the tools are
+non-normative.
+
+## §21 Run-Off Operator Successor Integration
+
+When a portfolio transfer moves policies to a successor
+operator under the regulator's portfolio-transfer process
+(PHASE-3 §14), the integration carries the successor's
+identifier, the per-policy transfer audit chain, and the
+recordkeeping continuity arrangement that preserves
+content-addresses across the operator boundary.
+
+## §22 Open-Banking and Aggregator Integration
+
+Operators that consume open-banking aggregator feeds for
+income-verification and direct-debit-mandate integrations
+follow the operating jurisdiction's open-banking specification
+(PSD2 / UK CMA Open Banking / equivalent). The integration
+record carries the aggregator's identifier, the per-policyholder
+consent reference, and the operator's data-minimisation filter
+that retains only the underwriting-relevant signals.
+
+## §23 Identity-Provider Integration for Consumer Self-Service
+
+Consumer-facing portals authenticate consumers through an
+identity provider (the operator's own IdP, or a federated IdP
+under the operator's broker relationship). The integration
+carries the IdP's identifier, the supported authentication
+strengths (per NIST SP 800-63B AAL tiers), and the per-action
+authorisation matrix that maps consumer self-service actions
+to the required AAL.
+
+## §24 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully
+with the prudential regulator, the market-conduct regulator,
+the relevant tax authority, at least one KYC and one sanctions
+provider, at least one reinsurer ledger, at least one
+distribution partner, at least one payment processor, the
+relevant fraud bureau, the relevant ombudsman body, and at
+least one long-term archive, and has published at least one
+externally citable evidence package.
+
+Sunsetting an integration is announced via the well-known
+discovery document at least 90 calendar days before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-insurtech
+- **Last Updated:** 2026-04-28

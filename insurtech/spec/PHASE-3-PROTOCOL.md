@@ -5,237 +5,288 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-insurtech (Insurtech).
+This document defines the protocols that govern an accredited
+insurtech operator: regulator authorisation and prudential
+supervision, product filing and approval, underwriting governance,
+claim handling discipline, anti-fraud governance, consumer
+protection and treating-customers-fairly discipline, reinsurance
+governance, sanctions screening, complaint handling, recordkeeping,
+and operator wind-down or run-off.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 22301:2019 (business continuity management)
+- ISO 31000:2018 (risk management)
+- ISO 37001:2016 (anti-bribery management systems)
+- ISO 19600:2014 / 37301:2021 (compliance management)
+- ISO/IEC 17025:2017 (calibration / testing laboratories,
+  cited where forensic adjusters operate accredited labs)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- IFRS 17 (Insurance Contracts)
+- Solvency II Directive (EU); Insurance Capital Standard (IAIS);
+  RBC frameworks (US, JP, KR, CA)
+- IAIS Insurance Core Principles
+- FATF Recommendations (AML/CFT)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
 
 ---
 
-## §1 Scope
+## §1 Regulator Authorisation
 
-This PHASE document is one of four that together define the WIA-insurtech
-standard. It addresses the protocol layer of the standard.
+An insurer or MGA MAY claim conformance to WIA-insurtech only
+after the prudential regulator (or the relevant licensing
+authority for MGAs) has issued a valid licence covering the
+lines of business the operator writes. Licence amendments are
+recorded against the programme; amendments narrow the lines of
+business the API will accept new policies under.
 
-## §2 Manifest
+## §2 Solvency and Capital
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "insurtech"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Operators report solvency and capital adequacy at the cadence
+the regulator requires (typically quarterly QRTs under Solvency
+II, NAIC RBC filings annually with quarterly supplements, KICS
+filings under the Korean regime). The submission cadence and
+the responsible chief actuary are recorded in the programme's
+quality dossier.
 
-## §3 Conformance Tiers
+Operators that fall below the regulator's solvency capital
+requirement (SCR) trigger the regulator's recovery-plan workflow;
+the recovery plan is recorded against the programme and
+referenced in subsequent regulator submissions.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Product Filing and Approval
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Insurance products are filed with the regulator (or the
+state-level filing authority in the US) before any policy can be
+bound under the product code. The product register holds product
+codes, the regulator filing references, and the policy-form
+references that the product issues. Product withdrawals follow
+the regulator's runoff procedure for in-force policies.
 
-## §4 Discovery
+## §4 Underwriting Governance
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/insurtech`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Underwriting models (rules engines, machine-learning models)
+that influence consumer outcomes (declines, tier shifts, premium
+multipliers) are governed by the operator's model-risk-
+management framework. The framework records:
 
-## §5 Time and Identity
+- model identifier and version,
+- training data lineage (for ML models),
+- monitoring metrics (calibration drift, disparate-impact
+  metrics in jurisdictions that require them),
+- review cadence by the operator's model-risk committee,
+- adverse-action explanation templates that the model emits at
+  decision time (PHASE-1 §7).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Models that fail review enter remediation; declines emitted by
+a model under remediation are routed to human underwriter
+referral.
 
-## §6 Versioning and Deprecation
+## §5 Claim Handling Discipline
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Claims are handled per the operator's published claim-service
+standards: acknowledgement within the operator's published
+window, first contact with the claimant within the operator's
+published window, and a target settlement window per peril and
+per claim complexity tier. Standards are recorded in the
+operator's quality dossier and exposed to consumers through the
+programme's discovery document.
 
-## §7 Privacy and Security
+Complex claims (litigation, suspected fraud, large losses above
+the operator's threshold) follow escalated workflows with
+mandatory peer review and senior-claim-handler signoff.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Anti-Fraud Governance
 
-## §8 Open Governance
+Suspected-fraud investigations follow the operator's special-
+investigations-unit (SIU) protocol and respect the regulator's
+fraud-bureau notification requirements. Confirmed fraud cases
+emit notifications to the relevant fraud bureau (the IFB in the
+UK, the NICB in the US, equivalent bureaux in other
+jurisdictions) and update the consumer's status only after
+appeal rights have been exhausted.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `insurtech` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Consumer Protection and TCF
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Treating-customers-fairly principles govern product design,
+distribution, and claims. The operator records its TCF
+framework in the quality dossier and conducts at least annual
+TCF reviews that test products against the operator's customer
+outcomes statement.
 
+Vulnerable consumers (per the regulator's vulnerable-consumer
+guidance) receive enhanced support during quote, claim, and
+complaint workflows; the operator records the vulnerability
+flagging policy and trains front-line staff against it.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §8 Reinsurance Governance
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Reinsurance counterparties are subject to the operator's
+counterparty risk framework: minimum financial-strength rating,
+collateral arrangements when below threshold, and the operator's
+maximum aggregated exposure to any one reinsurer. Treaty
+renewals and cancellations follow the operator's treaty-
+renewal calendar and are recorded against each treaty.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Facultative cessions are subject to per-risk pre-binding
+authorisation through the operator's reinsurance team;
+unauthorised facultative cessions are flagged in the operator's
+reconciliation workflow.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §9 Sanctions Screening
 
-## Annex F — Adoption Roadmap
+All parties (policyholders, insureds, beneficiaries, claimants,
+reinsurers, third-party payees) are screened against the
+applicable sanctions lists at intake and at the operator's
+ongoing screening cadence (typically daily for high-risk lines).
+Screening hits trigger the operator's sanctions workflow:
+investigation, regulator notification when required, and policy
+or claim disposition consistent with the sanctions law.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §10 Complaint Handling
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Complaints are recorded against the policy or claim, classified
+per the operator's complaint taxonomy, and resolved within the
+regulator's required window. Operators report complaint
+volumes and themes to the regulator at the cadence the
+regulator requires (typically annually or biannually) and to
+their internal TCF committee.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Complaints that escalate to the operator's external dispute
+resolution body (the Financial Ombudsman Service in the UK,
+the National Association of Insurance Commissioners' channels
+in the US, equivalent bodies elsewhere) carry the body's
+reference identifier in the complaint record.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §11 Records Retention
 
-## Annex G — Test Vectors and Conformance Evidence
+Programme records — every record defined in PHASE-1, the API
+audit logs, the consumer-disclosure artefacts, the underwriting-
+decision rationales, the claim files, the reinsurance bordereaux,
+the regulator submissions, and the complaint files — retain per
+the regulator's required window. Life-business records and
+liability claims with long-tail exposure retain indefinitely.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §12 Time Synchronisation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Operator clocks synchronise per RFC 5905 (NTPv4) against a
+national-metrological-laboratory stratum-1 service so that
+timestamped records — premium-receipt times, claim-notification
+times, sanctions-screening times — are consistent across the
+operator's systems and consistent with reinsurer ledgers.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §13 Cross-Jurisdictional Programme Operation
 
-## Annex H — Versioning and Deprecation Policy
+Multi-jurisdiction operators honour each participating
+jurisdiction's licensing rules, market-conduct rules,
+data-protection rules, and prudential rules. Per-policy records
+carry the governing jurisdiction so that downstream consumers
+can apply the right legal regime.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §14 Run-Off and Resolution
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Operators that enter run-off cease writing new policies, manage
+claims through closure, and report run-off progress to the
+regulator at the regulator's required cadence. Operators in
+resolution operate under the resolution authority's direction
+and may transfer policies to a successor under the regulator's
+portfolio-transfer process; the API enforces freeze conditions
+on transferred policies.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §15 Quality Dossier
 
-## Annex I — Interoperability Profiles
+The operator's quality dossier records the regulator
+authorisations, the model-risk-management framework, the SIU
+protocol, the TCF framework, the reinsurance counterparty
+register, the complaint taxonomy, and the operational events
+the operator has experienced. The dossier is reviewed at least
+annually by the operator's chief risk officer.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §16 Operational Resilience and Business Continuity
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Operators that fall under the regulator's operational-resilience
+expectations (DORA in the EU, the operational-resilience
+framework in the UK, equivalent regimes elsewhere) record their
+important business services, the impact tolerances per service,
+the third-party dependencies, and the incident-response
+playbooks in the operational-resilience dossier.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Resilience-impacting incidents (PAS unavailability, claim-
+handling outage, telematics-feed loss) trigger the operator's
+incident-response playbook, are recorded against the
+programme, and are reported to the regulator within the
+regulator's required notification window.
+
+## §17 Internal Audit and Three Lines of Defence
+
+The operator's three-lines-of-defence model is recorded in the
+quality dossier: front-line risk-owners (line 1), the
+compliance and risk-management functions (line 2), and the
+internal audit function (line 3). Internal audit reports
+covering insurtech-relevant risks are referenced from the
+operator's annual audit plan; remediation actions are tracked
+to closure in the quality dossier.
+
+## §18 Climate-Risk Disclosure
+
+Operators that fall under climate-risk disclosure expectations
+(TCFD-aligned regimes, ISSB IFRS S2, jurisdictional climate-
+disclosure rules) record their physical and transition risk
+analyses, the per-line scenario testing, and the climate-
+related underwriting policies that flow from the analysis.
+
+## §19 Outsourcing and Critical-Service-Provider Oversight
+
+Outsourced functions (PAS hosting, claim-handling TPAs, BPO
+services, cloud infrastructure) are subject to the operator's
+outsourcing policy: due-diligence prior to onboarding, service-
+level agreements with measurable outcomes, exit and
+substitutability arrangements, and ongoing monitoring of
+provider performance.
+
+Critical service providers (those whose failure would impair
+the operator's important business services within the
+impact-tolerance window of §16) are designated and reported to
+the regulator where the regulator's outsourcing rules require
+notification.
+
+## §20 Sustainability and Net-Zero Commitments
+
+Operators that have published sustainability or net-zero
+commitments (NZIA-aligned, TCFD-aligned, ISSB IFRS S2-aligned)
+record the commitment text, the per-line underwriting policies
+that flow from the commitment, and the measurement framework
+the operator uses to track progress against the commitment.
+Commitment progress is reported externally on the cadence the
+operator has committed to.
+
+## §21 Cyber-Underwriting Discipline
+
+Operators that write standalone cyber lines or provide cyber
+endorsements to other lines record their cyber-underwriting
+methodology in the quality dossier: the threat-intelligence
+sources they consume, the assumed-attacker capability tiers,
+and the systemic-event aggregate-exposure caps they apply to
+prevent silent-cyber accumulation across the operator's book.
+
+## §22 Conformance and Auditing
+
+A programme conformant with WIA-insurtech publishes its
+licensing references, its product register, its quality
+dossier, and the catalogue of consumer disclosures issued, and
+answers an annual self-assessment that maps each clause of this
+PHASE to the operator's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-insurtech
+- **Last Updated:** 2026-04-28

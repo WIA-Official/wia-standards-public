@@ -5,237 +5,302 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-intent-lang (Intent Lang).
+This document defines the protocols that govern an
+intent-language programme: grammar versioning and stewardship,
+SHACL constraint shape stewardship, intent-author onboarding,
+intent linting and approval workflow, planner-runtime
+qualification, execution-agent qualification, evaluator
+qualification, fallback-handler discipline, recordkeeping, and
+programme wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time)
+- ISO 9001:2015 (quality management systems)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO/IEC 25010:2011 (systems and software quality models;
+  cited where intent acceptance criteria reuse the standard's
+  quality characteristics)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- W3C SHACL
+- W3C JSON-LD 1.1
 
 ---
 
-## §1 Scope
+## §1 Programme Registration
 
-This PHASE document is one of four that together define the WIA-intent-lang
-standard. It addresses the protocol layer of the standard.
+An operator MAY claim conformance to WIA-intent-lang only after
+publishing an intent registry that the operator's authoring
+tools and runtimes target. The registry's domain scopes
+(PHASE-1 §2) are recorded against the programme; intents whose
+domain does not overlap any of the programme's scopes are
+rejected at the linter stage.
 
-## §2 Manifest
+## §2 Grammar Stewardship
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "intent-lang"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The canonical predicate grammar (PHASE-1 §5) is versioned by a
+working group named in the operator's quality dossier. Minor
+revisions remain backwards-compatible; major revisions go
+through a deprecation window of at least 12 calendar months
+before authoring tools are required to migrate.
 
-## §3 Conformance Tiers
+Grammar revisions are content-addressed and exposed through the
+grammar endpoint (PHASE-2 §9). Authoring tools pin the grammar
+revision they emit against; intents that reference an unpinned
+grammar revision are rejected by the linter.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 SHACL Stewardship
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+SHACL constraint shapes encode the intent registry's policy:
+the budget-envelope plausibility rules, the per-domain-scope
+predicate vocabularies, and the operator's safety constraints
+(e.g. forbidding intents whose acceptance criteria depend on
+non-deterministic external services without a fallback policy).
 
-## §4 Discovery
+SHACL revisions follow the same versioning rules as the
+grammar. Linter failures (PHASE-2 §4) cite the failing
+constraint paths so that authors can correct the intent without
+a round-trip with the SHACL stewardship working group.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/intent-lang`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Intent Linting and Approval
 
-## §5 Time and Identity
+Intents move from `draft` to `approved` through the linter
+gateway. The linter performs:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- syntactic validation against the pinned grammar;
+- SHACL validation against the pinned SHACL revision;
+- budget-envelope plausibility checking against the operator's
+  per-domain-scope norms;
+- duplicate-intent detection against the recent intent
+  history;
+- author-authorisation check against the operator's IDP.
 
-## §6 Versioning and Deprecation
+Intents that pass the linter advance to `approved`; intents
+that fail receive a Problem-Details response with the
+constraint paths in question.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Planner Runtime Qualification
 
-## §7 Privacy and Security
+Planner runtimes are qualified per programme. Qualification
+requires:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- demonstrated capability to materialise representative
+  intents from each domain scope without manual intervention;
+- documented behaviour for fallback policies (PHASE-1 §3);
+- alignment with the operator's plan-recordkeeping rules;
+- conformance attestation from the operator's planner-runtime
+  certifying body.
 
-## §8 Open Governance
+Planners that lose qualification are removed from the registry;
+intents that referenced the removed planner are re-planned
+through a successor planner before execution.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `intent-lang` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Execution Agent Qualification
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Execution agents are qualified per action kind that the
+operator's intent vocabulary names. Qualification requires:
 
+- documented action contracts (parameter shapes, success
+  predicates, retry semantics, idempotency guarantees);
+- conformance attestation from the operator's execution-agent
+  certifying body;
+- per-agent IDP credentials that bind the agent to the action
+  kinds it is authorised to perform.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Execution events emitted by an unqualified agent are rejected
+at the trace endpoint with type
+`urn:wia:intent-lang:agent-not-qualified`.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## §7 Evaluator Qualification
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Evaluators that score traces against acceptance criteria are
+qualified per evaluation methodology. Qualification covers the
+evaluator's deterministic behaviour, the per-criterion
+explainability of the evaluator's verdicts, and the evaluator's
+treatment of inconclusive cases.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Fallback Handler Discipline
 
-## Annex F — Adoption Roadmap
+Intents whose `fallbackPolicy` requires `request-human-decision`
+escalate to a human operator through the operator's notification
+infrastructure; the human's decision is recorded against the
+intent and is treated as part of the audit chain. Programmes
+configure an escalation timeout per fallback policy and notify
+the intent author when the timeout elapses.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Recordkeeping
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Programme records — every record defined in PHASE-1, the API
+audit logs, the grammar and SHACL revisions in force at the
+time of intent processing, the fallback-handler decisions, and
+the conformance attestations of qualified runtimes / agents /
+evaluators — retain per the operator's recordkeeping policy.
+Intents that supported regulator-attested processes (financial
+reporting, healthcare workflows, public-safety operations)
+retain indefinitely.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Time Synchronisation
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Programme clocks synchronise per RFC 5905 (NTPv4) so that
+intent / plan / trace / evaluation timestamps are consistent
+across the programme's runtime fleet.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §11 Privacy
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Intent author identity is held in the operator's IDP, never in
+the intent registry; the intent record's `authorRef` is an
+opaque token. Intent goal text and predicate source text MAY
+contain references that, in some operating contexts, qualify
+as personal data; the operator's data-protection policy
+records the per-domain-scope handling (de-identification,
+access controls, retention).
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §12 Quality Dossier
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The operator's quality dossier records the grammar and SHACL
+stewardship working groups, the planner / agent / evaluator
+certifying bodies, the qualified runtime / agent / evaluator
+register, the programme's incident history, and the operator's
+remediation actions.
 
-## Annex H — Versioning and Deprecation Policy
+## §13 Programme Freeze and Wind-Down
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Programmes that freeze (no new intents accepted, in-flight
+intents drained) record the freeze rationale and the expected
+wind-down date. Wind-down archives the intent registry to the
+operator's long-term archive (PHASE-4 §10) and notifies
+authoring tools so that they can redirect new authoring to a
+successor programme where one exists.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §14 Observation-Artefact Privacy and Retention
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Observation artefacts (PHASE-1 §9) are governed by the
+operator's privacy-class matrix:
 
-## Annex I — Interoperability Profiles
+- `public` artefacts MAY be shared without restriction.
+- `operator-internal` artefacts are restricted to the operator's
+  audit and analytics consumers.
+- `subject-restricted` artefacts contain personal data and are
+  gated by the operator's data-protection workflow; subject-
+  access requests are honoured through the operator's CRM.
+- `regulator-restricted` artefacts are released only to the
+  regulator's authorised consumer or under court order.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Programmes record the per-class retention window in the quality
+dossier. Retention windows that elapse trigger eligibility for
+purge; purge events are recorded against the artefact so that
+downstream audit reviews can see that a once-existing artefact
+has been intentionally removed.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §15 Compensation and Idempotency Discipline
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Compensations (PHASE-1 §10) are subject to the operator's
+compensation-strategy register. Each action kind that is
+eligible for compensation declares:
+
+- the compensation algorithm (saga-style compensating
+  transaction, semantic rollback, manual-intervention escalation);
+- the compensation timeout beyond which manual intervention is
+  required;
+- the idempotency key strategy that the compensation respects so
+  that a partially-applied compensation can be safely retried.
+
+Compensations whose action kind has no registered strategy
+escalate to the operator's manual-intervention queue and are
+recorded as `manual-intervention-required`.
+
+## §16 Per-Domain-Scope Safety Constraints
+
+Domain scopes (PHASE-1 §2) carry per-scope safety constraints
+that the operator's SHACL stewardship working group encodes.
+Examples:
+
+- `infrastructure-ops` domain constraints forbid intents that
+  delete resources without an explicit recovery path.
+- `business-process` domain constraints require intents whose
+  acceptance criteria depend on financial reconciliation to
+  emit explicit reconciliation-evidence references.
+- `robotics-mission` domain constraints require intents whose
+  actions move physical assets to declare bounding-box and
+  collision-budget envelopes.
+
+## §17 Author Onboarding and Authorisation
+
+Authors are onboarded through the operator's IDP. Onboarding
+records the author's role (intent author, intent reviewer,
+intent approver, fallback handler) and the per-domain-scope
+authorisation that the role grants. Authors that lose role
+authorisation (departure, role change, training expiry) are
+demoted to read-only access; in-flight intents authored by a
+demoted author retain their original `authorRef` for audit
+continuity but cannot be advanced past their current status by
+the demoted author.
+
+## §18 Reviewer-and-Approver Discipline
+
+Intents whose domain scope or budget envelope exceeds the
+operator's per-author authorisation require a separate reviewer
+and approver. The reviewer-and-approver workflow is recorded
+against the intent so that audit reviewers can confirm that
+high-risk intents went through the operator's elevated-risk
+approval process before reaching `approved` status. Reviewers
+and approvers are subject to the operator's segregation-of-
+duties rules: the same author cannot be reviewer or approver
+of their own intent.
+
+## §19 Plan Re-Planning Discipline
+
+When an in-flight intent encounters a planner failure (for
+example a runtime that raises an irrecoverable error mid-
+execution), the intent's plan may be superseded by a fresh
+plan from a successor planner. Re-planning preserves the
+intent's identity and acceptance criteria; the trace records
+the planner transition so that audit reviewers can correlate
+pre-transition and post-transition behaviour against the
+single intent.
+
+## §20 Cross-Programme Intent Federation
+
+Operators that participate in cross-programme intent federation
+(intents whose action graphs span multiple operators' execution
+agents) follow a federation protocol: the originating
+operator's planner publishes the action graph to the federation
+broker, partner operators receive the action subgraphs they
+own, and the originating operator reconciles trace events from
+each partner into the unified trace. Federation participation
+is recorded against the programme; audit reviewers can resolve
+the unified trace to its constituent partner traces.
+
+## §21 Reproducibility and Replay Discipline
+
+Programmes that support replay (re-executing a closed intent
+against the same inputs to verify reproducibility) record the
+replay parameters separately from the original trace so that
+audit reviewers can compare replay outcomes against the
+original outcome without confusion. Replays of intents whose
+actions have side effects (production-system mutations,
+financial movements) follow the operator's replay-safety
+policy: dry-run mode by default, full-execution replay only
+under explicit operator authorisation.
+
+## §22 Conformance and Auditing
+
+A programme conformant with WIA-intent-lang publishes its
+grammar and SHACL stewardship references, its qualified runtime
+register, its quality dossier, and the catalogue of intent
+domain scopes it supports, and answers an annual self-
+assessment that maps each clause of this PHASE to the
+programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-intent-lang
+- **Last Updated:** 2026-04-28

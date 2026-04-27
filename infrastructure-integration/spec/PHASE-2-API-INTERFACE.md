@@ -5,237 +5,336 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-infrastructure-integration (Infrastructure Integration).
+This document defines the HTTP API contract that an accredited
+infrastructure-integration operator exposes for the records defined
+in PHASE-1. Consumers include integration architects authoring
+new flows, integration brokers operating in production, vendor
+support teams onboarding contributing systems, regulators reviewing
+critical-infrastructure integration deployments, and citation tools
+that resolve published flow descriptions to their underlying
+records.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 (HTTP Semantics) / 9111 (HTTP Caching) /
+  9457 (Problem Details) / 6901 / 6902 / 8288 (Web Linking) /
+  8259 (JSON) / 9421 (HTTP Message Signatures)
+- ISO 8601 (date and time)
+- ISO 15926 (life-cycle integration)
+- IEC 62541 (OPC UA)
+- IEC 61850 (substation automation)
+- IEC 61968 / 61970 (CIM)
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-infrastructure-integration
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the operating
+federation. Versioning uses `/v1/` path segments and Semantic
+Versioning 2.0.0. The OpenAPI 3.1 document at `/v1/openapi.json`
+is canonical.
 
-## §2 Manifest
+The API is a *control-plane and metadata facade*; production
+message traffic flows over the protocol bindings recorded in
+PHASE-1 §4 (OPC UA, IEC 61850 GOOSE/MMS, MQTT, AMQP, Kafka, and
+others), and the API references those flows but does not
+itself carry production payloads.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "infrastructure-integration"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Root Discovery
 
-## §3 Conformance Tiers
+```
+GET /v1/
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```json
+{
+  "standard": "WIA-infrastructure-integration",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "federations":      "/v1/federations",
+    "systems":          "/v1/systems",
+    "protocolBindings": "/v1/protocol-bindings",
+    "semanticMappings": "/v1/semantic-mappings",
+    "namespaceMappings":"/v1/namespace-mappings",
+    "messageFlows":     "/v1/message-flows",
+    "replayWindows":    "/v1/replay-windows",
+    "auditTrails":      "/v1/audit-trails",
+    "changeControls":   "/v1/change-controls",
+    "evidence":         "/v1/evidence",
+    "openapi":          "/v1/openapi.json"
+  }
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Federation Endpoints
 
-## §4 Discovery
+```
+POST   /v1/federations                  — establish a federation
+GET    /v1/federations/{fid}            — retrieve a federation
+PATCH  /v1/federations/{fid}/charter    — replace the governance
+                                          charter content-address
+GET    /v1/federations/{fid}/topology   — return a topology map
+                                          of contributing systems
+                                          and active flows
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/infrastructure-integration`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+A federation registration whose governance charter does not
+resolve to a content-address whose digest matches the submitted
+hash returns `422` with type
+`urn:wia:infrastructure-integration:charter-mismatch`.
 
-## §5 Time and Identity
+## §4 System Endpoints
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST   /v1/federations/{fid}/systems   — register a contributing
+                                          system
+GET    /v1/systems/{sid}               — retrieve system descriptor
+PATCH  /v1/systems/{sid}/version       — upgrade product version;
+                                          emits an audit record
+DELETE /v1/systems/{sid}               — initiate decommissioning;
+                                          emits a decommissioning
+                                          record (PHASE-1 §11)
+GET    /v1/systems/{sid}/protocol-bindings — list bindings
+```
 
-## §6 Versioning and Deprecation
+System version upgrades trigger automatic re-validation of
+semantic mappings whose source or target is the upgraded system;
+the API returns the list of mappings that require re-validation
+in the response so the integration architect can plan the
+upgrade.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Protocol-Binding Endpoints
 
-## §7 Privacy and Security
+```
+POST   /v1/systems/{sid}/protocol-bindings — register a binding
+GET    /v1/protocol-bindings/{bid}         — retrieve binding
+PATCH  /v1/protocol-bindings/{bid}/conformance-class
+                                           — record a vendor-
+                                              published conformance
+                                              class change
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Binding registrations whose `messageSchemaContentAddress` is not
+a recognised schema family (OPC UA NodeSet2, IEC 61850 SCL,
+OpenAPI 3.1, AsyncAPI 2/3) return `422` with type
+`urn:wia:infrastructure-integration:schema-family-unrecognised`.
 
-## §8 Open Governance
+## §6 Semantic-Mapping Endpoints
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `infrastructure-integration` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST   /v1/semantic-mappings                — register a mapping
+GET    /v1/semantic-mappings/{mid}          — retrieve mapping
+PATCH  /v1/semantic-mappings/{mid}/validate — append a validation
+                                              record
+GET    /v1/semantic-mappings/{mid}/lineage  — trace the source
+                                              and target model
+                                              references back to
+                                              the contributing
+                                              systems' schemas
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Validation records are signed by the integration architect and
+counter-signed by a reviewing architect; submissions whose
+counter-signature is missing return `422` with type
+`urn:wia:infrastructure-integration:counter-signature-required`.
 
+## §7 Namespace-Mapping Endpoints
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST   /v1/namespace-mappings              — register a namespace
+                                              mapping
+GET    /v1/namespace-mappings/{nmid}        — retrieve mapping
+GET    /v1/namespace-mappings/{nmid}/resolve?systemId={sid}&local={localId}
+                                            — resolve a local
+                                              identifier to the
+                                              authoritative
+                                              identifier
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+The resolver endpoint is read-heavy and is cached aggressively;
+responses are immutable for a given `(systemId, localId, asOf)`
+triple. Cache-Control directives (PHASE-2 §13) reflect that
+immutability.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §8 Message-Flow Endpoints
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+POST   /v1/message-flows               — register a message flow
+GET    /v1/message-flows/{flowId}      — retrieve flow record
+PATCH  /v1/message-flows/{flowId}/qos  — update quality-of-service
+                                         contract
+PATCH  /v1/message-flows/{flowId}/state — suspend / restore /
+                                          deprecate the flow
+GET    /v1/message-flows/{flowId}/lineage — trace from publisher
+                                            through subscribers
+                                            with the active
+                                            mappings
+```
 
-## Annex F — Adoption Roadmap
+State transitions on a flow emit audit-trail records (PHASE-1 §9)
+automatically; clients do not need to write the audit records
+directly, but they MAY query them for visibility.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §9 Replay-Window Endpoints
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+POST   /v1/replay-windows              — request a replay window
+                                         on a flow
+GET    /v1/replay-windows/{windowId}   — retrieve window record
+PATCH  /v1/replay-windows/{windowId}/approvals
+                                       — append approvals
+PATCH  /v1/replay-windows/{windowId}/state
+                                       — initiate / pause /
+                                         complete / abort the
+                                         replay
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Replay-window approvals require the federation's change-control
+board chair's signature; submissions whose chair's signature is
+missing return `422` with type
+`urn:wia:infrastructure-integration:replay-approvals-incomplete`.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Audit-Trail Endpoints
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+GET    /v1/audit-trails?federationId={fid}&from={iso8601}
+                                       — query audit trail for a
+                                         federation over a window
+GET    /v1/audit-trails/{auditId}      — retrieve a specific audit
+                                         record
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Audit-trail responses are streamed using the `text/event-stream`
+content type when the requested window exceeds 10,000 events;
+small windows return JSON arrays with hyperlinks to the
+individual audit records.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Change-Control Endpoints
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+POST   /v1/change-controls             — propose a change
+PATCH  /v1/change-controls/{cid}/approvals
+                                       — append approvals from
+                                         change-control board
+                                         members
+PATCH  /v1/change-controls/{cid}/rollout-state
+                                       — start / monitor / complete
+                                         / rollback the change
+GET    /v1/change-controls/{cid}/affected-flows
+                                       — list flows affected
+```
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Evidence Package
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+POST   /v1/federations/{fid}/evidence  — request evidence package
+                                         generation
+GET    /v1/evidence/{packageId}        — retrieve a package
+GET    /v1/evidence/{packageId}/manifest — manifest only
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The evidence-package format is governed by PHASE-4 §3 and contains
+the federation record, the contributing-system catalogue, the
+protocol-binding catalogue, the semantic-mapping catalogue, the
+namespace mapping, the message-flow catalogue, the audit trail,
+and the change-control register, plus the signed manifest.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §13 Errors
 
-## Annex I — Interoperability Profiles
+All error responses are `application/problem+json` per RFC 9457.
+Defined types include:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- `urn:wia:infrastructure-integration:charter-mismatch`
+- `urn:wia:infrastructure-integration:schema-family-unrecognised`
+- `urn:wia:infrastructure-integration:counter-signature-required`
+- `urn:wia:infrastructure-integration:replay-approvals-incomplete`
+- `urn:wia:infrastructure-integration:flow-locked`
+- `urn:wia:infrastructure-integration:evidence-mismatch`
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §14 Authentication
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Mutually-authenticated TLS for all write operations; client
+certificates are scoped to the federations the client architect
+or vendor supports. Public read-only endpoints (federation
+governance charter content-address, system catalogue published
+under the federation's transparency policy) are reachable
+without a client certificate.
+
+## §15 Caching
+
+Stable resources (signed semantic mappings, completed replay
+windows, executed change-control records) are cacheable with
+`Cache-Control: max-age=31536000, immutable`. Mutable resources
+(in-flight change controls, draft mappings) are cacheable for
+60 seconds; ETags are mandatory on every PATCH endpoint with
+`If-Match` conditional requests.
+
+## §16 Streaming Subscriptions
+
+Consumers subscribe via Server-Sent Events at
+`/v1/federations/{fid}/events`. Topics include flow QoS events,
+mapping validation events, replay-window state changes, change-
+control state changes, and decommissioning notifications.
+
+## §17 Provenance Endpoint
+
+```
+GET    /v1/provenance/{recordId}    — retrieve provenance entry
+                                       for any PHASE-1 record
+```
+
+## §18 Audit and Observability
+
+Every endpoint emits structured logs with `federationId`,
+`traceId`, the issuing client certificate's subject, and the
+broker's clock skew vs the reference NTP source.
+
+## §19 Bulk Operations
+
+Long onboarding campaigns and large catalogue migrations produce
+many records that are exchanged in bulk:
+
+```
+POST   /v1/bulk/systems            — bulk system onboarding
+POST   /v1/bulk/protocol-bindings  — bulk binding registration
+POST   /v1/bulk/semantic-mappings  — bulk mapping registration
+POST   /v1/bulk/message-flows      — bulk flow registration
+GET    /v1/bulk/{operationId}      — operation status
+```
+
+Bulk operations are idempotent on the operation identifier;
+retried submissions resolve to the same operation identifier and
+return the prior outcome rather than producing duplicate records.
+
+## §20 Worked Example: Onboard a Substation IED Federation Member
+
+1. The vendor publishes the IED's IEC 61850 SCL ICD file and the
+   operator's integration architect uploads the file to the
+   integration broker.
+2. The broker emits a system descriptor draft and protocol-
+   binding draft; the architect signs the drafts via PATCH.
+3. The architect drafts initial semantic mappings from the IED's
+   Logical Nodes to the federation's CIM model; mappings are
+   counter-validated by a reviewing architect.
+4. A change-control record is opened citing the test-bed
+   verification result.
+5. After approval and rollout, the broker promotes the system
+   to production and emits an audit-trail record.
+
+## §21 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI
+3.1 document, and signs evidence packages per RFC 9421.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-infrastructure-integration
+- **Last Updated:** 2026-04-28

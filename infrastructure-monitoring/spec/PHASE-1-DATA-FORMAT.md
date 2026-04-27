@@ -5,237 +5,344 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-infrastructure-monitoring (Infrastructure Monitoring).
+This document defines the canonical data-format layer for WIA-
+infrastructure-monitoring. The standard governs the records that an
+accredited operator publishes when instrumenting and monitoring
+civil-infrastructure assets — bridges, dams, levees, tunnels,
+buildings of public significance, water-distribution mains,
+transmission-tower foundations, transit viaducts, and harbour
+walls — with structural-health-monitoring (SHM) sensor networks,
+including strain gauges, accelerometers, fibre-optic distributed
+sensors, displacement transducers, settlement monitors, tilt-meters,
+crack monitors, acoustic-emission sensors, and corrosion sensors.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 13822 (assessment of existing structures)
+- ISO 16587 (mechanical vibration — performance parameters for
+  the structural-health monitoring of fixed structures)
+- ISO 4866 (vibration of fixed structures — measurement and
+  evaluation)
+- ISO 10816 (vibration severity for rotating machinery — used for
+  monitored mechanical sub-assemblies)
+- ISO 18649 (mechanical vibration — evaluation of measurement
+  results)
+- ISO 8601 (date and time)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- IEC 61400-25 (communications for wind-turbine monitoring —
+  applicable to monitored utility-scale wind assets)
+- IEEE 1451 (smart-transducer interface)
+- IETF RFC 4122 (UUID URN), RFC 8259 (JSON), RFC 9457 (Problem
+  Details)
+- OGC SensorThings API 1.1
+- W3C Sensor APIs (W3C Recommendation)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-infrastructure-monitoring
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines the persistent shapes for the records
+that an SHM operator exchanges across the lifecycle of a monitored
+asset: sensor commissioning, calibration, time-synchronisation
+binding, raw-sample window, derived-metric series, threshold
+breach, alert, post-event capture, decommissioning, and archival.
+It is intended for use by:
 
-## §2 Manifest
+- Asset owners that operate SHM systems on safety-critical
+  structures (dam owners, bridge owners, transit operators,
+  utility owners).
+- SHM contractors that install and operate sensor networks on
+  behalf of asset owners.
+- Calibration laboratories that issue ISO/IEC 17025 calibration
+  certificates for the sensors used.
+- Long-term archives that hold monitoring records beyond the
+  operating life of the SHM system.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "infrastructure-monitoring"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Out of scope are the asset-management records governed by WIA-
+infrastructure (which this standard cross-references) and the
+process-control SCADA loops governed by WIA-infrastructure-
+integration (which this standard publishes telemetry into).
 
-## §3 Conformance Tiers
+## §2 Sensor Identifier and Class
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+sensorId           : string (uuidv7)
+operatorOrgId      : string (institutional identifier)
+parentAssetRef     : string (WIA-infrastructure asset identifier
+                     this sensor is bound to; may be a component
+                     identifier within the parent asset)
+sensorClass        : enum  ("strain-gauge-foil" |
+                     "strain-gauge-vibrating-wire" |
+                     "accelerometer-mems" |
+                     "accelerometer-piezoelectric" |
+                     "fibre-optic-fbg" |
+                     "fibre-optic-distributed-strain" |
+                     "fibre-optic-distributed-temperature" |
+                     "displacement-lvdt" |
+                     "displacement-laser" |
+                     "settlement-magnetometer" |
+                     "tilt-meter-electrolytic" |
+                     "tilt-meter-mems" |
+                     "crack-monitor-vibrating-wire" |
+                     "crack-monitor-electrical" |
+                     "acoustic-emission" |
+                     "half-cell-corrosion" |
+                     "linear-polarisation-corrosion" |
+                     "user-defined")
+manufacturerRef    : string (institutional manufacturer identifier)
+modelName          : string
+serialNumber       : string
+nominalRange       : object
+  rangeMin         : number
+  rangeMax         : number
+  rangeUnit        : string (SI; e.g. "microstrain", "g",
+                     "mm", "degree", "millivolt")
+sensitivity        : number (units of output per unit of input;
+                     publication units recorded in
+                     `sensitivityUnit`)
+sensitivityUnit    : string
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Sensor identifiers are opaque and are generated when the sensor
+is commissioned. Identifier reuse is forbidden — sensors that are
+removed from service retain their identifier permanently for
+citation purposes; replacement sensors get a new identifier and a
+`predecessor` reference if they replace a removed unit.
 
-## §4 Discovery
+## §3 Spatial-Mounting Identity
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/infrastructure-monitoring`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+mounting:
+  mountingId      : string (uuidv7)
+  sensorId        : string (uuidv7)
+  parentComponentRef : string (WIA-infrastructure component
+                       identifier of the structural component
+                       this sensor is mounted to)
+  mountingPosition : object
+    x             : number
+    y             : number
+    z             : number
+    crs           : string (EPSG code or local-frame reference;
+                       local-frame references include the
+                       parent component's structural axes)
+  mountingMethod  : string (operator-controlled vocabulary —
+                       "epoxy-bonded", "welded-stud", "bracket-
+                       bolted", "fibre-embedded", "drilled-
+                       inclinometer-casing", etc.)
+  mountedAt       : string (ISO 8601)
+  mountedBy       : string (institutional identifier of the SHM
+                       contractor)
+  validFromPeriod : object
+    from          : string (ISO 8601)
+    until         : string (ISO 8601, nullable)
+```
 
-## §5 Time and Identity
+Mounting records are versioned: every re-bond, re-position, or
+post-event remount emits a new mounting record with
+`validFromPeriod` set so that historical samples resolve to the
+mounting that produced them.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Calibration Record
 
-## §6 Versioning and Deprecation
+```
+calibration:
+  calibrationId    : string (uuidv7)
+  sensorId        : string (uuidv7)
+  laboratoryRef   : string (institutional identifier of the
+                     ISO/IEC 17025-accredited laboratory)
+  certificateContentAddress : string (URI of the calibration
+                     certificate)
+  calibrationDate : string (ISO 8601)
+  validUntil      : string (ISO 8601)
+  measurementUncertainty : object
+    coverageFactor : number (per ISO/IEC Guide 98-3)
+    expandedUncertaintyValue : number
+    expandedUncertaintyUnit  : string
+  traceabilityRef : string (national-metrology-institute reference
+                     to which the calibration is traceable —
+                     KRISS, NIST, NPL, PTB, BIPM equivalent)
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Calibration records are immutable; revoked calibrations emit a
+successor record with `supersedes` set so the chain is
+auditable.
 
-## §7 Privacy and Security
+## §5 Time-Synchronisation Binding
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+timeSync:
+  timeSyncId      : string (uuidv7)
+  sensorId        : string (uuidv7)
+  acquisitionUnitRef : string (institutional identifier of the
+                     data-acquisition unit reading this sensor)
+  syncSource      : enum  ("ntp-stratum-2" |
+                     "ntp-stratum-3" |
+                     "ptp-grandmaster" |
+                     "gnss-disciplined-oscillator" |
+                     "manual")
+  syncSourceRef   : string (host or device identifier of the
+                     reference)
+  observedSkewMs  : number (last observation of clock skew vs
+                     the reference)
+  observedAt      : string (ISO 8601)
+```
 
-## §8 Open Governance
+Time-synchronisation bindings record the *current* sync state.
+For high-frequency dynamic measurements (modal-analysis
+campaigns, blast monitoring) PTP grandmasters with sub-
+microsecond precision are typical and are recorded as such.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `infrastructure-monitoring` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Raw-Sample Window
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Raw sensor samples accumulate at high cadence (kHz-range for
+accelerometers, sub-Hz for static gauges). They are bundled into
+*windows* whose envelopes are recorded separately from the bulk
+sample data.
 
+```
+sampleWindow:
+  windowId        : string (uuidv7)
+  sensorId        : string (uuidv7)
+  windowStart     : string (ISO 8601 / RFC 3339)
+  windowEnd       : string (ISO 8601 / RFC 3339)
+  sampleCount     : integer
+  samplingRateHz  : number
+  archivalContentAddress : string (URI of the bulk-sample archive
+                     — operator-published format; the operator's
+                     procedure register specifies the chosen
+                     format, typically TDMS, MAT, HDF5, or a
+                     SensorThings observation collection)
+  envelope        : object
+    minValue      : number
+    maxValue      : number
+    rmsValue      : number
+    meanValue     : number
+    standardDeviation : number
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Raw-sample windows are content-addressable; superseded windows
+(corrected for clock-skew, re-windowed for analysis) emit
+successor records but do not overwrite earlier windows.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §7 Derived-Metric Series
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Derived metrics — natural-frequency estimates, modal-shape
+coefficients, displacement double-integrations, RMS vibration,
+crack-extent estimates — are recorded separately from the raw
+windows because they can be re-derived if the analysis method
+is updated.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+```
+derivedMetric:
+  metricId        : string (uuidv7)
+  sensorRefs      : array of string (sensor identifiers used)
+  metricFamily    : enum  ("natural-frequency" |
+                     "modal-shape" |
+                     "displacement-double-integration" |
+                     "vibration-rms-velocity" |
+                     "vibration-rms-acceleration" |
+                     "crack-extent-estimate" |
+                     "settlement-cumulative" |
+                     "tilt-cumulative" |
+                     "corrosion-rate" |
+                     "user-defined")
+  windowRefs      : array of string (sample-window identifiers
+                     used as input)
+  derivationMethod : string (operator-published method reference
+                     — paper citation, internal procedure, vendor
+                     algorithm version)
+  derivedValue    : number
+  derivedUnit     : string
+  uncertaintyEstimate : number (nullable)
+```
 
-## Annex F — Adoption Roadmap
+## §8 Threshold-Breach Record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+thresholdBreach:
+  breachId        : string (uuidv7)
+  metricRef       : string (derivedMetric identifier or sensor
+                     envelope identifier)
+  thresholdScheme : string (operator-published scheme — typically
+                     bound to ISO 4866 vibration severity classes,
+                     ISO 10816 vibration severity, or owner-
+                     specific limit-state ladder)
+  thresholdValue  : number
+  thresholdUnit   : string
+  observedValue   : number
+  breachStart     : string (ISO 8601)
+  breachEnd       : string (ISO 8601, nullable while ongoing)
+  severity        : enum ("watch" | "alert" | "alarm" | "trip")
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Threshold breaches at severity `alert` or higher emit alert
+records (PHASE-1 §9) automatically.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Alert Record
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+alert:
+  alertId         : string (uuidv7)
+  breachRef       : string (thresholdBreach identifier)
+  notifiedAt      : string (ISO 8601)
+  notifiedRecipients : array of object (recipient identifier,
+                     channel — email, SMS, paging, on-call rota)
+  acknowledgedBy  : string (institutional identifier; nullable)
+  acknowledgedAt  : string (ISO 8601, nullable)
+  resolvedAt      : string (ISO 8601, nullable)
+  resolutionContentAddress : string (URI of the resolution
+                     report when resolved — inspection finding,
+                     temporary-restriction notice, false-positive
+                     re-classification)
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+## §10 Post-Event Capture
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+postEventCapture:
+  captureId       : string (uuidv7)
+  triggeringEvent : object
+    eventType     : enum  ("seismic" | "wind" | "flood" |
+                       "vehicle-impact" | "vessel-impact" |
+                       "fire" | "blast" | "user-defined")
+    eventReference : string (national-seismic-network event ID,
+                       NWS storm ID, owner-recorded incident
+                       identifier, etc.)
+  capturedSensorRefs : array of string
+  capturedWindowRefs : array of string
+  postEventReportContentAddress : string
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §11 Decommissioning
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+```
+decommissioning:
+  decommissioningId : string (uuidv7)
+  sensorId        : string (uuidv7)
+  reason          : enum  ("end-of-service-life" |
+                     "calibration-failure" |
+                     "destroyed-by-event" |
+                     "removed-during-rehabilitation")
+  decommissionDate : string (ISO 8601)
+  archivalDepositRef : string
+```
 
-## Annex H — Versioning and Deprecation Policy
+## §12 Conformance
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Implementations claiming PHASE-1 conformance emit each record
+type for every sensor under their operation, hold the
+calibration certificates and post-event reports at the content-
+addresses recorded above, and honour identifier-permanence and
+immutability rules in §2 / §4.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+---
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+**Document Information:**
 
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-infrastructure-monitoring
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,280 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-infrastructure (Infrastructure).
+This document defines the protocols that govern an accredited civil-
+infrastructure asset programme: asset-management-system accreditation
+under ISO 55001, BIM information-management governance under ISO
+19650, inspection-procedure governance, condition-rating governance,
+maintenance-prioritisation governance, dam-safety and bridge-safety
+inspection cycles, hydraulic structures' load-rating refresh, post-
+event protocols (seismic, flood, wind, fire), data-stewardship
+through asset transfer, and the chain of accountability across
+designer-builder, owner, and inspector.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 55001 (asset-management-system requirements)
+- ISO 19650-2 (information delivery using BIM)
+- ISO 16739 (IFC4 / IFC4.3)
+- ISO 23386 / 23387 (data templates for built assets)
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO 9001:2015 (quality management systems)
+- ISO 31000 (risk management)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
 
 ---
 
-## §1 Scope
+## §1 Asset-Management-System Accreditation
 
-This PHASE document is one of four that together define the WIA-infrastructure
-standard. It addresses the protocol layer of the standard.
+A programme MAY claim conformance to WIA-infrastructure only after
+a recognised certification body has issued a valid certificate
+against ISO 55001:2014 covering the asset classes the programme
+manages (bridges, hydraulic, water, transmission). The certificate
+reference is published in the discovery document and is held in
+the asset-management-system register that the API exposes as a
+read-only resource.
 
-## §2 Manifest
+Programmes that operate in jurisdictions whose national law adopts
+ISO 55001-equivalent regulation (e.g. national asset-management
+plans for transportation networks) MAY substitute the national
+accreditation reference, provided the substitution is documented
+in the operating programme's quality-management dossier.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "infrastructure"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 BIM Information Management under ISO 19650
 
-## §3 Conformance Tiers
+The federation file delivered at hand-over (PHASE-1 §8) is
+governed by ISO 19650-2:2018 Information Delivery Cycle. The
+operator's appointed BIM coordinator records:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- the Common Data Environment (CDE) reference;
+- the levels of information need (LOIN) agreed for each
+  delivery milestone;
+- the appointed parties (designers, contractors, sub-
+  contractors);
+- the BIM execution plan governing the delivery; and
+- the verification reports against the delivery's exchange
+  information requirements.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+CDE access is mutually authenticated; PII or commercially
+sensitive content is redacted from the published federation file
+before it enters the operating-phase record set.
 
-## §4 Discovery
+## §3 Inspection-Procedure Governance
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/infrastructure`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Inspection types in PHASE-1 §5 each map to a governing procedure
+that the operator publishes in the programme's procedure register:
 
-## §5 Time and Identity
+- Routine-visual inspections cite the operator's inspection manual
+  and the qualifications of inspectors authorised to perform them
+  (e.g. AASHTO Bridge Inspector qualification, EN 1090 inspector
+  qualification, AWWA-certified water-utility inspector);
+- In-depth and underwater inspections cite the diving or rope-
+  access procedure and the safety-of-work plan;
+- NDT inspections cite the ISO/IEC 17025-accredited laboratory's
+  test methods (ISO 16828 for ultrasonic, ISO 17640 for weld
+  testing, ASTM C876 for half-cell potential, ASTM D6432 for
+  ground-penetrating radar);
+- Load tests cite the design-code clause governing the test
+  (AASHTO LRFR §8, EN 1990 Annex D).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Inspections submitted to the API whose `governingMethod` does not
+resolve to an entry in the operator's procedure register return
+`422` with type
+`urn:wia:infrastructure:governing-method-unregistered`.
 
-## §6 Versioning and Deprecation
+## §4 Condition-Rating Governance
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Condition rating ladders cited in PHASE-1 §6 are versioned in the
+programme's rating-scheme register. The register records the
+ladder name (e.g. "AASHTO general appraisal 2024"), the categories
+(0..9 in AASHTO), the descriptions, the period of applicability,
+and the authority that maintains the ladder.
 
-## §7 Privacy and Security
+When an authority revises a ladder (e.g. an AASHTO update,
+adoption of a new EN reliability category) the operator emits a
+new register entry; prior entries remain addressable so that
+historical assessments resolve to the ladder version current at
+the time of assessment.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Maintenance-Prioritisation Governance
 
-## §8 Open Governance
+The operator maintains a prioritisation methodology that converts
+condition assessments and remaining-service-life estimates into
+ranked work-order recommendations. The methodology is documented
+in the programme's quality-management dossier and is reviewed at
+least annually by the asset-management-system steering committee.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `infrastructure` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Prioritisation factors include condition severity, public-safety
+exposure (Annual Average Daily Traffic for roadway assets,
+population downstream for hydraulic assets, customers served for
+utility assets), financial cost-of-failure, environmental cost-of-
+failure, and budget availability. Each work-order record records
+the prioritisation score and the methodology version that
+produced it.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Dam-Safety Inspection Cycle
 
+Dams classified as significant-hazard or high-hazard under the
+operator's national dam-safety regulator's classification follow
+a regulator-mandated inspection cycle:
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+- annual visual inspection;
+- five-yearly intermediate inspection by an independent
+  qualified engineer;
+- ten-yearly comprehensive inspection (statutory cycle in many
+  jurisdictions, including the US National Dam Safety Program
+  cadence and the UK Reservoirs Act 1975 inspection cadence).
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Failure to complete a cycle within the regulator's deadline
+triggers a regulatory-reportable event that the operator records
+in the programme's incident register and in the regulator's
+notification feed.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Bridge-Safety Inspection Cycle
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Bridges follow inspection cycles published by the bridge owner's
+regulator:
 
-## Annex F — Adoption Roadmap
+- US bridges: National Bridge Inspection Standards 23 CFR 650.305
+  (typically 24-month routine cycle, with extensions or
+  reductions per condition).
+- EU bridges: cycles per the national-annex implementations of
+  EN 1990 and the bridge owner's national bridge inspection
+  manual.
+- Korean bridges: cycles per 「시설물의 안전 및 유지관리에 관한
+  특별법」 (Special Act on the Safety Control and Maintenance
+  of Establishments) and the implementing regulations of the
+  Ministry of Land, Infrastructure and Transport.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The operator records the regulator's reference cycle in the
+programme's quality-management dossier and against each bridge
+asset record.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Hydraulic-Asset Load-Rating Refresh
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Hydraulic structures (dams, levees, lock gates, harbour walls)
+refresh their load rating after each post-event inspection
+(PHASE-1 §5 inspection-type "post-event") and at intervals
+specified in the operating programme's procedure register. The
+refresh emits a new condition-assessment record (PHASE-1 §6) with
+`method` referencing the hydraulic load-rating method used
+(e.g. CIRIA, USACE, KICT method).
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §9 Post-Event Protocols
 
-## Annex G — Test Vectors and Conformance Evidence
+Following a triggering event (earthquake, flood, wind, fire,
+vehicle impact, vessel impact) the operator triggers a post-event
+inspection workflow:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- a rapid visual screening within hours by the on-call duty
+  inspector;
+- a follow-on in-depth inspection by an independent qualified
+  engineer;
+- if warranted, a load test or NDT campaign;
+- a revised condition assessment;
+- a regulator notification within the deadline that the
+  applicable jurisdiction requires.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Post-event inspection records are flagged with the triggering
+event reference; downstream consumers can then filter the
+asset's history by the event of interest.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §10 Designer-Builder Liability and Defect Period
 
-## Annex H — Versioning and Deprecation Policy
+Hand-over records (PHASE-1 §8) include a defect-liability period
+during which the designer-builder consortium is responsible for
+remediating residual defects in the residual-defect register.
+The operator records each defect-liability event (issue, response,
+resolution) under the hand-over record. After the defect-
+liability period elapses, the asset transitions to the operator's
+ordinary maintenance regime.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Data Stewardship Through Asset Transfer
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+When an asset transfers from one owner to another (acquisition,
+divestiture, transfer to successor jurisdiction) the originating
+operator transfers the complete record set together with the
+content-addresses; the receiving operator emits a transfer record
+that binds the originating operator's records to the receiving
+operator's identifier without reissuing the asset identifier.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The transfer record carries the date of effective transfer, the
+contractual basis (sale, conveyance, statutory transfer), and any
+warranties retained by the originating operator.
 
-## Annex I — Interoperability Profiles
+## §12 Cybersecurity for Asset-Management Platforms
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Asset-management platforms operate under the operator's ISO/IEC
+27001:2022 information-security-management system. Platforms
+holding records that bear on public safety (dam-safety
+inspections, bridge-safety inspections, water-quality monitoring)
+have the highest IEC 62443-equivalent zoning the operator
+declares; firmware updates to platform components are signed and
+verified before install.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §13 Quality-Management Dossier
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The operator's quality-management dossier records the certified
+asset-management-system scope, the procedure register, the
+rating-scheme register, the prioritisation methodology, and the
+deprecation history of inspection procedures. The dossier is
+reviewed annually by the operator's asset-management-system
+manager and is read during the operator's ISO 55001 surveillance
+audits.
+
+## §14 Cross-Jurisdiction Operation
+
+Multi-jurisdiction operators (e.g. transport-corridor consortia,
+trans-border water utilities) honour each participating
+jurisdiction's regulatory regime and record the applicable
+regulator references against each asset.
+
+## §15 Programme Wind-Down and Successor Handover
+
+A programme that ceases operations transfers asset records to a
+recognised long-term archive, exports the record set to the
+successor operator's records-management system, and notifies
+regulators of the cessation. Records subject to indefinite-
+retention regulations (dam-safety records, contaminated-land
+records under the asset's footprint) transfer with content-
+addresses preserved.
+
+## §16 Climate-Adaptation Governance
+
+Operators of long-life civil assets re-assess design assumptions
+against the climate-adaptation guidance current in their
+jurisdiction (national adaptation plans, regional climate-impact
+assessments, sector-specific guidance such as the FHWA Adaptation
+Decision-Making Assessment Process, the EU adaptation strategy,
+or comparable national equivalents). Re-assessment outcomes feed
+the prioritisation methodology in §5; assets whose climate-
+adaptation review concludes that the design margin is depleted
+are flagged for accelerated rehabilitation or re-design.
+
+The operator records the climate-adaptation review reference,
+the review's reviewer identifier, the asset classes covered, and
+the date of the review. Reviews are repeated at intervals that
+the operating programme's quality-management dossier sets.
+
+## §17 Conformance and Auditing
+
+A programme conformant with WIA-infrastructure publishes its
+ISO 55001 certificate reference, its programme registration in
+the discovery document, the catalogue of assets it operates, the
+quality-management dossier reference, and the cyber-posture
+summary, and answers an annual self-assessment that maps each
+clause of this PHASE to the programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-infrastructure
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,297 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-intelligent-transportation (Intelligent Transportation).
+This document defines how an accredited intelligent-transportation
+programme integrates with the systems that surround it: national
+spectrum regulators; type-approval bodies; SCMS operators;
+neighbouring TMCs (mutual aid); transit agencies; emergency-
+services dispatch (CAD); journey-planning aggregators; map
+vendors; weather-information service providers; long-term
+archives; and citation tools that resolve published incident or
+research reports to their evidence packages.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- IEEE 1609.2-2022 (V2X security services)
+- ETSI TS 102 941 (security credential management)
+- TMDD v3.1 (mutual-aid messaging)
+- GTFS-Realtime v2.0
+- SIRI v2.1
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 Spectrum Regulator Integration
 
-This PHASE document is one of four that together define the WIA-intelligent-transportation
-standard. It addresses the integration layer of the standard.
+The national radio regulator is the primary external counterpart
+for the programme's RSU radio operations. Integration carries the
+regulator identifier, the programme's spectrum licence reference,
+the per-band masks that the licence authorises, and the
+notification cadence the regulator requires (typically annual
+operating reports plus per-incident notifications for harmful
+interference).
 
-## §2 Manifest
+## §2 Type-Approval Body Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "intelligent-transportation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Type-approval bodies emit signed certificates per RSU and OBU
+hardware revision. The integration record carries the type-
+approval reference, the issuing date, and the validity expiry.
+Type-approval revisions that lapse trigger an alert through the
+streaming subscription so that the operator can plan radio-stack
+updates in advance.
 
-## §3 Conformance Tiers
+## §3 SCMS Operator Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The SCMS operator emits long-term enrolment certificates and
+pseudonym certificates per IEEE 1609.2 / ETSI TS 102 941. The
+integration carries the SCMS operator's identifier, the
+programme's enrolment authority binding, the pseudonym
+provisioning cadence, and the misbehaviour reporting endpoint.
+SCMS-side certificate revocations refresh the programme's CRL
+cache per the SCMS operator's distribution schedule.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Mutual-Aid Partner TMC Integration
 
-## §4 Discovery
+Adjacent TMCs exchange incidents, detours, and signal-coordination
+state through TMDD v3.1 messaging over a mutually-authenticated
+TLS channel. The integration record carries each partner's
+identifier, the mutual-aid agreement reference, and the per-
+record-class authorisation matrix.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/intelligent-transportation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Cross-boundary detour acknowledgement (PHASE-3 §6) flows through
+this integration: operator A publishes the detour proposal,
+operator B acknowledges or rejects, and operator A activates the
+detour only when acknowledgement is received.
 
-## §5 Time and Identity
+## §5 Transit Agency Integration
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Transit agencies publish GTFS-Realtime VehiclePositions,
+TripUpdates, and Alerts feeds. The programme's WIA facade
+consumes the feed and re-emits position records (PHASE-1 §9)
+that resolve against the network reference (PHASE-1 §3) so that
+journey-planning consumers can correlate transit positions with
+arterial signal-coordination state.
 
-## §6 Versioning and Deprecation
+## §6 Emergency-Services CAD Integration
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Computer-Aided Dispatch systems consume incident notifications
+and emit emergency-vehicle preemption requests. The integration
+record carries the dispatch agency's identifier, the per-incident-
+class subscription scope, and the preemption authorisation
+matrix recorded in PHASE-3 §7.
 
-## §7 Privacy and Security
+## §7 Journey-Planning Aggregator Integration
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Multimodal journey-planning aggregators consume incident,
+detour, and transit-position records. The integration is read-
+only and is rate-limited; aggregator client certificates are
+issued by the operator and bound to the aggregator's terms-of-use
+agreement.
 
-## §8 Open Governance
+## §8 Map Vendor Integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `intelligent-transportation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Map vendors consume the network reference records (PHASE-1 §3)
+and emit vendor-internal identifiers that the WIA facade can
+look up at decode time (PHASE-2 §4). The integration carries
+the map vendor's identifier, the cadence of map-version refresh,
+and the dispute-resolution path when a network reference no
+longer resolves cleanly to a vendor identifier.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Weather-Information Provider Integration
 
+Weather-impact incidents (PHASE-1 §8 classification
+`weather-impact`) are sourced from weather-information providers
+operating per WMO conventions. The integration record carries
+the weather provider's identifier, the per-area subscription, and
+the latency budget for impactful weather notifications (typically
+under 90 seconds for high-impact phenomena).
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §10 Evidence Package Format
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+The evidence package is the externally-citable artefact for an
+incident, a research dataset, or a programme audit. It is
+produced by the API endpoint at `/v1/evidence` and is a tarball
+with the following layout:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+evidence/
+  manifest.json                — package manifest (signed, see §11)
+  programme.json               — programme record
+  incidents/                   — incident records and root-cause
+                                  references
+  detours/                     — detour plans
+  rsus/                        — RSU records, firmware history
+  obus/                        — OBU summaries (no per-OBU PII)
+  v2x-captures/                — capture metadata and archive
+                                  references (privacy-filter
+                                  version recorded)
+  signal-control-states/       — control-state windows for the
+                                  cited interval
+  transit-positions/           — transit positions for the cited
+                                  interval
+  mutual-aid/                  — mutual-aid exchange logs
+  audit/                       — API audit log excerpts
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The package is content-addressable; the manifest is signed by
+the operator's HTTP-message-signature key (RFC 9421) and counter-
+signed by the regulator when the package supports a regulatory
+submission.
 
-## Annex F — Adoption Roadmap
+## §11 Manifest and Signatures
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Verification tools recompute file digests, compare to the
+manifest, and reject the package on mismatch with type
+`urn:wia:intelligent-transportation:evidence-mismatch`.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §12 well-known URI Discovery
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A conformant programme exposes a discovery document at
+`/.well-known/wia-intelligent-transportation` that links to the
+API root, the public spectrum-licence summary, the published
+quality dossier, the catalogue of material incidents, and the
+mutual-aid partner list.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Long-Term Archive Integration
 
-## Annex G — Test Vectors and Conformance Evidence
+Programmes designate a long-term archive that holds operational
+records (V2X capture archives at their declared retention,
+incident root-cause investigations, audit logs) beyond the
+programme wind-down horizon. Quarterly deposits round-trip
+content-addresses; on wind-down, remaining records transfer to
+the archive with content-addresses preserved.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Cross-Standard Linkage
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programmes that consume adjacent WIA standards (electric-grid
+for electrified bus depots, infrastructure for monitored bridges
+on the road network, infrastructure-monitoring for SHM data on
+those bridges) emit cross-standard linkage records that name
+the consuming standard and the version under which the linkage
+is claimed.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §15 Public Catalogue and Aggregator Feeds
 
-## Annex H — Versioning and Deprecation Policy
+Programmes that publish a public catalogue of material incidents
+emit an Atom or JSON Feed listing incidents with their evidence-
+package manifest digests, the affected reference, the severity,
+and the resolution timeline. The feed is intended for
+transparency to the public served by the programme.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Verifiable-Credential Re-Issuance (optional)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Programmes that wish to expose attestations (spectrum licence
+status, type-approval validity, ISO 39001 conformance) to
+consumers of W3C Verifiable Credentials MAY re-issue the
+attestations as Verifiable Credentials under the Data Model 2.0
+specification. Re-issuance is optional; the canonical record
+remains the JSON evidence-package manifest.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Streaming Heartbeat and Replay
 
-## Annex I — Interoperability Profiles
+SSE subscribers receive a heartbeat every 30 seconds with
+`Last-Event-ID` resume support. Subscribers that disconnect
+during long incident or weather windows resume from the last
+seen event identifier without losing visibility of priority-1
+incident events.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Backwards-Compatibility Guarantee
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+PHASE-4 minor revisions remain backwards-compatible with prior-
+minor clients. Major revisions go through a deprecation window
+of at least one full TMDD revision cycle so that mutual-aid
+partner integrations have time to migrate.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 Reader Tooling for Operations
+
+Operators, regulators, and certifying bodies benefit from
+visualisation tools that surface incident-timeline maps, signal-
+coordination plans, and V2X capture summaries. Programmes MAY
+publish reader tools alongside the canonical evidence package;
+the tools are non-normative.
+
+## §20 Federation Adapter for Multi-TMC Operators
+
+Operators that run multiple TMCs (regional authority operating
+several metropolitan TMCs) integrate through a federation
+adapter that translates between per-TMC WIA records and a
+combined view. The adapter honours each TMC's authorisation
+scope so that federated queries respect the source TMC's
+spectrum licence and IEC 62443 zone classification.
+
+## §21 Programme Wind-Down
+
+A programme that ceases operations transfers indefinite-retention
+records to a recognised long-term archive, notifies regulators
+and mutual-aid partners, and publishes a sunset timeline for
+in-flight detours and incidents. Roadside infrastructure is
+decommissioned per PHASE-3 §9 and SCMS certificates are revoked
+through the SCMS operator integration of §3.
+
+## §22 CAV Mapping Service Integration
+
+Connected and automated vehicle (CAV) mapping services consume
+work-zone CAV advisories (PHASE-1 §11 `cavAdvisoryRef`) and
+incident detour plans so that CAV planning stacks can adjust
+trajectories in advance of the operator's roadside broadcast.
+The integration carries the mapping service's identifier and the
+per-record-class subscription scope; CAV mapping services do not
+write back into the operator's records.
+
+## §23 Probe-Vehicle Aggregator Integration
+
+Probe-vehicle aggregators (commercial telematics providers,
+smartphone-based location services, freight-fleet telematics
+providers) emit anonymised speed and travel-time observations.
+The integration consumes the probe feed against the operator's
+network reference (PHASE-1 §3) so that operator analytics can
+correlate probe-derived speeds with signal-control state and
+incident posture. Probe data is consumed under data-licence
+agreements that the operator records in the integration record;
+data licences that limit re-publication are honoured at the
+operator's downstream evidence-package boundary.
+
+## §24 Air-Quality Monitor Integration
+
+Roadside and near-road air-quality monitors emit pollutant
+observations (NO2, PM2.5, PM10, ozone) that operators consume to
+support low-emission-zone enforcement, dynamic congestion
+pricing, and public-health reporting. The integration carries
+the monitor operator's identifier, the per-monitor calibration
+chain (per ISO/IEC 17025 §3 of the adjacent WIA-air-quality
+standard where applicable), and the publication cadence.
+
+## §25 Multimodal Trip-Planner Open Standards
+
+Programmes that publish trip-planning data into open
+multimodal-trip-planner ecosystems emit GTFS, GTFS-RT, GBFS,
+SIRI, and OJP feeds through the operator's open-data portal.
+The integration carries each consuming planner's identifier,
+the per-feed access cadence, and the per-feed update latency
+budget that planners can rely on.
+
+## §26 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully
+with the spectrum regulator, at least one type-approval body,
+the SCMS operator, at least one mutual-aid partner TMC, at
+least one transit agency, the relevant CAD system, and at least
+one long-term archive, and has published at least one externally
+citable evidence package.
+
+Sunsetting an integration is announced via the well-known
+discovery document at least 90 calendar days before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-intelligent-transportation
+- **Last Updated:** 2026-04-28

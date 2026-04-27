@@ -5,237 +5,365 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-intent-lang (Intent Lang).
+This document defines the canonical data-format layer for
+WIA-intent-lang. The standard covers the persistent shapes that
+flow through declarative-intent description, parsing, planning,
+execution, evaluation, and audit. WIA-intent-lang is consumed
+by application teams that author intents (high-level statements
+of "what should happen"), by planning runtimes that translate
+intents into concrete actions, by execution agents that perform
+the actions, and by audit and observability platforms that
+reconstruct what was intended versus what occurred.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 14977:1996 (extended Backus-Naur form, EBNF — used to
+  describe the canonical intent grammar)
+- ISO/IEC 19505 (UML 2.5 superstructure — used as the reference
+  metamodel for intent diagrams)
+- ISO/IEC 27001:2022 (information security management)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 5234 (Augmented BNF for Syntax Specifications, ABNF)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details)
+- W3C XML 1.1 (used for legacy intent-set import only)
+- W3C JSON-LD 1.1 (used for the optional semantic-overlay
+  serialisation)
+- W3C SHACL (used for intent validation against constraint
+  shapes)
+- OpenAPI Specification 3.1 (used by adapter manifests)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-intent-lang
-standard. It addresses the data-format layer of the standard.
+This PHASE defines persistent shapes for the artefacts produced
+and consumed by an intent-language programme. Implementations
+covered include:
 
-## §2 Manifest
+- Intent authoring tools (visual diagramming editors, command-
+  line authoring tools, IDE plug-ins).
+- Intent compilers and validators that transform authored
+  intents into the canonical interchange representation.
+- Planners that materialise intents into action graphs.
+- Execution agents that perform actions and emit observation
+  records.
+- Evaluation and audit platforms that compare observed outcomes
+  against intended outcomes.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "intent-lang"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Generative-language model fine-tuning pipelines, model-weight
+artefact catalogues, and runtime-cost optimisation engines are
+addressed in adjacent WIA standards and are out of scope here.
 
-## §3 Conformance Tiers
+## §2 Programme Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+programmeId          : string (uuidv7)
+programmeOperator    : string (institutional identifier of the
+                         operator that maintains the intent
+                         registry)
+programmeRegistered  : string (ISO 8601 / RFC 3339)
+domainScopes         : array of enum ("infrastructure-ops" |
+                         "data-pipeline" | "business-process" |
+                         "supply-chain" | "robotics-mission" |
+                         "creative-workflow" | "research-
+                           experiment" | "user-defined")
+intentLanguageMinor  : string (semantic-version minor that the
+                         operator's compilers understand;
+                         compilers MUST interpret intents
+                         labelled at this minor or earlier)
+programmeStatus      : enum ("draft" | "operating" |
+                         "frozen" | "archived")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Intent Record
 
-## §4 Discovery
+The intent is the canonical declarative artefact. It is a JSON
+document conforming to the canonical schema, with optional
+JSON-LD context for semantic overlays.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/intent-lang`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+intent:
+  intentId           : string (uuidv7)
+  programmeId        : string (uuidv7)
+  authoredAt         : string (ISO 8601 / RFC 3339)
+  authorRef          : string (opaque token mapped in the
+                         operator IDP to the human or service
+                         author)
+  title              : string (single-line human-readable
+                         summary, ≤ 80 characters)
+  goal               : string (multi-line declarative
+                         statement of the desired outcome)
+  preconditions      : array of Predicate
+  postconditions     : array of Predicate
+  invariants         : array of Predicate (predicates that
+                         MUST hold throughout execution)
+  acceptanceCriteria : array of Predicate (predicates that
+                         confirm the intent's success after
+                         execution)
+  budgetEnvelope     : object (per-resource caps — e.g. wall-
+                         clock, monetary, computational, energy,
+                         carbon — with currency / unit codes)
+  fallbackPolicy     : enum ("abort-and-rollback" |
+                         "abort-no-rollback" |
+                         "degrade-and-continue" |
+                         "request-human-decision")
+  intentStatus       : enum ("draft" | "approved" |
+                         "scheduled" | "in-flight" |
+                         "completed" | "failed" |
+                         "withdrawn")
+```
 
-## §5 Time and Identity
+The operator's intent linter (PHASE-3 §4) checks every intent
+for SHACL constraint conformance and for budget-envelope
+plausibility before the intent advances past `draft`.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Predicate Record
 
-## §6 Versioning and Deprecation
+Predicates are the units of state and outcome assertion. They
+are expressed in a typed predicate language defined in PHASE-1
+§5; the predicate record stores the parsed AST and the source
+text.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+predicate:
+  predicateId        : string (uuidv7)
+  intentId           : string (uuidv7)
+  role               : enum ("precondition" |
+                         "postcondition" | "invariant" |
+                         "acceptance")
+  sourceText         : string (UTF-8; the human-authored
+                         predicate text)
+  parsedAst          : object (the predicate's parsed AST
+                         conforming to the grammar in §5)
+  contextOverlayRef  : string (URI of the JSON-LD context
+                         overlay; absent for predicates
+                         expressed only in the canonical
+                         language)
+```
 
-## §7 Privacy and Security
+## §5 Predicate Grammar (ABNF Excerpt)
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+predicate     = atom / "(" predicate ")" / and-expr / or-expr /
+                not-expr / quantifier
+atom          = identifier 1*( "." identifier ) "(" args ")"
+and-expr      = predicate 1*( WSP "AND" WSP predicate )
+or-expr       = predicate 1*( WSP "OR" WSP predicate )
+not-expr      = "NOT" WSP predicate
+quantifier    = ( "FOR-ALL" / "EXISTS" ) WSP variable WSP
+                "IN" WSP collection WSP ":" WSP predicate
+identifier    = ALPHA *( ALPHA / DIGIT / "-" / "_" )
+args          = [ value *( "," WSP value ) ]
+value         = literal / variable / atom
+literal       = string / number / boolean / iso-8601-instant
+```
 
-## §8 Open Governance
+The canonical grammar is published as a versioned artefact
+under `/spec/grammar/`; minor revisions remain backwards-
+compatible with prior-minor compilers.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `intent-lang` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Plan Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Planners materialise intents into action graphs. The plan
+captures the action set, the dependencies, the assigned
+execution agents, and the planner's confidence indicators.
 
+```
+plan:
+  planId             : string (uuidv7)
+  intentId           : string (uuidv7)
+  plannerVersion     : string (planner identifier and version)
+  plannedAt          : string (ISO 8601)
+  actionGraph        : object (DAG of actions; node identifiers,
+                         action kinds, parameters, success
+                         predicates)
+  estimatedBudget    : object (per-resource estimate with
+                         confidence intervals)
+  fallbackPlanRef    : string (URI of the fallback plan; absent
+                         when no fallback is registered)
+  planStatus         : enum ("draft" | "approved" |
+                         "scheduled" | "executing" |
+                         "completed" | "aborted" |
+                         "superseded")
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Plan revisions are append-only; superseded plans remain
+addressable for retrospective comparison.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §7 Execution Trace Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+executionTrace:
+  traceId            : string (uuidv7)
+  planId             : string (uuidv7)
+  beganAt            : string (ISO 8601)
+  endedAt            : string (ISO 8601; absent until ended)
+  actorRef           : string (institutional identifier of the
+                         execution agent)
+  actionEvents       : array of ActionEvent
+  budgetConsumed     : object (per-resource actuals)
+  outcome            : enum ("succeeded" | "partially-met" |
+                         "failed" | "aborted" |
+                         "human-deferred")
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+ActionEvent:
+  eventAt            : string (ISO 8601)
+  actionId           : string (the DAG node identifier)
+  eventKind          : enum ("started" | "succeeded" |
+                         "failed" | "retried" | "skipped" |
+                         "compensated")
+  observationRef     : string (content-addressed URI of the
+                         observation artefact, e.g. a structured
+                         response, a log fragment, an image,
+                         a measurement)
+```
 
-## Annex F — Adoption Roadmap
+## §8 Evaluation Record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The evaluator compares the execution trace against the intent's
+acceptance criteria and the planner's estimated budget. The
+evaluation record carries the per-criterion verdict and the
+overall verdict.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+evaluation:
+  evaluationId       : string (uuidv7)
+  traceId            : string (uuidv7)
+  evaluatedAt        : string (ISO 8601)
+  perCriterionVerdict: array of object (criterion identifier,
+                         predicate evaluated, verdict
+                         {satisfied|partially-satisfied|
+                          violated|inconclusive}, evidenceRefs)
+  budgetVerdict      : enum ("within-envelope" |
+                         "envelope-exceeded" |
+                         "envelope-exceeded-with-rationale")
+  overallVerdict     : enum ("intent-met" | "intent-partially-met"
+                         | "intent-failed" |
+                         "evaluation-inconclusive")
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §9 Observation Artefact Reference
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Action events (PHASE-1 §7) carry an `observationRef` that
+content-addresses the artefact the execution agent produced.
+Programmes record the artefact-class metadata so that downstream
+evaluators and auditors can interpret the artefact without
+bespoke knowledge of the action.
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+observationArtefact:
+  artefactId         : string (uuidv7)
+  traceId            : string (uuidv7)
+  actionId           : string (DAG node identifier)
+  capturedAt         : string (ISO 8601 / RFC 3339)
+  artefactKind       : enum ("structured-response-json" |
+                         "log-fragment" | "image" | "audio" |
+                         "video" | "measurement-series" |
+                         "shell-transcript" | "model-output" |
+                         "human-attestation" | "user-defined")
+  artefactRef        : string (content-addressed URI of the
+                         artefact bytes)
+  artefactDigest     : string (SHA-256)
+  artefactSizeBytes  : integer
+  privacyClass       : enum ("public" | "operator-internal" |
+                         "subject-restricted" |
+                         "regulator-restricted")
+  retentionWindow    : enum ("trace-only" | "intent-bound" |
+                         "regulatory-required")
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Artefact retention windows derive from the operating programme's
+records-management policy and the per-domain-scope regulatory
+expectations. Artefacts whose retention window is `trace-only`
+are eligible for purge once the trace has reached terminal
+status; artefacts that supported a regulator-attested process
+retain per the regulator's required window.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 Compensation Record
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Action events with `eventKind=compensated` (PHASE-1 §7) record
+the compensating action that the execution agent performed when
+an action failed and the plan's fallback policy required a
+rollback. The compensation record links the failed action and
+the compensating action so that auditors can reconstruct the
+unwind chain.
 
-## Annex H — Versioning and Deprecation Policy
+```
+compensation:
+  compensationId     : string (uuidv7)
+  traceId            : string (uuidv7)
+  failedActionId     : string (DAG node identifier of the
+                         action that failed)
+  compensatingActionId : string (DAG node identifier of the
+                         compensating action; introduced into
+                         the DAG by the planner's compensation
+                         strategy)
+  compensationOutcome: enum ("compensated" |
+                         "compensation-failed" |
+                         "manual-intervention-required")
+  rationaleRef       : string (content-addressed URI of the
+                         planner's compensation rationale; the
+                         rationale text is consumed by audit
+                         reviewers)
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §11 Review-and-Approve Record
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Intents that exceed the operator's per-author authorisation
+require a separate review and approval (PHASE-3 §18). The
+review-and-approve record captures the workflow.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+reviewAndApprove:
+  recordId           : string (uuidv7)
+  intentId           : string (uuidv7)
+  reviewerRef        : string (opaque IDP token)
+  reviewedAt         : string (ISO 8601)
+  reviewVerdict      : enum ("approved-for-approval" |
+                         "changes-requested" | "rejected")
+  reviewNotesRef     : string (URI of the reviewer's notes)
+  approverRef        : string (opaque IDP token; absent until
+                         the approver acts)
+  approvedAt         : string (ISO 8601; absent until approval)
+  approvalVerdict    : enum ("approved" | "rejected")
+  segregationOfDutiesAttested : boolean (true when the operator's
+                         IDP confirmed reviewer != approver !=
+                         author)
+```
 
-## Annex I — Interoperability Profiles
+## §12 Replay Record
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Replays (PHASE-3 §21) emit a separate trace plus a replay
+record that links replay outcome to original outcome.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+replay:
+  replayId           : string (uuidv7)
+  originalTraceId    : string (uuidv7)
+  replayTraceId      : string (uuidv7)
+  replayMode         : enum ("dry-run" | "full-execution")
+  replayedAt         : string (ISO 8601)
+  replayAuthorisedBy : string (opaque IDP token; required for
+                         `full-execution` mode)
+  outcomeDelta       : enum ("identical" | "deviated" |
+                         "inconclusive")
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §13 Conformance
+
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every intent processed and honour the
+predicate-grammar rules in §5.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-intent-lang
+- **Last Updated:** 2026-04-28

@@ -5,237 +5,274 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-intelligent-transportation (Intelligent Transportation).
+This document defines the protocols that govern an accredited
+intelligent-transportation programme: regulator authorisation,
+type approval of RSU and OBU radios, V2X security credential
+management, privacy filtering of broadcast records, mutual-aid
+governance with neighbouring TMCs, transit-priority and emergency
+preemption discipline, incident-management workflow, decommissioning
+of roadside infrastructure, and records retention.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 9001:2015 (quality management systems)
+- ISO 14001:2015 (environmental management)
+- ISO 39001:2012 (road traffic safety management)
+- ISO 21217:2020 (CALM ITS station architecture)
+- ISO 21384-3 (UAS — operational procedures, cited where TMC
+  programmes interact with traffic-monitoring drone operations)
+- ISO/IEC 17025:2017 (calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- IEEE 1609.2-2022 (V2X security services)
+- ETSI TS 103 097 (security headers and certificate formats)
+- ETSI TS 102 941 (security credential management)
+- SAE J2945/1 (V2V minimum performance requirements)
+- SAE J3161/1 (C-V2X)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- TMDD v3.1 (mutual-aid messaging conventions)
+- NTCIP 1202 v03 / 1203 v03 (signal controller / DMS protocols)
 
 ---
 
-## §1 Scope
+## §1 Regulator Authorisation
 
-This PHASE document is one of four that together define the WIA-intelligent-transportation
-standard. It addresses the protocol layer of the standard.
+A road operator MAY claim conformance to WIA-intelligent-
+transportation only after the national radio regulator has
+authorised the programme's RSU radio operations under the
+applicable spectrum band (5.850–5.925 GHz ITS band in most
+jurisdictions, with regional variations on DSRC vs C-V2X
+allocation).
 
-## §2 Manifest
+The programme records the spectrum authorisation reference per
+band per jurisdiction. Authorisations that revoke or narrow are
+recorded; the API enforces the revocation by refusing to
+register an RSU whose radio stack is no longer authorised.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "intelligent-transportation"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Type Approval
 
-## §3 Conformance Tiers
+RSU and OBU radios carry type-approval references against the
+applicable conformance regime (FCC OET Bulletin 65 / Part 95 in
+the US, RED Directive equivalents in the EU, regional regulators
+elsewhere). Type-approval revisions emit cross-references when
+they change power masks, channel allocations, or coexistence
+behaviour.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 V2X Security Credential Management
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+V2X messaging is authenticated under the Security Credential
+Management System (SCMS) per IEEE 1609.2 / ETSI TS 102 941.
+Programmes configure:
 
-## §4 Discovery
+- **Enrolment authority** that issues the long-term enrolment
+  certificate to each OBU and RSU.
+- **Pseudonym certificate authority** that issues short-lived
+  pseudonym certificates to OBUs (preserving driver privacy by
+  rotating the broadcast certificate frequently — typically every
+  5 minutes).
+- **Misbehaviour reporting service** that consumes signed
+  reports from peers about anomalous V2X behaviour and decides
+  on certificate revocation.
+- **Certificate revocation list (CRL) distribution** for
+  revoked certificates.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/intelligent-transportation`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Misbehaviour reports flow through the operator's incident-
+management workflow when they correlate with infrastructure
+faults; they flow to the SCMS operator when they implicate
+OBU misbehaviour.
 
-## §5 Time and Identity
+## §4 Pseudonym Rotation Policy
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Passenger-vehicle OBUs rotate pseudonym certificates at the
+cadence the regulator's privacy framework requires (5 minutes
+is the SAE J2945/1 default). Transit-vehicle and emergency-
+vehicle OBUs MAY operate under longer-lived role certificates
+since their operational role is itself disclosed by virtue of
+the vehicle's external markings.
 
-## §6 Versioning and Deprecation
+Rotation cadence is recorded against the programme; rotations
+that fall outside the published cadence are flagged in the
+operator's audit log.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 Privacy Filtering of Broadcast Records
 
-## §7 Privacy and Security
+V2X capture archives (PHASE-1 §6) contain broadcast messages that
+were public over-the-air but that, when aggregated and stored,
+allow reconstruction of vehicle trajectories. Programmes apply a
+privacy filter before any disclosure outside the programme:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- BSM messages are de-aggregated so that no consumer outside the
+  programme can reconstruct individual vehicle journeys longer
+  than the operator's privacy threshold (typically 60 seconds).
+- Pseudonym certificates within the archive are replaced with
+  capture-local opaque tokens.
+- Geographic precision is reduced to the operator's published
+  privacy precision (typically 10-metre cells for non-incident
+  research, 1-metre cells for incident investigation under court
+  order).
 
-## §8 Open Governance
+The filter version applied is recorded against every disclosure;
+filter upgrades are versioned independently of the API.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `intelligent-transportation` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Mutual-Aid with Neighbouring TMCs
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Adjacent road operators exchange incident, detour, and signal-
+coordination information across boundaries through the integration
+described in PHASE-4 §6. Mutual-aid governance:
 
+- Both parties carry mutual-aid agreements that name the data
+  classes shared and the response-time commitments.
+- Cross-boundary detour plans (a detour on operator A's network
+  that touches operator B's signals) require operator B's
+  acknowledgement; absent acknowledgement, the detour falls back
+  to within-network only.
+- Joint-operations exercises are conducted at least annually.
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+## §7 Transit-Priority and Emergency Preemption
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Transit-signal-priority (TSP) and emergency-vehicle preemption
+(EVP) are governed by the operator's preemption policy, recorded
+against the programme. Preemption requests carry the requesting
+vehicle's role token and are validated against the operator's
+authorisation register; unauthorised preemption requests are
+logged and discarded.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Programmes that operate cross-jurisdictional transit (regional
+bus systems crossing TMC boundaries) record reciprocal
+authorisation so that a transit vehicle on a partner network is
+treated identically.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §8 Incident-Management Workflow
 
-## Annex F — Adoption Roadmap
+Incident workflow follows a documented playbook per incident
+classification. Incidents at severity `critical` (multi-fatality
+collision, hazmat spill, infrastructure collapse) trigger the
+operator's emergency-operations centre activation.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Root-cause investigations for incidents that cause public-safety
+impact are deposited as evidence and surface in the operator's
+annual safety report.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Decommissioning of Roadside Infrastructure
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+RSU decommissioning follows the operator's asset-disposition
+process: physical removal, certificate revocation through the
+SCMS, archival of the RSU's operational history (firmware
+versions, message volumes, fault history), and update of the
+programme's geographic scope. Decommissioned RSUs remain
+addressable in the API at their content-addressed identifier so
+that historical incident investigations can reference them.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Records Retention
 
-## Annex G — Test Vectors and Conformance Evidence
+Programme records — every record defined in PHASE-1, the API
+audit logs, the V2X capture archives at their declared retention
+window, the regulator submissions, and the mutual-aid exchanges —
+retain per the regulator's required window. Public-safety-impact
+incident records and their root-cause investigations retain
+indefinitely.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Time Synchronisation
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programme clocks synchronise per RFC 5905 (NTPv4) against a
+national-metrological-laboratory stratum-1 service or an
+equivalent recognised service. Sub-microsecond timing required
+for V2X interlocks (intersection movement assist, signal-phase
+coordination across nearby intersections) uses PTP or GNSS-
+disciplined oscillators per the operator's timing dossier.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §12 Cross-Jurisdictional Programme Operation
 
-## Annex H — Versioning and Deprecation Policy
+Multi-jurisdiction programmes (interstate corridor management,
+trans-European corridor management, border-crossing freight
+corridors) honour each participating jurisdiction's spectrum
+rules, type-approval rules, and privacy framework. Per-segment
+records carry the governing jurisdiction.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Quality Dossier
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The programme's quality dossier records the regulator
+authorisations, the mutual-aid agreements, the SCMS operator
+relationship, the pseudonym rotation cadence, the privacy filter
+versions, the joint-operations exercises performed, and the
+operational events the programme has experienced. The dossier
+is reviewed at least annually by the operator's quality
+manager.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Safety Management
 
-## Annex I — Interoperability Profiles
+Programmes that operate under a road-safety management framework
+(ISO 39001:2012 or equivalent) integrate the WIA-intelligent-
+transportation records with the operator's safety dossier:
+safety performance indicators (KSI rates, secondary-crash rates),
+safety risks identified through V2X data analytics, and the
+corrective actions undertaken.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §15 Cybersecurity for Operational Technology
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+TMC operational technology (signal controllers, RSU back-ends,
+preemption gateways) follows the operator's defence-in-depth
+cybersecurity expectations recorded in the operator's IEC 62443
+zone classification. Cybersecurity incidents that affect
+operational technology trigger an immediate notification under
+the operator's incident-response process.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §16 VRU Privacy and Aggregation
+
+Vulnerable-road-user awareness records (PHASE-1 §10) carry
+de-identified trajectories produced by the operator's privacy
+filter. The filter applies the same precision-reduction rules as
+the V2X capture filter (§5) and additionally suppresses
+trajectories shorter than the operator's published minimum
+threshold (typically 30 seconds) to prevent re-identification of
+individual pedestrians at low-traffic locations.
+
+Aggregate VRU detection counts published through the API
+(PHASE-2 §18) are subject to a cohort-size protection rule that
+suppresses counts in cells where fewer than the operator's
+threshold of detections occurred.
+
+## §17 Work-Zone Activation Discipline
+
+Work-zone records (PHASE-1 §11) are authorised by the operator's
+construction-permit system; activation in the API requires the
+permit reference. Work zones that activate without a permit
+reference (emergency lane closures for collision response, debris
+removal) carry a `provisional` flag and reconcile to a permit
+reference within 24 hours; failure to reconcile triggers an
+audit alert.
+
+Cross-boundary work zones (a work zone whose geometry crosses
+TMC boundaries) require coordination with the partner TMC
+through the mutual-aid integration of §6.
+
+## §18 Vehicle-Class Authorisation
+
+Vehicle-role tokens recorded in the OBU record (PHASE-1 §5)
+authorise the OBU to participate in role-specific protocols:
+transit-signal-priority for transit OBUs, emergency-vehicle
+preemption for emergency OBUs, snowplow-coordinated signal
+adjustment for snowplow OBUs. Role assignments are subject to
+the operator's authorisation register; vehicles whose role
+authorisation has expired are demoted to baseline OBU operation.
+
+## §19 Conformance and Auditing
+
+A programme conformant with WIA-intelligent-transportation
+publishes its spectrum and type-approval references, its mutual-
+aid agreements, its quality dossier, and the catalogue of
+material incidents (severity `critical` and resolved
+public-safety incidents), and answers an annual self-assessment
+that maps each clause of this PHASE to the programme's
+implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-intelligent-transportation
+- **Last Updated:** 2026-04-28

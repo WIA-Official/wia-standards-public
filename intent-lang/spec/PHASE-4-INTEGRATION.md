@@ -5,237 +5,270 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-intent-lang (Intent Lang).
+This document defines how an intent-language programme
+integrates with the systems that surround it: authoring tools
+(IDE plug-ins, visual diagram editors, command-line authoring
+tools), the operator's IDP for author identity, planner-runtime
+catalogues, execution-agent catalogues, evaluator catalogues,
+fallback-handler infrastructure (notification systems, on-call
+rotas, ticketing systems), observability platforms, and
+long-term archives that hold intent registries beyond programme
+wind-down. It also defines the evidence-package format that
+bundles a programme's intent record set for external audit.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 17065:2012 (conformity-assessment bodies)
+- ISO 8601 (date and time)
+- W3C SHACL
+- W3C JSON-LD 1.1
+- W3C Verifiable Credentials Data Model 2.0 (optional)
 
 ---
 
-## §1 Scope
+## §1 Authoring Tool Integration
 
-This PHASE document is one of four that together define the WIA-intent-lang
-standard. It addresses the integration layer of the standard.
+Authoring tools target the API at `/v1/intents` with the
+authoring tool's client certificate; the certificate's subject
+identifies the tool to the operator's audit trail. Authoring
+tools fetch the active grammar and SHACL artefacts from the
+endpoints in PHASE-2 §9 and pin the revisions they emit
+against. Authoring tools that emit intents under a stale
+grammar or SHACL pinning receive a refresh notification through
+the streaming subscription.
 
-## §2 Manifest
+## §2 Identity Provider Integration
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "intent-lang"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The operator's IDP federates author identity. Authors obtain
+opaque `authorRef` tokens by authenticating to the IDP; the
+authoring tool exchanges the tokens for intent registry
+authorisation through the operator's authorisation service.
+IDP integrations support the AAL tiers required by the
+operator's per-domain-scope authorisation matrix.
 
-## §3 Conformance Tiers
+## §3 Planner Runtime Catalogue Integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Planner runtime catalogues advertise qualified planners
+(PHASE-3 §5). The integration carries the catalogue's
+identifier, the per-planner qualification chain, the per-domain-
+scope coverage, and the catalogue's notification endpoint for
+planner deprecations.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §4 Execution Agent Catalogue Integration
 
-## §4 Discovery
+Execution agent catalogues advertise qualified agents
+(PHASE-3 §6). The integration carries the catalogue's
+identifier, the per-agent action-kind coverage, the per-agent
+operational-region binding, and the catalogue's notification
+endpoint for agent deprecations.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/intent-lang`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §5 Evaluator Catalogue Integration
 
-## §5 Time and Identity
+Evaluator catalogues advertise qualified evaluators (PHASE-3
+§7). The integration carries the catalogue's identifier and
+the per-evaluator methodology coverage so that intents can
+select appropriate evaluators per acceptance criterion.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §6 Fallback Handler Integration
 
-## §6 Versioning and Deprecation
+Fallback handlers receive escalations from intents whose
+`fallbackPolicy` requires `request-human-decision` or whose
+evaluation outcome is `intent-failed`. The integration record
+carries the handler's identifier (notification system,
+ticketing queue, on-call rota), the per-domain-scope routing,
+and the escalation timeout per fallback policy.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §7 Observability Platform Integration
 
-## §7 Privacy and Security
+Observability platforms consume execution traces (PHASE-1 §7)
+and emit per-intent dashboards for the operator's analytics
+team. The integration is read-only; the observability platform
+does not write back into the intent registry. Observability
+queries that exceed the operator's per-tenant rate limit are
+throttled.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §8 Evidence Package Format
 
-## §8 Open Governance
+```
+evidence/
+  manifest.json                 — package manifest (signed, see §9)
+  programme.json                — programme record
+  grammar/                      — grammar revisions in force at
+                                   the cited interval
+  shacl/                        — SHACL revisions in force at
+                                   the cited interval
+  intents/                      — per-intent records and
+                                   predicates
+  plans/                        — per-intent plan history
+  execution-traces/             — per-plan trace and action
+                                   events
+  evaluations/                  — per-trace evaluations
+  fallback-decisions/           — fallback-handler decisions
+                                   recorded against the intent
+  audit/                        — API audit log excerpts
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `intent-lang` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The package is content-addressable; the manifest is signed by
+the operator's HTTP-message-signature key (RFC 9421) and
+counter-signed by the programme's quality manager when the
+package supports an external audit.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §9 Manifest and Signatures
 
+Verification tools recompute file digests, compare to the
+manifest, and reject the package on mismatch with type
+`urn:wia:intent-lang:evidence-mismatch`.
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+## §10 well-known URI Discovery
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+A conformant programme exposes a discovery document at
+`/.well-known/wia-intent-lang` that links to the API root, the
+grammar / SHACL endpoints, the qualified runtime register, and
+the published quality dossier.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §11 Long-Term Archive Integration
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Programmes designate a long-term archive that holds intents
+and traces beyond programme wind-down. Quarterly deposits
+round-trip content-addresses; on wind-down, remaining records
+transfer to the archive with content-addresses preserved.
 
-## Annex F — Adoption Roadmap
+## §12 Cross-Standard Linkage
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Programmes that consume adjacent WIA standards (workflow-
+orchestration, data-lineage, ai-agent-governance) emit cross-
+standard linkage records that name the consuming standard and
+the version under which the linkage is claimed.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §13 Verifiable-Credential Re-Issuance (optional)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Operators that wish to expose attestations (planner-runtime
+qualification, execution-agent qualification, ISO/IEC 27001
+certification) to consumers of W3C Verifiable Credentials MAY
+re-issue the attestations as Verifiable Credentials under the
+Data Model 2.0 specification. Re-issuance is optional; the
+canonical record remains the JSON evidence-package manifest.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §14 Streaming Heartbeat
 
-## Annex G — Test Vectors and Conformance Evidence
+SSE subscribers receive a heartbeat every 30 seconds with
+`Last-Event-ID` resume support; subscribers that disconnect
+during long-running execution traces resume from the last seen
+event identifier without losing visibility of priority-1
+events.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §15 Backwards-Compatibility Guarantee
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+PHASE-4 minor revisions remain backwards-compatible with prior-
+minor clients. Major revisions go through a deprecation window
+of at least one full grammar major-version release cycle so
+that authoring tools and runtimes have time to migrate.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §16 Migration from Pre-Standard Records
 
-## Annex H — Versioning and Deprecation Policy
+Programmes that operated before WIA-intent-lang reached version
+1.0 MAY migrate historical intent registries by emitting
+synthetic intent records with a `legacyImport` flag. Synthetic
+intents are accepted by the public catalogue but are not
+eligible for evidence-package generation without contemporaneous
+re-validation under the in-force SHACL revision.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §17 Reader Tooling
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Programmes MAY publish supplementary reader tools (visual
+intent timelines, predicate-evaluation explanations,
+budget-vs-actuals charts, fallback-decision diaries) alongside
+the canonical evidence package; the tools are non-normative.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §18 Public Catalogue and Aggregator Feeds
 
-## Annex I — Interoperability Profiles
+Programmes that publish a public catalogue of representative
+intents (for community learning, benchmarking, or research)
+emit an Atom or JSON Feed listing intents with their evidence-
+package manifest digests, the goal text, the domain scope, and
+the overall verdict at the time of publication. The feed
+respects the operator's privacy and confidentiality policy.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §19 Compensation-Strategy Catalogue Integration
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Compensation-strategy catalogues advertise per-action-kind
+compensation algorithms (PHASE-3 §15). The integration record
+carries the catalogue's identifier, the per-strategy
+applicability matrix (which planner-runtimes and execution-
+agent versions can honour the strategy), and the catalogue's
+notification endpoint for strategy deprecations.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §20 Audit-Reviewer Workflow Integration
+
+External audit reviewers (programme auditors, regulator
+inspectors) consume audit-trail exports through dedicated
+client certificates. The export carries the intent / plan /
+trace / evaluation / compensation chain for the audit window
+the auditor was commissioned for. Audit reviewers do not
+write back into the intent registry; remediation actions
+flow back through the operator's quality-management system.
+
+## §21 Quality-Aggregate Endpoint Integration
+
+External quality-benchmarking services that compare intent-
+language programmes consume aggregate endpoints (PHASE-2 §18)
+and publish per-domain success-rate, budget-overrun-rate, and
+fallback-trigger-rate league tables. The integration is
+read-only and is rate-limited; benchmark service certificates
+are bound to the operator's terms-of-use that the benchmark
+operator has agreed.
+
+## §22 Federated Programme Operation
+
+Operators that run multiple intent registries (per business
+unit, per regulatory jurisdiction, per technology stack)
+integrate through a federation adapter that translates between
+per-registry WIA records and a combined view. The adapter
+honours each registry's domain-scope authorisation matrix so
+that federated queries respect the source registry's safety
+constraints.
+
+## §23 Cross-Programme Federation Broker Integration
+
+Operators that participate in cross-programme intent federation
+(PHASE-3 §20) integrate with a federation broker that routes
+action subgraphs between partner programmes. The integration
+record carries the broker's identifier, the partner-programme
+catalogue, the per-partner authorisation matrix, and the
+trace-reconciliation protocol that the broker honours. Brokers
+are typically operated by a programme consortium and are
+themselves audited under the operator's outsourcing policy.
+
+## §24 Workflow Hand-Off to Adjacent Standards
+
+Programmes that hand off completed intents to adjacent
+WIA-orchestration or WIA-data-lineage programmes integrate
+through a hand-off adapter that translates the intent /
+plan / trace / evaluation set into the adjacent programme's
+record vocabulary. The adapter preserves content-addresses so
+that downstream consumers can resolve back to the originating
+intent registry without ambiguity.
+
+## §25 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully
+with at least one authoring tool, at least one IDP, the
+qualified planner / agent / evaluator catalogues, the operator's
+fallback-handler infrastructure, at least one observability
+platform, and at least one long-term archive, and has published
+at least one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-known
+discovery document at least 90 calendar days before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-intent-lang
+- **Last Updated:** 2026-04-28
