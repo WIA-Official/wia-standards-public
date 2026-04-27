@@ -1,241 +1,274 @@
-# WIA-military-drone PHASE 4 — INTEGRATION Specification
+# WIA-military-drone PHASE 4 — Integration Specification
 
 **Standard:** WIA-military-drone
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-military-drone (Military Drone).
+This PHASE describes how a UAS deployment integrates the data, APIs,
+and protocols from PHASEs 1–3 with the operational picture: airframe
+fleet management, ground control station infrastructure, mission
+planning system, civil-airspace coordination, video / KLV storage,
+fire-control consumers (WIA-missile-defense), and coalition exchange.
+It is non-prescriptive about specific vendors; it specifies the
+integration *contracts* a deployment must satisfy.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 4586 — UAV Control System interfaces
+- STANAG 4609 — NATO Digital Motion Imagery (MISB)
+- ICAO Doc 4444 — air-traffic management procedures
+- ICAO Annex 2 — Rules of the Air
+- WIA-missile-defense (PHASE 1–4) — for engagement-decision cross-reference
+- WIA-military-communication (PHASE 1–4) — for cross-coalition transport
+- WIA-laser-weapon (PHASE 1–4) — for UAS-mounted laser-designator integration
 
 ---
 
-## §1 Scope
+## §1 Airframe fleet registry
 
-This PHASE document is one of four that together define the WIA-military-drone
-standard. It addresses the integration layer of the standard.
+The deployment maintains a registry of every fielded airframe:
 
-## §2 Manifest
+- `airframeRef` — URN
+- vendor, model, serial number
+- MTOW band, endurance band, payload capability set
+- supported link classes
+- flight-control firmware version + last update date
+- TLS client certificate fingerprint and expiry
+- maintenance schedule + last-flight-hour count
+- operating-area policy (geographic + RoE scope)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-drone"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+An airframe not in the registry, or with expired certificate or
+firmware out of currency, is refused at PHASE 2 §1 mission-plan
+intake.
 
-## §3 Conformance Tiers
+## §2 Ground control station integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+GCS integration follows STANAG 4586:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- The GCS authenticates with mTLS + JWS-signed messages
+- Operator identity is bound to the GCS's authentication; multi-
+  operator GCSs use per-operator authentication for accountability
+- The GCS forwards mission-plan submissions and re-tasking to the
+  boundary; the boundary returns the canonical record URN
+- The GCS subscribes to airframe state, payload state, and link
+  state streams via PHASE 2 §2
 
-## §4 Discovery
+Multi-GCS deployments (one airframe controlled by different GCSs at
+different mission phases) coordinate via the boundary's hand-over
+records.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-drone`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Mission planning system
 
-## §5 Time and Identity
+The mission planner is a separate service that owns:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Route construction (waypoints, legs, climb/descent profiles)
+- Geofence drafting
+- Civil-airspace coordination message generation (ICAO-compatible
+  flight plans, NOTAM submission, dynamic re-route)
+- Lost-link behaviour selection
+- Weapon-loadout planning (for strike missions)
 
-## §6 Versioning and Deprecation
+The planner submits the resulting mission plan via PHASE 2 §1; the
+boundary's role is gatekeeping and audit.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Civil-airspace coordination
 
-## §7 Privacy and Security
+UAS operating in civil airspace require coordination with ATC:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- ICAO Annex 2 rules apply except where the deployment's national
+  authority exempts (e.g., dedicated military-only airspace,
+  pre-coordinated training zones)
+- Pre-flight: NOTAM submission and acknowledgement
+- In-flight: ATC clearance for any altitude / route changes
+- Post-flight: NOTAM closure
 
-## §8 Open Governance
+The deployment policy enumerates which airspaces require which
+level of coordination; the boundary refuses missions whose route
+crosses unauthorised airspace.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-drone` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Video / KLV storage
+
+Full-motion video and associated KLV metadata flow to the
+deployment's video-storage system:
+
+- Video transport: per-airframe video link (FMV stream over the C2
+  bandwidth or a dedicated wideband link)
+- KLV metadata: per-frame KLV stream paired with the video
+- Storage: video-indexed-by-time + KLV-indexed-by-time; the
+  deployment's playback tools join them for analysis
+- Retention: per-airspace retention policy (typically ≥ 12 months
+  for ISR, ≥ 7 years for strike-mission video)
+
+PHASE 2 §3 observation publication references the storage URI; the
+canonical record at the boundary references the storage URI rather
+than duplicating the bulk data.
+
+## §6 Fire-control consumer (WIA-missile-defense)
+
+For strike missions, the WIA-missile-defense fusion engine is a
+consumer of the airframe's track and the released munition's track:
+
+- Airframe state stream feeds the fusion engine (the airframe is a
+  friendly track)
+- Released munition (PHASE 1 §6) creates a new munition-track in
+  WIA-missile-defense via cross-domain reference
+- Outcome (kinetic-kill / miss / partial) is recorded in
+  WIA-missile-defense PHASE 1 §8 outcome record with reference back
+  to the WIA-military-drone release record
+
+This bridge ties two audit chains across the strike lifecycle.
+
+## §7 Coalition exchange
+
+Multi-national coalition operations exchange mission plans, observations,
+and (where authorised) weapon-release authority bilaterally under a
+federation manifest:
+
+- Manifest enumerates which records flow which direction, which
+  airframes each party may control on the other's airspace, and the
+  release authorities for cross-party content
+- The boundary honours the manifest at every cross-national release
+- Manifest expiry suspends cross-national flows; renewal is signed
+  and recorded as an AuditEvent
+
+Ad-hoc cross-coalition tasking outside the manifest requires both
+nations' release officers to sign individually.
+
+## §8 Operational SLAs
+
+| Concern                                          | Default SLA              |
+|--------------------------------------------------|--------------------------|
+| Mission-plan submission p95 latency              | ≤ 200 ms                 |
+| Airframe state stream sample latency             | ≤ 100 ms (1-10 Hz stream)|
+| Weapon-release authorisation turnaround          | ≤ 500 ms                 |
+| Sensor observation publication                   | ≤ 1 s after sensor frame |
+| Lost-link detection threshold                     | per airframe class (typ. 30 s) |
+| Audit chain entry available after operation      | ≤ 1 s                    |
+| RoE authorisation cache refresh                   | ≤ 5 minutes              |
+| Civil-airspace coordination acknowledgement       | per ATC SLA              |
+
+Tighter SLAs negotiable per deployment; loosening requires
+operational sign-off.
+
+## §9 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every fielded airframe is in the registry with current certificate
+   and firmware
+2. Every mission in the past quarter has a matching audit chain entry
+   with verifiable inclusion proof
+3. Every weapon-release event has dual signatures on file
+4. Every civil-airspace overlap has matching ATC coordination evidence
+5. Geofence-evidence records are on file for every mission
+6. Lost-link events have recovery records or mishap-investigation
+   evidence
+7. Cross-coalition releases have both release-authority signatures
+8. Quarterly compliance report has no integrity-check failures
+
+A deployment failing any of these reports the gap in its compliance
+package rather than concealing it.
+
+## Annex A — Common pitfalls (informative)
+
+- **Civil-airspace dynamic re-route mismatch** — ATC issues dynamic
+  re-routes that differ from the airframe's filed flight plan; the
+  GCS must propagate the re-route into the mission record before the
+  airframe acts on it (or the geofence-evidence record will show a
+  breach the deployment cannot defend at audit)
+- **KLV metadata staleness** — KLV streams have per-frame timestamps;
+  storage that loses synchronisation between video and KLV produces
+  unreplayable observations. The deployment SHOULD validate
+  video-KLV alignment at storage ingest
+- **Lost-link behaviour mismatch** — operator-set and airframe-
+  programmed lost-link behaviour MUST agree; mismatch surfaces only
+  at link-loss, when recovery is impossible
+- **Multi-GCS hand-over drift** — hand-over events lose audit
+  visibility if the prior GCS's session ends before the receiving
+  GCS's begins; the deployment SHOULD ensure overlap or use signed
+  hand-over records
+
+## Annex B — Decommissioning (informative)
+
+When an airframe is decommissioned: outstanding missions complete or
+transfer to a successor airframe, the system is removed from the
+registry, final flight-hour count is recorded, and audit records are
+preserved per WIA-payment-system retention rules. The decommissioning
+manifest is itself an audit event.
+
+## Annex C — Quarterly compliance report (informative)
+
+The boundary emits a quarterly compliance report covering total
+missions by type, observation volumes, weapon-release events with
+authorisation chain, geofence-breach incidence, lost-link events
+and recovery rates, civil-airspace coordination status, federation
+peer activity, and audit-chain integrity check results.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex D — Worked civil-airspace coordination (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Pre-flight:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+1. Mission planner constructs the route + flight plan
+2. Mission planner submits NOTAM to the controlling national authority
+3. National authority issues NOTAM identifier; coordination message
+   includes the NOTAM URN
+4. Mission plan PHASE 2 §1 submission includes
+   `civilAirspaceCoordinationRef` referencing the NOTAM
+5. Boundary verifies NOTAM exists and covers the route
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+In-flight dynamic change:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+1. ATC issues a re-route via voice or CPDLC
+2. Operator confirms; mission planner updates the route + NOTAM
+3. Re-tasking via PHASE 2 §1 with the updated coordination reference
+4. Boundary records the change; the airframe acts on the new route
 
-## Annex F — Adoption Roadmap
+Post-flight:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+1. NOTAM is closed at the controlling authority
+2. Recovery record references the NOTAM closure for audit completeness
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex E — Versioning and deprecation (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Versioning follows Semantic Versioning 2.0.0. STANAG 4586 versions
+bump independently from this PHASE; the deployment policy maps each
+PHASE version to the STANAG 4586 version it honours so coalition
+partners know what their counterpart's GCS expects. Deprecation
+enters a 12-month sunset window with migration notes recorded in
+the audit chain.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex F — Lost-link mishap investigation (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+A lost-link event whose mishap-flag is true triggers a formal
+investigation:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+1. Audit-chain entries from the mission start through the lost-link
+   window are preserved in a forensic store
+2. Last-known airframe state, lost-link behaviour, mission-plan
+   parameters, weather + airspace conditions are extracted
+3. If physical evidence is recoverable, it is preserved under
+   ISO 17025-style chain-of-custody
+4. A written investigation report is filed within 30 days
+5. Lessons-learned are fed back to the mission-planning system
+   (e.g., updated geofence margins, revised lost-link behaviour
+   defaults, revised airframe-class operational envelope)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The investigation report is itself signed and recorded in the
+audit chain.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## Annex G — Quarterly compliance report (informative)
 
-## Annex H — Versioning and Deprecation Policy
+The boundary emits a quarterly compliance report covering:
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- Total missions by type and outcome
+- Sensor-observation volumes by sensor type and storage destination
+- Weapon-release events with authorisation chain
+- Geofence-breach incidence by airframe and corridor
+- Lost-link events and recovery rates
+- Civil-airspace coordination acknowledgement timeliness
+- Federation peer activity (cross-coalition flows)
+- Audit-chain integrity check results
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The report is signed and is itself in scope for the audit chain.

@@ -1,241 +1,259 @@
-# WIA-military-drone PHASE 3 — PROTOCOL Specification
+# WIA-military-drone PHASE 3 — Protocol Specification
 
 **Standard:** WIA-military-drone
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-military-drone (Military Drone).
+This PHASE specifies the protocols binding the data format (PHASE 1)
+to the API surface (PHASE 2): authentication of airframes, ground
+control stations (GCS), operators, and release authorities; the
+constrained binary tactical encoding (Link 16 J-series mapping +
+STANAG 4586 UCS interfaces); audit-chain construction; time discipline;
+geofence enforcement integrity; weapon-release dual-signature
+handshake; and the cross-coalition release-authority handshake.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 4586 — UAV Control System interfaces
+- STANAG 5516 — Tactical Data Link 16 (J-series)
+- MISB ST 0601, ST 0903 — UAS metadata
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK), RFC 9162 (Certificate Transparency 2.0 pattern)
+- WGS-84 — geodetic reference frame
+- ICAO Doc 4444 — air-traffic management procedures
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-military-drone
-standard. It addresses the protocol layer of the standard.
+Airframes, ground control stations, operators, and release authorities
+authenticate using JWS-signed JWTs issued by the deployment's identity
+provider (KA). Token claim layout:
 
-## §2 Manifest
+| Claim          | Source                                                         |
+|----------------|----------------------------------------------------------------|
+| `iss`          | KA URL                                                         |
+| `aud`          | the boundary URL                                               |
+| `sub`          | airframe URN, GCS URN, operator URN, release-authority URN     |
+| `iat` / `exp`  | issuance/expiry per RFC 7519                                    |
+| `wia_role`     | one of: airframe, gcs, operator, release-authority, c2          |
+| `wia_doctrine` | declared doctrine                                              |
+| `wia_clearance`| classification clearance                                       |
+| `wia_roe_scope[]` | RoE categories the principal may invoke                      |
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-drone"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Airframe tokens are short-lived (≤ 1 hour) and refresh during
+flight by the GCS. Release-authority tokens are session-scoped
+(≤ 8 hours) and require fresh issuance per operational shift.
 
-## §3 Conformance Tiers
+## §2 Token format and signing
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Tokens are JWS-signed JWTs (RFC 7515 + RFC 7519). Default signature
+algorithm is ES256 (P-256 ECDSA); higher classification levels SHOULD
+use ES384. Tactical narrowband links MAY use Ed25519.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Tokens MUST be sent over TLS 1.3.
 
-## §4 Discovery
+## §3 Key management
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-drone`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The KA publishes a JWKS at a fixed well-known URI. Signing keys
+rotate at least every 90 days for routine traffic, every 30 days for
+operational deployments. Prior keys remain in the JWKS for ≥ 180 days.
 
-## §5 Time and Identity
+Cross-coalition deployments register peer KAs in a federation
+manifest signed by both parties. Private keys live in HSMs (FIPS 140-3
+Level 2 or national equivalent, KCMVP for KR).
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Audit chain construction
 
-## §6 Versioning and Deprecation
+Every mission-plan submission, airframe state event, payload event,
+sensor observation, weapon-release authorisation, weapon-release event,
+geofence evidence record, lost-link event, and recovery record emits
+an AuditEvent. AuditEvents form a per-deployment hash chain:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+chain_input  = SHA-256(prev_chain_root || canonical(event))
+chain_root_t = chain_input
+```
 
-## §7 Privacy and Security
+Canonicalisation uses RFC 8785 JSON Canonicalisation Scheme. The chain
+root is sealed once per UTC day. Sealed roots MAY be published to a
+transparency log following RFC 9162 when the deployment policy
+enables external auditability.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+For high-tempo ISR operations (multiple airframes, 10 Hz state
+updates) the chain is sharded by airframeRef hash prefix; sharding
+is itself audited so an after-the-fact reshard is detectable.
 
-## §8 Open Governance
+## §5 STANAG 4586 UCS interfaces
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-drone` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The deployment's GCS speaks STANAG 4586 to the airframe and to the
+boundary. The protocol maps STANAG 4586 message classes into PHASE 2:
+
+| STANAG 4586 message class    | PHASE 2 endpoint                          |
+|------------------------------|-------------------------------------------|
+| Mission planning             | POST /missions, PUT /missions/<>/$retask  |
+| Vehicle control              | tactical link to airframe (out of scope of this PHASE; the boundary records the resulting state events) |
+| Payload control              | airframe state stream (PHASE 2 §2) + observation publication (PHASE 2 §3) |
+| Operator messaging            | sideband, out of scope                    |
+| Mission monitoring            | GET /airframes/<>/state/$subscribe        |
+
+Mapping is *projection* — the canonical record at the boundary is
+the JSON record from PHASE 2; STANAG 4586 messages on the tactical
+link reference the canonical record by URN.
+
+## §6 Tactical bandwidth-constrained encoding (Link 16)
+
+For Link 16 fire-control loops:
+
+| WIA record                     | J-series mapping                                |
+|--------------------------------|-------------------------------------------------|
+| Airframe state                 | J3.x position-and-track of the airframe         |
+| Sensor observation             | J3.x track of the observed object               |
+| Weapon-release authorisation   | J11.x weapon-direction (UAS class)              |
+| Weapon-release event           | J12.x weapon-status (released)                  |
+| Recovery record                | J17.x amplifying remarks                         |
+
+Constrained encoding is *projection only*; the canonical record
+remains at the boundary. The J-series payload includes a hash
+reference back to the canonical record.
+
+## §7 Time discipline
+
+Airframe clocks discipline to GNSS PPS (multi-constellation receiver:
+GPS + Galileo + BeiDou + GLONASS) where available, falling back to
+oscillator-only with a recorded warning. Drift exceeding 100 ms
+suspends new mission-plan acceptance because route timing depends on
+agreed time. Drift exceeding 5 s suspends weapon-release
+authorisation because release-condition timing depends on tight time
+discipline.
+
+All record timestamps are RFC 3339 with offset; tactical loops use
+microsecond precision where the underlying clock supports it.
+
+## §8 Weapon-release dual-signature handshake
+
+A weapon release flows under dual signatures:
+
+1. The operator (in the GCS) signs the release request with their
+   token's signing key
+2. The release authority (in the operations centre, at a higher
+   command level) signs the release request with their token's
+   signing key
+3. The boundary verifies both signatures + the RoE authorisation
+   (`wia_roe_scope` covering the engagement category) before issuing
+   the fire instruction to the airframe over the tactical link
+4. The airframe acknowledges receipt; the airframe's release event
+   is signed by the airframe's signing key
+
+A release event with fewer than two signatures (operator + release
+authority) is rejected at the boundary with
+`urn:wia:md-uas:problem:dual-signature-required`. An airframe that
+attempts to fire without a fresh signed authorisation is treated as
+a safety-override event and triggers the deployment's incident
+response.
+
+## §9 Failure modes
+
+| Failure                              | Behaviour                                          |
+|--------------------------------------|----------------------------------------------------|
+| KA JWKS unreachable                  | Cached keys honoured until cache expiry             |
+| Tactical link drops mid-mission      | Lost-link behaviour from mission plan invoked       |
+| Weapon-release authorisation expires | Release refused; new authorisation required         |
+| Civil-airspace coordination revoked  | Airframe diverted to closest approved airspace      |
+| Audit chain write failure            | Mission-plan acceptance refused; in-flight ops continue with local persistence |
+| Time drift > 5 s                     | Release authorisation suspended                     |
+| Federation manifest expired          | Cross-coalition release refused                     |
+
+## Annex A — Algorithm choices (informative)
+
+| Concern                  | Default                       | Notes                              |
+|--------------------------|-------------------------------|------------------------------------|
+| Token signing            | ES256 (P-256 ECDSA)           | Ed25519 for tactical narrowband    |
+| Daily-root signing       | ES384 (P-384 ECDSA)           |                                    |
+| Tactical packet signing  | EdDSA Ed25519 (64-byte)       | air-time minimisation               |
+| Audit hash               | SHA-256 (RFC 6234)            |                                    |
+| TLS                      | 1.3 (RFC 8446)                | 1.2 explicit-list only             |
+| Symmetric at rest (audit)| AES-256-GCM                   |                                    |
+
+## Annex B — Federation manifest worked example (informative)
+
+```yaml
+federation:
+  parties:
+    - {orgRef: "urn:wia:org:rok-army.adcc", kid: "ka-rok-2026"}
+    - {orgRef: "urn:wia:org:us-army.380adabde", kid: "ka-us-2026"}
+  flows:
+    - {from: "rok", to: "us", purposes: ["operational"], records: ["state", "observations", "releases"]}
+    - {from: "us", to: "rok", purposes: ["operational"], records: ["state", "observations"]}
+  weaponReleaseScope:
+    - {fromParty: "us", airframeClass: "rok-tactical", crossUseAllowed: false}
+  expiry: "2027-04-27"
+  signatures: [<JWS-by-rok>, <JWS-by-us>]
+```
+
+## Annex C — Time-precision worked example (informative)
+
+| Concern                          | Precision                      |
+|----------------------------------|--------------------------------|
+| Mission-plan timestamp           | second                         |
+| Airframe state stream             | millisecond (1 Hz to 10 Hz)    |
+| Sensor observation                | sub-second (millisecond-level) |
+| KLV metadata stream               | per-frame (typically 30 Hz)    |
+| Weapon-release event              | microsecond (fire-control)     |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex D — Lost-link recovery worked example (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+1. Airframe loses BLOS-SATCOM link at 09:31:14; LOS-RF was already
+   beyond range
+2. Onboard logic invokes `lostLinkBehaviour: return-to-base` per
+   mission plan
+3. Airframe persists state events locally to flash-storage during
+   the lost-link window
+4. At 09:43:07 LOS-RF is re-acquired as the airframe approaches base
+5. Airframe pushes its locally-persisted state events to the boundary
+   via PHASE 2 §2; the boundary inserts them into the chain at the
+   recorded timestamps and emits a `lost-link-recovery` audit event
+6. Recovery record (PHASE 1 §9) is created at landing
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Late-arrival events with timestamps inside an already-sealed daily
+root are routed to the late-arrival queue and surface to operations
+for review.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex E — Conformance levels (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+| Level     | Scope                                                                 |
+|-----------|-----------------------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                                   |
+| Verified  | annual third-party audit (STANAG 4586 conformance + RoE compliance)    |
+| Anchored  | continuous evidence package per audit chain transparency               |
 
-## Annex F — Adoption Roadmap
+Coalition operations typically require Verified or Anchored from all
+parties; cross-coalition weapon-release authority requires Anchored.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex F — Tactical narrowband budget (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+For STANAG 4586 narrowband TC links to a low-bandwidth airframe:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Message class                | Approx. on-air time @ 9.6 kbps |
+|------------------------------|--------------------------------|
+| Vehicle-control command      | 50-200 ms                      |
+| Mission-plan dispatch (small)| 1-5 s                          |
+| State stream (compact)       | 10-50 ms / sample              |
+| KLV metadata (frame)         | per-vendor compression         |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Higher-bandwidth airframes (SATCOM-equipped MALE/HALE) carry the
+full PHASE 2 §3 KLV stream over the dedicated wideband link; the
+boundary's tactical link still carries the canonical state events.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex G — Versioning and deprecation (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Versioning follows Semantic Versioning 2.0.0. STANAG 4586 versions
+bump independently from this PHASE; the deployment policy maps each
+PHASE version to the STANAG 4586 version it honours so coalition
+partners' GCSs interoperate. Deprecation enters a 12-month sunset
+window with migration notes recorded in the audit chain.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex H — Conformance disclosure
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations declare per-section conformance in their published capability document. Sections marked partial or excluded reference the deployment policy. A deployment that is partial or excluded on §1 (Authentication), §4 (Audit chain), §7 (Time discipline), or §8 (Dual-signature handshake) is non-conformant overall.

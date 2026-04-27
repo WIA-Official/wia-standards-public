@@ -1,241 +1,344 @@
-# WIA-laser-weapon PHASE 2 — API-INTERFACE Specification
+# WIA-laser-weapon PHASE 2 — API Interface Specification
 
 **Standard:** WIA-laser-weapon
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-laser-weapon (Laser Weapon).
+This PHASE defines the API surface a laser-weapon deployment exposes
+for engagement-command intake (from WIA-missile-defense), pre-fire
+eye-safety zone validation, beam-emission lifecycle reporting,
+thermal/coolant telemetry streaming, beam-quality post-shot
+publication, and range-test scheduling. The shape is HTTP/JSON for
+C2/range-control planes; tactical fire-control loops use the
+constrained binary mapping described in PHASE 3.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS)
+- STANAG 5516 — for J11.x weapon-direction inbound
+- IEC 60825-1 — eye-safety classification
+- ANSI Z136.1 — laser hazard zones
+- ISO 11146 — M² measurement methods
+- WIA-missile-defense PHASE 2 — referenced for engagement decision delivery
+- WIA-military-communication PHASE 2 — referenced for cross-domain transport
 
 ---
 
-## §1 Scope
+## §1 Engagement-command intake
 
-This PHASE document is one of four that together define the WIA-laser-weapon
-standard. It addresses the api-interface layer of the standard.
+```
+POST /commands/engage HTTP/1.1
+Host: lw.coalition-c2.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiJ9...
+Content-Type: application/wia-lw+json
+WIA-RoE-Authorisation: urn:wia:lw:roe:rok-army.adcc:authA-2026
 
-## §2 Manifest
+{
+  "decisionRef": "urn:wia:md:decision:d-91a7",
+  "wsRef": "urn:wia:lw:ws:rok-army:hel-bty-1",
+  "engagementCategory": "counter-uas",
+  "targetRef": "urn:wia:md:track:fusion-A:91a7",
+  "intendedEffect": "mission-kill",
+  "expectedDwellTime": {"seconds": 3.5, "confidence": "medium"}
+}
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "laser-weapon"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The boundary validates the RoE authorisation, runs the eye-safety
+zone check (PHASE 2 §2) before issuing a fire instruction to the
+weapon system, and records the engagement decision. On rejection
+the response carries `urn:wia:lw:problem:roe-not-authorised`,
+`urn:wia:lw:problem:eye-safety-zone-violation`, or
+`urn:wia:lw:problem:weapon-not-armed`.
 
-## §3 Conformance Tiers
+## §2 Eye-safety-zone check
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+POST /safety/zone-check HTTP/1.1
+{
+  "wsRef": "urn:wia:lw:ws:...",
+  "beamGeometryAtFire": {"azimuth": 1.234, "elevation": 0.567},
+  "beamGeometryAtEnd": {"azimuth": 1.235, "elevation": 0.568},
+  "atmosphericChannel": {...}
+}
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The boundary returns `clear` or `violation` with the violating
+zone (per IEC 60825-1 / ANSI Z136.1 nominal-ocular-hazard distance
+NOHD plus operational buffer). The deployment policy enumerates
+human-rated zones and friendly-asset zones that always trigger
+violation.
 
-## §4 Discovery
+## §3 Beam-emission lifecycle
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/laser-weapon`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The weapon system pushes lifecycle events:
 
-## §5 Time and Identity
+```
+POST /emissions HTTP/1.1
+{
+  "emissionId": "urn:wia:lw:emission:hel-bty-1:e-91a7",
+  "wsRef": "urn:wia:lw:ws:hel-bty-1",
+  "decisionRef": "urn:wia:md:decision:d-91a7",
+  "startTimestamp": "2026-04-27T09:31:14.523000+09:00",
+  "beamGeometry": {...},
+  "pulseModel": "cw",
+  "commandedAveragePower": {"kw": 50, "uncert": 1.5},
+  "commandedDuration": 3.5
+}
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+End-of-emission update:
 
-## §6 Versioning and Deprecation
+```
+PUT /emissions/<emissionId> HTTP/1.1
+{
+  "endTimestamp": "2026-04-27T09:31:18.045000+09:00",
+  "actualEnergyDelivered": {"joules": 167500, "uncert": 4500},
+  "thermalLimitsReached": false
+}
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Emissions are append-only at the lifecycle level; corrections
+issue a new record with a `corrigenda` reference.
 
-## §7 Privacy and Security
+## §4 Thermal/coolant telemetry stream
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Thermal and coolant samples flow as a stream:
 
-## §8 Open Governance
+```
+GET /weapons/<wsRef>/thermal/$subscribe HTTP/1.1
+Authorization: Bearer ...
+Accept: text/event-stream
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `laser-weapon` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The boundary streams Server-Sent Events at the configured sample
+rate (typically 10 Hz). Subscribers consume for safety monitoring
+and for engineering trend analysis.
+
+## §5 Beam-quality publication
+
+```
+POST /emissions/<emissionId>/beam-quality HTTP/1.1
+{
+  "m2": 1.32,
+  "pointingStability": {"rmsMicroradians": 8.7},
+  "intensityProfileRef": "https://lw-storage.example/profiles/...",
+  "aperturePower": {"kw": 49.4, "uncert": 1.0}
+}
+```
+
+Beam-quality records feed the deployment's mission-effectiveness
+analysis. The boundary indexes M² and pointing-stability per
+weapon system so trend reports surface degradation early.
+
+## §6 Atmospheric-channel logging
+
+```
+POST /emissions/<emissionId>/atmospheric-channel HTTP/1.1
+{
+  "slantRangeMetres": 1240,
+  "cnSquared": "moderate",
+  "aerosolBand": "haze",
+  "weatherSnapshot": {"tempC": 14.2, "pressureHpa": 1013, "rh": 0.72, "windMs": 4.5}
+}
+```
+
+Atmospheric records pair with beam-quality records so post-event
+analysis distinguishes channel effects from weapon-internal effects.
+
+## §7 Range-test scheduling
+
+For range-test deployments:
+
+```
+POST /range/schedule HTTP/1.1
+{
+  "wsRef": "...",
+  "testPlan": "<reference to test plan document>",
+  "scheduledStart": "...",
+  "scheduledEnd": "...",
+  "rangeControlAuthorisationRef": "..."
+}
+```
+
+Range-test schedules are gated by the range-control authorisation;
+schedules are visible to all range stakeholders so over-scheduling
+is detected.
+
+## §8 Status query
+
+```
+GET /weapons/<wsRef>/status HTTP/1.1
+```
+
+Returns the most recent weapon-status record (PHASE 1 §6),
+including thermal state, coolant state, optical-axis state, and
+state-transition timeline since the last cooldown.
+
+## §9 Errors and warnings
+
+| URI                                              | Status | Meaning                                       |
+|--------------------------------------------------|-------:|-----------------------------------------------|
+| `urn:wia:lw:problem:roe-not-authorised`          | 403    | engagement category outside RoE authorisation |
+| `urn:wia:lw:problem:eye-safety-zone-violation`   | 422    | proposed beam path violates IEC 60825-1 zone  |
+| `urn:wia:lw:problem:weapon-not-armed`            | 409    | weapon not in armed-full-power state          |
+| `urn:wia:lw:problem:thermal-limit-pending`       | 503    | thermal state too high for new emission       |
+| `urn:wia:lw:problem:m2-out-of-band`              | 422    | post-shot M² exceeds operational threshold    |
+| `urn:wia:lw:problem:state-transition-invalid`    | 422    | state transition out of order                  |
+| `urn:wia:lw:problem:audit-unavailable`           | 503    | audit chain write failed                      |
+
+Warnings (200-OK with caveats) use `Warning:` headers per RFC 7234
+§5.5 with codes namespaced under `wia-lw-`.
+
+## Annex A — Worked engagement sequence (informative)
+
+1. WIA-missile-defense engagement decision issues to laser-weapon
+   boundary via PHASE 2 §1
+2. Boundary runs eye-safety-zone check; clears
+3. Boundary instructs weapon system to fire; weapon transitions
+   `armed-full-power` → `firing`
+4. Weapon emits PHASE 2 §3 startEmission record
+5. Thermal stream publishes per-sample telemetry
+6. Weapon transitions `firing` → `cooldown` at end of duration
+7. Weapon emits endEmission update
+8. Beam-quality and atmospheric records published post-shot
+9. WIA-missile-defense outcome record references this emission
+   for the kill-assessment chain
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex B — Capability advertisement (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+GET /.well-known/wia/laser-weapon/capabilities HTTP/1.1
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Response advertises supported engagement categories, supported
+weapon-system classes (HEL kW bands, IEC 60825-1 classes), the
+deployment's RoE authorities, the eye-safety-zone planner reference,
+the atmospheric-monitoring sensor inventory, and the federation
+peers. Capability documents are signed.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex C — Pagination + rate limiting (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Emission and weapon-status queries paginate at ≤ 1000 entries per
+page. Per-token rate-limit defaults: 100 engagement-commands per
+minute per fire-control authority, 1000 thermal samples per second
+per weapon system. Rate-limit refusals carry
+`urn:wia:lw:problem:rate-limited`.
 
-## Annex F — Adoption Roadmap
+## Annex D — Idempotency
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Engagement commands accept `Idempotency-Key`; retries within 24 h
+with the same key return the original response. Different bodies
+under the same key are rejected with
+`urn:wia:lw:problem:idempotency-conflict`.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex E — Worked thermal-stream sample (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+event: thermal-sample
+data: {"timestamp":"2026-04-27T09:31:14.523+09:00","wsRef":"urn:wia:lw:ws:hel-bty-1","primaryElementC":42.3,"coolantFlowLpm":35.2,"coolantReturnC":31.7,"reservoirLevelPct":0.78}
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+event: thermal-limit-warning
+data: {"timestamp":"2026-04-27T09:31:17.910+09:00","wsRef":"...","level":"approaching","field":"primaryElementC","value":78.4,"threshold":80.0}
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Subscribers (safety operator console + engineering trend store)
+consume the same stream; safety operator surfaces warnings, the
+engineering store retains for trend analysis.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex F — Versioning and deprecation (informative)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Versioning follows Semantic Versioning 2.0.0. Coalition-shared
+records carry the originating deployment's version in the audit
+chain. Deprecation enters a 12-month sunset window with migration
+notes recorded in the chain so coalition partners know which
+version their counterpart honours.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## Annex G — Worked range-test schedule (informative)
 
-## Annex H — Versioning and Deprecation Policy
+```
+POST /range/schedule HTTP/1.1
+Host: lw.range-c.example
+Authorization: Bearer ...
+Content-Type: application/wia-lw+json
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+{
+  "wsRef": "urn:wia:lw:ws:test-range-A:hel-1",
+  "testPlan": "https://range-c.example/plans/2026-04-27-mocking-uas",
+  "scheduledStart": "2026-04-27T13:00:00+09:00",
+  "scheduledEnd": "2026-04-27T17:00:00+09:00",
+  "rangeControlAuthorisationRef": "urn:wia:lw:rangeauth:rangeC-2026-04-27"
+}
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Response on accepted schedule:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```
+201 Created
+Location: /range/schedule/sched-91a7
+WIA-Audit-Event-Id: urn:wia:lw:audit:2026-04-27T08:30:00+09:00:9c01
+```
 
-## Annex I — Interoperability Profiles
+Conflicting schedules (overlapping range time-windows for the same
+weapon system) are refused with `urn:wia:lw:problem:range-conflict`.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex H — Long-running emission status
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Long-dwell emissions (e.g., 30-second cooking against a hardened
+target) update the lifecycle event with intermediate progress:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+```
+POST /emissions/<emissionId>/progress HTTP/1.1
+{
+  "elapsedSeconds": 15.0,
+  "energyDeliveredJoulesSoFar": 720000,
+  "thermalState": "approaching-limit"
+}
+```
+
+This is informational; the canonical record is the start + end
+records (PHASE 2 §3).
+
+## Annex I — Worked atmospheric-channel logging (informative)
+
+Atmospheric records flow per emission so that post-shot beam-quality
+analysis can attribute degradation to atmospheric vs. weapon-internal
+sources. A worked example for an engagement at slant-range 1240 m
+through moderate-haze atmosphere:
+
+```json
+{
+  "channelId": "urn:wia:lw:channel:c-91a7",
+  "emissionRef": "urn:wia:lw:emission:hel-bty-1:e-91a7",
+  "slantRangeMetres": 1240,
+  "cnSquared": "moderate",
+  "cnSquaredNumeric": 8.2e-15,
+  "aerosolBand": "haze",
+  "weatherSnapshot": {
+    "tempC": 14.2,
+    "pressureHpa": 1013,
+    "rh": 0.72,
+    "windMs": 4.5,
+    "windDir": 230
+  },
+  "transmissionEstimate": {
+    "atSourceWavelengthBand": "nir-1µm",
+    "endToEndTransmittance": 0.62,
+    "atmosphericLossDb": 2.07
+  }
+}
+```
+
+The transmissionEstimate is computed at the boundary from a vendor-
+provided atmospheric-loss model; the deployment's mission-effectiveness
+analysis joins this with the beam-quality record to attribute
+on-target intensity correctly.
+
+## Annex J — Idempotency policy
+
+Engagement-command and emission-lifecycle POST/PUT calls accept Idempotency-Key. Boundary stores keys for 24 h; retries within that window with the same key return the original response. Different bodies under the same key return urn:wia:lw:problem:idempotency-conflict.
+
+## Annex K — Capability versioning
+
+Capability documents declare wia.standardVersion alongside wia.implementationVersion so coalition partners verify compatibility.

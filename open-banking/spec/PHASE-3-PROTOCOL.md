@@ -1,241 +1,245 @@
-# WIA-open-banking PHASE 3 — PROTOCOL Specification
+# WIA-open-banking PHASE 3 — Protocol Specification
 
 **Standard:** WIA-open-banking
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-open-banking (Open Banking).
+This PHASE specifies the protocols binding the data format (PHASE 1)
+to the API surface (PHASE 2): SCA flows (redirect, decoupled,
+embedded), FAPI 2.0 message-signature obligations, eIDAS PSD2
+certificate handling, audit-chain construction, dynamic linking
+under PSD2 RTS Article 5, and the cross-jurisdiction handling for
+deployments that operate under multiple regimes.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- OpenID Foundation FAPI 2.0 (Baseline + Advanced)
+- OpenID Connect Core 1.0
+- IETF OAuth 2.0 (RFC 6749), OAuth 2.1 draft, RFC 7515 (JWS),
+  RFC 7517 (JWK), RFC 7519 (JWT), RFC 7636 (PKCE), RFC 9101 (JAR),
+  RFC 9126 (PAR), RFC 8705 (mTLS, certificate-bound tokens),
+  RFC 8628 (Device Authorisation)
+- IETF RFC 8446 (TLS 1.3), RFC 9162 (Certificate Transparency 2.0 pattern)
+- EU PSD2 RTS on SCA and CSC
+- EBA Guidelines on the conditions of the SCA exemptions (EBA/GL/2018/04)
+- EU eIDAS Regulation (910/2014) — QWAC and QSealC
 
 ---
 
-## §1 Scope
+## §1 Strong Customer Authentication
 
-This PHASE document is one of four that together define the WIA-open-banking
-standard. It addresses the protocol layer of the standard.
+PSD2 RTS Article 4 requires SCA combining at least two of:
+knowledge, possession, inherence — independent factors. The
+deployment supports:
 
-## §2 Manifest
+- **Redirect SCA** (preferred under FAPI 2.0): TPP redirects user
+  to ASPSP's authorisation endpoint; user authenticates in the
+  ASPSP's UI; ASPSP redirects back with an authorisation_code
+- **Decoupled SCA**: ASPSP authenticates the user on a separate
+  channel (e.g., mobile-banking app push); TPP polls for completion
+- **Embedded SCA** (rare in PSD2/FAPI 2.0): SCA UI rendered inline;
+  generally avoided because it conflicts with FAPI 2.0's
+  redirect-and-PKCE preference
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "open-banking"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Each SCA invocation produces an SCA evidence record (PHASE 1 §4).
+Records are signed by the customer's SCA-bound credential plus the
+ASPSP's signing key.
 
-## §3 Conformance Tiers
+## §2 Dynamic linking (PSD2 RTS Article 5)
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For payment-initiation flows, the SCA evidence MUST be dynamically
+linked to the specific transaction:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- The amount and the payee of the transaction are bound into the
+  authentication code
+- A modification of either field after SCA invalidates the SCA
+  evidence; the boundary refuses the payment
 
-## §4 Discovery
+Dynamic-linking implementation: the JAR JWT (RFC 9101) carrying the
+PAR includes the `authorization_details` block (RAR) with the
+exact transaction; the SCA-bound credential signs over a hash of
+this block plus the authorisation_code.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/open-banking`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 FAPI 2.0 message-signature obligations
 
-## §5 Time and Identity
+FAPI 2.0 Advanced profile requires:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- **mTLS-bound access tokens** per RFC 8705
+- **Pushed Authorisation Requests** (PAR, RFC 9126) — the TPP MUST
+  push the authorisation request to the ASPSP before redirect
+- **JWT-Secured Authorisation Requests** (JAR, RFC 9101) — the
+  authorisation request body is signed
+- **Detached JWS** (`x-jws-signature` header) on payment-initiation
+  request bodies and on notification deliveries
+- **Replay protection** via `iat` / `nbf` / `exp` JWT claims plus
+  per-call `x-fapi-interaction-id`
 
-## §6 Versioning and Deprecation
+A request that omits these signatures or fails signature
+verification is rejected with the relevant problem URI.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 eIDAS PSD2 certificates (EU/UK)
 
-## §7 Privacy and Security
+EU/UK PSD2 deployments use eIDAS-grade certificates:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- **QWAC** (Qualified Web Authentication Certificate) — used as
+  the TPP's mTLS client certificate; the QWAC includes the TPP's
+  PSD2 role attributes (PSP_AS, PSP_PI, PSP_AI, PSP_IC) per
+  ETSI TS 119 495
+- **QSealC** (Qualified Seal Certificate) — used to sign request
+  bodies (JWS detached); the QSealC binds the message to the legal
+  entity, distinct from the connection-level QWAC
 
-## §8 Open Governance
+The boundary verifies certificates against the ETSI Trust Service
+Status List (TSL) of the issuing nation. A QWAC/QSealC whose
+issuer is not in the TSL is rejected.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `open-banking` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 KR MyData certificates
+
+KR 마이데이터 deployments use KFSC-issued certificates:
+
+- **상호인증서** — TPP's mTLS client certificate issued by the
+  KFSC PKI
+- **공동인증서 (formerly 공인인증서)** — customer's authentication
+  certificate (legacy SCA path; modern KR MyData uses 간편인증)
+
+KR consent records carry the customer's signed consent in the
+KFSC standard template; the boundary verifies signatures against
+KFSC's published JWKS and the KFSC's certificate-revocation list.
+
+## §6 Audit chain construction
+
+Every consent setup, SCA invocation, account-information access,
+payment initiation, funds-confirmation, notification delivery, and
+licence-status check emits an AuditEvent. AuditEvents form a per-
+ASPSP hash chain:
+
+```
+chain_input  = SHA-256(prev_chain_root || canonical(event))
+chain_root_t = chain_input
+```
+
+Canonicalisation uses RFC 8785 JSON Canonicalisation Scheme. The
+chain root is sealed once per UTC day. Sealed roots MAY be published
+to a transparency log (RFC 9162 pattern) for jurisdictions that
+require public auditability (UK FCA's Open Banking initiative
+encourages such publishing).
+
+## §7 Time discipline
+
+Clocks synchronise to NTPv4 stratum-2 sources. Drift exceeding 100 ms
+causes the boundary to refuse new SCA invocations because dynamic
+linking depends on agreed time. Drift exceeding 5 s suspends new
+token issuance.
+
+All record timestamps are RFC 3339 with offset; UTC is preferred
+on the wire; SCA evidence carries the local time-zone offset of
+the user's authenticating device for forensic reconstruction.
+
+## §8 Cross-regime handling
+
+A deployment operating in multiple regimes (e.g., EU PSD2 + UK
+OBIE + KR 마이데이터) holds a separate boundary instance per regime
+because the consent semantics and certificate roots differ. Cross-
+regime traffic does not exist in this PHASE; a customer with
+accounts in two regimes engages each regime's TPPs separately.
+
+## §9 Failure modes
+
+| Failure                              | Behaviour                                                      |
+|--------------------------------------|----------------------------------------------------------------|
+| TPP licence revoked                  | All consents suspended; in-flight calls completed; new refused |
+| eIDAS TSL fetch fails                | Cached TSL honoured until cache expiry; new TPP-onboarding refused |
+| SCA channel unreachable (decoupled)  | TPP poll times out per deployment policy; SCA marked failed    |
+| Dynamic-linking mismatch             | Payment refused with `urn:wia:ob:problem:dynamic-link-mismatch`|
+| Audit chain write failure            | Operation rejected (consistency w/ payment-system §9)          |
+| Time drift > 5 s                     | Token issuance + SCA invocation suspended                      |
+| Notification webhook unreachable     | Retry per deployment policy; persistent failure surfaces incident |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Algorithm choices (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| Concern                       | Default                                | Notes                                   |
+|-------------------------------|----------------------------------------|-----------------------------------------|
+| JAR signing                   | PS256 or ES256                         | per FAPI 2.0 Advanced                   |
+| Detached JWS body signature   | PS256 or ES256                         |                                         |
+| OIDC ID token signing         | PS256 (FAPI 2.0 Baseline)              | RS256 not permitted                     |
+| TLS                           | 1.3 (RFC 8446)                         | 1.2 explicit-list only                  |
+| mTLS client cert              | RSA 2048 / ECC P-256                   | EU/UK: eIDAS QWAC                       |
+| Token format                  | mTLS-bound JWT (RFC 8705)              | bearer + cnf claim with thumbprint      |
+| PKCE                          | S256                                   | plain method not permitted              |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Quantum-resistance migration is tracked separately as NIST PQ
+standards reach deployment-grade financial HSM support.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex B — SCA exemption regime (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+EBA Guidelines GL/2018/04 enumerate SCA exemptions:
 
-## Annex F — Adoption Roadmap
+- Trusted Beneficiary list (RTS Article 13)
+- Recurring transactions (RTS Article 14)
+- Low-value payments (≤ €30; ≤ 5 cumulative or ≤ €100 cumulative
+  per RTS Article 16)
+- Transaction Risk Analysis (TRA) exemption (RTS Article 18) —
+  permitted only when the deployment's fraud rate is below the
+  threshold per Article 19
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Each exemption invocation is itself an audit event so regulators
+can review TRA-exemption usage against the deployment's fraud
+rate over the relevant window.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Worked dynamic-linking flow (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+1. Customer enters £100 to "Bob's Plumbing"
+2. TPP submits PAR with `authorization_details: [{type:
+   "payment_initiation", instructedAmount: {currency: "GBP",
+   amount: "100.00"}, creditorName: "Bob's Plumbing", ...}]`
+3. ASPSP renders the SCA UI showing exactly £100 to "Bob's Plumbing"
+4. Customer authenticates; SCA-bound credential signs a hash of the
+   `authorization_details` block
+5. ASPSP issues authorization_code; the SCA evidence record carries
+   the signed hash
+6. At payment-initiation time, the boundary recomputes the hash
+   from the request body's Initiation block; mismatch refuses the
+   payment with `urn:wia:ob:problem:dynamic-link-mismatch`
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+A modification of amount or payee after SCA fails the dynamic-
+linking check; the customer is protected from man-in-the-middle
+modification.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex D — Conformance levels (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Level     | Scope                                                              |
+|-----------|--------------------------------------------------------------------|
+| Surface   | data formats accepted; self-attested; no FAPI 2.0 conformance test |
+| Verified  | annual third-party audit + FAPI 2.0 conformance test pass          |
+| Anchored  | continuous evidence package per audit chain transparency            |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Implementations declare their level in the OpenID Connect
+discovery document. Coalition operations (cross-jurisdiction PIS)
+typically require Verified or Anchored from all parties.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## Annex E — Time-precision worked example (informative)
 
-## Annex H — Versioning and Deprecation Policy
+For open-banking:
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+- Consent timestamps: second precision; SCA timestamps millisecond
+- Payment-initiation timestamps: millisecond precision; clearing
+  rails inherit their own precision (sub-second to second)
+- Notification timestamps: millisecond precision
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Drift between TPP, ASPSP, and clearing rail clocks must stay within
+the most-restrictive operation's tolerance (SCA dynamic linking
+~ 100 ms).
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex F — Federation manifest
 
-## Annex I — Interoperability Profiles
+Cross-jurisdictional flow (rare) uses a federation manifest signed by both regimes' authorities. Without a federation manifest, cross-regime traffic is refused.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex G — Audit transparency option (informative)
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+UK OBIE encourages public publishing of daily audit roots to a
+transparency log so customers and TPPs can independently verify the
+ASPSP's audit chain. KR 마이데이터 currently does not require public
+publishing. EU PSD2 leaves the choice to each ASPSP. The deployment
+policy enumerates which transparency-log mode is in effect.

@@ -5,237 +5,290 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-images (Images).
+This document defines the protocols that govern an accredited
+images programme: operator accreditation, GPS redaction policy,
+accessibility-review discipline, rights-clearance discipline,
+provenance attestation policy, derivative recipe versioning,
+delivery-state hygiene, AI-training opt-in / opt-out signalling,
+records retention, take-down handling, and programme wind-down.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO/IEC 17025:2017 (testing and calibration laboratories)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO/IEC 17043:2010 (proficiency testing)
+- ISO 9001:2015 (quality management systems)
+- ISO 8601 (date and time)
+- IETF RFC 5905 (NTPv4)
+- IETF RFC 8446 (TLS 1.3)
+- IETF RFC 9457 (Problem Details)
+- W3C WCAG 2.2 (accessibility)
+- C2PA Content Authenticity (provenance manifest framework)
+- IPTC Photo Metadata (community-managed metadata schema; cited
+  normatively as a metadata interchange envelope)
 
 ---
 
-## §1 Scope
+## §1 Operator Accreditation
 
-This PHASE document is one of four that together define the WIA-images
-standard. It addresses the protocol layer of the standard.
+An images programme MAY claim conformance to WIA-images only after
+a recognised accreditation body has issued a valid certificate
+against ISO 9001:2015 and against the operator's information
+security management posture (ISO/IEC 27001:2022). Programmes that
+operate accessibility review at scale SHOULD additionally maintain
+an accessibility-review competency framework documented in their
+quality dossier.
 
-## §2 Manifest
+## §2 GPS Redaction Policy
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "images"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Programmes that publish photographs of people, sensitive sites, or
+private property MUST apply a GPS redaction policy that defaults
+to redaction on ingestion. Operator-side override is permitted for
+landscape and editorial-context assets where geolocation is
+relevant; the override decision is recorded against the capture
+record. GPS redaction is one-way at the bitstream level once a
+derivative is published.
 
-## §3 Conformance Tiers
+## §3 Accessibility Review Discipline
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Auto-generated text alternatives MUST be reviewed by a qualified
+accessibility reviewer before the asset transitions to
+`ready-for-delivery`. The qualification framework is documented in
+the operator's quality dossier and follows the WCAG 2.2
+text-alternative conventions for non-text content (1.1.1).
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Decorative-image classification (PHASE-1 §6 `isDecorative=true`)
+is reviewed by a human at first publication; auto-classification
+of decorative images is permitted only when the auto-tool's
+precision against the operator's gold-set exceeds the operator's
+declared threshold (typically 95% on the operator's calibration
+sample).
 
-## §4 Discovery
+## §4 Rights-Clearance Discipline
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/images`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Rights-clearance operators verify that the asset's licence terms
+are in force, that the operator is authorised to use the asset in
+the intended use defined in §2 of PHASE-1, and that the licence
+covers the geographic scope of intended publication. Renewal
+events emit new clearance records; expired clearances retain at
+the prior content-address but are flagged in the public catalogue.
 
-## §5 Time and Identity
+Programmes operating in jurisdictions with statutory licensing
+schemes (collective management organisations, statutory image
+levies) record the scheme's identifier and the operator's
+membership status in the rights-clearance record.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 Provenance Attestation Policy
 
-## §6 Versioning and Deprecation
+Programmes that publish externally cited photographs (news, legal
+evidence, scholarly publication) attach a C2PA-aligned provenance
+manifest at publication. The manifest signs the bitstream digest,
+the editing chain, and the publishing operator's identity.
+Verification re-runs the signature chain on every retrieval; failed
+verification is exposed alongside the asset so that downstream
+consumers can decide whether to trust an unverified manifest.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The C2PA framework is community-managed and evolves; programmes
+pin the C2PA spec revision in the manifest record so that
+verification re-runs against the same revision the manifest was
+issued under.
 
-## §7 Privacy and Security
+## §6 Derivative Recipe Versioning
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Rendition recipes (PHASE-1 §5) are content-addressed; recipe
+revisions emit new identifiers rather than overwriting the prior
+recipe. Re-running an old recipe against the same source produces
+a byte-identical rendition, so historical builds are reproducible.
 
-## §8 Open Governance
+Recipe deprecation follows a published timeline; deprecated
+recipes remain executable but the public catalogue marks
+renditions produced under deprecated recipes for downstream
+awareness.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `images` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §7 Delivery-State Hygiene
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+CDN edges that serve renditions report delivery state through the
+delivery endpoint (PHASE-2 §9). Invalidation events propagate
+through the edge mesh to honour withdrawal notices and rights-
+clearance lapses; invalidation latency targets are recorded in
+the operator's quality dossier and audited at the annual
+ISO 9001 surveillance.
 
+## §8 AI-Training Opt-In / Opt-Out
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Programmes record an explicit AI-training disposition for every
+asset: `ai-training-permitted`, `ai-training-prohibited`, or
+`silent` (operator declines to declare). Public-facing renditions
+expose the disposition through the IPTC PLUS metadata when
+present, the C2PA manifest's training disposition assertion, and
+HTTP response headers conforming to community-published opt-out
+conventions.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+Programmes that ship `ai-training-prohibited` assets through
+public CDNs MUST respect crawler robots-txt-style opt-outs at the
+operator's discoverable URI; honouring the opt-out is the
+operator's commitment, not a guarantee against non-compliant
+crawlers.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §9 Records Retention
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Programme records — every record defined in PHASE-1, the API audit
+logs, accessibility reviews, rights clearances, provenance
+manifests, and delivery-state events — retain for a minimum of
+seven calendar years from the last access of the asset. Externally
+cited assets retain indefinitely; on programme wind-down
+indefinite-retention assets transfer to a recognised long-term
+archive.
 
-## Annex F — Adoption Roadmap
+## §10 Time Synchronisation
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Programme clocks synchronise per RFC 5905 (NTPv4) so that capture
+times, edit chain timestamps, and delivery events can be ordered
+unambiguously across operator systems and CDN edges.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §11 Take-Down Handling
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Take-down requests (DMCA-style notifications, GDPR right-to-
+erasure, statutory take-downs) follow a documented workflow:
+intake, verification, action (withdraw asset and propagate
+invalidation), notification of the original rights claimant or
+data subject, and audit-log entry. The workflow is documented in
+the operator's quality dossier and is exercised through the
+asset withdrawal and delivery-invalidation endpoints.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §12 Cybersecurity
 
-## Annex G — Test Vectors and Conformance Evidence
+Editorial CMS uploads, rights-clearance integrations, and CDN
+edge connections operate over mutually-authenticated TLS 1.3
+(RFC 8446). Provenance manifests are signed by the operator's
+release key; verification failure halts the publication pipeline.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §13 Programme Wind-Down
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A programme that ceases operations transfers indefinite-retention
+records to a recognised long-term archive, notifies known external
+citers, and publishes a sunset timeline for in-flight assets. The
+wind-down workflow honours pending rights-clearance obligations
+through to expiry where the operator has remaining rights.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## §14 Quality Dossier and Cross-Border Operation
 
-## Annex H — Versioning and Deprecation Policy
+The programme's quality dossier records the rights-clearance
+operators it works with, the provenance signing key chain, the
+accessibility-reviewer competency framework, the take-down case
+log, and the deprecation history of derivative recipes. Multi-
+jurisdiction programmes maintain operating MoUs with partner
+jurisdictions and honour each partner's data-protection law for
+person-pictured assets.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §15 IPTC Metadata Discipline
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+IPTC PhotoMetadata fields (PHASE-1 §10) are mandatory for editorial-
+context assets. The operating programme records the IPTC fields at
+ingestion through the editor's workflow and re-validates them at
+publication; missing creator or copyright fields halt publication
+under the workflow's enforcement.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Programmes that publish editorial photographs to wire services or
+syndication networks include IPTC fan-out in the publication step
+so that consuming systems do not need to fetch the WIA-native
+sidecar separately.
 
-## Annex I — Interoperability Profiles
+## §16 Generative-Image Disclosure
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Generative-image and synthetic-rendered assets (PHASE-1 §2
+`sourceKind=synthetic-rendered`) carry an explicit synthesis
+disclosure in the C2PA manifest's edit chain (PHASE-1 §7
+`stepKind=synthesised`). The disclosure names the generator family,
+the operator's authorisation to publish under the operator's
+editorial standards, and the model-output content-address.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §17 Cross-Border Programme Operation
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Programmes that operate across borders maintain a primary
+jurisdiction of registration and operating MoUs with partner
+jurisdictions. Cross-jurisdictional data transfers honour the
+source-jurisdiction's data-protection and image-rights law for any
+asset that pictures identifiable people or sensitive sites.
+
+## §18 Person-Pictured Discipline
+
+Editorial-context assets that depict identifiable people are
+governed by the operator's image-rights workflow: model release
+where applicable, public-figure / public-event exemption where
+applicable, and `no-release-no-publication` for assets that lack
+a defensible release. Minor-pictured assets follow stricter
+governance (parental or guardian consent, jurisdiction-specific
+broadcasting law) recorded in the person-pictured record.
+
+Right-to-erasure or image-removal requests from depicted persons
+flow through the operator's CRM and trigger the take-down workflow
+(§11). The operator records the request reference and the
+disposition.
+
+## §19 Generative-Image Rights Disposition
+
+Generative-image and synthetic-rendered assets carry their own
+rights disposition: the operator's authorisation to use the
+generator's outputs under the generator's licence, the operator's
+authorisation to attribute the synthesis (or to omit attribution
+when the generator's licence permits), and the operator's
+declaration of the AI-training disposition for the synthetic
+output. Programmes that publish synthetic editorial illustrations
+treat the synthesis disclosure as a precondition for the publish
+step, not as an optional metadata enrichment.
+
+## §20 Stale-Manifest Handling
+
+C2PA manifests reference an external trust list and a signing key
+chain. When the trust list rotates or a signing key is revoked,
+existing manifests become stale. The operating programme runs a
+periodic re-verification sweep (typically weekly) that re-validates
+manifests against the current trust list and emits stale-manifest
+alerts; consumers of stale manifests receive the alert through the
+streaming subscription so that they can re-fetch the freshest
+manifest for the asset.
+
+## §21 Reduced-Motion and Sensory Accessibility
+
+Animated and sequence-image assets (PHASE-1 §13) are exposed
+to consumers along with a still-image fallback honoured by clients
+that respect user reduced-motion preferences. The operating
+programme records the fallback URI for every animated asset and
+verifies its presence at publication; assets that lack a fallback
+cannot transition to `ready-for-delivery`.
+
+Programmes that publish animated assets at sites with photosensitive-
+seizure risk (children's media, public-display advertising)
+additionally record the asset's flash and contrast profile against
+WCAG 2.2 §2.3 expectations and exclude assets that fail the profile
+from publication into those contexts.
+
+## §22 Operator Quality Dossier and Annual Review
+
+The operator's quality dossier (PHASE-3 §14) is reviewed at least
+annually by the operator's quality manager, the operator's
+accessibility advisor, and the operator's rights-clearance lead.
+The review's outcomes are recorded as content-addressed minutes
+that the public catalogue references; programmes that publish
+externally cited assets attach the most recent review reference to
+the evidence package's audit section.
+
+## §23 Conformance and Auditing
+
+A programme conformant with WIA-images publishes its operator
+accreditation references, its rights-clearance partner list, its
+quality dossier, and the catalogue of published assets, and
+answers an annual self-assessment that maps each clause of this
+PHASE to the programme's implementation.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 3 — PROTOCOL
+- **Status:** Stable
+- **Standard:** WIA-images
+- **Last Updated:** 2026-04-27

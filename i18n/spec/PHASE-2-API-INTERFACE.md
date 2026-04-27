@@ -5,237 +5,333 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-i18n (I18n).
+This document defines the HTTP API contract that an accredited
+i18n / l10n programme exposes for the records defined in PHASE-1.
+Consumers include software-publisher build pipelines, language-
+service-vendor (LSV) management systems, individual translators
+and reviewers, terminology managers, and quality-assurance services.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 9110 / 9111 / 9112 / 9457 (HTTP Semantics, Caching,
+  HTTP/1.1, Problem Details)
+- IETF RFC 6901 / 6902 / 5789 (JSON Pointer / Patch / PATCH method)
+- IETF RFC 8259 / 8288 / 9421 (JSON, Linking, Message Signatures)
+- IETF RFC 5646 / BCP 47 (language tags)
+- ISO 8601 (date and time)
+- ISO/IEC 27001:2022 (information security management)
+- W3C Trace Context
 
 ---
 
-## §1 Scope
+## §1 Scope and Versioning
 
-This PHASE document is one of four that together define the WIA-i18n
-standard. It addresses the api-interface layer of the standard.
+JSON-over-HTTPS served from a domain published by the operating
+programme. Versioning uses `/v1/` path segments and Semantic
+Versioning 2.0.0. The OpenAPI 3.1 document at `/v1/openapi.json` is
+canonical.
 
-## §2 Manifest
+## §2 Root Discovery
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "i18n"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /v1/
+```
 
-## §3 Conformance Tiers
+```json
+{
+  "standard": "WIA-i18n",
+  "phase": "API-INTERFACE",
+  "version": "1.0",
+  "links": {
+    "projects":      "/v1/projects",
+    "localeData":    "/v1/locale-data",
+    "segments":      "/v1/segments",
+    "translations":  "/v1/translations",
+    "glossary":      "/v1/glossary",
+    "tm":            "/v1/tm",
+    "qualityReviews":"/v1/quality-reviews",
+    "buildBundles":  "/v1/build-bundles",
+    "evidence":      "/v1/evidence",
+    "openapi":       "/v1/openapi.json"
+  }
+}
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Projects and Locale Data
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST   /v1/projects                     — register a project
+GET    /v1/projects/{pid}               — retrieve project record
+PATCH  /v1/projects/{pid}/target-locales — adjust target locale set
+POST   /v1/locale-data                  — register a locale-data
+                                           pinning (CLDR revision)
+GET    /v1/locale-data?tag={t}          — retrieve current pinning
+```
 
-## §4 Discovery
+Submissions whose target locale tag does not parse under BCP 47
+return `422` with type `urn:wia:i18n:locale-tag-invalid`.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/i18n`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Source Segments
 
-## §5 Time and Identity
+```
+POST   /v1/projects/{pid}/segments       — register a source segment
+GET    /v1/segments/{sid}                — retrieve source segment
+PATCH  /v1/segments/{sid}/status         — advance segment status
+POST   /v1/bulk/segments                 — batched source extraction
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Segments are immutable beyond `source-extracted`; subsequent
+`PATCH` attempts that mutate `sourceText` return `409 Conflict` with
+type `urn:wia:i18n:source-immutable`.
 
-## §6 Versioning and Deprecation
+## §5 Translations
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST   /v1/segments/{sid}/translations   — submit a translation
+GET    /v1/translations/{tid}            — retrieve translation
+PATCH  /v1/translations/{tid}/status     — advance status
+PATCH  /v1/translations/{tid}/approval   — append approval
+```
 
-## §7 Privacy and Security
+Translations carrying machine-translation or fuzzy-match origin
+include the `matchScore` field; submissions that omit it for
+non-`human-translator` authorKinds return `422` with type
+`urn:wia:i18n:match-score-missing`.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §6 Glossary and Terminology
 
-## §8 Open Governance
+```
+POST   /v1/projects/{pid}/glossary       — register a term
+GET    /v1/glossary/{tid}                — retrieve term
+PATCH  /v1/glossary/{tid}/forbidden      — extend forbidden list
+GET    /v1/projects/{pid}/glossary?domain={d}
+                                          — list terms by domain
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `i18n` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Glossary submissions that introduce a `forbiddenTranslation`
+matching an existing approved translation return `409 Conflict`
+with type `urn:wia:i18n:glossary-conflict`; the operating
+programme resolves the conflict before accepting the new entry.
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §7 Translation Memory
 
+```
+POST   /v1/projects/{pid}/tm-entries     — register a TM entry
+GET    /v1/tm/{eid}                      — retrieve TM entry
+GET    /v1/projects/{pid}/tm-search?source={text}&context={hash}
+                                          — query for matches
+```
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+TM search returns ICE matches (context hash matches), 100% matches,
+and fuzzy matches with their `matchScore`. Programmes pin a default
+fuzzy-match floor (typically 75) below which matches are not
+returned for leverage.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## §8 Quality Reviews and Build Bundles
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+POST   /v1/translations/{tid}/quality-reviews   — register a review
+GET    /v1/quality-reviews/{rid}                — retrieve review
+POST   /v1/projects/{pid}/build-bundles         — register a build
+                                                  bundle
+GET    /v1/build-bundles/{bid}                  — retrieve bundle
+GET    /v1/build-bundles/{bid}/artefact         — fetch built bundle
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Build bundles are immutable; corrections emit a new bundle and the
+prior bundle remains addressable for retrospective audit.
 
-## Annex F — Adoption Roadmap
+## §9 Evidence Package
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST   /v1/projects/{pid}/evidence       — request package generation
+GET    /v1/evidence/{packageId}          — retrieve a package
+GET    /v1/evidence/{packageId}/manifest — manifest only
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The evidence-package format is governed by PHASE-4 §3 and contains
+project, locale-data, segments, translations, glossary, TM
+summaries, quality reviews, build bundles, and the signed manifest.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## §10 Errors
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+All error responses are `application/problem+json` per RFC 9457.
+Defined types include:
 
-## Annex G — Test Vectors and Conformance Evidence
+- `urn:wia:i18n:locale-tag-invalid`
+- `urn:wia:i18n:source-immutable`
+- `urn:wia:i18n:match-score-missing`
+- `urn:wia:i18n:glossary-conflict`
+- `urn:wia:i18n:bundle-build-failure`
+- `urn:wia:i18n:evidence-mismatch`
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §11 Authentication
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The API uses mutually-authenticated TLS for LSV, individual
+translator (via vendor proxy), and build-pipeline connections.
+Public read-only endpoints (released build bundles, the OpenAPI
+document) are reachable without a client certificate.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## §12 Caching
 
-## Annex H — Versioning and Deprecation Policy
+Stable resources (released build bundles, signed evidence packages)
+are cacheable with `Cache-Control: max-age=31536000, immutable`.
+Mutable resources are cacheable for 60 seconds.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §13 Streaming and Bulk
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Continuous-localisation pipelines subscribe to project events via
+Server-Sent Events at `/v1/projects/{pid}/events`. Topics include
+new source segments, translation status changes, glossary updates,
+and build-bundle releases. Bulk endpoints accept arrays for source
+extraction, TM entries, and translation submissions.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §14 Worked Example: From Source Extraction to Build
 
-## Annex I — Interoperability Profiles
+1. Build pipeline POSTs new source segments at extract time.
+2. LSV consumes ready-for-translation segments via the streaming
+   endpoint and dispatches to translators.
+3. Translators submit translations; reviewers register quality
+   reviews; the operating programme appends approvals.
+4. Build pipeline retrieves approved translations and registers a
+   build bundle.
+5. Citation tool requests an evidence package for the release
+   pinning the manifest digest as the citation anchor.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §15 Pseudo-Locale and Selection-Catalogue Endpoints
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+POST   /v1/projects/{pid}/pseudo-locales       — register pseudo-
+                                                  locale config
+GET    /v1/pseudo-locales/{plid}               — retrieve config
+POST   /v1/segments/{sid}/selection-catalogues — register selection
+                                                  catalogue
+GET    /v1/selection-catalogues/{cid}          — retrieve catalogue
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Pseudo-locale records cannot be referenced as a `targetLocale` in
+build-bundle submissions; attempts return `409 Conflict` with
+type `urn:wia:i18n:pseudo-locale-not-shippable`.
+
+## §16 Pagination and Audit
+
+List endpoints use cursor-based pagination via the `cursor` query
+parameter and `Link` headers (RFC 8288). Audit logs carry
+`projectId`, `traceId`, the issuing client certificate's subject,
+and the LSV / build-pipeline clock skew vs the reference NTP source.
+
+## §17 Privacy-Preserving Aggregation
+
+Aggregate consumers (research collaboratives, public-policy
+analysts) fetch population-level statistics through endpoints that
+emit counts, means, and dispersions (e.g. average review-cycle
+latency by language pair, glossary-deviation rates by domain).
+
+```
+GET    /v1/aggregate/review-latency?language-pair=...&period=...
+GET    /v1/aggregate/glossary-deviation?domain=...&period=...
+```
+
+Out-of-policy queries return `403 Forbidden` with type
+`urn:wia:i18n:cohort-too-small`.
+
+## §18 Dispatch Endpoints
+
+```
+POST   /v1/projects/{pid}/dispatches      — register a dispatch
+GET    /v1/dispatches/{did}               — retrieve dispatch
+PATCH  /v1/dispatches/{did}/reassign      — record reassignment
+GET    /v1/projects/{pid}/dispatches?vendor={v}&from={t}
+                                          — list by vendor / window
+```
+
+Dispatch endpoints surface project-level dispatch state to the
+operating programme manager; LSV-internal dispatch detail (which
+individual translator received which batch) flows through the
+vendor's CAT-tool integration and is never exposed externally.
+
+## §19 Provenance Endpoint
+
+```
+GET    /v1/provenance/{recordId}    — retrieve the provenance entry
+                                       for any PHASE-1 record
+```
+
+Provenance entries trace a build bundle to its parents (project,
+locale-data pinning, source segments, approved translations,
+glossary state) so that auditors can walk the chain end-to-end.
+
+## §20 Format Adapter Endpoints
+
+```
+POST   /v1/projects/{pid}/format-adapters    — register an adapter
+GET    /v1/format-adapters/{aid}             — retrieve adapter
+PATCH  /v1/format-adapters/{aid}/rules       — update rules
+```
+
+Adapter rules are content-addressed; updates emit new content-
+addresses. Build pipelines pin a particular adapter rule revision
+in their integration so that re-extraction at later builds is
+reproducible.
+
+## §21 Streaming Subscription Heartbeat and Replays
+
+SSE subscriptions to project events (PHASE-2 §13) emit a heartbeat
+every 30 seconds. Reconnections support replay via the
+`Last-Event-ID` header (W3C EventSource semantics) so that build
+pipelines that disconnect during long releases do not lose
+visibility of approval / glossary / build events.
+
+## §22 FHIR-Adjacent Bridges (optional)
+
+Programmes whose i18n content includes clinical-document
+translation MAY expose a read-only FHIR R5 facade that translates
+selected build-bundle metadata into FHIR `Composition` and
+`Bundle` resources for clinical-document workflows. The facade is
+read-only and is consumed by clinical-document software that
+prefers FHIR-native discovery.
+
+## §23 Embargo Endpoint
+
+```
+PATCH  /v1/build-bundles/{bid}/embargo     — schedule or release
+                                              an embargo
+GET    /v1/build-bundles/{bid}/embargo     — retrieve embargo
+                                              schedule
+```
+
+Embargoed bundles return `403 Forbidden` with type
+`urn:wia:i18n:embargo-active` to non-authorised clients before the
+release time; the embargo endpoint enforces the release time
+server-side. Authorised pre-release consumers (a press team, a
+regulator counterpart) carry their authorisation in the access-
+control list referenced from the embargo record.
+
+## §24 Quality-Aggregate Endpoints
+
+```
+GET    /v1/aggregate/quality-by-vendor?language-pair=...&period=...
+GET    /v1/aggregate/error-distribution?quality-model=...&period=...
+```
+
+Quality-aggregate endpoints return cohort-size-protected statistics
+to operators that compare multiple LSVs across language pairs and
+quality models. Out-of-policy queries (cohort below threshold,
+language-pair scope outside the consumer's allowed set) return
+`403 Forbidden` with type `urn:wia:i18n:cohort-too-small`.
+
+## §25 Conformance
+
+A conformant server passes the test vectors published under
+`tests/phase-vectors/phase-2-api-interface/`, emits an OpenAPI 3.1
+document, and signs evidence packages per RFC 9421.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 2 — API-INTERFACE
+- **Status:** Stable
+- **Standard:** WIA-i18n
+- **Last Updated:** 2026-04-27

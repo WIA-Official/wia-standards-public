@@ -5,237 +5,280 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-i18n (I18n).
+This document defines how an accredited i18n / l10n programme
+integrates with the systems that surround it: software-publisher
+build pipelines (CI/CD); language-service-vendor management
+systems; CAT tooling that translators use; translation-memory and
+terminology repositories; quality-assurance services; long-term
+archives that hold released build bundles; and the certifying
+bodies that audit i18n programmes.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- IETF RFC 8259 / 9457 / 8615 / 8288 / 9421
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 27701:2019 (privacy information management)
+- ISO 17100:2015 (translation services — requirements)
+- ISO 8601 (date and time)
+- BCP 47 (language tags)
+- W3C XLIFF 2.x (interchange envelope reference)
+- Unicode CLDR
 
 ---
 
-## §1 Scope
+## §1 Build Pipeline Integration
 
-This PHASE document is one of four that together define the WIA-i18n
-standard. It addresses the integration layer of the standard.
+Software-publisher build pipelines consume approved translations
+through pull-based polling or streaming subscriptions (PHASE-2
+§13). The pipeline pins a build-bundle manifest digest at each
+release so that the deployed binaries reference a verifiable
+translation set.
 
-## §2 Manifest
+Pipelines that fail bundle integrity verification halt the build
+with a Problem-Details (RFC 9457) response of type
+`urn:wia:i18n:bundle-integrity-failure`.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "i18n"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 LSV Management System Integration
 
-## §3 Conformance Tiers
+LSV management systems integrate via dispatch and acceptance
+endpoints. The integration carries the LSV's accreditation reference,
+the project scope, the per-language-pair pricing terms, and the
+SLA window for delivery. LSV-side translator records are held in
+the LSV's HR system; the API never carries individual translator
+identifiers.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §3 Evidence Package Format
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+evidence/
+  manifest.json                — package manifest (signed, see §4)
+  project.json                 — project record
+  locale-data/                 — pinned CLDR revisions per locale
+  segments/                    — source segment summaries (full
+                                  bodies referenced by content-
+                                  address)
+  translations/                — translation summaries per locale
+  glossary/                    — current glossary state
+  tm/                          — TM index summary (full TM held in
+                                  the TM server)
+  quality-reviews/             — review records
+  build-bundles/               — bundle records and manifest digests
+  audit/                       — API audit log excerpts
+```
 
-## §4 Discovery
+The package is content-addressable; the manifest is signed by the
+operating programme and counter-signed by the LSV when the package
+is consumed for SLA verification.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/i18n`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Manifest and Signatures
 
-## §5 Time and Identity
+Verification tools recompute file digests, compare to the manifest,
+and reject the package on mismatch with type
+`urn:wia:i18n:evidence-mismatch`.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §5 well-known URI Discovery
 
-## §6 Versioning and Deprecation
+A conformant programme exposes a discovery document at
+`/.well-known/wia-i18n` that links to the API root, the public
+LSV accreditation references, the published quality dossier, the
+CLDR pinning currently in force, and the catalogue of released
+build bundles.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §6 CAT Tooling Integration
 
-## §7 Privacy and Security
+Computer-assisted translation tools (CAT systems used by individual
+translators) integrate via the LSV's proxy, not directly with the
+API. The LSV's proxy translates between the CAT tool's native
+format (typically XLIFF 2.x or vendor-specific equivalents) and
+the API's segment / translation records. Direct CAT-tool access
+is permitted only when the CAT tool's operator carries an LSV
+accreditation.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §7 Quality-Assurance Service Integration
 
-## §8 Open Governance
+Independent QA services consume completed translations and emit
+review records (PHASE-2 §8). The QA service's client certificate
+is bound to the QA service's accreditation reference; reviews from
+non-accredited services are accepted into the project but flagged
+as `non-accredited-review` so that downstream consumers can weigh
+them appropriately.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `i18n` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §8 TM and Terminology Repository Integration
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+Cross-project TM sharing (within or across operators) integrates
+through repository-level federation. The integration carries the
+participating operators' identifiers, the data-sharing agreement
+content-address, and the per-segment access scope. Federation is
+mutually authenticated; TM cross-flow without an active agreement
+returns `403 Forbidden` with type
+`urn:wia:i18n:tm-federation-not-authorised`.
 
+## §9 Long-Term Archive Integration
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+Programmes designate a long-term archive that holds released build
+bundles beyond programme wind-down. Quarterly deposits round-trip
+content-addresses; on programme wind-down, remaining bundles
+transfer to the archive with content-addresses preserved.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## §10 Citation and Pinning
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Externally cited translations (a release, a journal-translated
+abstract, a regulatory-translated dossier) are referenced by the
+build-bundle manifest digest. Programmes MUST keep build bundles
+addressable by their pinned digests for at least seven years from
+the citation event.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## §11 Verifiable-Credential Re-Issuance (optional)
 
-## Annex F — Adoption Roadmap
+Programmes that wish to expose translation attestations (quality
+review pass, ISO 17100 conformance) to consumers of W3C Verifiable
+Credentials MAY re-issue the attestations as Verifiable Credentials
+under the Data Model 2.0 specification. Re-issuance is optional;
+the canonical record remains the JSON evidence-package manifest.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## §12 Worked Example: Continuous-Localisation Round-Trip
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+1. Build pipeline POSTs new source segments at extract time.
+2. Streaming subscription notifies the LSV; LSV dispatches to a
+   qualified translator via its CAT tool integration.
+3. Translator completes translations; LSV reviewer adds quality
+   review; operating programme appends approval.
+4. Build pipeline pulls approved translations and publishes a new
+   build bundle; the bundle's manifest digest is pinned in the
+   release notes.
+5. Translation memory federation propagates the new TM entries to
+   sister projects under the same operator.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+A conformant tool completes this flow without further input.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §13 Cross-Standard Linkage
 
-## Annex G — Test Vectors and Conformance Evidence
+Programmes that consume adjacent WIA standards (publication,
+clinical-document translation, regulatory-document translation)
+emit cross-standard linkage records.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## §14 Reader Tooling
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Programmes MAY publish supplementary reader hints (visual
+language-coverage maps, glossary-evolution timelines, quality-
+review distributions) alongside the canonical evidence package.
+Reader tools are non-normative.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## §15 Backwards-Compatibility Guarantee
 
-## Annex H — Versioning and Deprecation Policy
+PHASE-4 minor revisions remain backwards-compatible with prior-
+minor clients. Major revisions go through a deprecation window of
+at least one full CLDR release cycle.
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## §16 Public Catalogue and Aggregator Feeds
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Programmes that publish a public catalogue emit an Atom or JSON
+Feed listing released build bundles with their evidence-package
+manifest digests, the project, the release date, and the locales
+covered. The feed does not carry translator identifiers; it is
+intended for engineering discovery and audit.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## §17 Migration from Pre-Standard Records
 
-## Annex I — Interoperability Profiles
+Programmes that operated before WIA-i18n reached version 1.0 MAY
+migrate historical projects by emitting synthetic project records
+with a `legacyImport` flag. Synthetic projects are accepted by the
+public catalogue but are not eligible for evidence-package
+generation without contemporaneous re-validation under PHASE-3
+§3.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## §18 Cross-Standard Linkage
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+Programmes that consume adjacent WIA standards (publication
+workflows, clinical-document translation, regulatory-document
+translation) emit cross-standard linkage records that name the
+consuming standard and the version under which the linkage is
+claimed. Linkages are not transitive; consumers verify each
+adjacent standard's evidence directly.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## §19 LSV-Side Audit-Trail Export
+
+LSVs that are subject to audit (annual ISO 17100 surveillance,
+operator-side QA review) consume audit-trail exports through
+dedicated client certificates. The export carries the dispatch
+records, the per-segment translation timeline, the quality-review
+chain, and the build-bundle integration events relevant to the
+LSV. Audit access is scoped to the LSV's own contributions; the
+operating programme does not expose other LSVs' detail through
+this integration.
+
+## §20 Format Adapter Vendor Integration
+
+Format-adapter implementations are typically open-source community
+projects (Mozilla L20n / Fluent, Apple's stringsdict tooling,
+Android's resource compiler) or commercial CAT-vendor adapters.
+The operating programme integrates the adapter as a content-
+addressed module and pins a particular module revision per
+project. Module revisions are consumed through standard package-
+manager channels; the integration record carries the channel and
+the pinned revision.
+
+## §21 CLDR Mirror and Refresh Integration
+
+The operating programme mirrors the active CLDR revisions it
+consumes so that locale-data lookups remain available even when
+the upstream CLDR distribution is unreachable. Refresh integration
+runs at the cadence the operator declares (typically per CLDR
+release); refresh events emit cross-references when locale-data
+changes affect already-released bundles.
+
+## §22 Backwards-Compatibility Guarantee
+
+PHASE-4 minor revisions remain backwards-compatible with prior-
+minor clients: build-pipeline adapters, LSV management adapters,
+and CAT-tooling proxies continue to function across minor
+revisions. Major revisions go through a deprecation window of at
+least one full CLDR release cycle so that downstream pipelines
+have time to migrate without losing localised builds in flight.
+
+## §23 Operator-Side Audit-Trail Export
+
+External auditors retained by the operating organisation consume
+audit-trail exports through the integration layer. The export
+includes API audit logs, dispatch records, build-pipeline
+integration events, and the certificate-rotation history; auditor
+client certificates are issued by the certifying body with scope
+limited to the audit window the auditor was commissioned for.
+
+## §24 Verifiable-Credential Re-Issuance for Project Attestations
+
+Programmes that wish to expose project-level attestations (LSV
+ISO 17100 conformance, build-bundle integrity, glossary curation
+status) to consumers of W3C Verifiable Credentials MAY re-issue
+the attestations as Verifiable Credentials under the Data Model
+2.0 specification. Re-issuance is optional; the canonical record
+remains the JSON evidence-package manifest.
+
+## §25 Reader Tooling for Translation Reviewers
+
+Manuscript reviewers, in-house language QA leads, and accessibility
+advisors benefit from visualisation tools that surface translation
+diff views, glossary deviation reports, and locale-coverage maps
+across releases. Programmes MAY publish such reader tools alongside
+the canonical evidence package; the tools are non-normative.
+
+## §26 Conformance and Sunset
+
+A programme conformant with PHASE-4 has integrated successfully
+with at least one build pipeline, at least one LSV management
+system, the relevant CAT tooling proxy, at least one quality-
+assurance service, and at least one long-term archive, and has
+published at least one externally citable evidence package.
+
+Sunsetting an integration is announced via the well-known
+discovery document at least 90 calendar days before removal.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 4 — INTEGRATION
+- **Status:** Stable
+- **Standard:** WIA-i18n
+- **Last Updated:** 2026-04-27

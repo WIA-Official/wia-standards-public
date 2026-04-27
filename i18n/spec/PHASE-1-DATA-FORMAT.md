@@ -5,237 +5,355 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-i18n (I18n).
+This document defines the canonical data-format layer for WIA-i18n.
+The standard covers exchange of internationalisation (i18n) and
+localisation (l10n) artefacts — translation memory, glossary,
+locale data, message catalogues, and translator workflow records —
+among software publishers, language-service vendors, individual
+translators, and the platform tooling (CAT systems, build pipelines,
+review workflows) that processes the artefacts.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO 639-1 / 639-2 / 639-3 (language codes)
+- ISO 15924 (script codes)
+- ISO 3166-1 / 3166-2 (country and subdivision codes)
+- ISO/IEC 17025:2017 (testing and calibration laboratories — used here
+  for translation-quality calibration where the laboratory model
+  applies)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 11578 (UUID)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 5646 / BCP 47 (Tags for Identifying Languages)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- W3C XML Localisation Interchange File Format (XLIFF) 2.x as a
+  community-maintained interchange envelope; the WIA standard wraps
+  rather than redefines XLIFF 2.x
+- Unicode CLDR (Common Locale Data Repository) — cited normatively
+  for canonical locale data definitions
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-i18n
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines persistent shapes for translation
+memory, glossary, message catalogues, and the workflow records that
+accompany them across the i18n / l10n pipeline. Implementations
+covered include:
 
-## §2 Manifest
+- Translation memory (TM) servers that ingest and serve segment
+  alignments.
+- Terminology / glossary servers that govern domain-specific
+  translation choices.
+- Continuous-localisation pipelines that ingest source-language
+  artefacts, dispatch them to translators, and re-integrate
+  translated artefacts.
+- Quality-assurance services that review translations against
+  agreed quality models (LISA QA, MQM-aligned models).
+- Publication systems that emit localised builds and runtime
+  message bundles.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "i18n"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Machine-translation system internals (training data, model weights)
+and font-rendering pipelines are out of scope.
 
-## §3 Conformance Tiers
+## §2 Project Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+projectId         : string (uuidv7)
+projectCreatedAt  : string (ISO 8601 / RFC 3339)
+projectOperator   : string (institutional identifier of the
+                       publisher operating the project)
+sourceLocale      : string (BCP 47 language tag for the source
+                       language; e.g. "en-US")
+targetLocales     : array of string (BCP 47 tags; e.g.
+                       ["ko-KR", "ja-JP", "zh-Hans-CN", "ar-SA"])
+qualityModelRef   : string (content-addressed URI of the project's
+                       quality model definition)
+projectStatus     : enum ("draft" | "active" | "freeze" |
+                       "archived" | "deprecated")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Projects whose `targetLocales` change after `active` emit a new
+project-version record; prior records remain addressable as the
+historical state.
 
-## §4 Discovery
+## §3 Locale Data Reference
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/i18n`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+localeData:
+  localeTag       : string (BCP 47)
+  cldrRevision    : string (CLDR release identifier)
+  fallbackChain   : array of string (BCP 47 tags in fallback order)
+  features:
+    plural        : enum ("zero-one-other" | "one-few-other" |
+                       "one-other" | "other-only" | "user-defined")
+    bidi          : enum ("ltr" | "rtl" | "context")
+    digitGrouping : string (CLDR-style group/separator definition)
+    quotationMarks : array of string
+    listSeparator : string
+    timeZoneAware : boolean
+```
 
-## §5 Time and Identity
+A project may pin a CLDR revision per locale or globally; revisions
+emit new locale-data records and prior records remain addressable.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Source Segment Record
 
-## §6 Versioning and Deprecation
+```
+sourceSegment:
+  segmentId       : string (uuidv7)
+  projectId       : string (uuidv7)
+  sourceLocale    : string (BCP 47)
+  sourceText      : string (UTF-8; preserves source-side markup)
+  context         : string (free text; UI screenshot URI, code
+                       comment, calling site identifier, etc.)
+  contextRef      : string (content-addressed URI of richer context
+                       artefact when applicable)
+  maxLengthCodepoints : integer (constraint that affects
+                       translation; e.g. UI button caption)
+  domain          : string (domain code, e.g. "ui-button",
+                       "legal-notice", "marketing-headline")
+  status          : enum ("source-extracted" | "ready-for-translation"
+                       | "frozen-in-build" | "deprecated")
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Source segments are immutable once status moves beyond
+`source-extracted`; corrections emit a new source segment and emit
+a deprecation record against the prior segment.
 
-## §7 Privacy and Security
+## §5 Translation Record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+translation:
+  translationId   : string (uuidv7)
+  segmentId       : string (uuidv7, references §4)
+  targetLocale    : string (BCP 47)
+  targetText      : string (UTF-8)
+  authorRef       : string (institutional or freelancer identifier;
+                       PII held in operator HR / vendor system)
+  authorKind      : enum ("human-translator" | "in-house-team" |
+                       "machine-translation-with-pe" |
+                       "post-edited-mt" | "fuzzy-match" |
+                       "exact-match")
+  matchScore      : number (0-100; for fuzzy or MT matches, the
+                       similarity to the TM hit; absent for full
+                       human translations)
+  status          : enum ("draft" | "in-review" | "approved" |
+                       "rejected" | "deprecated")
+  approvalChain   : array of ApprovalEntry
+```
 
-## §8 Open Governance
+Approved translations populate the project's published build; in-
+review translations are excluded from the runtime bundle.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `i18n` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Glossary and Terminology Record
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+```
+glossaryTerm:
+  termId          : string (uuidv7)
+  projectId       : string (uuidv7)
+  domain          : string (matches §4 segment domain when
+                       applicable)
+  sourceTerm      : string
+  sourceLocale    : string (BCP 47)
+  preferredTranslations : array of LocaleTranslation
+  forbiddenTranslations : array of LocaleTranslation
+  notes           : string (translator guidance; redacted on
+                       export when contains client-confidential
+                       detail)
 
+LocaleTranslation:
+  targetLocale    : string (BCP 47)
+  text            : string
+  rationale       : string
+```
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+Glossary entries are referenced by translation records (§5) so that
+QA services can flag deviations from preferred terminology.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## §7 Translation Memory Record
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+tmEntry:
+  entryId         : string (uuidv7)
+  projectId       : string (uuidv7)
+  sourceSegmentId : string (uuidv7)
+  translationId   : string (uuidv7)
+  bidiText:
+    sourceText    : string
+    targetText    : string
+  contextHash     : string (SHA-256 of the segment's context
+                       artefact for ICE-match detection)
+  createdAt       : string (ISO 8601)
+  lastUsedAt      : string (ISO 8601 / RFC 3339; updated on each
+                       leverage)
+  usageCount      : integer
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+TM entries are append-only; deprecation of a source segment emits
+a TM-entry deprecation record but does not delete the entry, so
+that historical builds remain reproducible.
 
-## Annex F — Adoption Roadmap
+## §8 Quality Review Record
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+qualityReview:
+  reviewId        : string (uuidv7)
+  translationId   : string (uuidv7)
+  reviewerRef     : string (institutional identifier)
+  performedAt     : string (ISO 8601)
+  qualityModel    : string (e.g. "MQM-2.0", "LISA-QA-3.1",
+                       "operator-internal")
+  errorCategory   : array of enum ("accuracy" | "fluency" |
+                       "terminology" | "style" | "locale-convention"
+                       | "design-fit" | "verity" | "user-defined")
+  errorSeverity   : enum ("critical" | "major" | "minor" |
+                       "preferential")
+  recommendedAction : enum ("accept" | "edit" | "retranslate" |
+                       "escalate")
+  reviewNotes     : string
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §9 Build Bundle Record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+buildBundle:
+  bundleId        : string (uuidv7)
+  projectId       : string (uuidv7)
+  builtAt         : string (ISO 8601)
+  bundleArtefactRef : string (content-addressed URI of the
+                       built localisation bundle; XLIFF 2.x,
+                       gettext .mo, JSON i18n, ICU MessageFormat)
+  includedTranslations : array of string (translation IDs)
+  emptyKeyHandling : enum ("source-fallback" | "empty-string" |
+                       "untranslated-marker")
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## §10 Pseudo-Locale and Test-Locale Records
 
-## Annex G — Test Vectors and Conformance Evidence
+Build pipelines exercise i18n correctness through pseudo-locales
+(e.g. `en-XA` accent-mangling, `en-XB` length-stretching) that surface
+hard-coded strings, length-budget violations, bidirectional layout
+breaks, and missing format placeholders.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+pseudoLocale:
+  pseudoLocaleId  : string (uuidv7)
+  projectId       : string (uuidv7)
+  pseudoTag       : string (BCP 47 private-use tag)
+  generationRule  : enum ("accent-mangling" | "length-stretch" |
+                       "bidi-injection" | "format-strict" |
+                       "user-defined")
+  parameters      : object (rule-specific configuration)
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Pseudo-locale builds are gated as `non-shippable` so that they are
+never accidentally promoted to release; the API enforces the gate
+at the build-bundle endpoint by refusing to accept pseudo-locale
+records as a `targetLocale`.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+## §11 Plural / Gender / Selection Catalogue
 
-## Annex H — Versioning and Deprecation Policy
+Some target locales require message catalogues to express plural
+or gender selection beyond the simple key→value pair. The catalogue
+record carries the selection rules and the per-rule translations.
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```
+selectionCatalogue:
+  catalogueId     : string (uuidv7)
+  segmentId       : string (uuidv7)
+  targetLocale    : string (BCP 47)
+  selectorKind    : enum ("plural" | "gender" | "case" |
+                       "user-defined")
+  rules           : array of SelectionRule
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+SelectionRule:
+  match           : string (CLDR plural keyword or selector value)
+  text            : string (UTF-8)
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+The selector follows CLDR plural-keyword conventions; submissions
+whose keywords do not match the locale's plural set return `422`
+with type `urn:wia:i18n:plural-rule-mismatch` from the API.
 
-## Annex I — Interoperability Profiles
+## §12 Translator Workload and Vendor Dispatch Record
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The dispatch record tracks the assignment of source segments (or
+groups of segments) to LSV vendors and to individual translators
+through the LSV proxy. The record carries the dispatch time, the
+agreed delivery window, the rate / fee class for the pairing, and
+the audit trail of redispatches when the original target cannot
+deliver.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+```
+dispatch:
+  dispatchId      : string (uuidv7)
+  projectId       : string (uuidv7)
+  segmentBatchRef : string (URI of the dispatched segment batch)
+  vendorRef       : string (LSV identifier)
+  translatorRef   : string (opaque LSV-internal identifier)
+  dispatchedAt    : string (ISO 8601)
+  dueAt           : string (ISO 8601)
+  rateClassRef    : string (opaque pricing-tier identifier;
+                       commercial detail held in vendor agreement)
+  reassignmentLog : array of ReassignmentEntry
+```
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Translator identity (legal name, contact, payment) is held in the
+LSV's HR / accounts-payable system and is never carried in the
+API. The `translatorRef` is the LSV's internal opaque token that
+maps to the translator's HR record.
+
+## §13 Format Adapter Record
+
+Source artefacts arrive in many formats — Java `.properties`, iOS
+`.strings` / `.stringsdict`, Android `strings.xml`, gettext PO,
+ICU MessageFormat JSON, YAML, FluentJS, web frameworks' bespoke
+formats. The format-adapter record describes the operator's
+extraction recipe per source format so that downstream pipelines
+can reconstruct the segment set from the source artefacts.
+
+```
+formatAdapter:
+  adapterId       : string (uuidv7)
+  projectId       : string (uuidv7)
+  sourceFormat    : enum ("java-properties" | "apple-strings" |
+                       "apple-stringsdict" | "android-xml" |
+                       "gettext-po" | "icu-messageformat-json" |
+                       "yaml-i18n" | "fluent-js" | "xliff-2" |
+                       "user-defined")
+  extractionRulesRef : string (content-addressed URI of the
+                       extraction rules)
+  reintegrationRulesRef : string (content-addressed URI of the
+                       reintegration rules used at build time)
+```
+
+A project may bind multiple format adapters when its source
+artefacts span multiple formats (e.g. iOS + Android + web).
+
+## §14 BCP 47 Tag Validity Notes
+
+All language-tag fields in the records described above are valid
+BCP 47 tags. Tags that include private-use subtags (`-x-...`) are
+permitted only for pseudo-locales (PHASE-1 §10) and for operator-
+internal experimental locales that never reach a release build.
+Implementations validate tags against the in-force IANA Language
+Subtag Registry on submission.
+
+## §15 Conformance
+
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every supported project and honour the
+content-addressing rules in §3-§9.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-i18n
+- **Last Updated:** 2026-04-27

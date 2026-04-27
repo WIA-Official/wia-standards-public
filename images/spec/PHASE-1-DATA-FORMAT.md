@@ -5,237 +5,376 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-images (Images).
+This document defines the canonical data-format layer for WIA-images.
+The standard covers exchange of digital still-image assets and their
+operational metadata across publishing pipelines, content-management
+systems, image-CDN services, accessibility tooling, rights-clearance
+operators, and downstream renderers (web, mobile, print). The format
+captures source asset identity, bitstream metadata, encoding
+variants, derivative renditions, accessibility descriptions,
+provenance attestations, rights-clearance records, and the
+delivery / cache state of each rendition.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+
+- ISO 8601 (date and time representation)
+- ISO/IEC 17025:2017 (testing and calibration laboratories — used for
+  colour-management calibration where the laboratory model applies)
+- ISO/IEC 27001:2022 (information security management)
+- ISO/IEC 11578 (UUID)
+- ISO/IEC 15444 (JPEG 2000 family)
+- ISO/IEC 23000 (MPEG-A application formats; cited only for HEIF
+  envelope reference)
+- ISO/IEC 21000-21 (MPEG-21 — Cross-Media Exchange; cited normatively
+  for cross-platform rights metadata definitions)
+- IETF RFC 4122 (UUID URN)
+- IETF RFC 8259 (JSON)
+- IETF RFC 9457 (Problem Details for HTTP APIs)
+- W3C WCAG 2.2 (cited normatively for accessibility text-alternative
+  conventions)
+- W3C PNG (Portable Network Graphics) Specification
+- W3C SVG 2 (Scalable Vector Graphics)
+- C2PA (Content Authenticity / provenance manifest framework — cited
+  normatively as a community-managed envelope for provenance
+  attestations)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-images
-standard. It addresses the data-format layer of the standard.
+This PHASE document defines persistent shapes for image asset
+records as they flow through ingestion, transformation, delivery,
+and archival. Implementations covered include:
 
-## §2 Manifest
+- Editorial and publishing pipelines that ingest source photographs
+  and illustrations.
+- Content-management systems that hold per-asset metadata and
+  rights-clearance state.
+- Image-CDN services that serve responsive renditions to web and
+  mobile clients.
+- Accessibility tooling that generates and reviews text alternatives.
+- Rights-clearance operators that track licence terms and expiry.
+- Provenance services that emit C2PA-compatible attestations.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "images"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Generative-image model internals (training data, model weights),
+real-time camera-pipeline calibration, and broadcast-video
+distribution are out of scope.
 
-## §3 Conformance Tiers
+## §2 Asset Identifier
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+assetId           : string (uuidv7)
+assetCreatedAt    : string (ISO 8601 / RFC 3339)
+operatorRef       : string (institutional identifier of the
+                       publishing operator)
+sourceKind        : enum  ("photograph" | "illustration" |
+                       "screenshot" | "diagram" | "infographic" |
+                       "synthetic-rendered" | "user-uploaded" |
+                       "scan-of-physical")
+intendedUse       : enum  ("editorial" | "advertising" |
+                       "internal-only" | "public-domain-source" |
+                       "ai-training" | "user-generated-content")
+assetStatus       : enum  ("draft" | "ready-for-delivery" |
+                       "embargoed" | "withdrawn" | "deprecated")
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A withdrawn asset (rights-clearance lapse, take-down notice,
+operator-initiated removal) emits a withdrawal notice that the API
+serves alongside the canonical record.
 
-## §4 Discovery
+## §3 Bitstream Record
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/images`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The bitstream record describes the source-of-truth digital file.
+The bitstream itself is content-addressed; the record carries the
+metadata needed to interpret it.
 
-## §5 Time and Identity
+```
+bitstream:
+  bitstreamId     : string (uuidv7)
+  assetId         : string (uuidv7)
+  format          : enum ("jpeg" | "png" | "webp" | "avif" |
+                       "heif" | "tiff" | "jpeg-2000" | "svg" |
+                       "raw-cr2" | "raw-nef" | "raw-arw" |
+                       "raw-dng" | "user-defined")
+  contentDigest   : string (SHA-256 of the bitstream)
+  artefactRef     : string (content-addressed URI)
+  pixelWidth      : integer
+  pixelHeight     : integer
+  bitDepth        : integer
+  colourSpace     : enum ("srgb" | "display-p3" | "rec-2020" |
+                       "adobe-rgb" | "prophoto-rgb" | "cmyk" |
+                       "grayscale" | "lab")
+  iccProfileRef   : string (content-addressed URI of the embedded
+                       ICC profile, when not srgb)
+  exifRef         : string (content-addressed URI of the EXIF
+                       sidecar; absent when EXIF is empty or
+                       stripped)
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §4 Capture and Camera Metadata
 
-## §6 Versioning and Deprecation
+For photograph-kind assets, the capture record carries the EXIF-
+sourced camera metadata that downstream consumers (forensics, image
+search, rights verification) reference.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+capture:
+  captureId       : string (uuidv7)
+  bitstreamId     : string (uuidv7)
+  capturedAt      : string (ISO 8601 / RFC 3339; timezone-pinned)
+  cameraMake      : string
+  cameraModel     : string
+  lensModel       : string
+  exposureSeconds : number
+  apertureFNumber : number
+  isoSensitivity  : integer
+  focalLengthMm   : number
+  flashFired      : boolean
+  geoLatitude     : number (when EXIF GPSLatitude is present and
+                       not redacted)
+  geoLongitude    : number
+  geoRedacted     : boolean (operator may strip GPS for privacy)
+```
 
-## §7 Privacy and Security
+Programmes that publish externally cited photographs MUST record
+whether GPS was redacted; redaction is permanent at the bitstream
+level once a derivative is published, but the capture record's
+`geoRedacted` flag preserves the audit fact.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §5 Variant and Rendition Record
 
-## §8 Open Governance
+The original bitstream is rendered into multiple variants for
+delivery: width-stepped responsive renditions, format-converted
+copies for browser support fan-out, focal-cropped art-direction
+variants, and accessibility-friendly renditions.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `images` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+rendition:
+  renditionId     : string (uuidv7)
+  bitstreamId     : string (uuidv7, source bitstream)
+  variantPurpose  : enum ("responsive-step" | "format-convert" |
+                       "art-direction-crop" | "thumbnail" |
+                       "preview" | "accessibility-friendly" |
+                       "preview-blurhash" | "preview-svg-placeholder"
+                       | "user-defined")
+  format          : enum (matches §3.format)
+  pixelWidth      : integer
+  pixelHeight     : integer
+  contentDigest   : string (SHA-256)
+  artefactRef     : string (content-addressed URI)
+  derivationRecipe : string (recipe identifier; renditions produced
+                       by a deterministic pipeline cite the recipe
+                       so re-rendering is reproducible)
+```
 
-弘益人間 (Hongik Ingan) — Benefit All Humanity
+## §6 Accessibility Description Record
 
+Accessibility tooling emits text alternatives, long descriptions,
+and decorative-flag metadata for each asset. The record carries the
+description per locale and the review state.
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```
+accessibility:
+  accessibilityId : string (uuidv7)
+  assetId         : string (uuidv7)
+  locale          : string (BCP 47)
+  altText         : string (short text alternative; required for
+                       non-decorative assets)
+  longDescriptionRef : string (content-addressed URI of an
+                       extended description, when the image
+                       requires more than altText)
+  isDecorative    : boolean (when true, altText is empty per
+                       WCAG 2.2 1.1.1 decorative image guidance)
+  reviewState     : enum ("auto-generated" | "human-reviewed" |
+                       "human-authored" | "needs-review")
+  reviewedAt      : string (ISO 8601; absent until reviewed)
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+Auto-generated text alternatives MUST be reviewed before the
+asset is published in editorial or advertising contexts; the
+review state gates the publication pipeline.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## §7 Provenance Attestation Record
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Provenance attestations (C2PA-style content credentials) describe
+the asset's chain of edits and the signers responsible for each
+step.
 
-## Annex F — Adoption Roadmap
+```
+provenance:
+  provenanceId    : string (uuidv7)
+  assetId         : string (uuidv7)
+  manifestRef     : string (content-addressed URI of the C2PA
+                       manifest)
+  signerRef       : string (institutional signer identifier)
+  steps           : array of ProvenanceStep
+  isVerified      : boolean (signature verification result at
+                       last verification)
+  lastVerifiedAt  : string (ISO 8601)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+ProvenanceStep:
+  stepKind        : enum ("captured" | "imported" | "edited" |
+                       "synthesised" | "format-converted" |
+                       "rights-cleared" | "published" |
+                       "user-defined")
+  occurredAt      : string (ISO 8601)
+  actorRef        : string (institutional or tool identifier)
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## §8 Rights and Clearance Record
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+rightsClearance:
+  clearanceId     : string (uuidv7)
+  assetId         : string (uuidv7)
+  rightsHolderRef : string (institutional rights-holder identifier)
+  licenceCode     : enum ("rf" | "rm" | "editorial-use-only" |
+                       "creative-commons-by" |
+                       "creative-commons-by-sa" |
+                       "creative-commons-by-nd" |
+                       "creative-commons-by-nc" |
+                       "public-domain" | "operator-internal" |
+                       "ai-training-permitted" |
+                       "ai-training-prohibited")
+  licenceTermsRef : string (content-addressed URI of the licence
+                       terms artefact)
+  licenceExpiresAt: string (ISO 8601 date; absent for perpetual)
+  geographyScope  : array of string (ISO 3166-1 codes; absent for
+                       worldwide)
+  embargoUntil    : string (ISO 8601; absent for unembargoed)
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+A rendition served to a request whose context falls outside the
+licence's `geographyScope` returns `403 Forbidden` from the API
+with type `urn:wia:images:licence-geography-violation`.
 
-## Annex G — Test Vectors and Conformance Evidence
+## §9 Delivery State Record
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+deliveryState:
+  deliveryId      : string (uuidv7)
+  renditionId     : string (uuidv7)
+  cdnEdgeId       : string (content-delivery edge identifier)
+  cachedAt        : string (ISO 8601)
+  invalidationsApplied : array of InvalidationEntry
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## §10 IPTC Photo Metadata Record
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Editorial-context assets carry IPTC PhotoMetadata fields (creator,
+credit line, copyright notice, headline, caption, keywords) which
+are referenced as a content-addressed sidecar to the bitstream so
+that downstream consumers can rebuild the IPTC fan-out from a
+single source of truth.
 
-## Annex H — Versioning and Deprecation Policy
+```
+iptcMetadata:
+  iptcId          : string (uuidv7)
+  bitstreamId     : string (uuidv7)
+  iptcArtefactRef : string (content-addressed URI of the IPTC JSON
+                       sidecar)
+  creator         : string (author display string)
+  credit          : string (publisher-required credit line)
+  copyrightNotice : string
+  headline        : string
+  description     : string (free text caption; localised
+                       descriptions follow PHASE-1 §6 accessibility
+                       records when relevant)
+  keywords        : array of string
+  subjectCode     : array of string (IPTC Subject Codes when
+                       applicable)
+```
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+IPTC fields are mandatory for editorial-context assets and SHOULD
+be present for advertising-context assets; assets that lack
+IPTC creator and copyright fields cannot transition past
+`ready-for-delivery` for those use contexts.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## §11 Person-Pictured Subject Record
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Editorial photographs that depict identifiable people carry a
+person-pictured record so that downstream consumers can honour
+model releases, image-rights restrictions, and right-to-erasure
+requests.
 
-## Annex I — Interoperability Profiles
+```
+personPictured:
+  recordId        : string (uuidv7)
+  assetId         : string (uuidv7)
+  subjectToken    : string (opaque token mapped in operator CRM
+                       to the depicted person's contact record)
+  releaseKind     : enum ("signed-model-release" |
+                       "editorial-public-figure" |
+                       "implicit-public-event" |
+                       "no-release-no-publication")
+  releaseRef      : string (content-addressed URI of the signed
+                       release artefact when applicable)
+  ageMinor        : boolean (additional minor-rights workflows
+                       apply when true)
+  jurisdictionScope : array of string (ISO 3166 codes)
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The clinical / legal identity of the depicted person is held in
+the operator's CRM, not in the API. Right-to-erasure requests
+flow through the CRM's subject-access workflow.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## §12 Print-Production Variant (Optional)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Print-bound assets carry colour-managed CMYK renditions and
+print-process-specific metadata so that downstream press operations
+do not need to derive colour conversions ad-hoc.
+
+```
+printProduction:
+  recordId        : string (uuidv7)
+  renditionId     : string (uuidv7)
+  inkProfile      : string (CMYK profile identifier)
+  paperStock      : string (paper specification reference)
+  totalAreaCoveragePct : number (TAC budget)
+  separationStrategy   : enum ("ucr" | "gcr-light" |
+                       "gcr-medium" | "gcr-heavy" |
+                       "user-defined")
+```
+
+## §13 Animated and Sequence Image Variant
+
+Animated formats (animated WebP, animated AVIF, animated PNG, GIF)
+and image-sequence assets (multi-frame OME-TIFF, photo bursts)
+carry a sequence record that describes per-frame metadata so that
+downstream consumers can reason about timing, looping, and frame-
+level accessibility.
+
+```
+sequenceVariant:
+  recordId        : string (uuidv7)
+  bitstreamId     : string (uuidv7)
+  frameCount      : integer
+  totalDurationMs : integer (omitted for non-temporal sequences)
+  loopBehaviour   : enum ("none" | "indefinite" |
+                       "fixed-count" | "ping-pong" |
+                       "user-defined")
+  perFrameDurationMs : array of integer
+  reduceMotionAlternativeRef : string (URI of a still-image
+                       fallback honoured by clients that respect
+                       prefers-reduced-motion)
+```
+
+Animated assets MUST publish a `reduceMotionAlternativeRef` so that
+clients honouring user-agent reduced-motion preferences can fall
+back gracefully.
+
+## §14 Conformance
+
+Implementations claiming PHASE-1 conformance emit each of the
+records defined above for every published asset and honour the
+content-addressing rules in §3-§9.
+
+---
+
+**Document Information:**
+
+- **Version:** 1.0
+- **Phase:** 1 — DATA-FORMAT
+- **Status:** Stable
+- **Standard:** WIA-images
+- **Last Updated:** 2026-04-27

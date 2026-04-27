@@ -1,241 +1,244 @@
-# WIA-military-robot PHASE 4 — INTEGRATION Specification
+# WIA-military-robot PHASE 4 — Integration Specification
 
 **Standard:** WIA-military-robot
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-military-robot (Military Robot).
+This PHASE describes how a military-robot deployment integrates the
+data, APIs, and protocols from PHASEs 1–3 with the operational
+picture: platform fleet management, GCS integration, mission planner,
+manned-unmanned teaming, NBC-defense bridge, EOD coordination, UUV
+support-ship integration, fire-control consumers, and coalition
+exchange. It is non-prescriptive about specific vendors; it specifies
+the integration *contracts* a deployment must satisfy.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- STANAG 4856 — UGV common architecture
+- STANAG 4677 — Dismounted Soldier Reference Architecture
+- IEC 61508 — Safety Integrity Levels
+- WIA-military-drone (PHASE 1–4) — for shared GCS infrastructure
+- WIA-missile-defense (PHASE 1–4) — for cross-domain weapon-release
+- WIA-nbc-defense (PHASE 1–4) — for NBC-sensor integration
+- WIA-medical-data-privacy — for casualty integration
 
 ---
 
-## §1 Scope
+## §1 Platform fleet registry
 
-This PHASE document is one of four that together define the WIA-military-robot
-standard. It addresses the integration layer of the standard.
+The deployment maintains a registry of every fielded platform:
 
-## §2 Manifest
+- `platformRef` — URN
+- vendor, model, serial, domain (UGV/USV/UUV)
+- weight class, mobility profile
+- payload capability set
+- supported link classes
+- firmware version + last update date
+- TLS client certificate fingerprint and expiry
+- maintenance schedule + last-mission-hour count
+- safety SIL (per IEC 61508)
+- operating-area policy (geographic + autonomy-level scope)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-robot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A platform not in the registry, with expired certificate, with stale
+firmware, or whose declared mission autonomy exceeds the platform's
+SIL is refused at PHASE 2 §1.
 
-## §3 Conformance Tiers
+## §2 GCS integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+GCS integration follows STANAG 4856 (UGV/USV) or STANAG 4677
+(soldier-deployable). Multi-platform GCSs use the same authentication
+and audit-chain shape as WIA-military-drone PHASE 4 §2; per-operator
+authentication is mandatory for accountability.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The deployment may share GCS hardware and operator workflows between
+UAS and ground-robot operations; the boundary distinguishes by
+`platformRef.domain` so audit attribution remains correct.
 
-## §4 Discovery
+## §3 Mission planner
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-robot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The mission planner is a separate service:
 
-## §5 Time and Identity
+- Route construction with platform-specific mobility profiles
+- Geofence drafting (2D for ground/surface, 3D for UUV)
+- Autonomy-level declaration drafting
+- Lost-link behaviour selection
+- Loadout planning for armed missions
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The planner submits via PHASE 2 §1; the boundary's role is gatekeeping
+and audit.
 
-## §6 Versioning and Deprecation
+## §4 Manned-unmanned teaming (MUM-T)
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+When a robot operates as part of a manned formation:
 
-## §7 Privacy and Security
+- The lead manned platform's commander is the operator-on-loop
+- The robot's mission record references the manned platform's
+  mission record
+- Sensor observations flow into the manned platform's situational
+  awareness display (typically via a shared C2 system)
+- Weapon-release authority for the robot defers to the manned
+  commander's release authority
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+The boundary verifies the manned-mission cross-reference exists
+before accepting the robot's mission plan; orphan robot missions
+require explicit authorisation outside the MUM-T frame.
 
-## §8 Open Governance
+## §5 NBC-defense bridge
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-robot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+When a robot's payload includes NBC sensors:
+
+- Observations cross-reference WIA-nbc-defense PHASE 2 §1 ingest
+- The robot's chemical/radiological sniffer becomes a WIA-nbc-defense
+  sensor for purposes of plume-modelling and threat-assessment
+- The sensor's calibration is recorded in both registries (NBC
+  fleet + robot fleet)
+
+## §6 EOD coordination
+
+EOD operations have specific integration:
+
+- Mission plans declare the suspect-device location and category
+- The robot's manipulator and disrupt-charge inventory are tracked
+- Disrupt-charge fire requires dual signatures (operator + EOD lead)
+- Post-disrupt sensor sweep verifies neutralisation; the result is
+  recorded as the mission's outcome
+
+## §7 UUV support-ship integration
+
+UUV deployments integrate with their surface support ship:
+
+- The support ship hosts the GCS, the acoustic-modem, the launch
+  & recovery system
+- UUV and support ship time-discipline syncs at every acoustic ping
+- Support ship's position acts as the UUV's reference frame for
+  navigation reconstruction
+- Recovery records reference the support ship's recovery operation
+  identifier
+
+Loss of the support ship (during operations) requires emergency
+recovery procedures defined in deployment policy; the UUV's
+fully-autonomous recovery behaviour engages.
+
+## §8 Operational SLAs
+
+| Concern                                          | Default SLA              |
+|--------------------------------------------------|--------------------------|
+| Mission-plan submission p95 latency              | ≤ 200 ms                 |
+| Platform state stream sample latency             | ≤ 100 ms (ground/surface)|
+|                                                  | per acoustic window (UUV)|
+| Weapon-release authorisation turnaround          | ≤ 500 ms                 |
+| Sensor observation publication                   | ≤ 1 s after sensor frame |
+| Lost-link detection threshold (ground)           | ≤ 10 s                   |
+| Audit chain entry available after operation      | ≤ 1 s (live link); per acoustic window (UUV) |
+| Mishap response — token freeze                   | ≤ 5 s                    |
+| Mishap response — chain snapshot                 | ≤ 60 s                   |
+
+## §9 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every fielded platform is in the registry with current certificate,
+   firmware, and SIL declaration
+2. Every mission has a matching audit chain entry with verifiable
+   inclusion proof
+3. Every weapon-release event has dual signatures plus autonomy-level
+   compatibility check
+4. Geofence-evidence records are on file for every mission
+5. Lost-link events have recovery records or mishap-investigation
+   evidence
+6. UUV missions have INS-drift records consistent with the deployment's
+   policy
+7. Mishap investigations close within 30 days of incident (or have
+   formal extension authorisations)
+8. Cross-coalition releases have both release-authority signatures
+9. Quarterly compliance report has no integrity-check failures
+
+## Annex A — Common pitfalls (informative)
+
+- **Autonomy declaration drift** — operator changes mission scope
+  in-flight without re-declaring autonomy; the platform's onboard
+  supervisor refuses, but the operator's expectation drifts. The
+  GCS UI MUST surface the active declaration prominently
+- **Acoustic-modem desync (UUV)** — multi-UUV ops with overlapping
+  acoustic ranges experience modem collision; the deployment's TDMA
+  schedule MUST be designed for the worst-case overlap
+- **Manned-unmanned cross-reference orphaning** — manned mission ends
+  while robot mission continues; the boundary surfaces the orphan
+  and the operator must either re-authorise standalone or recover
+- **EOD disrupt-charge inventory** — inventory must reconcile after
+  every mission; an unaccounted charge is itself a safety incident
+
+## Annex B — Decommissioning (informative)
+
+When a platform is decommissioned: outstanding missions complete or
+transfer, the system is removed from the registry, final mission-hour
+count is recorded, audit records are preserved per deployment retention
+rules. The decommissioning manifest is itself an audit event.
+
+## Annex C — Quarterly compliance report (informative)
+
+The report covers total missions by type and outcome, sensor-observation
+volumes, weapon-release events with authorisation chain, autonomy-
+level declarations and exceedances, geofence-breach incidence,
+lost-link events and recovery rates, mishap investigations (open /
+closed within 30d / closed >30d), federation peer activity, and
+audit-chain integrity check results. The report is signed and is
+itself in scope for the audit chain.
+
+## Annex D — Worked MUM-T sequence (informative)
+
+1. Manned commander launches an MUM-T mission incorporating an EOD
+   robot
+2. Manned mission plan references the robot's mission plan; both
+   are recorded in the boundary
+3. Robot proceeds along the cleared route under operator-on-loop
+   autonomy; sensor observations flow to the commander's display
+4. Manned commander authorises a disrupt against a suspect device;
+   dual signatures are committed
+5. Robot acts; outcome is recorded; manned commander reviews
+6. Both missions close; the audit chains are linked
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex E — UUV operations notes (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+UUV deployments differ from UGV/USV in several integration points:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+- **Acoustic-modem bandwidth budget** — typically 1-10 kbps; design
+  the deployment's PHASE 2 traffic to fit within the budget
+- **GNSS denied** — the UUV cannot fix position underwater except via
+  surface, USBL/LBL acoustic positioning, or pre-mapped landmark
+  matching; the deployment policy specifies acceptable INS drift
+- **Pressure hull integrity** — incidents (water ingress, hull-strike)
+  trigger mishap workflow even when the platform recovers; investigation
+  retrieves prior-window audit chain
+- **Recovery weather windows** — surface ship + UUV recovery is sea-
+  state-dependent; mission planning should account for weather windows
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex F — Versioning and deprecation (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Versioning follows Semantic Versioning 2.0.0. STANAG 4856 / 4677
+versions bump independently from this PHASE; the deployment policy
+maps each PHASE version to the STANAG version it honours.
+Deprecation enters a 12-month sunset window with migration notes
+recorded in the audit chain.
 
-## Annex F — Adoption Roadmap
+## Annex G — Lessons-learned register (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Recurring lessons-learned across robot operations:
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+- **Tether snag** (EOD): wired-fibre tethers snag on debris; the
+  platform's tether-management system MUST detect snag and either
+  retract or signal operator
+- **Manipulator drift** (EOD): hydraulic manipulators drift from
+  commanded position over time; per-mission pre-flight calibration
+  reduces the drift impact
+- **Sea-state recovery window** (USV/UUV): the launch & recovery
+  system has a sea-state ceiling; missions extending into degrading
+  weather must include alternate recovery plans
+- **Acoustic crosstalk** (UUV multi-platform ops): TDMA scheduling
+  with margin for propagation-delay variance prevents collisions
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex H — Cross-platform identifier reuse
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A platform's URN is preserved across firmware updates. Major hardware refurbishment that changes the platform's serial number or safety SIL issues a new URN; the prior URN is retired with a recorded successor reference.

@@ -1,241 +1,336 @@
-# WIA-military-drone PHASE 2 — API-INTERFACE Specification
+# WIA-military-drone PHASE 2 — API Interface Specification
 
 **Standard:** WIA-military-drone
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-military-drone (Military Drone).
+This PHASE defines the API surface a UAS deployment exposes for
+mission-plan submission and re-tasking, airframe / payload / link
+state reporting, sensor observation publication (including KLV-
+metadata streaming), weapon-release authorisation and event reporting,
+geofence evidence collection, lost-link tracking, and recovery
+record. The shape is HTTP/JSON for C2 / mission planners; tactical
+fire-control loops use the constrained binary mapping described in
+PHASE 3 (J3.x for tracks, J11.x for weapon-direction).
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS), RFC 8259 (JSON)
+- STANAG 4586 — UAV Control System interfaces
+- STANAG 4609 — NATO Digital Motion Imagery (MISB)
+- MISB ST 0601 — UAS Datalink Local Set
+- MISB ST 0903 — Moving-Target-Indicator metadata
+- ICAO Doc 4444 — air-traffic management procedures
+- WIA-missile-defense PHASE 2 — referenced for cross-domain weapon-direction
+- WIA-military-communication PHASE 2 — referenced for cross-coalition release
 
 ---
 
-## §1 Scope
+## §1 Mission-plan submission
 
-This PHASE document is one of four that together define the WIA-military-drone
-standard. It addresses the api-interface layer of the standard.
+```
+POST /missions HTTP/1.1
+Host: uas.coalition-c2.example
+Authorization: Bearer eyJhbGciOiJFUzI1NiJ9...
+Content-Type: application/wia-md-uas+json
+WIA-Doctrine: NATO-AAP-15
 
-## §2 Manifest
+{
+  "missionId": "urn:wia:md-uas:mission:rok-army:m-91a7-2026-04-27",
+  "airframeRef": "urn:wia:md-uas:airframe:rok-army:tail-37",
+  "missionType": "isr-named-target",
+  "route": [
+    {"waypointId": "wp-1", "lat": 37.50, "lon": 127.00, "alt": 6000, "speed": 80, "legDuration": 1800},
+    {"waypointId": "wp-2", "lat": 37.45, "lon": 127.05, "alt": 6000, "speed": 80, "legDuration": 600}
+  ],
+  "geofence": {"type": "Polygon", "coordinates": [[...]]},
+  "rulesOfEngagement": "urn:wia:md-uas:roe:rok-army.adcc:roe-2026",
+  "lostLinkBehaviour": "return-to-base",
+  "civilAirspaceCoordinationRef": "urn:wia:md-uas:atc-coord:icao-2026-04-27-0915"
+}
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-drone"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The boundary validates the route against geofence + civil-airspace
+coordination, the airframe's registry presence, the rules-of-engagement
+authorisation, and the operations-authority signature, then creates
+the mission record. On rejection the response carries the relevant
+problem URI (`urn:wia:md-uas:problem:airspace-conflict`,
+`urn:wia:md-uas:problem:roe-not-authorised`, etc.).
 
-## §3 Conformance Tiers
+Re-tasking in flight uses `PUT /missions/<missionId>/$retask` with
+the new route; the prior plan is preserved in version history.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Airframe / payload / link state
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+The airframe pushes state events:
 
-## §4 Discovery
+```
+POST /airframes/<airframeRef>/state HTTP/1.1
+{
+  "stateTimestamp": "2026-04-27T09:31:14.523+09:00",
+  "position": {"lat": 37.5, "lon": 127.0, "alt": 6000},
+  "velocity": {"speed": 80, "heading": 270, "vertical": 0},
+  "attitude": {"roll": 2, "pitch": -1, "yaw": 270},
+  "fuelRemainingPct": 0.78,
+  "linkStates": [
+    {"linkClass": "los-rf", "state": "tracking", "signalQualityBand": "strong"},
+    {"linkClass": "blos-satcom", "state": "tracking", "signalQualityBand": "nominal"}
+  ]
+}
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-drone`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+State updates are streamed at the deployment-configured rate
+(typically 1 Hz for routine ops, 10 Hz for engagement windows).
+Subscribers consume via Server-Sent Events on
+`/airframes/<airframeRef>/state/$subscribe`.
 
-## §5 Time and Identity
+## §3 Sensor observation publication
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST /observations HTTP/1.1
+{
+  "obsId": "urn:wia:md-uas:obs:tail-37:2026-04-27T09:31:14:0001",
+  "airframeRef": "urn:wia:md-uas:airframe:rok-army:tail-37",
+  "payloadRef": "urn:wia:md-uas:payload:tail-37:gimbal-1",
+  "sensorType": "eo",
+  "geometry": {...},
+  "targetGroundFootprint": {...},
+  "observationTimestamp": "2026-04-27T09:31:14.523+09:00",
+  "observationProductRef": "https://uas-storage.example/products/...",
+  "klvMetadataRef": "https://uas-storage.example/klv/..."
+}
+```
 
-## §6 Versioning and Deprecation
+Streaming KLV metadata flows on a separate channel:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+GET /airframes/<airframeRef>/klv/$subscribe HTTP/1.1
+Authorization: Bearer ...
+Accept: application/vnd.misb.0601+klv
+```
 
-## §7 Privacy and Security
+The KLV stream pairs with the FMV (full-motion video) stream
+delivered out-of-band via the deployment's video-storage system.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Weapon-release authorisation
 
-## §8 Open Governance
+```
+POST /releases/$authorise HTTP/1.1
+{
+  "missionRef": "urn:wia:md-uas:mission:...",
+  "decisionRef": "urn:wia:md:decision:...",
+  "munitionType": "AGM-114",
+  "targetRef": "urn:wia:md:track:...",
+  "aimpointGeometry": {...},
+  "releaseConditions": {...}
+}
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-drone` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The release-authority's signed authorisation must be present; the
+boundary refuses release without dual-signatures (operator + release
+authority). On acceptance, the release record (PHASE 1 §6) is
+created and the airframe receives the fire instruction over the
+tactical link.
+
+## §5 Weapon-release event reporting
+
+After release:
+
+```
+POST /releases HTTP/1.1
+{
+  "releaseId": "urn:wia:md-uas:release:tail-37:r-91a7",
+  ...all PHASE 1 §6 fields...
+}
+```
+
+The boundary chains the release event to the authorisation, records
+the airframe's signed event, and emits an AuditEvent. Outcome
+reporting follows WIA-missile-defense PHASE 1 §8 outcome shape with
+`outcomeSourceUasRelease` reference.
+
+## §6 Geofence evidence collection
+
+The airframe reports geofence compliance as a stream:
+
+```
+POST /airframes/<airframeRef>/geofence-evidence HTTP/1.1
+{
+  "geofenceEvidenceId": "...",
+  "legRef": "urn:wia:md-uas:leg:m-91a7:wp-1-to-wp-2",
+  "actualTrack": [...samples...],
+  "geofenceBreachEvents": []
+}
+```
+
+End-of-mission summary records the geofence-evidence URN in the
+recovery record (PHASE 2 §8).
+
+## §7 Lost-link tracking
+
+```
+POST /airframes/<airframeRef>/lost-link HTTP/1.1
+{
+  "lostFromTimestamp": "...",
+  "lastKnownLinkClass": "blos-satcom",
+  "behaviourTriggered": "return-to-base"
+}
+```
+
+The boundary records the lost-link event; subsequent recovery uses
+`PUT /airframes/<airframeRef>/lost-link/<lostLinkId>` with the
+recovery evidence.
+
+## §8 Recovery record
+
+```
+POST /missions/<missionRef>/$recover HTTP/1.1
+{
+  "recoveryType": "runway-landing",
+  "recoveryLocation": {...},
+  "flightDurationSeconds": 7200,
+  "fuelRemainingPct": 0.18,
+  "payloadStatus": "intact",
+  "airframeCondition": "operational",
+  "geofenceEvidenceRef": "urn:wia:md-uas:geofenceEvidence:..."
+}
+```
+
+Recovery closes the mission's audit chain. The boundary indexes
+recovery records per airframe so flight-hour tracking + maintenance
+scheduling join the chain.
+
+## §9 Errors and warnings
+
+| URI                                              | Status | Meaning                                            |
+|--------------------------------------------------|-------:|----------------------------------------------------|
+| `urn:wia:md-uas:problem:airspace-conflict`       | 422    | mission route conflicts with civil-airspace coordination |
+| `urn:wia:md-uas:problem:roe-not-authorised`      | 403    | mission RoE outside operator's authorisation       |
+| `urn:wia:md-uas:problem:airframe-not-registered` | 404    | airframe URN not in deployment registry            |
+| `urn:wia:md-uas:problem:dual-signature-required` | 403    | weapon-release lacks operator + release-authority signatures |
+| `urn:wia:md-uas:problem:geofence-breach-pending` | 422    | mission segment requires resolution of pending breach |
+| `urn:wia:md-uas:problem:link-prerequisite-missing`| 503   | mandated link-class not currently tracking         |
+| `urn:wia:md-uas:problem:audit-unavailable`       | 503    | audit chain write failed                            |
+
+Warnings (200-OK with caveats) use `Warning:` headers per RFC 7234
+§5.5 with codes namespaced under `wia-md-uas-`.
+
+## Annex A — Capability advertisement (informative)
+
+```
+GET /.well-known/wia/military-drone/capabilities HTTP/1.1
+```
+
+Response advertises supported airframe MTOW bands, payload
+capabilities, supported link classes, supported MISB metadata
+versions, the deployment's RoE authorities, federation peers, and
+the conformance level. Capability documents are signed.
+
+## Annex B — Pagination + rate limiting (informative)
+
+Observation and state queries paginate at ≤ 1000 entries per page.
+Per-token rate limits default to 10 mission-plan submissions per
+hour per operator, 1000 state samples per second per airframe.
+Rate-limit refusals carry `urn:wia:md-uas:problem:rate-limited`.
+
+## Annex C — Idempotency
+
+Mission-plan submissions and weapon-release authorisations accept
+`Idempotency-Key`; retries within 24 h with the same key return the
+original response.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex D — Worked re-task sequence (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+In-flight re-task:
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+```
+PUT /missions/<missionId>/$retask HTTP/1.1
+Authorization: Bearer ...
+WIA-Operator-Signature: <JWS by operator>
+WIA-Release-Authority-Signature: <JWS by release authority, when re-task crosses RoE bands>
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+{
+  "newRoute": [...],
+  "reason": "target relocated; updated coordinates from JTAC"
+}
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Re-tasking that stays within the same RoE band requires only
+operator signature; re-tasking that crosses RoE bands requires
+both operator + release-authority signatures (per §1 mission-plan
+submission rules). The boundary refuses cross-RoE re-tasks without
+dual signatures.
 
-## Annex F — Adoption Roadmap
+## Annex E — Worked sensor observation publication (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST /observations HTTP/1.1
+Content-Type: application/wia-md-uas+json
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+{
+  "obsId": "urn:wia:md-uas:obs:tail-37:2026-04-27T09:31:14:0001",
+  "airframeRef": "urn:wia:md-uas:airframe:rok-army:tail-37",
+  "payloadRef": "urn:wia:md-uas:payload:tail-37:gimbal-1",
+  "sensorType": "eo",
+  "geometry": {
+    "airframeState": {"lat": 37.5, "lon": 127.0, "alt": 6000, "heading": 270, "speed": 80},
+    "gimbalAttitude": {"roll": 0, "pitch": -25, "yaw": 270},
+    "fovHorizontal": 12.5,
+    "fovVertical": 9.8
+  },
+  "targetGroundFootprint": {"type": "Polygon", "coordinates": [[...]]},
+  "observationTimestamp": "2026-04-27T09:31:14.523+09:00",
+  "observationProductRef": "https://uas-storage.example/products/2026-04-27/tail-37/0001.mp4",
+  "klvMetadataRef": "https://uas-storage.example/klv/2026-04-27/tail-37/0001.klv"
+}
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+The boundary records the observation, indexes by target ground
+footprint for spatial queries, and emits an AuditEvent.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex F — Worked weapon-release authorisation (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+POST /releases/$authorise HTTP/1.1
+Authorization: Bearer <operator-token>
+WIA-Operator-Signature: <JWS by operator over body>
+WIA-Release-Authority-Signature: <JWS by release authority over body>
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+{
+  "missionRef": "urn:wia:md-uas:mission:rok-army:m-91a7-2026-04-27",
+  "decisionRef": "urn:wia:md:decision:d-91a7",
+  "munitionType": "AGM-114",
+  "munitionCount": 1,
+  "targetRef": "urn:wia:md:track:fusion-A:91a7",
+  "aimpointGeometry": {"lat": 37.4516, "lon": 126.6531, "alt": 0},
+  "releaseConditions": {"speed": 80, "altitude": 6000, "rangeM": 4500}
+}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Response on accepted:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+201 Created
+Location: /releases/r-91a7
+WIA-Audit-Event-Id: urn:wia:md-uas:audit:release-auth:7f2c
+```
 
-## Annex H — Versioning and Deprecation Policy
+The boundary verifies both signatures, the RoE authorisation, the
+airframe's current state allows the release conditions, and the
+target-track is live in WIA-missile-defense before issuing the fire
+instruction over the tactical link.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex G — Capability discovery (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```
+GET /.well-known/wia/military-drone/capabilities HTTP/1.1
+Accept: application/json
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Response advertises supported airframe classes (MTOW bands), supported
+payload types, supported KLV metadata versions, RoE authorities,
+federation peers, and the deployment's conformance level (Surface /
+Verified / Anchored). Cached capability documents expire on the
+deployment's session-token lifetime.
