@@ -1,241 +1,363 @@
-# WIA-medical-robot PHASE 2 — API-INTERFACE Specification
+# WIA-medical-robot PHASE 2 — API Interface Specification
 
 **Standard:** WIA-medical-robot
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-medical-robot (Medical Robot).
+This PHASE defines the HTTP API surface a medical-robot boundary
+exposes to OR-control consoles, surgeon workstations, biomedical-
+engineering ops, regulator audit clients, manufacturers, and the
+robot fleet itself. The surface is FHIR R5 RESTful, layered with
+robot-specific resources and operations: procedure orchestration,
+motion telemetry capture, intervention-event acknowledgement,
+imaging cross-reference, and tele-link management.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — RESTful API, Procedure, Device, ServiceRequest,
+  Subscription, Bundle, OperationOutcome, CapabilityStatement
+- HL7 SMART App Launch 2.2
+- IEEE 11073-10101 — for vital-sign metric codes when robot
+  monitors patient vitals during procedure
+- IETF RFC 9457 (Problem Details), RFC 8615 (well-known URIs),
+  RFC 7515 (JWS), RFC 7519 (JWT), RFC 8259 (JSON), RFC 3339
+- IEC 80601-2-77 §201.4.4 (operator control)
 
 ---
 
-## §1 Scope
+## §1 Capability discovery
 
-This PHASE document is one of four that together define the WIA-medical-robot
-standard. It addresses the api-interface layer of the standard.
+```
+GET /metadata HTTP/1.1
+Accept: application/fhir+json
+```
 
-## §2 Manifest
+Returns FHIR CapabilityStatement augmented with WIA extensions:
+declared particular standards (IEC 80601-2-77, -78, ISO 13482),
+supported robot kinds (PHASE 1 §2 catalogue), tele-surgery
+support, motion-telemetry sampling rate.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-robot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /.well-known/wia/medical-robot HTTP/1.1
+```
 
-## §3 Conformance Tiers
+Returns robot-fleet summary: kinds in inventory, current
+maintenance status, deployment policy URL, IEC 80001-1 risk
+file reference.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Robot registration
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST /Robot HTTP/1.1
+Authorization: Bearer <bme-jwt>
+Content-Type: application/fhir+json
+```
 
-## §4 Discovery
+Body is a FHIR Device resource conforming to PHASE 1 §2 with
+the WIA medical-robot extension. Boundary verifies UDI
+integrity, particular-standard declaration, and end-effector
+catalogue (each end effector is registered separately as a
+sub-Device).
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-robot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+```
+PUT /Robot/<id> HTTP/1.1
+PUT /Robot/<id>/$retire HTTP/1.1
+GET /Robot?kindRef=<kind>&siteRef=<site>
+```
 
-## §5 Time and Identity
+Retirement closes active associations and triggers a
+data-egress check before the robot is reassigned.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §3 Procedure orchestration
 
-## §6 Versioning and Deprecation
+```
+POST /Procedure HTTP/1.1
+Content-Type: application/fhir+json
+WIA-Purpose-Of-Use: TREAT
+```
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Body is a FHIR Procedure resource. Boundary verifies:
 
-## §7 Privacy and Security
+1. Active consent for `TREAT` purpose at WIA-medical-data-privacy
+2. Robot is calibrated (PHASE 1 §7) and verified
+3. Required end effectors are within use-life
+4. Operator has surgical-credentials for the procedure code
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+```
+PUT /Procedure/<id>/$start HTTP/1.1
+PUT /Procedure/<id>/$pause HTTP/1.1
+PUT /Procedure/<id>/$resume HTTP/1.1
+PUT /Procedure/<id>/$complete HTTP/1.1
+PUT /Procedure/<id>/$abort HTTP/1.1
+```
 
-## §8 Open Governance
+The `$abort` operation accepts a structured reason and emits
+a high-priority audit event; aborts do not delete telemetry
+or intervention-event records, which remain for review.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-robot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §4 Motion telemetry
+
+For high-frequency telemetry, a streaming endpoint:
+
+```
+POST /Procedure/<procedureRef>/telemetry/$ingest HTTP/1.1
+Content-Type: application/json+ndjson
+WIA-Robot-Ref: urn:wia:mrobot:robot:M-LAP-1.2.3:SN-91A7
+WIA-Stream-Id: t-91a7-2026-04-28
+```
+
+NDJSON of telemetry samples (PHASE 1 §4); sequence numbers are
+monotonic per stream. The boundary acknowledges the highest
+received sequence; on reconnect the client resumes.
+
+Alternatively, the boundary supports an out-of-band time-
+series upload at procedure completion:
+
+```
+POST /Procedure/<procedureRef>/telemetry/$archive HTTP/1.1
+Content-Type: application/octet-stream
+Content-Encoding: zstd
+```
+
+For procedures completed under tele-link loss where streaming
+is impossible, this archive path captures the buffered
+telemetry on reconnection.
+
+## §5 Intervention events
+
+```
+POST /Procedure/<procedureRef>/InterventionEvent HTTP/1.1
+GET  /Procedure/<procedureRef>/InterventionEvent?kind=force-limit-violation
+```
+
+Events are append-only; an erroneous event is corrected with
+a follow-up event of `kind: correction` referencing the
+original.
+
+## §6 Alarm conditions
+
+Same as WIA-medical-iot PHASE 2 §4, with the addition of
+robot-specific alarm catalogue (PHASE 1 §6) and the
+`procedureRef` cross-reference.
+
+## §7 Tele-link management
+
+For tele-surgery and remote-console scenarios:
+
+```
+POST /Procedure/<procedureRef>/$tele-link-establish HTTP/1.1
+PUT  /Procedure/<procedureRef>/$tele-link-handover HTTP/1.1
+PUT  /Procedure/<procedureRef>/$tele-link-end HTTP/1.1
+```
+
+Establishment requires both ends to authenticate; handover
+authorises an alternative remote surgeon to take control on
+a documented quorum. The link's quality (latency, packet
+loss) is observed continuously and surfaced via:
+
+```
+GET /Procedure/<procedureRef>/$tele-link-status HTTP/1.1
+```
+
+Link-quality degradation past deployment-declared thresholds
+triggers a `tele-link-loss` intervention event.
+
+## §8 Imaging cross-reference
+
+```
+PUT /Procedure/<procedureRef>/imaging HTTP/1.1
+Content-Type: application/json
+
+{
+  "imagingRefs": [
+    {"studyInstanceUid": "1.2.840.113619.2...", "modality": "US", "acquisitionPeriod": {"start": "2026-04-28T03:14:00+09:00", "end": "2026-04-28T04:01:30+09:00"}}
+  ]
+}
+```
+
+Boundary verifies the studyInstanceUid resolves at the
+WIA-medical-imaging boundary before binding.
+
+## §9 Search filtering and minimum necessary
+
+Same approach as WIA-medical-iot PHASE 2 §7. Search results
+respect the patient's consent scope; the response carries a
+`link` of `relation: prohibited` for filtered records to
+preserve audit transparency without leaking content.
+
+## §10 Error model
+
+RFC 9457 Problem Details with reserved `type` URIs:
+
+| URI                                                  | Status | Meaning                                   |
+|------------------------------------------------------|-------:|-------------------------------------------|
+| `urn:wia:mrobot:problem:udi-required`                | 422    | UDI absent on robot or end effector       |
+| `urn:wia:mrobot:problem:end-effector-life-exceeded`  | 422    | End effector beyond use-life threshold    |
+| `urn:wia:mrobot:problem:calibration-overdue`         | 403    | Robot calibration lapsed                  |
+| `urn:wia:mrobot:problem:operator-not-credentialed`   | 403    | Operator lacks credentials for procedure  |
+| `urn:wia:mrobot:problem:no-active-consent`           | 403    | No consent matches purpose                |
+| `urn:wia:mrobot:problem:tele-link-quality-degraded`  | 200    | Accepted with telemetry annotation        |
+| `urn:wia:mrobot:problem:procedure-not-startable`     | 422    | Pre-start checks failed                   |
+
+## §11 Bulk export
+
+The boundary supports FHIR Bulk Data Access for procedure,
+intervention-event, and telemetry-summary resources:
+
+```
+GET /$export?_type=Procedure,InterventionEvent&purpose=HRESCH&consentBundle=<id>
+```
+
+Telemetry samples are exported as a downsampled summary by
+default (one sample per second) to bound dataset size; the
+high-frequency raw telemetry is available on a separate
+endpoint with explicit research authorisation.
+
+## §12 Subject self-service
+
+Patients access their own procedure records:
+
+```
+GET /Patient/<self>/$procedure-summary HTTP/1.1
+```
+
+Returns:
+
+- Procedures performed with procedure-code translation to
+  patient-friendly description
+- Each procedure's outcome and the team that performed it
+- Active follow-up plans
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked procedure-start sequence (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST /Procedure HTTP/1.1
+{
+  "resourceType": "Procedure",
+  "status": "preparation",
+  "code": {"coding": [{"system": "http://snomed.info/sct", "code": "82918005", "display": "Laparoscopic cholecystectomy"}]},
+  "subject": {"reference": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e"},
+  "performer": [
+    {"function": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType", "code": "PRF"}]}, "actor": {"reference": "urn:wia:hr:surgeon:s-91a7"}},
+    {"function": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType", "code": "ASSIST"}]}, "actor": {"reference": "urn:wia:mrobot:robot:M-LAP-1.2.3:SN-91A7"}}
+  ]
+}
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Boundary returns 201 Created with the assigned `procedureRef`;
+operator then issues `$start` to begin telemetry streaming.
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+## Annex B — Tele-link quality observation (informative)
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+The boundary samples tele-link quality continuously; observations
+are recorded as:
 
-## Annex F — Adoption Roadmap
+```json
+{
+  "linkQualityId": "urn:wia:mrobot:tlq:p-91a7:s-1024",
+  "procedureRef": "urn:wia:mrobot:procedure:p-91a7",
+  "at": "2026-04-28T03:30:15+09:00",
+  "rttMs": 18,
+  "packetLossPct": 0.03,
+  "jitterMs": 2.1,
+  "qualityBand": "good"
+}
+```
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Quality bands: `good` (rtt ≤ 50 ms, loss ≤ 0.1%), `degraded`
+(rtt 50–200 ms or loss 0.1–1%), `unusable` (rtt > 200 ms or
+loss > 1%). Transitions to `unusable` trigger immediate alarm.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Subscription delivery for OR consoles (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+OR consoles register a subscription to the procedure's events
+and alarms; the boundary delivers a Bundle on every event,
+signed with detached JWS. Consoles acknowledge with 200 OK or
+flag with 4xx for human review.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex D — Tele-surgery handover sequence (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+A surgeon-handover from a primary remote surgeon to a secondary
+during a tele-surgery procedure follows a documented sequence:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+```
+POST /Procedure/<procedureRef>/$tele-link-handover-request HTTP/1.1
+Authorization: Bearer <primary-surgeon-jwt>
+Content-Type: application/json
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+{
+  "primarySurgeonRef": "urn:wia:hr:surgeon:s-91a7",
+  "secondarySurgeonRef": "urn:wia:hr:surgeon:s-77c2",
+  "reason": "primary-fatigue",
+  "expectedDuration": "PT10M"
+}
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+The boundary verifies:
 
-## Annex H — Versioning and Deprecation Policy
+1. The secondary surgeon holds equivalent credentials for
+   the procedure code
+2. The secondary surgeon's tele-link quality is currently
+   in `good` band
+3. The patient consent for the procedure does not exclude
+   surgeon-substitution
+4. The OR-side anesthesia team has acknowledged the handover
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+If all checks pass, the boundary issues a 200 OK with a
+handover-token. Both surgeons countersign the handover-token
+within 60 seconds; the boundary then issues the actual
+control transfer at a documented checkpoint in the procedure
+(typically a tool-disengagement instant). The handover and
+both signatures are recorded in the audit chain.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+If any check fails, the response carries a Problem Details
+document explaining the refusal. Persistent refusal patterns
+surface in the quarterly compliance report.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex E — Operator-credential discovery (informative)
 
-## Annex I — Interoperability Profiles
+```
+GET /Operator/<operatorRef>/$credentials HTTP/1.1
+Accept: application/fhir+json
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Returns the operator's currently-valid credentials and their
+expiry; the caller (typically the procedure-scheduler) uses
+this to verify eligibility before scheduling.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex F — Pagination and rate limiting (informative)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+List endpoints paginate at ≤ 200 procedures per page. Per-token
+rate limits default to 10 procedure-start calls per minute
+(operational sufficient bound) and 1000 telemetry-ingest calls
+per minute per stream (matches highest sample-rate target).
+Rate-limit refusals carry `urn:wia:mrobot:problem:rate-limited`.
+
+## Annex G — Conformance disclosure
+
+Sections §1, §2, §3, §4, §5, §6, §10 are mandatory. §7 (Tele-
+link management) is mandatory for deployments performing
+tele-surgery; non-tele deployments may exclude §7 with
+documented reason. §8 (Imaging cross-reference) is mandatory
+for procedures that use intraoperative imaging. §11 (Bulk
+export) is mandatory where the deployment shares data with a
+clinical-data warehouse. §12 (Subject self-service) is
+mandatory where the deployment provides a patient-facing app
+that exposes procedure records.
+
+A deployment that excludes any mandatory section reports the
+gap in its compliance package; deployments that exclude
+optional sections record their reason in the deployment policy
+referenced from the capability discovery endpoint.
+
+## Annex H — Backwards-compatibility for v1 → v2 transitions
+
+When the boundary moves from v1 to v2 of this PHASE, the v1
+endpoints remain operational under a `/v1/` path prefix for
+the deployment-declared overlap window. v1 procedures
+in-flight at the cutover continue under v1 semantics until
+they complete; new procedures use v2. The audit chain
+records the version of each operation so reviewers can
+distinguish v1 and v2 entries when reconstructing history.

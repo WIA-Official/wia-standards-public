@@ -1,241 +1,304 @@
-# WIA-mineral-mining PHASE 3 — PROTOCOL Specification
+# WIA-mineral-mining PHASE 3 — Protocol Specification
 
 **Standard:** WIA-mineral-mining
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-mineral-mining (Mineral Mining).
+This PHASE specifies the protocols binding the data format
+(PHASE 1) to the API surface (PHASE 2): authentication of
+operators, laboratories, competent persons, and regulators;
+audit-chain construction; time discipline; QA/QC linkage
+enforcement; OECD DDG status calculation; worker-privacy
+contract; cryptographic signing; and post-quantum migration.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK),
+  RFC 9162 (Certificate Transparency 2.0)
+- ISO 17025:2017 — laboratory accreditation
+- OECD Due Diligence Guidance for Responsible Supply Chains
+- ICMM Mining Principles
+- WIA-pq-crypto PHASE 3 — for ML-KEM/ML-DSA migration profiles
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-mineral-mining
-standard. It addresses the protocol layer of the standard.
+Operators, laboratories, competent persons, regulators, and
+HSE officers authenticate using JWS-signed JWTs issued by the
+deployment's identity authority. Token claims:
 
-## §2 Manifest
+- `iss` — issuing authority URN
+- `sub` — operator/system URN
+- `aud` — boundary URN
+- `iat`, `exp` — RFC 3339 with offset
+- `wia.role` — one of the roles in PHASE 2 Annex H
+- `wia.scope[]` — operation-class scopes
+- `wia.cpId` — for competent-person tokens, the qualifying
+  registration URN
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mineral-mining"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Tokens are short-lived (typically 5 minutes for write tokens,
+30 minutes for read-only). Long-lived credentials are
+forbidden for any write-capable role.
 
-## §3 Conformance Tiers
+## §2 Laboratory accreditation binding
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Laboratory tokens carry `wia.iso17025Scopes[]` listing the
+analyte/method combinations the laboratory is currently
+accredited for. The token issuer (the deployment's identity
+authority) refreshes the scope list from the accrediting
+body's published register on a declared cadence; tokens
+issued for an out-of-scope analyte/method are refused at
+boundary intake. Accreditation suspension or withdrawal
+propagates to outstanding tokens via the credentials
+service's revocation surface.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §3 Competent-person binding
 
-## §4 Discovery
+Competent-person tokens carry the qualifying-registration
+URN and the codes the person is qualified under (JORC,
+NI 43-101, SAMREC, PERC). The boundary refuses an estimate
+filing whose declared code is not in the competent person's
+qualified list. Removal or suspension of a person's
+qualification revokes outstanding tokens and propagates a
+follow-up request to estimates that the person had signed
+within the deployment's reconciliation window.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mineral-mining`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §4 Audit chain
 
-## §5 Time and Identity
+Every boundary state transition is appended to a Merkle
+audit log:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `entryId` — URN
+- `parent` — prior `entryId` SHA-256
+- `at` — RFC 3339 with offset
+- `actor` — authority URN making the transition
+- `kind` — closed enum: `asset-registered`, `asset-updated`,
+  `closure-bond-mutated`, `exploration-received`,
+  `estimate-filed`, `production-received`, `assay-received`,
+  `qaqc-linked`, `environmental-received`, `exceedance-flagged`,
+  `exposure-received`, `handover-received`, `incident-opened`,
+  `incident-closed`, `regulator-witnessed`
+- `payloadHash` — SHA-256 of the canonical JSON payload
+- `signature` — JWS by the actor
 
-## §6 Versioning and Deprecation
+Anchored deployments mirror the audit chain to a regulator-
+trusted witness on a declared cadence; missing-mirror
+escalations are publicly disclosed as part of the conformance
+evidence package.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §5 QA/QC linkage enforcement
 
-## §7 Privacy and Security
+Assay records (PHASE 1 §6) declare QA/QC packages
+(blanks, duplicates, CRMs, pulp duplicates). The boundary
+runs a reconciliation job:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- For each assay, verify the cited QA/QC package exists
+- Compare CRM values against certified means within the
+  declared confidence band
+- Flag duplicate-pair variance against the laboratory's
+  declared precision spec
+- Mark the assay `validated` on full pass; `provisional` on
+  pending; `rejected` on fail with a follow-up request to the
+  laboratory and operator
 
-## §8 Open Governance
+QA/QC reconciliation results are themselves audit-chained.
+Reconciliation is fully transparent: the deployment's QA/QC
+acceptance criteria are published in the capability document
+so partners and regulators can verify the regime in use.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mineral-mining` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §6 Time discipline
+
+All record timestamps use RFC 3339 with explicit offset.
+Boundary clock is disciplined to a national-laboratory time
+reference; drift outside declared bound triggers a
+`boundary-clock-degraded` capability flag and tags subsequent
+records `provisional` until recovered. Records carrying
+local-time-without-offset are rejected at boundary intake.
+
+## §7 Transport security
+
+All endpoints require TLS 1.3 (RFC 8446) with a deployment-
+declared cipher-suite list. Mutual TLS is required for
+laboratory, regulator, and bulk-export endpoints. Certificate
+revocation is published through the deployment's revocation
+surface aligned with WIA-network-security PHASE 3.
+
+## §8 Worker-privacy contract
+
+Worker identifiers in PHASE 1 §8 exposure records are
+deployment-issued pseudonyms, not direct PII. The binding
+between pseudonym and the underlying HR identity is held in
+a separate, access-controlled service ("HR vault"). Access
+to the HR vault is restricted to:
+
+- The worker (their own records)
+- Authorised health-and-safety personnel under a signed
+  consent record
+- Statutory health authorities under a regulator
+  counter-signature
+
+The HR vault publishes audit logs of every access to a
+secondary regulator-trusted witness; these logs are
+themselves part of the conformance evidence package.
+
+## §9 OECD DDG status calculation
+
+The `oecdDdgStatus` field on handover records (PHASE 1 §9) is
+computed by a declared rule set:
+
+- `red` — open critical incident on the asset within the
+  declared lookback window, or a regulator-issued
+  prohibition; or upstream OECD-flagged red supplier
+- `requires-additional-action` — open non-critical incident,
+  or pending regulator review
+- `green` — no open critical incidents and no pending
+  regulator actions
+
+The rule set is deployment-policy and is published in the
+capability document. Changes to the rule set require a
+regulator counter-signature and emit a `ddg-rules-mutated`
+audit-chain entry.
+
+## §10 Replay protection
+
+Production POST and assay POST require `Idempotency-Key`;
+the boundary stores keys for 30 days. Replays within that
+window with the same body return the original response;
+different bodies return `urn:wia:mm:problem:idempotency-conflict`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cryptographic signature suite
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Default signature algorithms are ECDSA P-256 with SHA-256 for
+operator and lab tokens, and EdDSA (Ed25519) for audit-chain
+entries. Deployments may declare alternative suites in the
+capability document; partners verify suite compatibility on
+initial connection.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — Post-quantum migration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The standard supports a phased PQC migration aligned with
+WIA-pq-crypto PHASE 3:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- Phase A — classical-only (current default)
+- Phase B — hybrid (classical + ML-KEM, classical + ML-DSA)
+- Phase C — PQ-only
 
-## Annex F — Adoption Roadmap
+Mining-operation timelines are typically multi-year; the
+deployment declares its target migration phase per role
+class in the capability document.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Audit-chain replication
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Anchored deployments replicate audit-chain entries to a
+regulator-trusted witness on a declared cadence (typically
+hourly for high-criticality operations, daily for routine
+production). Replication uses a Merkle batch envelope
+witnessed by the regulator authority.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Cipher-suite floors
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Endpoints accept only TLS 1.3 cipher suites with forward
+secrecy. The cipher-suite floor is published in the
+capability document; partners verify compatibility before
+exchange.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Negative-test vectors for protocol layer
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+| Stimulus                                              | Expected outcome                              |
+|-------------------------------------------------------|-----------------------------------------------|
+| Lab token submitting analyte outside ISO 17025 scope  | 422 + lab-scope-mismatch                      |
+| Competent-person token signing under non-qualified code | 422 + cp-not-qualified                       |
+| Audit-chain entry with broken parent hash             | rejected at append; boundary alerts           |
+| Time-tag without offset                               | 422 + time-discipline-violation               |
+| HR vault access without consent record                | 403; logged to regulator-trusted witness      |
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex F — Algorithm registry
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The deployment maintains an algorithm registry naming the
+specific cipher and signature algorithms in use per role
+class. The registry is published in the capability document
+and tracked across PQ migration phases for partner
+verification and regulator audit.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Boundary-clock health
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+The boundary publishes a clock-health record in the capability
+document including the primary and secondary time sources,
+the most recent successful sync, and the current drift
+estimate. Partners verify clock health before accepting
+time-sensitive products.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex H — Worked QA/QC reconciliation
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+A worked example for a copper-assay batch:
 
-## Annex I — Interoperability Profiles
+1. Lab submits assays for ten samples plus a CRM, two
+   blanks, and three duplicate pairs
+2. Boundary verifies the CRM falls within the certified
+   ±2σ window (deployment-declared)
+3. Boundary verifies blanks fall below the laboratory's
+   declared method detection limit
+4. For each duplicate pair, boundary computes the relative
+   percent difference (RPD) and compares against the
+   laboratory's declared precision spec
+5. On full pass: assays move to `validated`; on partial
+   fail: affected assays move to `provisional` pending
+   re-analysis
+6. Reconciliation outcome is appended to the audit chain
+   and reflected in the lab's reconciliation report at
+   `/reconciliation` (PHASE 2 Annex G)
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+A persistent CRM bias triggers a follow-up to the lab and
+the operator; the operator may elect to re-route work to a
+backup laboratory until the issue is resolved.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex I — Worker pseudonym lifecycle
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Pseudonyms in the exposure record (PHASE 1 §8) follow this
+lifecycle:
+
+- Issued on worker engagement with the operation
+- Stable across shifts and assets within the operation
+- Re-issued (a new pseudonym) on a documented re-engagement
+  after a long absence; the previous pseudonym is retained
+  in the HR vault binding for continuity of medical history
+- Retired on permanent separation; HR-vault binding is
+  retained per the operation's records-retention policy
+
+Cross-operation pseudonym portability is out of scope; a
+worker engaged by multiple operators receives separate
+pseudonyms per operation.
+
+## Annex J — Negative-test vectors for laboratory binding
+
+| Stimulus                                              | Expected outcome                              |
+|-------------------------------------------------------|-----------------------------------------------|
+| Lab submitting analyte after accreditation suspension | 422; token revoked                            |
+| Lab submitting method outside declared scope          | 422 + lab-scope-mismatch                      |
+| CRM result outside certified window                   | assays in batch flagged `provisional`         |
+| Duplicate-pair RPD exceeding precision spec           | affected pair flagged for re-analysis         |
+| Chain-of-custody URN unreachable                      | sample held for chain reconciliation          |
+
+## Annex K — Regulator counter-signature lifecycle
+
+Regulator counter-signatures (PHASE 2 Annex C) follow this
+lifecycle:
+
+- Mutation request emitted by the operator with all
+  supporting evidence URNs
+- Regulator reviews and either counter-signs (issuing a
+  detached JWS) or refuses (issuing a refusal note)
+- Boundary applies the mutation only on counter-signed
+  acceptance
+- Counter-signatures are themselves audit-chained at
+  `kind=regulator-witnessed`
+- Refusals are audit-chained at `kind=regulator-refusal`
+  with the regulator's refusal note URN
+
+A mutation that has been pending counter-signature beyond
+the deployment-declared timeout (typically 30 days) is
+elevated to regulator escalation; the operator and regulator
+both receive notification.

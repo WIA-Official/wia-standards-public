@@ -1,241 +1,308 @@
-# WIA-mineral-mining PHASE 1 — DATA-FORMAT Specification
+# WIA-mineral-mining PHASE 1 — Data Format Specification
 
 **Standard:** WIA-mineral-mining
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-mineral-mining (Mineral Mining).
+This PHASE defines the canonical data format for mineral
+mining operations: mining-asset registry records, exploration
+and resource-estimate records, ore-grade and assay records,
+production-shift records, environmental-compliance records,
+worker-health records, supply-chain provenance for critical
+minerals, and the cross-references binding extraction to
+downstream smelting and refining. The shape interoperates
+with internationally recognised resource-reporting codes
+(JORC / NI 43-101 / SAMREC / PERC under the CRIRSCO
+template) and supply-chain due-diligence frameworks (OECD
+DDG, EU Conflict-Minerals Regulation, ICMM commitments).
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- CRIRSCO International Reporting Template (JORC, NI 43-101, SAMREC, PERC)
+- OECD Due Diligence Guidance for Responsible Supply Chains of
+  Minerals from Conflict-Affected and High-Risk Areas
+- ISO 14001:2015 — Environmental management systems
+- ISO 45001:2018 — Occupational health and safety
+- ISO 17025:2017 — Testing and calibration laboratory competence
+- ISO/IEC 27001:2022 — Information security
+- ICMM Mining Principles
+- IETF RFC 3339 (timestamps), RFC 7515 (JWS), RFC 8259 (JSON)
+- WGS-84 — geodetic reference frame
+- UN Framework Classification for Resources (UNFC) 2019
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-mineral-mining
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to the data shape used by extractive
+operations from exploration through stope/face production
+to gate-of-mine handover, plus environmental and worker
+records associated with those operations. Out of scope:
+downstream concentrator chemistry (handled by metallurgy
+standards), smelter mass-balance accounting (cross-domain
+to refining standards), and capital-market reporting
+formats (handled by the issuer's listing-authority
+templates with this standard providing the underlying
+data).
 
-## §2 Manifest
+The standard is competent-person-aware: any record
+classified as a Mineral Resource or Reserve under a CRIRSCO-
+family code carries a competent-person attribution and the
+qualifying code; misuse of those classifications outside
+their codes is a conformance violation.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mineral-mining"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: asset registry, exploration data, resource and
+reserve estimate metadata, production records, environmental
+sample records, worker-exposure records, equipment-state
+records, supply-chain provenance handover. Out of scope:
+royalty contracts, geological-model file formats (carried
+opaquely as binary references), mineral-rights registries
+(jurisdictional).
 
-## §3 Conformance Tiers
+## §2 Mining-asset registry record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Every operation tracks the assets it operates:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field             | Source / Binding                                       |
+|-------------------|--------------------------------------------------------|
+| `assetRef`        | URN of form `urn:wia:mm:asset:<operator>:<id>`         |
+| `assetType`       | `pit`, `underground-mine`, `placer`, `dredging`, `in-situ-leach`, `tailings-storage`, `processing-plant` |
+| `operatorRef`     | URN of operating entity                                |
+| `licenceRef`      | URN of governing mineral-rights licence               |
+| `commodity[]`     | declared commodities (Cu, Au, Li, REE, Ni, Co, Zn, …) |
+| `methodClass`     | `open-pit`, `underground-cut-and-fill`, `block-cave`, `room-and-pillar`, `solution-mining`, `placer` |
+| `lifeOfMineEnd`   | declared end-of-mine date (planning estimate)          |
+| `closureBondRef`  | URN of the closure-bond instrument                    |
+| `coordinatingAuthority` | URN of the regulatory authority                  |
 
-## §4 Discovery
+Asset registry changes are signed and audit-logged. Closure-
+bond status changes are first-class events that propagate to
+downstream provenance consumers.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mineral-mining`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Exploration data record
 
-## §5 Time and Identity
+Exploration drives the resource picture:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `explorationId` — URN
+- `assetRef` — URN of the licence area or operating asset
+- `programName` — programme identifier
+- `methods[]` — closed enum: `mapping`, `geochem-soil`,
+  `geochem-stream`, `geophysics-em`, `geophysics-magnetics`,
+  `geophysics-gravity`, `drilling-rc`, `drilling-diamond`,
+  `drilling-aircore`, `trenching`, `bulk-sample`
+- `dateRange` — from/to RFC 3339
+- `dataPackagesRef[]` — URIs of the underlying data packages
+  (assays, lithology logs, surveys)
+- `competentPersonRef` — URN of the competent person under
+  the applicable code
+- `reportRef` — URN of the public exploration report (where
+  required by listing rules)
 
-## §6 Versioning and Deprecation
+Exploration records do not by themselves classify resources;
+they are inputs to a resource-estimate record (PHASE 1 §4).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Resource and reserve estimate record
 
-## §7 Privacy and Security
+Estimates classified under a CRIRSCO-family code:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- `estimateId` — URN
+- `assetRef` — URN
+- `code` — closed enum: `JORC`, `NI 43-101`, `SAMREC`, `PERC`
+- `classification` — closed enum within the chosen code
+  (e.g., for JORC: `inferred`, `indicated`, `measured`;
+  for reserves: `probable`, `proved`)
+- `commodity` — primary commodity
+- `tonnes` — declared tonnes (at declared confidence)
+- `gradeMean` — mean grade with units (% or g/t)
+- `cutOffGrade` — economic cut-off applied
+- `effectiveDate` — RFC 3339
+- `competentPersonRef` — URN, with the person's
+  qualification per the chosen code
+- `reportRef` — URN of the public technical report
+- `modifyingFactors` — declared list of factors applied for
+  reserve classification
 
-## §8 Open Governance
+Resource and reserve records are versioned by code and
+effective-date; cross-version replay reconstructs the
+estimate evolution. Records claiming a code-classification
+without a corresponding competent-person attribution are
+refused at boundary intake.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mineral-mining` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Production record
+
+For every shift / panel / face / pit-bench:
+
+- `productionId` — URN
+- `assetRef` — URN
+- `shiftStart`, `shiftEnd` — RFC 3339
+- `locationRef` — URN of the workplace within the asset
+  (panel, level, bench)
+- `tonnesMined` — measured tonnes (with vendor-quantified
+  uncertainty)
+- `gradeSampleRefs[]` — URNs of grade samples backing the
+  declared mined grade (PHASE 1 §6)
+- `commodityProduced[]` — for multi-commodity operations
+- `equipmentRefs[]` — URNs of equipment used
+- `dilutionFactor` — declared dilution applied
+- `recoveryFactor` — declared recovery applied
+- `signatures[]` — shift-foreman and survey signatures
+
+Production records feed gate-of-mine reconciliation against
+the resource estimate; persistent over- or under-call against
+the estimate triggers PHASE 4 §6 reconciliation review.
+
+## §6 Assay / grade-sample record
+
+Each laboratory result is recorded:
+
+- `sampleId` — URN
+- `assetRef` — URN
+- `samplingMethod` — closed enum: `chip`, `channel`, `bulk`,
+  `drill-core-half`, `drill-core-quarter`, `pulp-rejects`
+- `sampledAt` — RFC 3339 with offset
+- `coordinates` — easting, northing, elevation (WGS-84)
+- `length` — metres of the sample interval
+- `assays[]` — per-element entry with method, value, unit,
+  detection-limit, accreditation reference (ISO 17025)
+- `qaqcRefs[]` — URNs of accompanying blanks, duplicates,
+  certified reference materials (CRMs), pulp duplicates
+- `laboratoryRef` — URN of the assaying laboratory
+
+Assay records without QA/QC linkage are tagged `provisional`
+and excluded from resource-estimate inputs until the QA/QC
+package is reconciled.
+
+## §7 Environmental sample record
+
+Routine and incident environmental sampling:
+
+- `envSampleId` — URN
+- `assetRef` — URN
+- `mediaType` — `surface-water`, `groundwater`, `soil`, `dust`,
+  `tailings-supernatant`, `acid-mine-drainage`, `noise`, `air`
+- `sampledAt` — RFC 3339 with offset
+- `coordinates` — WGS-84
+- `analytes[]` — analyte/value/unit/limit-of-quantification
+- `regulatoryThresholdRefs[]` — URN of the regulatory
+  threshold against which the sample is evaluated
+- `exceedance` — boolean
+- `chainOfCustodyRef` — URN of the chain-of-custody record
+
+Exceedance events trigger PHASE 4 §7 environmental incident
+workflow within a deployment-declared latency budget. The
+deployment publishes its environmental-monitoring plan as a
+declared schedule; missing samples on the plan are treated
+as a conformance violation regardless of incident outcomes.
+
+## §8 Worker-exposure record
+
+Per worker per shift, the deployment records measured
+exposure relevant to the mine's hazards:
+
+- `exposureId` — URN
+- `workerRef` — URN of the worker (privacy-preserving
+  pseudonym; binding to PII held in a separately access-
+  controlled HR system per PHASE 3 §9)
+- `assetRef` — URN
+- `shiftRef` — URN
+- `noiseDoseDb` — equivalent continuous noise dose
+- `dustExposureMgM3` — respirable dust exposure
+- `silicaExposureMgM3` — respirable crystalline silica
+- `radonWlm` — radon working-level-months (uranium / hard-rock)
+- `dieselParticulateMgM3` — DPM (underground diesel-equipment
+  operations)
+- `noteRef` — narrative reference for any exceptional events
+
+Exposures exceeding the operation's occupational limit
+trigger PHASE 4 §8 worker-health follow-up workflows.
+
+## §9 Supply-chain provenance handover
+
+When ore or concentrate leaves the gate, a provenance
+record handing it to the next custody chain is emitted:
+
+- `handoverId` — URN
+- `fromAssetRef` — URN
+- `toCustodyRef` — URN of receiving party
+- `handoverAt` — RFC 3339 with offset
+- `commodity` — declared commodity
+- `gradeDeclared` — declared head-grade (with uncertainty)
+- `tonnesHandover` — declared tonnes (with uncertainty)
+- `oecdDdgStatus` — declared due-diligence status per the
+  OECD DDG (e.g., `green`, `red`, `requires-additional-action`)
+- `incidentReports[]` — URNs of any open environmental or
+  social-incident reports relevant to this batch
+- `signatures[]` — shipper and receiver signatures
+
+Handover records are the canonical entry point into
+downstream WIA-supply-chain and refining standards; the
+boundary refuses handover for operations whose `oecdDdgStatus`
+is `red`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain references (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Reference                     | Use site                                                 |
+|-------------------------------|----------------------------------------------------------|
+| WIA-supply-chain              | downstream provenance receiver (PHASE 4 §3)              |
+| WIA-environmental-monitoring  | shared schema for environmental sample evaluation        |
+| WIA-occupational-safety       | worker exposure reference framework                      |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Conformance disclosure
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Sections §2, §3, §5, §6, §7, §8, §9 are mandatory for any
+operating mining asset; §4 is mandatory for any operation
+declaring resource or reserve estimates publicly. A
+deployment `partial` or `excluded` on §6 (Assay) or §9
+(Handover) is non-conformant overall.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Versioning and deprecation
 
-## Annex F — Adoption Roadmap
+Versioning follows SemVer 2.0.0. Resource and reserve
+records carry the originating code's version (e.g.,
+`JORC 2012`); migration to a newer code edition is recorded
+as a versioned re-statement, not a silent overwrite.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Worked handover record (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A copper-concentrate handover with green DDG status:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```json
+{
+  "handoverId": "urn:wia:mm:handover:operator-x:h-2026-04-27-0014",
+  "fromAssetRef": "urn:wia:mm:asset:operator-x:north-pit",
+  "toCustodyRef": "urn:wia:logistics:carrier-y:lot-l-7791",
+  "handoverAt": "2026-04-27T22:30:00+09:00",
+  "commodity": "Cu",
+  "gradeDeclared": {"value": 28.4, "unit": "%", "uncert": 0.3},
+  "tonnesHandover": {"value": 1024.5, "unit": "t", "uncert": 1.2},
+  "oecdDdgStatus": "green",
+  "incidentReports": [],
+  "signatures": [/* shipper, receiver JWS detached signatures */]
+}
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The receiving custody chain consumes this record into
+WIA-supply-chain inflow. The originator retains a copy in
+the audit chain so reconciliation across the gate is
+auditable both directions.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Vendor extensions
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Mine-fleet vendors and lab vendors may extend records with
+`x-vendor-*` fields. Extensions MUST NOT contradict canonical
+fields and MUST NOT be required for core conformance.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex F — Time discipline cross-reference
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Time fields use the discipline of PHASE 3 §6 (UTC, leap-
+second handling). Records that fail clock discipline are
+tagged `provisional` until backfilled.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Conformance level
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations declare conformance level (Surface / Verified
+/ Anchored). Anchored requires a continuous evidence package
+plus an annual audit by an ISO 14001 / ISO 45001 auditor
+covering the integration contracts in PHASE 4.

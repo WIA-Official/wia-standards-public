@@ -1,241 +1,345 @@
-# WIA-military-satellite PHASE 2 — API-INTERFACE Specification
+# WIA-military-satellite PHASE 2 — API Interface Specification
 
 **Standard:** WIA-military-satellite
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-military-satellite (Military Satellite).
+This PHASE defines the API surface a military-satellite ground
+segment exposes for orbital-asset registry queries, payload
+tasking-order intake, telemetry/product publication,
+conjunction-assessment exchange, anti-jam posture reporting,
+and coalition-release workflows. The shape is HTTP/JSON for
+ground-segment planes and coalition exchanges; on-orbit
+command/telemetry uses the binary CCSDS encodings in PHASE 3.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS), RFC 7807-bis
+- CCSDS 502.0-B-2 — Orbit Data Messages (carried in JSON projection here)
+- CCSDS 503.0-B-1 — Tracking Data Message
+- MISB ST 0102 — security metadata in product responses
+- ITU Radio Regulations — for spectrum-coordination payloads
+- WIA-military-communication PHASE 2 — for transport delegation
+- WIA-missile-defense PHASE 2 — for early-warning product handoff
 
 ---
 
-## §1 Scope
+## §1 Tasking-order intake
 
-This PHASE document is one of four that together define the WIA-military-satellite
-standard. It addresses the api-interface layer of the standard.
+```
+POST /commands/task-orders HTTP/1.1
+Authorization: Bearer <jws-task-authority-jwt>
+Content-Type: application/json
 
-## §2 Manifest
+{
+  "taskOrderId": "urn:wia:msat:task:rok-acomd:t-2026-04-27-2210",
+  "assetRef": "urn:wia:msat:asset:rok-acomd:eo-1",
+  "taskType": "image",
+  "windowStart": "2026-04-28T02:14:00+09:00",
+  "windowEnd": "2026-04-28T02:18:30+09:00",
+  "priorityClass": "priority",
+  "targetGeometry": { "type": "polygon", "coordinates": [/* … */] },
+  "expectedProductType": "eo-frame",
+  "coalitionReleaseList": ["urn:wia:auth:rok", "urn:wia:auth:us-coalition-cell"],
+  "commandAuthorityRef": "urn:wia:auth:rok-acomd-tasking-cell"
+}
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-satellite"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Successful intake responds 202 Accepted with the boundary's
+internal queue position and an estimated uplink window.
+Refusal responses use RFC 9457 Problem Details with type
+URIs in the `urn:wia:msat:problem:` namespace:
 
-## §3 Conformance Tiers
+| problem URN                                  | meaning                              |
+|----------------------------------------------|--------------------------------------|
+| `urn:wia:msat:problem:asset-unknown`         | assetRef not in registry             |
+| `urn:wia:msat:problem:classification-exceeded` | taskOrder exceeds asset ceiling     |
+| `urn:wia:msat:problem:release-list-disallowed` | release inconsistent with policy   |
+| `urn:wia:msat:problem:window-infeasible`     | window does not contain a pass       |
+| `urn:wia:msat:problem:authority-unknown`     | commandAuthorityRef unrecognised     |
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Tasking responses include a `taskAck` URN that the boundary
+publishes to the audit chain.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §2 Tasking-order status
 
-## §4 Discovery
+```
+GET /commands/task-orders/{taskOrderId} HTTP/1.1
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-satellite`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Returns the lifecycle of a tasking order:
 
-## §5 Time and Identity
+```json
+{
+  "taskOrderId": "urn:wia:msat:task:…",
+  "state": "scheduled",
+  "scheduledPass": {
+    "ascendingNode": "2026-04-28T02:14:12+09:00",
+    "groundStationRef": "urn:wia:gs:rok-acomd:gs-1",
+    "expectedUplinkWindow": ["2026-04-28T01:58:00+09:00", "2026-04-28T02:03:00+09:00"]
+  },
+  "history": [
+    {"at": "…", "state": "received"},
+    {"at": "…", "state": "validated"},
+    {"at": "…", "state": "scheduled"}
+  ]
+}
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Lifecycle states: `received`, `validated`, `scheduled`,
+`uplinked`, `executing`, `completed`, `failed`, `cancelled`.
+Failure responses populate `failureReason` with a
+domain-specific code.
 
-## §6 Versioning and Deprecation
+## §3 Telemetry stream
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Telemetry is exchanged as a server-sent-event stream or via
+periodic POST batches; both use the same envelope. The streamed
+form:
 
-## §7 Privacy and Security
+```
+GET /assets/{assetRef}/telemetry/stream HTTP/1.1
+Accept: text/event-stream
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Each event is one telemetry record from PHASE 1 §5. Resume
+tokens are issued on every event so consumers can reconnect
+without loss. Bulk POST batches are used by ground stations
+operating in store-and-forward mode (e.g., polar-orbit pass
+playback over a single contact).
 
-## §8 Open Governance
+Subscribers may filter by subsystem with `?subsystems=power,thermal`.
+Subsystem snapshots not requested are omitted from the event.
+Filter changes do not cause a stream restart; they take effect
+on the next event boundary.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-satellite` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §4 Product publication and retrieval
+
+### §4.1 Publish
+
+Ground-segment processors publish products:
+
+```
+POST /products HTTP/1.1
+Authorization: Bearer <jws-processing-element-jwt>
+Content-Type: application/json
+```
+
+Body is a PHASE 1 §6 product record. The boundary verifies
+the security metadata is well-formed (MISB ST 0102), the
+classification ceiling is honoured, the release list is
+consistent with the asset's release-authority policy, and the
+collection window is contained in the originating tasking
+order's authorised window.
+
+Product binaries (frames, cubes, cuts) are referenced by URI
+in the record; the boundary does not store binaries inline.
+Default URI scheme is `s3://` or `https://` for trusted
+mission-storage; coalition-shared products use a partner-
+provided URI in the partner's `urn:wia:auth:` zone.
+
+### §4.2 Retrieve
+
+Authorised consumers retrieve products:
+
+```
+GET /products/{productId} HTTP/1.1
+```
+
+Responses include the security metadata; binaries are fetched
+through the URI carried in the metadata (subject to that
+URI's own auth). The boundary records every retrieval in the
+audit chain, indexed by the consumer's authority URN.
+
+A consumer not on the product's release list receives 403 with
+problem URN `urn:wia:msat:problem:release-denied`.
+
+## §5 Conjunction-assessment exchange
+
+```
+POST /conjunctions HTTP/1.1
+```
+
+Body is a PHASE 1 §7 CA record. The boundary distributes CA
+records to interested parties: the asset's operations cell,
+the secondary object's operator (if known and disclosure
+permitted), and the coalition space-domain-awareness cell.
+
+```
+GET /conjunctions?primaryRef=…&since=…
+```
+
+Returns the catalog of CA records for an asset since a given
+epoch.
+
+A CA record above the deployment's `pcThreshold` triggers
+PHASE 4 §6 collision-avoidance workflow (typically a
+delta-v-burn tasking order is generated and submitted via §1).
+
+## §6 Anti-jam posture exchange
+
+```
+POST /posture HTTP/1.1
+```
+
+Body is a PHASE 1 §8 posture record. Posture transitions to
+`denied` or `deceptive-suspected` are pushed to the
+spectrum-coordination cell via PHASE 4 §7 within a deployment-
+declared latency budget (typically < 30 s).
+
+```
+GET /posture/{assetRef}/current
+```
+
+Returns the current posture and history of state transitions
+for the requested asset.
+
+## §7 Coalition-release workflow
+
+When a national-only product becomes coalition-releasable,
+the originating deployment posts a release request:
+
+```
+POST /release-requests HTTP/1.1
+
+{
+  "releaseRequestId": "urn:wia:msat:release:rok-acomd:r-2026-04-27-001",
+  "productRefs": ["urn:wia:msat:product:rok-acomd:eo-1:p-991"],
+  "newReleaseList": ["urn:wia:auth:rok", "urn:wia:auth:us-coalition-cell"],
+  "rationale": "supports coalition early-warning analysis (free text, optional)",
+  "decisionAuthorityRef": "urn:wia:auth:rok-release-board"
+}
+```
+
+The release board's decision is posted as a
+counter-signature; the boundary updates the product record's
+release list only after the counter-signature is verified.
+All release-request traffic is mirrored to the coalition's
+audit witness for cross-coalition non-repudiation.
+
+## §8 Capability discovery
+
+```
+GET /.well-known/wia/military-satellite HTTP/1.1
+```
+
+Returns the deployment's capability document:
+
+```json
+{
+  "wia.standardVersion": "1.0",
+  "wia.implementationVersion": "rok-acomd-3.4.1",
+  "supportedAssetMissions": ["imagery-eo","imagery-sar","sigint","milsatcom"],
+  "supportedTaskTypes": ["image","intercept","relay","ranging","delta-v-burn"],
+  "telemetryDelivery": ["sse","batch-post"],
+  "productDelivery": ["uri-reference","coalition-mirror"],
+  "antijam": {"supportedMitigations": ["frequency-hop","nulling-antenna","crypto-rolled"]},
+  "manifest": "https://gs.rok-acomd.example/.well-known/wia/military-satellite/manifest.jws"
+}
+```
+
+The capability document is signed (JWS detached) so
+coalition partners verify compatibility before exchange.
+
+## §9 Authentication and rate-limiting
+
+All requests authenticate with a JWS-signed JWT (PHASE 3 §1).
+The boundary enforces per-authority quotas; a quota-exceeded
+response uses problem URN `urn:wia:msat:problem:quota-exceeded`
+with `retryAfter` (seconds). Per-authority quotas are recorded
+in the deployment policy and may be raised by the deployment's
+spectrum-coordination cell in `flash` priority cases.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Idempotency
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Tasking-order POST and product POST accept `Idempotency-Key`.
+Boundary stores keys for 24 h; replays within that window
+return the original response. Different bodies under the same
+key return `urn:wia:msat:problem:idempotency-conflict`.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## Annex B — Pagination
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+List endpoints (`/products`, `/conjunctions`, `/posture/.../history`)
+support cursor pagination. Cursors are opaque, signed by the
+boundary, and short-lived (10 min). Replay across page
+boundaries is consistent with respect to the page-build
+snapshot epoch returned in the page envelope.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Negative-test vectors (informative)
 
-## Annex F — Adoption Roadmap
+| Stimulus                                           | Expected response                              |
+|----------------------------------------------------|------------------------------------------------|
+| Tasking with unknown assetRef                      | 404 + `urn:wia:msat:problem:asset-unknown`     |
+| Tasking exceeding asset classification ceiling     | 422 + `urn:wia:msat:problem:classification-exceeded` |
+| Product publish missing securityMetadata           | 422 + `urn:wia:msat:problem:metadata-missing`  |
+| Retrieve by consumer not on releaseList            | 403 + `urn:wia:msat:problem:release-denied`    |
+| Posture POST with invalid frequencyBand            | 422 + `urn:wia:msat:problem:band-unknown`      |
+| Repeated tasking with same Idempotency-Key, different body | 409 + idempotency-conflict             |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Cross-domain delegation
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Products of type `early-warning` (e.g., IR detection of
+boost-phase events) are simultaneously published to
+WIA-missile-defense PHASE 2 §3 with the same productId; the
+missile-defense boundary treats them as engagement-decision
+inputs. Idempotency on the productId prevents double-counting
+across domains.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex E — Capability versioning
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Capability documents declare both `wia.standardVersion` and
+`wia.implementationVersion` so that coalition partners can
+verify compatibility independently of vendor build numbers.
+A standard-version mismatch is a hard refusal; an
+implementation-version mismatch is logged but not refusing.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex F — Bulk product retrieval
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Bulk product retrieval for archival or analytical replay is
+served by a separate endpoint:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+GET /products/bulk?since=…&until=…&assetRef=…
+Accept: application/x-ndjson
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Each line of the response is a PHASE 1 §6 product record;
+binaries are still by URI reference. Bulk retrieval is
+gated by the deployment's bulk-quota policy and is logged
+in the audit chain with `kind=product-bulk-retrieved`.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Operator action endpoints
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Operator-actuated state transitions (anomaly acknowledge,
+safe-mode entry/exit, propulsion enable, coalition release-
+list editing under emergency authority) are served by the
+`/operator-actions` endpoint with a JSON body declaring the
+action type, target object, justification, and the operator
+authority URN. Every action emits a signed audit-chain
+entry with `kind=operator-action`.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex H — Subscription endpoints
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+For systems that need pushed updates (intelligence-fusion,
+missile-defense early-warning), the boundary supports
+webhook subscriptions:
 
-## Annex I — Interoperability Profiles
+```
+POST /subscriptions HTTP/1.1
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+{
+  "subscriptionId": "urn:wia:msat:sub:fusion-cell:s-001",
+  "callbackUrl": "https://fusion.example/webhooks/msat",
+  "eventClasses": ["product-published","posture-changed"],
+  "filters": {"productTypes": ["eo-frame","sigint-cut"]},
+  "subscriberAuthorityRef": "urn:wia:auth:fusion-cell"
+}
+```
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Webhook delivery uses TLS 1.3 and is signed with a JWS
+detached signature in a `Wia-Signature` header. Failed
+deliveries are retried on an exponential schedule for up
+to 24 hours; persistent failure escalates to the
+operations cell.

@@ -1,241 +1,320 @@
-# WIA-military-satellite PHASE 3 — PROTOCOL Specification
+# WIA-military-satellite PHASE 3 — Protocol Specification
 
 **Standard:** WIA-military-satellite
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-military-satellite (Military Satellite).
+This PHASE specifies the protocols binding the data format
+(PHASE 1) to the API surface (PHASE 2) and to the on-orbit
+command/telemetry binary plane: authentication of assets and
+ground systems, the CCSDS uplink/downlink encoding,
+cryptographic command authentication, audit-chain
+construction, time discipline (GPS-week, leap-second, TAI-UTC),
+release-authority handshake, and post-quantum migration.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- CCSDS 133.0-B-2 — Space Packet Protocol
+- CCSDS 232.0-B-3 — TC Space Data Link Protocol
+- CCSDS 132.0-B-3 — TM Space Data Link Protocol
+- CCSDS 355.0-B-2 — Space Data Link Security Protocol
+- CCSDS 357.0-B-2 — Authenticated CRC for Telecommand
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK),
+  RFC 9162 (Certificate Transparency 2.0)
+- IERS Bulletin C — leap-second authority
+- WIA-pq-crypto PHASE 3 — for ML-KEM/ML-DSA migration profiles
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-military-satellite
-standard. It addresses the protocol layer of the standard.
+Tasking authorities, ground stations, processing elements,
+and coalition-release boards authenticate to the boundary
+using JWS-signed JWTs issued by the deployment's command
+authority. Token claims include:
 
-## §2 Manifest
+- `iss` — issuing authority URN
+- `sub` — operator/system URN
+- `aud` — boundary URN
+- `iat`, `exp` — RFC 3339 with offset
+- `wia.role` — one of `command-authority`, `ground-station`,
+  `processing-element`, `release-board`, `coalition-witness`
+- `wia.scope[]` — operation-class scopes, e.g.,
+  `task:image`, `task:burn`, `posture:write`
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-satellite"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Tokens are short-lived (typically 5 minutes) and refreshed
+via the deployment's credentials service. Long-lived
+credentials are forbidden for command-issuing roles.
 
-## §3 Conformance Tiers
+## §2 Cryptographic command authentication
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+On-orbit command frames are authenticated using CCSDS
+Authenticated CRC for Telecommand (CCSDS 357.0) or, where
+the asset bus supports it, the full Space Data Link Security
+Protocol (CCSDS 355.0). The deployment policy declares which
+profile applies to which asset class.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Command authentication keys:
 
-## §4 Discovery
+- `keyRef` — URN
+- `algorithm` — declared per-asset (typically AES-256-CMAC for
+  CCSDS 357.0, AES-256-GCM for CCSDS 355.0 link security)
+- `rolloverPolicy` — calendar-based with crypto-period not
+  exceeding the asset's design crypto-period
+- `escrow` — `none` for tactical operations; release-board-
+  witnessed escrow for coalition-shared assets
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-satellite`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Key updates are themselves uplinked under the prior key plus
+a counter-signature from the release board for assets that
+require it. A failed command authentication is logged at the
+asset and reported in the next telemetry contact; the asset
+does not execute the unauthenticated command under any
+circumstance.
 
-## §5 Time and Identity
+## §3 CCSDS uplink/downlink encoding
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+The boundary translates between PHASE-2 JSON tasking orders
+and the on-orbit binary plane:
 
-## §6 Versioning and Deprecation
+- Uplink commands use CCSDS Telecommand frames with the
+  Space Packet Protocol payload structure
+- Downlink telemetry uses CCSDS Telemetry frames with VC IDs
+  partitioned per subsystem (TT&C, payload, file-management,
+  store-and-forward)
+- File-management transfers (e.g., product delivery to ground)
+  use CCSDS File Delivery Protocol where supported, with
+  segmentation appropriate to the link's bit-error-rate
+  profile
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The mapping table from PHASE-2 task types to CCSDS application
+process IDs (APIDs) is published in the deployment's
+capability document. APIDs are stable across the asset's
+mission lifetime; introducing a new APID requires a new
+capability document version.
 
-## §7 Privacy and Security
+## §4 Audit chain
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Every boundary state transition is appended to a Merkle audit
+log:
 
-## §8 Open Governance
+- `entryId` — URN
+- `parent` — prior `entryId` SHA-256
+- `at` — RFC 3339 with offset
+- `actor` — authority URN of the entity making the transition
+- `kind` — closed enum: `task-received`, `task-validated`,
+  `task-uplinked`, `product-published`, `product-released`,
+  `posture-changed`, `key-rolled`, `release-decision`,
+  `coalition-mirror-confirm`
+- `payloadHash` — SHA-256 of the canonical JSON payload
+- `signature` — JWS by the actor
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-satellite` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Coalition-witness mirroring publishes selected entry classes
+(`product-released`, `release-decision`, `key-rolled` for
+coalition-shared assets) to the partner's audit witness with
+a counter-signature. A missing counter-signature past the
+deployment's witness-latency budget escalates to the
+release-board's monitoring console.
+
+## §5 Release-authority handshake
+
+Coalition release of a product follows a three-message
+exchange:
+
+1. Originating deployment posts a release request (PHASE 2 §7)
+2. Release board reviews and decides; decision is signed
+3. Boundary updates product record's release list and emits
+   `release-decision` audit-chain entry
+
+The decision message carries:
+
+- `decision` — `release`, `reject`, `defer`
+- `decisionAuthorityRef` — URN of the deciding board
+- `decidedAt` — RFC 3339 with offset
+- `validUntil` — RFC 3339 (for `release` decisions; bounded
+  by the asset's `classificationCeiling` review cadence)
+- `coalitionWitnessAck` — confirmation URN from the partner
+
+A decision without a coalition-witness acknowledgement is
+held in pending state and not applied to the product record.
+
+## §6 Time discipline
+
+All record timestamps use RFC 3339 with explicit offset.
+On-orbit telemetry is time-stamped by the asset's onboard
+clock disciplined to GPS time (or coalition equivalent
+PNT augmentation); downlink processing converts to UTC at
+boundary. Records that fail clock discipline (drift outside
+declared bound, lost lock to PNT source) are tagged
+`provisional` until a recovery time-tag from a trusted source
+arrives. Leap-second handling follows IERS Bulletin C;
+GPS-week rollover is handled by always carrying full epoch
+year-month-day to avoid ambiguity.
+
+## §7 Transport security
+
+Ground-segment HTTP(S) endpoints require TLS 1.3 (RFC 8446)
+with a deployment-declared cipher-suite list. Mutual TLS is
+required for command-authority and processing-element
+endpoints. Coalition exchanges use a coalition-issued
+certificate hierarchy with revocation surfaces published
+through the WIA-network-security PHASE 3 governance.
+
+## §8 Post-quantum migration
+
+The standard supports a phased migration to PQC:
+
+- Phase A — classical-only (current default)
+- Phase B — hybrid (classical KEM + ML-KEM, classical signature
+  + ML-DSA)
+- Phase C — PQ-only
+
+Asset-class migration timelines are declared in the
+deployment policy and aligned with WIA-pq-crypto PHASE 3
+profiles. On-orbit assets unable to receive PQ key uploads
+remain on Phase A under a documented exception until end of
+mission.
+
+## §9 Replay protection
+
+Telecommand frames carry monotonic counters; the asset
+rejects frames with counters older than the high-water mark
+plus a small backwards window for retransmission. Uplink-
+window contention (multiple ground stations attempting to
+reach the same asset) is resolved by the deployment's
+ground-network coordinator; only one station holds the
+"primary" role per pass.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cipher-suite floors
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Boundary endpoints accept only TLS 1.3 cipher suites with
+forward secrecy. The minimum cipher floor and PQ-hybrid
+profile is published in the deployment's capability
+document; partners verify compatibility before exchange
+begins.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — Audit-chain replication topology
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Coalition deployments mirror selected audit-chain entries
+to a partner-witness. The replication topology is
+deployment-policy and may be one of:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- bilateral (one-to-one)
+- star (originator to coalition cell)
+- chain (originator → coalition cell → onward partners)
 
-## Annex F — Adoption Roadmap
+Each topology has documented latency and witnessing
+characteristics; the topology in use is declared in the
+capability document.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — On-orbit anomaly handling
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Asset-detected anomalies (out-of-tolerance subsystem state,
+authentication failure, payload fault) are reported in the
+next telemetry contact with elevated priority. The boundary
+escalates anomaly events to the operations cell via PHASE 4
+§5 anomaly workflow within a deployment-declared latency
+budget. Anomaly state remains until cleared by an operator
+acknowledgement that is itself signed and audit-logged.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Range-safety carve-out
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+For assets with on-orbit propulsion, range-safety
+considerations during early-orbit operations may temporarily
+restrict tasking to safe-mode commands only. The
+deployment's command authority signals this restriction by
+emitting a `range-safety-active` capability flag; the
+boundary refuses non-safe-mode tasking until the flag clears.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Worked command authentication
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A worked example for an `image` tasking-order uplink under
+CCSDS 357.0 Authenticated CRC:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+1. Boundary receives the validated tasking order (PHASE 2 §1)
+2. Boundary projects the order into one or more Telecommand
+   frames per the deployment's mapping table
+3. Each frame's command-authentication tag is computed
+   over the frame body using the asset's current command-
+   authentication key
+4. Frames are submitted to the ground-station scheduler with
+   the asset's pass window
+5. Asset receives, verifies the tag, and either executes
+   (positive verification) or discards (negative)
+6. Verification result is reported in the next telemetry
+   contact and bound back to the tasking order via the
+   `taskAck` URN
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+A failed verification is itself audit-chained on the boundary
+side as `kind=task-rejected-by-asset` with the asset's
+verification failure code.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Coalition-witness mirroring detail
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Audit-chain entries selected for coalition mirroring are
+batched and pushed to the partner's witness with declared
+batch latency. The mirroring envelope:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+```json
+{
+  "batchId": "urn:wia:msat:audit-batch:rok-acomd:b-2026-04-27-001",
+  "originator": "urn:wia:auth:rok-acomd",
+  "witness": "urn:wia:auth:us-coalition-cell-witness",
+  "entries": [/* signed entries */],
+  "merkleRoot": "<sha-256>",
+  "originatorSignature": "<jws-detached>"
+}
+```
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Witness acknowledgement is a counter-signed receipt published
+to both the originator and witness audit chains. Missing
+acknowledgement past the latency budget escalates per the
+PHASE 4 §8 coalition-exchange contract.
 
-## Annex I — Interoperability Profiles
+## Annex G — PNT broadcast integrity
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+For PNT-augmentation assets, broadcast signals carry a
+signal-authentication-message (SAM) appended to the navigation
+data. The SAM is itself signed by the constellation's signing
+key (rolled per the same crypto-period rules as TT&C keys).
+Receivers verify the SAM before applying the navigation data;
+unverified data is reported in the receiver's posture record
+(PHASE 1 §8) for downstream spectrum-coordination evaluation.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex H — Algorithm registry
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The deployment maintains an algorithm registry naming the
+specific cipher and signature algorithms in use per asset
+and per role (TT&C cipher, command-auth MAC, link-security
+KEM, audit-chain signature). The registry is published in
+the capability document and tracked across PQ migration
+phases for partner verification.
+
+## Annex I — Boundary-clock health
+
+The boundary itself maintains a clock-health record published
+in the capability document:
+
+- `clockSourceRef` — primary time source (typically GPS or a
+  national-laboratory time reference)
+- `secondaryClockSourceRef` — fallback time source
+- `lastSyncAt` — most recent successful sync to primary
+- `currentDriftEstimateNs` — estimated drift in nanoseconds
+- `leapSecondsApplied` — count of leap seconds applied since
+  the deployment's epoch (per IERS Bulletin C)
+
+Coalition partners verify the boundary clock health before
+accepting time-sensitive products; a boundary whose drift
+exceeds its declared bound is treated as a degraded
+exchange peer until recovered.
+
+## Annex J — Negative-test vectors for protocol layer
+
+| Stimulus                                              | Expected outcome                              |
+|-------------------------------------------------------|-----------------------------------------------|
+| TT&C frame with bad authentication tag                | asset discards; logs in next telemetry        |
+| Command-key rollover before partner counter-signature | refused at boundary; held in pending state    |
+| Audit-chain entry with broken parent hash             | rejected at append; boundary alerts           |
+| Coalition-witness batch missing acknowledgement       | escalation per Annex F latency budget         |
+| Time-tag drift outside declared bound                 | record marked `provisional` until backfilled  |

@@ -1,241 +1,287 @@
-# WIA-medication-adherence PHASE 3 — PROTOCOL Specification
+# WIA-medication-adherence PHASE 3 — Protocol Specification
 
 **Standard:** WIA-medication-adherence
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-medication-adherence (Medication Adherence).
+This PHASE specifies the protocols binding the data formats
+(PHASE 1) and the API surface (PHASE 2) to operational exchanges:
+authentication of clinicians, pharmacies, devices, patients and
+caregivers; smart-pill-bottle pairing and verification; ingestion-
+sensor data flow; eMAR integration; controlled-substance handling
+protocol; time discipline; audit-chain construction.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7525, RFC 9162 (CT pattern)
+- IETF RFC 7252 (CoAP) and RFC 8613 (OSCORE) — for constrained
+  pill-bottle / blister-pack devices
+- IETF RFC 7515 (JWS), RFC 7519 (JWT), RFC 8705 (mTLS-bound JWT)
+- HL7 v2.x messaging protocols
+- IHE Pharmacy Hospital Medication Workflow profile
+- ISO/IEC 11073-10472 — medication monitor specialisation
+- ISO/IEC 11073-20601 — application profile (optimised exchange)
+- DEA 21 CFR §1311 — for US controlled-substance electronic
+  prescribing requirements (where deployment is in US scope)
+- KFDA / K-MFDS 의약품 안전사용서비스 — for KR scope
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-medication-adherence
-standard. It addresses the protocol layer of the standard.
+Principals authenticate via JWS-signed JWTs:
 
-## §2 Manifest
+- `iss`, `sub`, `aud`, `iat`, `exp`
+- `wia.role` — `prescriber`, `pharmacist`, `nurse`, `patient`,
+  `caregiver`, `device`, `regulator`, `auditor`
+- `wia.holderRef` — for clinician/pharmacist tokens, the
+  organisation whose patients/dispenses may be acted upon
+- `wia.deviceRef` — for device tokens, the URN of the bound
+  smart device
+- `cnf` — confirmation claim binding to a TLS client certificate
+  (RFC 8705 mTLS-bound JWT)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medication-adherence"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Prescriber tokens for controlled substances additionally carry
+the prescriber's DEA-equivalent identifier (or the deployment's
+jurisdictional equivalent) and require two-factor authentication
+per the controlling regulation.
 
-## §3 Conformance Tiers
+## §2 Smart pill bottle / blister pack pairing
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Smart medication-monitor devices (per ISO/IEC 11073-10472)
+pair to the deployment via a documented sequence:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+1. Patient receives the device with a pairing token printed on
+   a tear-off sticker
+2. Patient opens the patient-facing app and scans the pairing
+   token
+3. App + device complete a Bluetooth LE pairing per IEEE 11073-
+   20601 application profile
+4. Boundary records the pairing as a `device-pairing` event
+   with `gatewayRef` = patient's smartphone
+5. Device emits subsequent dose-event observations through the
+   patient's smartphone gateway
 
-## §4 Discovery
+Unpairing is initiated by the patient or the deployment;
+boundary records the event and refuses subsequent observations
+from the unpaired device.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medication-adherence`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Smart device dose-event protocol
 
-## §5 Time and Identity
+Dose events from smart bottles / blister packs:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `eventKind` — `cap-opened`, `cap-closed`, `blister-pressed`,
+  `dose-dispensed-confirmed`, `dose-skipped-confirmed`
+- `at` — RFC 3339 with offset
+- `dose` — for dispense-confirmed events, the actual dose
+  delivered (if the device measures it)
+- `deviceObs` — supplementary observations (battery level,
+  desiccant indicator, sensor health)
 
-## §6 Versioning and Deprecation
+The boundary correlates events with the patient's scheduled
+doses; an open-then-close within a tolerance window is treated
+as a tentative administration. Confirmation requires a second
+signal (ingestion sensor, patient self-report, or a follow-up
+inquiry) before the administration is recorded with high-
+reliability evidence.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Ingestion-sensor protocol
 
-## §7 Privacy and Security
+Ingestion-sensor systems (FDA-cleared digital medicines with
+ingestible sensor + body-worn patch + smartphone gateway):
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Patch detects the sensor's signal at ingestion; signal
+  decodes to a manufacturer-specific identifier
+- Patch's gateway uploads the detection through the smartphone
+- Boundary cross-references the manufacturer ID against
+  active prescriptions
+- Mismatches (sensor ID not matching any active prescription)
+  are flagged for clinical review
 
-## §8 Open Governance
+The boundary stores patch-detected signals as
+MedicationAdministration records with
+`evidenceSource: ingestion-sensor`. Patient consent for
+ingestion-sensor monitoring is a separate consent class (per
+WIA-medical-data-privacy `provision.purpose`) so opt-in is
+explicit.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medication-adherence` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 eMAR integration protocol
+
+In-hospital eMAR systems integrate via:
+
+- HL7 v2.x RAS/RGV messages over MLLP (legacy)
+- FHIR MedicationAdministration POST (modern)
+- IHE PHMP profile
+
+The boundary translates between protocols transparently;
+audit-chain entries record the source protocol so retrospective
+review can reconstruct.
+
+## §6 Controlled-substance handling protocol
+
+Controlled-substance prescriptions follow elevated discipline:
+
+- Prescriber two-factor authentication on every prescription
+- Pharmacy verification of DEA-equivalent ID before dispense
+- Per-jurisdiction reporting cadence (US DEA's PMP, KR 마약류
+  통합관리시스템, etc.) — boundary emits the required reports
+  on schedule
+- Diversion monitoring: unusual patterns (rapid early refills,
+  multiple prescribers, multiple pharmacies) flagged for
+  pharmacist + medical-leadership review
+- Disposal records: boundary tracks returned / unused
+  controlled-substance disposal per regulatory requirement
+
+## §7 Time discipline
+
+Devices and gateways synchronise to authoritative sources;
+boundary clock is NTPv4 stratum-2. Smart devices on battery
+typically derive time from their gateway (smartphone) on
+each handshake; gateway clock is the smartphone OS time
+source.
+
+A device whose declared event timestamp is more than the
+deployment-declared skew tolerance from boundary time has
+the event accepted but flagged `evidenceReliability: time-skew`.
+
+## §8 Audit chain
+
+Every prescription mutation, dispense, scheduled-dose
+generation, administration, deviation, refill, and adherence-
+summary computation emits an AuditEvent. Chain construction
+follows the same Merkle-chain pattern as WIA-medical-iot
+PHASE 3 §5.
+
+For high-volume in-hospital eMAR deployments, the chain is
+sharded by `subjectRef` hash prefix.
+
+## §9 Replay protection
+
+All write endpoints accept `Idempotency-Key`; the boundary
+stores keys for 30 days. CoAP/OSCORE replay protection uses
+the OSCORE sequence-number window for constrained devices.
+
+## §10 Disaster recovery
+
+Boundary outages during eMAR operation degrade to local-mode:
+the eMAR continues recording locally; on reconnection the
+boundary accepts the buffered records with their original
+timestamps. The eMAR's local audit chain is sealed at
+reconnection and merged into the boundary's chain.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Algorithm choices (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| Concern              | Default                            | Notes                                    |
+|----------------------|------------------------------------|------------------------------------------|
+| Token signing        | ES256                              | mTLS-bound (RFC 8705)                    |
+| TLS                  | 1.3 (RFC 8446)                     | hybrid groups when WIA-pq-crypto hybrid  |
+| OSCORE AEAD          | AES-CCM-16-64-128                  | for smart bottles / blister packs        |
+| Audit hash           | SHA-256                            |                                          |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — Smart device pairing worked example (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+1. Patient scans pairing token "WIA-PAIR-91A7-77C2" via app
+2. App resolves token to deviceRef = urn:wia:mdadh:device:smart-bottle-1.0:SN-91A7
+3. App + device complete BLE pairing with the device's GATT service
+4. App posts to /devices/$pair with patient JWT + deviceRef + pairing evidence
+5. Boundary verifies pairing evidence, creates DeviceAssociation
+6. Device begins emitting dose-events through the gateway
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Controlled-substance reporting cadence (informative)
 
-## Annex F — Adoption Roadmap
+| Jurisdiction | Required cadence                                       |
+|--------------|--------------------------------------------------------|
+| US DEA       | Per state PMP requirement (typically 24 hours after dispense) |
+| KR M-FDS     | 마약류 통합관리시스템: 익일 보고                         |
+| EU           | Per Member State (varies)                              |
+| JP           | Per PMD Act controlled-substance pharmacist reporting   |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The boundary publishes the deployment's reporting schedule
+in the deployment policy.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Negative-test vectors (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Stimulus                                              | Expected outcome                                    |
+|-------------------------------------------------------|-----------------------------------------------------|
+| Smart device claim without prior pairing              | 422 + `device-not-paired`                           |
+| Controlled-substance dispense from unauthorised pharmacist | 403 + `controlled-substance-authority-required` |
+| Late dose for time-critical medication                | clinical-alert deviation + clinician escalation     |
+| Eperal: Smart bottle event timestamp > 5 min skew     | accepted, flagged `time-skew`                       |
+| Ingestion-sensor signal not matching active Rx        | flagged for clinical review; not auto-recorded as administration |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex E — Patient-app local-mode (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+When the patient-facing app loses connectivity:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- Local self-reports are buffered with locally-generated event IDs
+- Smart-device events are buffered through the gateway role
+- On reconnection, buffered events sync with server-side
+  validation; duplicates are de-duplicated via Idempotency-Key
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+A patient who re-installs the app needs to re-authenticate
+and re-pair smart devices; the boundary records the re-install
+as a security event for review.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## Annex F — Adverse-event linkage (informative)
 
-## Annex H — Versioning and Deprecation Policy
+When a patient experiences an adverse event potentially related
+to a medication:
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+1. Clinician submits an AdverseEvent resource
+2. Boundary cross-references administrations within the
+   declared time window
+3. Adverse event is linked to candidate administrations for
+   pharmacovigilance review
+4. The pharmacovigilance partner subscription delivers the
+   linked bundle for evaluation
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+The linkage is informational; causality determination is the
+clinician's responsibility.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex G — Mail-order shipping-delay handling
 
-## Annex I — Interoperability Profiles
+Mail-order pharmacies may experience shipping delays that
+affect supply continuity. The boundary detects:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+- Predicted end-of-supply within deployment-declared window
+  (e.g., 3 days)
+- No new dispense in flight
+- Triggers an `expedite-refill` event for the pharmacy partner
+- If still no dispense within 2 days, escalates to clinical
+  team for bridge-supply or alternate-pharmacy resolution
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+This pattern protects patients on chronic medications from
+inadvertent missed doses due to logistics issues.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex H — eMAR-to-boundary translation cadence (informative)
+
+The boundary translates between in-hospital eMAR formats:
+
+| Direction                  | Latency target | Notes                                  |
+|----------------------------|---------------|----------------------------------------|
+| HL7 v2 RAS → FHIR Admin    | ≤ 1 s         | MLLP listener with checksum verification |
+| FHIR Admin → HL7 v2 RAS    | ≤ 2 s         | for legacy partners                    |
+| RGV (Give) → FHIR Admin    | ≤ 1 s         | per administration                     |
+| RDS (Dispense) → FHIR Disp | ≤ 1 s         | per dispense                           |
+
+Translation failures are recorded as audit events and
+delivered to the eMAR's operations team. Persistent translation
+failure on a partner triggers a partner-roster review.
+
+## Annex I — Disaster recovery worked example (informative)
+
+Boundary outage during a busy in-hospital eMAR shift:
+
+1. eMAR detects boundary unreachable
+2. eMAR continues recording locally with same per-event IDs
+3. Local audit chain accumulates with eMAR's signing key
+4. Boundary recovers; eMAR retries buffered events with
+   Idempotency-Key
+5. Boundary accepts buffered events; merges local audit chain
+   into boundary's chain
+6. Boundary publishes recovery-evidence record
+7. Operations review the gap window and any policy gaps

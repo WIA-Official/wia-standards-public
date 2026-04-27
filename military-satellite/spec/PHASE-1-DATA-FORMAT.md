@@ -1,241 +1,293 @@
-# WIA-military-satellite PHASE 1 — DATA-FORMAT Specification
+# WIA-military-satellite PHASE 1 — Data Format Specification
 
 **Standard:** WIA-military-satellite
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-military-satellite (Military Satellite).
+This PHASE defines the canonical data format for military
+space-segment operations: orbital-asset registry records, payload
+tasking orders, downlink-segment state, mission-data products
+(ISR, SIGINT, MASINT classification per coalition rules),
+TT&C (telemetry, tracking, command) telemetry, anti-jam
+posture observations, and the cross-references that bind the
+space picture to the broader operational fire-control and
+intelligence-fusion chain. The shape is interoperable with
+allied space-domain-awareness exchanges and CCSDS-aligned
+ground systems so coalition operations do not require parallel
+data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- CCSDS 133.0-B-2 — Space Packet Protocol
+- CCSDS 232.0-B-3 — TC Space Data Link Protocol
+- CCSDS 132.0-B-3 — TM Space Data Link Protocol
+- CCSDS 502.0-B-2 — Orbit Data Messages (OPM/OMM/OEM)
+- CCSDS 503.0-B-1 — Tracking Data Message (TDM)
+- ITU Radio Regulations (RR) — frequency-band coordination
+- STANAG 4609 — Motion-Imagery Standards Profile (NATO MISP)
+- MISB ST 0102 — Security Metadata Universal Set
+- MISB ST 0601 — UAS Datalink Local Set (re-used for satellite ISR metadata)
+- WGS-84 — geodetic reference frame
+- IETF RFC 7515 (JWS), RFC 8259 (JSON), RFC 9162 (Certificate Transparency 2.0)
+- ISO 19115-1 — Geographic information metadata
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-military-satellite
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that catalog, task, command,
+receive, or report on military space assets: imaging-ISR
+satellites (electro-optical, SAR, hyperspectral), SIGINT
+collection platforms, MASINT signatures, MILSATCOM relays,
+PNT augmentations, and ground-segment elements operating
+under coalition release authority. It addresses the *shape*
+of operational records; transport protocols are in PHASE 3
+and integration with C2 and intelligence-fusion is in PHASE 4.
 
-## §2 Manifest
+The standard is classification-aware: every record carries a
+CCEB or NATO security-classification marking and a
+release-caveat list that downstream consumers honour before
+re-disclosure. Records that have not been marked are refused
+at boundary intake.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "military-satellite"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: orbital-asset registry, payload tasking, downlink
+state, mission-data product metadata, TT&C telemetry,
+anti-jam posture, conjunction-assessment observations. Out of
+scope: launch-vehicle integration (governed by national-range
+standards), satellite-bus-vendor proprietary fault codes
+(carried opaquely as vendor extensions), and weapon
+deployment from space (excluded by treaty and out of WIA scope).
 
-## §3 Conformance Tiers
+## §2 Orbital-asset registry record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Every fielded asset carries a stable registry record:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field             | Source / Binding                                       |
+|-------------------|--------------------------------------------------------|
+| `assetRef`        | URN of form `urn:wia:msat:asset:<authority>:<id>`      |
+| `internationalDesignator` | YYYY-NNNAAA per standard space-object designation |
+| `noradCatalogNumber` | catalog number where coalition-disclosed             |
+| `mission`         | `imagery-eo`, `imagery-sar`, `sigint`, `milsatcom`, `pnt-aug`, `early-warning`, `meteorology`, `multi-mission` |
+| `orbitClass`      | `leo`, `meo`, `geo`, `heo`, `molniya`, `tundra`, `polar-leo` |
+| `referenceFrame`  | `j2000`, `icrf`, `tod`; positions exchanged in J2000 by default |
+| `releaseAuthority`| URN of the controlling release authority               |
+| `classificationCeiling` | maximum classification any product from this asset may carry |
+| `tleSourcePolicy` | `coalition-shared`, `national-only`, `restricted`     |
 
-## §4 Discovery
+Asset registry changes are signed and audit-logged. A
+cross-coalition disclosure of a previously national-only asset
+requires a release-authority counter-signature in the audit
+chain.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/military-satellite`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Orbital-state record
 
-## §5 Time and Identity
+Asset state is exchanged using the CCSDS Orbit Data Messages
+shape (OPM for instantaneous state, OEM for ephemeris,
+OMM for mean-elements):
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `stateId` — URN
+- `assetRef` — URN
+- `epoch` — RFC 3339 with offset (UTC by default; coalition
+  exchanges declare their reference)
+- `referenceFrame` — defaults to J2000
+- `position` — x, y, z metres
+- `velocity` — vx, vy, vz m/s
+- `covariance` — 6×6 covariance matrix (position+velocity)
+- `propagationModel` — `sgp4`, `sdp4`, `numerical-cowell`, `gtds`
+- `dataSource` — `national-tracking`, `coalition-shared`,
+  `commercial-augmentation`, `self-reported-gnss`
 
-## §6 Versioning and Deprecation
+Self-reported state from the asset's onboard GNSS is signed
+by the asset's signing key; coalition-shared external state
+is signed by the contributing partner's release authority.
+Mixing untrusted sources without provenance is rejected.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Payload tasking order
 
-## §7 Privacy and Security
+Mission planners issue tasking orders to assets:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- `taskOrderId` — URN of form `urn:wia:msat:task:<authority>:<seq>`
+- `assetRef` — target asset
+- `taskType` — `image`, `intercept`, `relay`, `ranging`, `safe-mode`,
+  `delta-v-burn`, `attitude-slew`, `payload-config`, `key-update`
+- `windowStart`, `windowEnd` — RFC 3339 with offset
+- `priorityClass` — `routine`, `priority`, `flash`, `flash-override`
+- `targetGeometry` — for image/intercept: geometric description
+  (point, polygon, area-of-interest in WGS-84) or signal-of-interest
+  parameters (frequency band, polarization, dwell)
+- `expectedProductType` — links to the product registry
+- `coalitionReleaseList` — list of partners cleared to receive
+  the resulting product
+- `commandAuthorityRef` — the issuing authority URN
 
-## §8 Open Governance
+Tasking orders are signed by the issuing authority. Orders
+that exceed the asset's `classificationCeiling` or whose
+release list contradicts the asset's release-authority policy
+are refused at boundary intake with an audit event.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `military-satellite` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 TT&C telemetry record
+
+Health-and-status telemetry from the asset is recorded:
+
+- `telemetryId` — URN
+- `assetRef` — URN
+- `epoch` — RFC 3339 with microsecond precision where available
+- `subsystemSnapshots` — per-subsystem state objects:
+  - `power` — solar-array current, battery state-of-charge,
+    bus voltage, anomaly flags
+  - `thermal` — per-zone temperature readings, thermal-margin
+  - `attitude` — quaternion, body-rate vector, sun/Earth/star
+    sensor health
+  - `propulsion` — tank pressure, valve states, residual delta-v
+  - `payload` — per-payload state (idle, configuring,
+    collecting, dumping, fault)
+  - `communications` — uplink lock status, downlink data-rate
+    state, anti-jam posture (PHASE 1 §8)
+- `anomalyFlags[]` — per-subsystem anomaly bitmask with
+  vendor-extension allowances
+- `signature` — JWS signature by the asset's signing key
+
+Sample cadence is mission-dependent (typically 1 Hz routine,
+10 Hz during burns, 100 Hz during contingency). Boundary
+deduplicates on `(assetRef, epoch)`.
+
+## §6 Mission-data product record
+
+Products generated from collection (imagery, SIGINT cuts,
+hyperspectral cubes, TDOA tuples) carry a product record:
+
+- `productId` — URN of form `urn:wia:msat:product:<assetRef>:<seq>`
+- `assetRef` — collecting asset
+- `taskOrderRef` — the originating tasking order
+- `productType` — `eo-frame`, `sar-frame`, `hyperspectral-cube`,
+  `sigint-cut`, `bistatic-tdoa`, `relay-segment`
+- `collectionWindow` — start/end RFC 3339
+- `targetGeometryActual` — what the asset actually collected
+- `qualityMetrics` — per-product modality (NIIRS-like for EO,
+  GRD for SAR, SNR for SIGINT) — vendor-quantified, coalition-
+  agreed scale where available
+- `securityMetadata` — MISB ST 0102 set carrying classification,
+  caveats, originator, declassification date
+- `motionImageryMeta` — for MI products, MISB ST 0601 local
+  set per STANAG 4609
+- `geoMetadata` — ISO 19115-1 metadata for spatial coverage
+- `signature` — JWS signature
+
+Products without complete security metadata are refused; the
+metadata is part of the canonical record, not an optional
+annotation.
+
+## §7 Conjunction-assessment record
+
+For collision-avoidance with operational and debris objects:
+
+- `caId` — URN
+- `assetRef` — primary asset
+- `secondaryRef` — URN of the secondary object (asset, debris,
+  unknown-tracked-object)
+- `tca` — time of closest approach RFC 3339
+- `missDistance` — metres at TCA
+- `pc` — probability of collision (computed per a declared model)
+- `screeningPolicy` — declared screening configuration ID
+- `recommendedAction` — `monitor`, `plan-burn`, `execute-burn`,
+  `de-orbit`, `safe-mode`
+- `coordinationRequired` — boolean (true when secondary is
+  another nation's asset and coordination is required)
+
+CA records drive PHASE 4 §6 collision-avoidance workflows.
+
+## §8 Anti-jam / anti-spoof posture record
+
+For asset uplink/downlink and PNT-aug payloads:
+
+- `postureId` — URN
+- `assetRef` — URN
+- `linkScope` — `uplink`, `downlink`, `pnt-broadcast`
+- `frequencyBand` — declared band per ITU RR
+- `interferenceState` — `nominal`, `degraded`, `denied`,
+  `deceptive-suspected`
+- `mitigationActive[]` — closed enum: `frequency-hop`,
+  `nulling-antenna`, `power-step`, `crypto-rolled`,
+  `geo-fence-confirm`, `civil-handoff`
+- `evidenceRefs[]` — links to TT&C / ground-station logs
+  supporting the posture
+
+A `denied` or `deceptive-suspected` posture triggers PHASE 4
+§7 spectrum-coordination and PHASE 4 §8 cross-coalition
+notification flows.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain references (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Reference                     | Use site                                                 |
+|-------------------------------|----------------------------------------------------------|
+| WIA-military-communication    | downlink relay over coalition transport                  |
+| WIA-missile-defense           | early-warning IR products feed engagement-decision intake|
+| WIA-network-security          | TT&C cipher-suite governance                             |
+| WIA-pq-crypto                 | PQ migration schedule for command authentication         |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Conformance disclosure
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Implementations declare per-section conformance in their
+published capability document. A deployment that is `partial`
+or `excluded` on §2 (Asset registry), §4 (Tasking order), §5
+(TT&C telemetry), or §6 (Product record) is non-conformant
+overall. Section §7 (CA) and §8 (Anti-jam posture) are
+mandatory for assets in their scope.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Versioning and deprecation
 
-## Annex F — Adoption Roadmap
+Versioning follows Semantic Versioning 2.0.0. Coalition-shared
+records carry the originating deployment's version so cross-
+coalition replay across version transitions is well-defined.
+Deprecation enters a 12-month sunset window with the migration
+notes recorded in the audit chain.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Worked tasking-order example (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+An imaging-EO tasking order with two-coalition release:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```json
+{
+  "taskOrderId": "urn:wia:msat:task:rok-acomd:t-2026-04-27-2210",
+  "assetRef": "urn:wia:msat:asset:rok-acomd:eo-1",
+  "taskType": "image",
+  "windowStart": "2026-04-28T02:14:00+09:00",
+  "windowEnd": "2026-04-28T02:18:30+09:00",
+  "priorityClass": "priority",
+  "targetGeometry": {
+    "type": "polygon",
+    "coordinates": [[[127.10,37.55],[127.20,37.55],[127.20,37.45],[127.10,37.45],[127.10,37.55]]]
+  },
+  "expectedProductType": "eo-frame",
+  "coalitionReleaseList": ["urn:wia:auth:rok", "urn:wia:auth:us-coalition-cell"],
+  "commandAuthorityRef": "urn:wia:auth:rok-acomd-tasking-cell"
+}
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The boundary chains the resulting product record to this
+order so traceability from operational requirement through
+collection to disseminated product is preserved.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Vendor extensions
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Asset bus and payload vendors may extend telemetry and
+product records with `x-vendor-*` fields. Extensions MUST NOT
+contradict the canonical fields and MUST NOT be required for
+core conformance. A coalition partner unable to interpret a
+vendor extension still satisfies conformance by ignoring it.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex F — Time discipline cross-reference
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Time fields use the discipline of PHASE 3 §6 (TAI/UTC, leap-
+second handling, GPS-week rollover safe encodings). Records
+that fail clock-discipline check are tagged `provisional`
+until backfill from a trusted time source.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Conformance level
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Implementations declare conformance level (Surface / Verified
+/ Anchored) per the deployment policy. Anchored requires
+continuous TT&C-signed evidence packages plus quarterly
+coalition-disclosure replay.

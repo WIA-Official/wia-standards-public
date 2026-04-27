@@ -1,241 +1,327 @@
-# WIA-network-security PHASE 1 — DATA-FORMAT Specification
+# WIA-network-security PHASE 1 — Data Format Specification
 
 **Standard:** WIA-network-security
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-network-security (Network Security).
+This PHASE defines the canonical data format for network-
+security operations: protected-asset inventory, security-
+event records, indicator-of-compromise (IOC) records,
+threat-intelligence object records, vulnerability records,
+incident records, alert records, response-action records,
+and the cross-references binding events to incidents and
+incidents to remediation. The shape interoperates with
+established intelligence-sharing formats (STIX 2.1, TAXII
+2.1) and event-detection schemas (OASIS Sigma, MITRE
+ATT&CK / D3FEND, OASIS OpenC2).
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- OASIS STIX 2.1 — Structured Threat Information Expression
+- OASIS TAXII 2.1 — Trusted Automated Exchange of Intelligence Information
+- OASIS OpenC2 — Open Command and Control
+- MITRE ATT&CK Framework
+- MITRE D3FEND
+- OASIS Sigma rule format
+- IETF RFC 9356 (Vulnerability Reporting), RFC 9116 (security.txt)
+- IETF RFC 4949 (Internet Security Glossary v2), RFC 6545 (RID)
+- OASIS Common Security Advisory Framework (CSAF) 2.0
+- ISO/IEC 27035 — Information security incident management
+- ISO/IEC 27001:2022 — Information security management systems
+- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 9162 (Certificate Transparency 2.0)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-network-security
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to the data shape used by security-
+operations centres (SOCs), threat-intelligence platforms
+(TIPs), security-information-and-event-management (SIEM)
+systems, and incident-response teams operating networked
+infrastructure. It addresses event capture, IOC management,
+vulnerability tracking, incident lifecycle, and response
+actions; transport protocols are in PHASE 3 and integration
+with broader IT/OT operations is in PHASE 4.
 
-## §2 Manifest
+The standard is privacy-aware: any field that may carry
+personally identifiable information (PII) of users (e.g.,
+usernames, email addresses, IP addresses where attributable
+to natural persons) carries a `ppiClass` marker so consumers
+honour deployment-specific privacy controls before
+re-disclosure.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "network-security"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: protected-asset inventory, security events, IOC
+records, STIX-aligned threat objects, vulnerability records,
+incident records, alert records, response-action records,
+analyst-attribution records. Out of scope: cryptographic
+primitives (governed by WIA-pq-crypto), endpoint configuration
+management (carried opaquely as asset properties), legal-
+investigation chain of custody (cross-domain to legal
+standards).
 
-## §3 Conformance Tiers
+## §2 Protected-asset inventory record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Every monitored asset carries a stable inventory record:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field             | Source / Binding                                       |
+|-------------------|--------------------------------------------------------|
+| `assetRef`        | URN of form `urn:wia:nsec:asset:<authority>:<id>`      |
+| `assetType`       | `host`, `network-device`, `cloud-workload`, `application`, `service`, `iot-device`, `ot-device`, `identity-account` |
+| `criticalityClass`| `tier-1` (mission-critical), `tier-2` (important), `tier-3` (supporting), `tier-4` (informational) |
+| `dataClass[]`     | data-classification labels (e.g., `pii`, `phi`, `classified`, `public`) |
+| `ownerRef`        | URN of accountable owner                               |
+| `locationRef`     | URN of physical or logical zone                        |
+| `softwareInventory[]` | references to CPE-formatted software entries      |
+| `controlsApplied[]` | references to control-framework entries (ISO 27001, NIST 800-53) |
 
-## §4 Discovery
+Asset registry mutations are signed and audit-logged.
+Criticality changes propagate to incident severity-mapping
+rules within a deployment-declared latency budget.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/network-security`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Security-event record
 
-## §5 Time and Identity
+Detector-generated events carry a normalised shape:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `eventId` — URN
+- `assetRef` — URN of the affected or observed asset
+- `detectorRef` — URN of the detecting source (NDR, EDR,
+  IDS, log-analytic rule)
+- `observedAt` — RFC 3339 with offset (microsecond precision
+  where the source supports it)
+- `mitreAttackTechnique[]` — MITRE ATT&CK technique IDs
+  (e.g., `T1110.001`)
+- `mitreAttackTactic[]` — tactic IDs (e.g., `TA0006`)
+- `severity` — closed enum: `low`, `medium`, `high`, `critical`
+- `confidence` — `low`, `medium`, `high`
+- `rawEventRef` — URI of the underlying log/packet evidence
+- `iocRefs[]` — URNs of IOCs that fired
+- `ppiClass` — privacy-class for downstream re-disclosure
 
-## §6 Versioning and Deprecation
+Events are deduplicated at the boundary on `(detectorRef,
+rawEventRef-hash)`. Detector-vendor extensions are accepted
+but MUST NOT contradict the canonical fields.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 IOC record
 
-## §7 Privacy and Security
+Indicators of compromise:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- `iocId` — URN
+- `iocType` — closed enum: `ipv4`, `ipv6`, `cidr`, `domain`,
+  `url`, `email`, `file-hash-sha256`, `file-hash-sha1`,
+  `tls-cert-fingerprint`, `mutex`, `registry-key`,
+  `process-image-name`, `user-agent`, `behavior-pattern`
+- `value` — the indicator value (canonicalised per type)
+- `firstObserved` — RFC 3339
+- `lastObserved` — RFC 3339
+- `confidence` — `low`, `medium`, `high`
+- `sourceRef` — URN of the contributing source
+- `validUntil` — declared expiry (RFC 3339); IOCs without
+  validity decay per the deployment's IOC-aging policy
+- `tlpMarking` — `clear`, `green`, `amber`, `amber-strict`,
+  `red` (Traffic Light Protocol 2.0)
+- `relationshipsRefs[]` — URNs of related STIX objects
 
-## §8 Open Governance
+IOCs without a TLP marking are refused. Marking changes are
+audit-chained.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `network-security` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Threat-intelligence object record
+
+STIX 2.1-aligned objects representing actors, campaigns,
+malware, attack patterns, and infrastructure:
+
+- `tioId` — URN bound to a STIX `id` field
+- `stixType` — `threat-actor`, `intrusion-set`, `campaign`,
+  `malware`, `attack-pattern`, `infrastructure`,
+  `vulnerability`, `tool`
+- `name` — declared name
+- `description` — narrative description
+- `aliases[]` — known aliases
+- `firstSeen`, `lastSeen` — RFC 3339
+- `tlpMarking` — TLP 2.0 marking
+- `confidence` — `low`, `medium`, `high`
+- `relationships[]` — STIX SROs binding this object to others
+- `sources[]` — contributing intelligence sources
+
+The boundary canonicalises STIX objects on intake; downstream
+consumers read either the STIX-native shape or the canonical
+WIA shape per their preference.
+
+## §6 Vulnerability record
+
+CSAF 2.0-aligned vulnerability records:
+
+- `vulnId` — URN
+- `cveRef` — CVE identifier where assigned
+- `productRefs[]` — affected product references (CPE)
+- `severity` — CVSS v3.1 / v4 base score band (deployment
+  declares which CVSS version is authoritative)
+- `exploitability` — `unknown`, `unproven`, `proof-of-concept`,
+  `functional`, `widespread`
+- `kev` — known-exploited-vulnerabilities flag (boolean)
+- `vendorAdvisoryRef` — URI of the vendor's advisory
+- `csafDocumentRef` — URI of the CSAF 2.0 document
+- `affectedAssetCount` — count of own assets (resolved from
+  software-inventory join)
+- `remediationStatus` — `pending`, `in-progress`, `mitigated`,
+  `fixed`, `accepted-risk`
+
+A vulnerability marked `accepted-risk` requires a signed
+risk-acceptance record from the asset owner.
+
+## §7 Incident record
+
+ISO/IEC 27035-aligned incident lifecycle:
+
+- `incidentId` — URN
+- `state` — `triage`, `investigate`, `contain`, `eradicate`,
+  `recover`, `lessons-learned`, `closed`
+- `severity` — `low`, `medium`, `high`, `critical`
+- `assetRefs[]` — affected assets
+- `eventRefs[]` — contributing events
+- `iocRefs[]` — related IOCs
+- `tioRefs[]` — related threat-intelligence objects
+- `assignedAnalystRef` — URN of the assigned analyst
+- `openedAt`, `closedAt` — RFC 3339
+- `mitreAttackKillChainCoverage[]` — tactics observed
+- `responseActionRefs[]` — actions taken
+- `lessonsLearnedRef` — post-mortem URI
+
+Incident state transitions are signed by the assigned
+analyst (or the SOC lead for cross-shift handoff). A
+critical incident open beyond the deployment-declared
+escalation threshold notifies the security-leadership chain.
+
+## §8 Alert record
+
+Alerts are the analyst-facing surface above events:
+
+- `alertId` — URN
+- `eventRefs[]` — contributing events
+- `iocRefs[]` — contributing IOCs
+- `severity` — alert severity (may differ from raw events
+  after correlation)
+- `correlationRuleRef` — URN of the correlation rule that
+  fired (Sigma, vendor-native, or deployment-custom)
+- `analystState` — `unread`, `triaging`, `in-incident`,
+  `false-positive`, `closed-benign`
+- `assignedAnalystRef` — URN
+- `linkedIncidentRef` — URN of an incident if escalated
+
+Alerts are deduplicated on a deployment-declared correlation
+key. False-positive alerts feed back into rule tuning.
+
+## §9 Response-action record
+
+OpenC2-aligned actions executed during response:
+
+- `actionId` — URN
+- `incidentRef` — URN of the controlling incident
+- `targetRef` — URN of the asset or network construct
+- `actionType` — closed enum: `block-network-flow`,
+  `quarantine-host`, `disable-account`, `revoke-token`,
+  `kill-process`, `apply-patch`, `restore-from-backup`,
+  `take-forensic-snapshot`, `re-enable` (lifting an action)
+- `actionParameters` — action-specific JSON object
+- `executedAt` — RFC 3339
+- `executedBy` — URN of executing actor
+- `outcome` — `succeeded`, `failed`, `partial`, `pending`
+- `evidenceRefs[]` — URNs of supporting evidence
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain references (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Reference                     | Use site                                                 |
+|-------------------------------|----------------------------------------------------------|
+| WIA-pq-crypto                 | cipher-suite governance for transport                    |
+| WIA-privacy                   | PPI-class controls for re-disclosure                     |
+| WIA-supply-chain              | software-inventory join for vulnerability resolution     |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Conformance disclosure
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Sections §2, §3, §4, §6, §7, §9 are mandatory; §5 (TIO) is
+mandatory for any deployment receiving external intelligence
+feeds; §8 is mandatory for any analyst-staffed SOC.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Versioning and deprecation
 
-## Annex F — Adoption Roadmap
+Versioning follows SemVer 2.0.0. STIX-aligned objects carry
+the originating STIX version (2.1 by default) so partners
+can verify compatibility before sharing.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Worked event-to-incident chain (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+A worked example for a credential-stuffing attack:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```json
+{
+  "event": {
+    "eventId": "urn:wia:nsec:event:soc-x:e-991",
+    "assetRef": "urn:wia:nsec:asset:soc-x:auth-1",
+    "detectorRef": "urn:wia:nsec:detector:soc-x:siem-rule-cred-stuff",
+    "observedAt": "2026-04-27T22:35:14.523000+09:00",
+    "mitreAttackTechnique": ["T1110.004"],
+    "severity": "high",
+    "confidence": "high",
+    "iocRefs": ["urn:wia:nsec:ioc:soc-x:ip-198.51.100.42"]
+  }
+}
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+The event correlates into an alert; the alert is escalated
+to an incident; response actions block the source IPs and
+trigger forced re-authentication for affected accounts.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Vendor extensions
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Detector vendors may extend events and alerts with `x-vendor-*`
+fields. Extensions MUST NOT contradict canonical fields and
+MUST NOT be required for core conformance.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex F — TLP marking enforcement
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+TLP markings on IOCs and TIOs flow with the records through
+distribution. The boundary refuses re-distribution that
+violates the marking (e.g., TLP:RED to a TLP:CLEAR partner)
+and audit-chains the refusal.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Conformance level
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Implementations declare conformance level (Surface / Verified
+/ Anchored). Anchored requires a continuous evidence package
+plus an annual ISO/IEC 27001 audit covering the integration
+contracts in PHASE 4.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex H — Worked CSAF advisory ingestion (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+An ingest of a vendor CSAF 2.0 advisory:
 
-## Annex I — Interoperability Profiles
+```json
+{
+  "vulnId": "urn:wia:nsec:vuln:cve-2026-12345",
+  "cveRef": "CVE-2026-12345",
+  "productRefs": ["cpe:2.3:a:vendor-a:product-b:1.4.2:*:*:*:*:*:*:*"],
+  "severity": "high",
+  "exploitability": "proof-of-concept",
+  "kev": false,
+  "vendorAdvisoryRef": "https://vendor-a.example/security/sa-2026-014",
+  "csafDocumentRef": "https://vendor-a.example/csaf/sa-2026-014.json",
+  "affectedAssetCount": null,
+  "remediationStatus": "pending"
+}
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The boundary asynchronously resolves `affectedAssetCount`
+from the software-inventory join (PHASE 4 §4) and emits a
+follow-up `vuln-resolution-completed` audit-chain entry.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex I — Worker-attribution carve-out
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Where security events necessarily reference natural-person
+identities (e.g., a credential-stuffing victim), the
+`ppiClass` marker on the event drives a parallel
+anonymisation policy in the boundary. Events flagged
+`ppiClass=user` are accessible by analysts only after a
+case-association justification, recorded in the audit chain.
+Aggregation queries (e.g., counts of affected users without
+identifying them) do not require the justification.

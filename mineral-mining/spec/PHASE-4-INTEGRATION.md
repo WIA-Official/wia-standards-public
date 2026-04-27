@@ -1,241 +1,316 @@
-# WIA-mineral-mining PHASE 4 — INTEGRATION Specification
+# WIA-mineral-mining PHASE 4 — Integration Specification
 
 **Standard:** WIA-mineral-mining
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-mineral-mining (Mineral Mining).
+This PHASE describes how a mining operation integrates the
+data, APIs, and protocols from PHASEs 1–3 with broader
+operational systems: regulator-monitoring exchange,
+laboratory networks, mine-fleet operations, environmental-
+monitoring stations, worker-health systems, supply-chain
+provenance receivers, capital-market reporting, and ICMM/
+OECD due-diligence frameworks. It is non-prescriptive about
+specific vendors; it specifies the integration *contracts* a
+deployment must satisfy.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- ISO 14001:2015 / ISO 45001:2018 — environmental and OHS
+- ISO 17025:2017 — laboratory accreditation
+- CRIRSCO International Reporting Template
+- OECD Due Diligence Guidance
+- ICMM Mining Principles
+- WIA-supply-chain (PHASE 1–4) — for provenance hand-off
+- WIA-environmental-monitoring (PHASE 1–4) — shared schema
+- WIA-occupational-safety (PHASE 1–4) — exposure framework
 
 ---
 
-## §1 Scope
+## §1 Regulator-monitoring exchange
 
-This PHASE document is one of four that together define the WIA-mineral-mining
-standard. It addresses the integration layer of the standard.
+The deployment maintains a real-time interface to the
+coordinating regulatory authority:
 
-## §2 Manifest
+- Regulator subscription to `exceedance-flagged`,
+  `incident-opened`, `closure-bond-mutated`,
+  `production-received` (aggregate digest)
+- Regulator counter-signatures for closure-bond mutations
+  and DDG rule-set mutations (per PHASE 2 Annex C, PHASE 3 §9)
+- Regulator-trusted witness for audit-chain replication
+  (per PHASE 3 Annex C)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mineral-mining"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+A deployment without a live regulator-monitoring channel
+does not satisfy `Verified` conformance.
 
-## §3 Conformance Tiers
+## §2 Laboratory network integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Operator-side integration with assaying laboratories:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- Operator publishes its sampling plan to the lab via the
+  lab's intake interface
+- Lab returns assay records via PHASE 2 §5
+- QA/QC reconciliation runs at the boundary (PHASE 3 §5)
+- Reconciliation results feed back to the lab's lab-info-
+  management system (LIMS) so the lab can trend its own
+  performance per analyte
 
-## §4 Discovery
+The integration contract requires the laboratory to be ISO
+17025-accredited for the analyte/method combinations it
+returns; an out-of-scope return is a contract violation.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mineral-mining`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Supply-chain provenance hand-off
 
-## §5 Time and Identity
+Handover records (PHASE 1 §9) feed downstream WIA-supply-chain
+operations:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- The handover URN is the canonical join key for the
+  receiving custody chain
+- Open incidents and DDG status flow through the URN
+- Reconciliation between declared handover tonnes/grade and
+  receiving custody's measured tonnes/grade is publishable
+  to the originating mining boundary (PHASE 2 §1) so the
+  mining operation can detect transfer-loss anomalies
 
-## §6 Versioning and Deprecation
+Receiving parties subscribe to `handover-received` events on
+the originator's boundary; missing-handover or out-of-window
+arrivals are surfaced to the operator's logistics team.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Mine-fleet operations integration
 
-## §7 Privacy and Security
+Production records (PHASE 1 §5) are typically generated by a
+combination of:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Fleet management systems (FMS) — truck/loader cycles
+- Mine planning software — block-by-block claim
+- Survey systems — physical pickups for end-of-month claim
 
-## §8 Open Governance
+The integration contract requires:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mineral-mining` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- Equipment URNs are stable across FMS and the boundary
+- End-of-shift production claim is reconciled against
+  cumulative FMS cycles plus survey adjustments before
+  publication
+- Equipment downtime that affects shift production is
+  recorded on the equipment URN, not silently absorbed in
+  the production record
+
+A persistent mismatch between FMS cycles and claimed
+production triggers PHASE 4 §6 reconciliation review.
+
+## §5 Environmental-monitoring station integration
+
+Environmental sample records (PHASE 1 §7) come from a mix of
+manual sampling, continuous monitoring stations, and remote-
+sensing campaigns. Integration contracts:
+
+- Continuous-monitoring stations publish at the deployment's
+  declared cadence; missing cadence triggers a
+  `monitoring-gap` event
+- Manual samples include chain-of-custody records signed by
+  the sampler and the receiving lab
+- Remote-sensing inputs (aerial, drone, satellite) are
+  carried as supplementary evidence with their own
+  provenance metadata
+
+For tailings-storage facilities, the standard recommends
+integrated dam-safety telemetry with conservative
+exceedance thresholds; specific dam-safety standards govern
+operational details outside this WIA standard.
+
+## §6 Reconciliation review
+
+Gate-of-mine reconciliation is the canonical accuracy check:
+
+- Claimed mined tonnes/grade are compared against the
+  contributing resource estimate
+- Production accountancy (mill receipts, smelter receipts,
+  payable metal) is compared against claimed production
+- Variance is classified by source (dilution, sampling,
+  equipment, surveying, mill recovery)
+- Material variances are reported in the deployment's
+  conformance evidence package
+
+Reconciliation review is conducted on a deployment-declared
+cadence (typically monthly for production, quarterly for
+estimate-reconciliation). Anchored conformance audits this
+process at least annually.
+
+## §7 Environmental incident workflow
+
+When `exceedance-flagged` fires (PHASE 3 §4):
+
+1. Boundary opens an incident URN
+2. HSE officer is notified via the deployment's notification
+   service
+3. Incident triage classifies severity:
+   - `S1` — immediate environmental risk; regulator
+     notified within statutory deadline
+   - `S2` — material exceedance, planned mitigation
+   - `S3` — minor exceedance, documented investigation
+4. Mitigation actions are appended to the incident URN
+5. Incident is closed with a root-cause note signed by the
+   HSE officer; regulator counter-signature is required
+   for `S1` closures
+6. Closure events feed the OECD DDG status calculation
+   (PHASE 3 §9)
+
+A deployment without a documented environmental-incident
+workflow is non-conformant.
+
+## §8 Worker-health follow-up
+
+Worker-exposure records exceeding occupational limits:
+
+1. Boundary flags the exposure record
+2. HSE officer reviews and either confirms or contests the
+   reading (with a justification)
+3. Confirmed exceedances trigger a follow-up workflow:
+   - Worker-health re-assessment (per the operation's
+     occupational-health programme)
+   - Engineering-control review for the workplace
+   - Statutory reporting where required
+4. Follow-up actions are recorded against the worker's
+   pseudonym (PHASE 3 §8) so longitudinal analysis is
+   possible without disclosing PII
+
+## §9 Capital-market reporting integration
+
+Resource and reserve estimates published under a CRIRSCO
+code (PHASE 1 §4) are typically referenced by the operator's
+capital-market filings. Integration contracts:
+
+- The estimate URN is the canonical reference; capital-market
+  filings cite the URN
+- Republication of an estimate requires republishing the
+  estimate URN with a new version (not silently restating)
+- Withdrawal of an estimate (e.g., on competent-person
+  resignation) is mirrored in the audit chain and triggers a
+  follow-up message to capital-market consumers
+
+Listing-authority templates remain governed by the
+authority's own rules; this standard provides the underlying
+data shape and provenance.
+
+## §10 ICMM and OECD due-diligence integration
+
+The deployment's OECD DDG status (PHASE 3 §9) and ICMM
+Mining Principles posture:
+
+- Are published in the capability document
+- Drive PHASE 1 §9 handover acceptance
+- Are independently reviewed under Anchored conformance
+  alongside ISO 14001 and ISO 45001 audits
+- Feed industry-association reporting where applicable
+
+A deployment whose ICMM commitments are not transparently
+published does not satisfy Anchored conformance.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain integration matrix
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Cross domain                  | Hand-off                                         |
+|-------------------------------|--------------------------------------------------|
+| WIA-supply-chain              | handover URN as canonical join                   |
+| WIA-environmental-monitoring  | shared exceedance and monitoring-gap schema      |
+| WIA-occupational-safety       | exposure framework and follow-up workflow        |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — Conformance evidence package
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Anchored conformance requires a continuous evidence package:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- Capability document signed by the operator
+- Audit-chain snapshot Merkle roots (regulator-witnessed)
+- Reconciliation reports per declared cadence
+- Environmental-incident closure archive with regulator
+  counter-signatures for S1
+- Worker-health follow-up archive (pseudonymised)
+- ISO 14001 / ISO 45001 audit reports
+- ICMM commitments posture statement
+- OECD DDG rule set version history
 
-## Annex F — Adoption Roadmap
+The evidence package is published to the deployment's
+attestation surface; partners and regulators consume it as
+the canonical conformance signal.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Conformance level summary
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Level     | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | structural conformance to PHASEs 1–3                 |
+| Verified  | annual third-party audit (ISO 14001 + 45001)         |
+| Anchored  | continuous evidence package per Annex B              |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Tailings-storage facility (TSF) integration
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+For operations with TSFs, integration adds:
 
-## Annex G — Test Vectors and Conformance Evidence
+- Real-time dam-instrumentation telemetry (piezometers,
+  inclinometers, settlement monitors) feeding the
+  boundary's environmental layer with elevated cadence
+- Pond-water-balance modelling outputs published as
+  declared schedules
+- Independent dam-safety review, audited under Anchored
+  conformance against the operation's chosen dam-safety
+  framework
+- Closure-bond status binding for the TSF asset
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+A TSF whose dam-instrumentation feed is interrupted beyond
+the deployment-declared latency is flagged in the
+capability document as `tsf-monitoring-degraded` and
+notified to the regulator within the statutory deadline.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex E — Concentrator-mass-balance hand-off
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+While concentrator chemistry is out of this standard's
+scope, the gate-of-concentrator hand-off is in scope:
 
-## Annex H — Versioning and Deprecation Policy
+- Concentrator publishes head-grade and recovery to the
+  boundary against the production records that fed the mill
+- Mill reconciliation forms part of the deployment's
+  Annex B evidence package
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+This hand-off is the canonical join into refining standards
+which take payable-metal calculations from there.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex F — Operator console contract
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Operations-cell consoles integrate with the boundary via:
 
-## Annex I — Interoperability Profiles
+- Production-claim builder issuing against PHASE 2 §4
+- Sampling-plan tracker reconciling against PHASE 2 §5
+- Environmental-monitoring board fed by PHASE 2 §6
+- HSE incident-thread board fed by §7 of this PHASE
+- Reconciliation-review pane fed by Annex G of PHASE 2
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Console actions that mutate boundary state always carry the
+operator's authority URN; consoles are themselves
+authenticated as operator-console role tokens (PHASE 3 §1).
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex G — Cross-operator benchmarking (informative)
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Industry-association benchmarking participation is voluntary
+but encouraged. Participants publish anonymised aggregate
+metrics (production-per-tonne-mined, recovery, environmental-
+incident rate, exposure-exceedance rate) to a trusted
+benchmarking body. The benchmarking body publishes range
+distributions; outliers are surfaced to the operator's
+internal review programme. Participation is recorded in the
+deployment's attestation surface.
+
+## Annex H — Public attestation surface
+
+Anchored conformance publishes an attestation surface
+containing:
+
+- Capability document (signed)
+- Audit-chain Merkle roots (regulator-witnessed)
+- Conformance-evidence package per Annex B
+- Cipher-suite floor and PQ migration phase
+- ISO 14001 / ISO 45001 audit reports (most recent)
+- ICMM commitments posture
+- Reconciliation reports per declared cadence
+
+Partners and regulators consume the surface as the canonical
+conformance signal for the operation.

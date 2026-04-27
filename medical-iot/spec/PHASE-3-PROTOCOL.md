@@ -1,241 +1,279 @@
-# WIA-medical-iot PHASE 3 — PROTOCOL Specification
+# WIA-medical-iot PHASE 3 — Protocol Specification
 
 **Standard:** WIA-medical-iot
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-medical-iot (Medical Iot).
+This PHASE specifies the protocols binding the data formats
+(PHASE 1) and the API surface (PHASE 2) to operational exchanges:
+device authentication, link-layer encryption, time discipline,
+clock-synchronisation between devices and the boundary, IEC 80001-1
+risk-network bring-up, audit-chain construction, and incident
+handling for connectivity loss or device compromise.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7525 (TLS recommendations)
+- IETF RFC 7252 (CoAP) and RFC 8323 (CoAP over TCP/TLS/WebSockets)
+- IETF RFC 8613 (OSCORE) — Object Security for Constrained RESTful
+  Environments, used with CoAP for constrained devices
+- IETF RFC 9162 (Certificate Transparency 2.0 pattern) — for tamper-
+  evident audit chain construction
+- IEEE 802.11-2020 (Wi-Fi), IEEE 802.15.4 (Zigbee), Bluetooth Core 5.4
+- 3GPP TS 33.501 (5G security architecture)
+- IEC 80001-1:2021 — risk management
+- IEC 62304:2006/A1:2015 — software life cycle
+- HL7 SMART App Launch 2.2
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-medical-iot
-standard. It addresses the protocol layer of the standard.
+Devices, gateways, clinicians, biomedical engineers, and patient
+self-service principals authenticate using JWS-signed JWTs issued
+by the deployment's identity authority. Token claims:
 
-## §2 Manifest
+- `iss`, `sub`, `aud`, `iat`, `exp`
+- `wia.role` — one of {`device`, `gateway`, `clinician`, `bme`,
+  `patient`, `auditor`}
+- `wia.deviceRef` — for device tokens, the URN of the bound device
+- `wia.scope[]` — operation-class scopes
+- `wia.holderRef` — for clinician/BME tokens, the organisation
+  whose patients/devices may be acted upon
+- `cnf` — confirmation claim binding the token to a TLS client
+  certificate (RFC 8705 mTLS-bound JWT)
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Device tokens are short-lived (≤ 24 hours); rotation is automated
+via the device-registry (PHASE 4 §2). Clinician tokens require a
+SMART-launch grant against the EHR.
 
-## §3 Conformance Tiers
+## §2 Constrained device profile (CoAP + OSCORE)
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For battery-powered or otherwise constrained devices, the
+boundary accepts the IETF constrained profile:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- CoAP over UDP with DTLS 1.3 for transport
+- OSCORE (RFC 8613) for object-security between the device and
+  the boundary, surviving gateway translation
+- CBOR-encoded payloads with a JSON-LD context that maps onto
+  the FHIR JSON model
 
-## §4 Discovery
+OSCORE security contexts are bound to the device's `deviceRef`
+and rotated on a deployment-declared cadence. Replay protection
+uses the OSCORE sequence number; replay outside the sequence
+window is rejected and audit-logged.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 General-purpose device profile (HTTP + TLS 1.3)
 
-## §5 Time and Identity
+For mains-powered or higher-bandwidth devices:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- HTTP/1.1 or HTTP/2 over TLS 1.3
+- Server certificate from the deployment's PKI; optional client
+  certificate for mTLS (required for high-priority alarms and
+  control-plane operations)
+- JSON-encoded FHIR payloads
+- Connection re-use across observations to keep handshake cost low
+- Server-Sent Events for streaming alarms and tele-monitoring
 
-## §6 Versioning and Deprecation
+The cipher-suite floor cross-references WIA-network-security:
+deployments in the `hybrid` migration phase configure
+TLS 1.3 with hybrid groups (per WIA-pq-crypto PHASE 3 §3).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Personal-health device profile (Bluetooth LE)
 
-## §7 Privacy and Security
+Personal-health devices (consumer-grade glucose meters, blood
+pressure monitors, scales) typically reach the boundary via a
+patient-owned smartphone gateway. The link is:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Bluetooth LE with the Bluetooth GATT profile defined by the
+  IEEE 11073-20601 application profile and the device-class GATT
+  service (e.g., Continuous Glucose Monitoring 0x181F)
+- The smartphone gateway runs the deployment's authorised
+  patient-facing app, which authenticates the patient (SMART
+  patient launch) and translates IEEE 11073 into FHIR
+- The translated FHIR is delivered to the boundary over TLS 1.3
 
-## §8 Open Governance
+The gateway, not the device, is the principal for authentication.
+The boundary records the gateway-device pairing in the
+`gatewayRef` field of the connectivity binding (PHASE 1 §7).
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Audit chain
+
+Every observation ingest, alarm transition, calibration,
+device-registration mutation, association change, and bulk
+export emits an AuditEvent. AuditEvents form a per-deployment
+hash chain:
+
+```
+chain_input = SHA-256(prev_chain_root || canonical(event))
+chain_root_t = chain_input
+```
+
+Canonicalisation uses RFC 8785 JSON Canonicalisation Scheme.
+The chain root is sealed once per UTC day; sealed roots MAY be
+published to a Certificate-Transparency-style log (RFC 9162
+pattern) for jurisdictions that require public auditability of
+medical-device interactions.
+
+For high-volume continuous monitoring (ECG, capnography), the
+chain is sharded by device-ref hash prefix to keep sealing
+throughput within operational SLAs; the sharding is itself
+audited so an after-the-fact reshard is detectable.
+
+## §6 Time discipline
+
+Clocks synchronise to authoritative sources:
+
+- Boundary: NTPv4 stratum-2 (or PTPv2 IEEE 1588 for facilities
+  requiring sub-millisecond synchronisation, e.g., catheterisation
+  lab telemetry)
+- Devices on AC mains power: NTPv4 stratum-3 against the boundary
+- Battery-powered devices: time set on each successful handshake;
+  device-clock drift is captured in the observation envelope
+
+A device whose declared `effectiveDateTime` is more than the
+deployment-declared skew tolerance from boundary time has the
+observation accepted but flagged `interpretation: "clock-skew"`.
+Persistent skew triggers a maintenance ticket via PHASE 4 §6.
+
+## §7 Connectivity loss and store-and-forward
+
+Devices disconnected from the boundary buffer observations
+locally up to the device's documented buffer capacity:
+
+- On reconnection, the device replays buffered observations in
+  sequence; the boundary accepts replay only if the device's
+  signature on each observation chains back to a session that
+  was active during the buffered interval
+- Buffer overflow drops the oldest observations; the device emits
+  a `buffer-overflow` annotation that the boundary records
+- For alarm conditions, buffer-overflow triggers a higher-priority
+  reconnection re-attempt schedule per IEC 60601-1-8
+
+## §8 Device compromise handling
+
+When a device is suspected compromised (out-of-policy firmware,
+unexpected behaviour, lost-and-found scenario):
+
+- Biomedical engineering submits a `device-quarantine` record
+  binding the `deviceRef` and an incident reference
+- Boundary refuses further observations from the device until
+  re-attestation
+- Active patient associations are dissolved with explicit
+  `dissolutionReason: "device-quarantine"`
+- Re-attestation requires fresh UDI-PI scan + clean firmware
+  attestation + biomedical-engineer two-person sign-off
+
+The quarantine event is part of the audit chain; downstream
+research datasets containing observations from a quarantined
+device's pre-quarantine window are flagged for review.
+
+## §9 Replay protection
+
+All write endpoints accept `Idempotency-Key`; the boundary
+stores keys for 30 days. Replays return the original response;
+conflicts return `urn:wia:miot:problem:idempotency-conflict`.
+
+CoAP/OSCORE replay protection uses the OSCORE sequence number
+window. TLS-protected sessions rely on sequence numbers within
+the session; cross-session replay is rejected via the
+`Idempotency-Key`.
+
+## §10 IEC 80001-1 risk-network bring-up
+
+Each new MedIoT deployment publishes an IEC 80001-1 risk file
+covering:
+
+- The clinical use cases the network supports
+- The risk-control measures (segmentation, monitoring, alarms)
+- Residual risks and clinical-acceptance signatures
+- Maintenance windows and emergency procedures
+
+The risk file is referenced by the capability document (PHASE 2
+§1). Material changes to the network (new device class, new
+gateway, IT-side configuration changes) require a risk-file
+update before the change is committed.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked CoAP/OSCORE exchange (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+```
+Request: CoAP CON POST coaps://boundary.example/Observation/$ingest
+Token: 0x91a7
+Content-Format: application/fhir+cbor
+Object-Security: <OSCORE option with seq=1024>
+Payload: <CBOR-encoded FHIR Observation per PHASE 1 §3>
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+```
+Response: CoAP ACK 2.04 Changed
+Token: 0x91a7
+Object-Security: <OSCORE option with seq=1024>
+Payload: <empty>
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The boundary appends the observation to the chain; the device
+considers the observation persisted only after receiving the
+ACK with matching token and OSCORE sequence acknowledgement.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Algorithm choices (informative)
 
-## Annex F — Adoption Roadmap
+| Concern               | Default                            | Notes                                       |
+|-----------------------|------------------------------------|---------------------------------------------|
+| Token signing         | ES256                              | mTLS-bound (RFC 8705)                       |
+| TLS                   | 1.3 (RFC 8446)                     | hybrid groups when in WIA-pq-crypto hybrid  |
+| OSCORE AEAD           | AES-CCM-16-64-128                  | RFC 8613 mandatory                          |
+| Audit hash            | SHA-256 (RFC 6234)                 |                                             |
+| Symmetric at rest     | AES-256-GCM                        |                                             |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+Quantum-resistance migration is governed by WIA-pq-crypto.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Negative-test vectors (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Stimulus                                                | Expected outcome                                  |
+|---------------------------------------------------------|---------------------------------------------------|
+| Token without `wia.deviceRef` for device principal      | 403 + token-malformed                             |
+| OSCORE replay outside sequence window                   | refused; audit-logged                             |
+| Device clock skew beyond tolerance                      | accepted, flagged `clock-skew`                    |
+| Buffer-overflow replay with broken signature chain      | refused; quarantine-warning emitted               |
+| Quarantined device attempting to ingest                 | 403 + `device-quarantined`                        |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex D — Reconnect storm mitigation (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+A network outage that drops many devices at once produces a
+reconnect storm when connectivity is restored. The boundary
+applies admission control:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- Reconnects are admitted at a deployment-declared rate
+  (typically 100 reconnects/sec/cluster)
+- Devices receive a `Retry-After` header on overflow with
+  a jitter-randomised back-off
+- Critical devices (high-priority alarm-bearing) are admitted
+  with priority 0; non-critical devices admit on priority 1
+- Buffered observations from priority-0 devices are processed
+  first; priority-1 observations queue behind
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+This prevents the boundary itself from becoming the next
+failure mode after a network outage.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## Annex E — Firmware update protocol (informative)
 
-## Annex H — Versioning and Deprecation Policy
+Firmware updates flow through the biomedical-engineering
+control plane:
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+1. Manufacturer publishes an update with a signed manifest
+   (cross-reference to WIA-supply-chain)
+2. BME imports the update into the deployment's update
+   repository
+3. Devices poll for updates on a documented cadence; the
+   poll authenticates the device and returns the manifest
+4. Device verifies the manifest signature against the
+   manufacturer's published key
+5. Device installs in a maintenance window declared by BME
+6. Post-install, device re-attests its firmware identifier
+   to the boundary; the boundary updates the Device
+   resource's `softwareRef`
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+A device that fails post-install attestation is quarantined
+(PHASE 3 §8) pending BME investigation.

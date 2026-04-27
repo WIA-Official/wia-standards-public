@@ -1,241 +1,361 @@
-# WIA-medical-iot PHASE 2 — API-INTERFACE Specification
+# WIA-medical-iot PHASE 2 — API Interface Specification
 
 **Standard:** WIA-medical-iot
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-medical-iot (Medical Iot).
+This PHASE defines the HTTP API surface a medical-IoT boundary
+exposes to gateways, clinical-workstation EHRs, biomedical-engineering
+operations consoles, regulator audit clients, and the device
+fleet itself. The shape is FHIR R5 RESTful, layered with this
+standard's IEEE 11073 nomenclature, IEC 60601-1-8 alarm semantics,
+and IEC 80001-1 risk-management metadata.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — RESTful API (R5/http.html), Bundle, OperationOutcome,
+  CapabilityStatement
+- HL7 SMART App Launch 2.2 (smarthealthit.org/specification) — for
+  clinical-app authentication and scope strings
+- IEEE 11073-20601:2019 — application profile message exchange
+- IEEE 11073-10206:2021 — abstract content information model for
+  REST-style resource access
+- IEC 80001-1:2021 — IT-network risk management
+- IETF RFC 9457 (Problem Details), RFC 8615 (well-known URIs),
+  RFC 7515 (JWS), RFC 7519 (JWT), RFC 8259 (JSON), RFC 3339
+- IHE PCD-01 / PCD-04 transactions (HL7 v2 + FHIR mappings)
 
 ---
 
-## §1 Scope
+## §1 Capability discovery
 
-This PHASE document is one of four that together define the WIA-medical-iot
-standard. It addresses the api-interface layer of the standard.
+The boundary publishes a FHIR CapabilityStatement at
+`/metadata`, augmented with WIA extensions:
 
-## §2 Manifest
+```
+GET /metadata HTTP/1.1
+Accept: application/fhir+json
+```
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The response declares supported resources (Device, DeviceMetric,
+Observation, AlarmCondition extension, DeviceAssociation), the
+IEEE 11073-10101 metric codes accepted, the alarm-priority
+mapping, the cipher-suite floor (cross-reference to
+WIA-network-security), and the migration phase (cross-reference
+to WIA-pq-crypto). Clients SHOULD cache the capability statement
+for the session lifetime.
 
-## §3 Conformance Tiers
+A second discovery endpoint advertises the deployment's IEC 80001-1
+risk-network properties:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+GET /.well-known/wia/medical-iot HTTP/1.1
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Returns:
 
-## §4 Discovery
+- supported `connectivityKind` values
+- declared `riskClass` (per IEC 80001-1 Annex)
+- maintenance-window schedule
+- offline-tolerance window
+- alarm-condition escalation policy reference
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §2 Device registration
 
-## §5 Time and Identity
+A new device is admitted to the deployment via:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST /Device HTTP/1.1
+Authorization: Bearer <jws-bme-jwt>
+Content-Type: application/fhir+json
+```
 
-## §6 Versioning and Deprecation
+Body is a FHIR Device resource conforming to PHASE 1 §2. The
+boundary verifies UDI integrity (FDA GUDID lookup or EU EUDAMED
+lookup or manufacturer-attestation chain), assigns the
+`deviceRef` URN, and emits an AuditEvent with `agent` =
+biomedical-engineer principal.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Device updates use `PUT /Device/<id>`; the prior version is
+preserved in version history because regulatory audit may
+require reconstruction of the device's configuration at any
+past timestamp.
 
-## §7 Privacy and Security
+Devices are retired (`status: inactive`) rather than deleted;
+historical observations remain bound to the retired Device.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §3 Observation streaming
 
-## §8 Open Governance
+High-frequency observations (ECG, plethysmography, capnography)
+flow on a streaming endpoint:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+```
+POST /Observation/$ingest HTTP/1.1
+Content-Type: application/json+ndjson
+WIA-Device-Ref: urn:wia:miot:device:M-PULSE-1.2.3:SN-91A7
+WIA-Stream-Id: s-91a7-2026-04-28
+WIA-Sequence-Start: 0
+```
+
+The body is NDJSON of Observation resources; sequence numbers
+are monotonically increasing per stream. The boundary acknowledges
+the highest received sequence number; on reconnect the client
+resumes from `lastAckedSeq + 1`. Out-of-order frames within a
+configurable reordering window are buffered; outside the window
+they are recorded with `interpretation: "out-of-order"`.
+
+Lower-frequency observations (vital-sign episodics, glucose
+readings, weight) use the standard FHIR endpoint:
+
+```
+POST /Observation HTTP/1.1
+```
+
+## §4 Alarm conditions
+
+Alarm endpoints use the WIA AlarmCondition extension on top of
+FHIR's resource framework:
+
+```
+POST /AlarmCondition HTTP/1.1
+PUT  /AlarmCondition/<id>/$acknowledge HTTP/1.1
+PUT  /AlarmCondition/<id>/$resolve HTTP/1.1
+GET  /AlarmCondition?subject=<patientRef>&status=active
+```
+
+The boundary applies IEC 60601-1-8 escalation cadence:
+unacknowledged high-priority alarms escalate to a paired
+clinical-care role within the priority's tau (typically 10 s
+for high, 30 s for medium, 5 min for low). Escalation events
+are recorded as additions to the alarm's `escalation[]` log,
+not as separate alarms.
+
+## §5 Calibration
+
+```
+POST /Device/<deviceRef>/$calibrate HTTP/1.1
+Content-Type: application/json
+```
+
+Body is a calibration record per PHASE 1 §6. The boundary
+verifies the calibration certificate's signature against the
+biomedical-engineering key, updates the device's `nextDueAt`,
+and emits an AuditEvent.
+
+```
+GET /Device/<deviceRef>/calibration?at=<RFC3339>
+```
+
+Returns the calibration record active at the supplied time,
+or 404 if the device was uncalibrated at that time.
+
+## §6 Patient association
+
+```
+POST /DeviceAssociation HTTP/1.1
+PUT  /DeviceAssociation/<id>/$end HTTP/1.1
+GET  /Patient/<subjectRef>/$active-devices
+```
+
+The `$active-devices` operation returns the bundle of
+DeviceAssociation entries currently active for the patient,
+annotated with the device's most recent observation timestamp
+and any active alarm conditions.
+
+## §7 Search filtering and minimum necessary
+
+A search query returns *only* the subset consented for the
+declared purpose:
+
+```
+GET /Observation?patient=<subjectRef>&code=150456&date=ge2026-04-01 HTTP/1.1
+WIA-Purpose-Of-Use: TREAT
+```
+
+The boundary verifies the consent (cross-reference to
+WIA-medical-data-privacy) before returning results. Records
+filtered out by minimum-necessary do not appear in the response,
+nor in the count; the response carries a `link` of
+`relation: prohibited` whose `url` is the consent record explaining
+the scope of redaction.
+
+## §8 Error model (Problem Details)
+
+All non-2xx responses use RFC 9457 Problem Details. Reserved
+`type` URIs:
+
+| URI                                                | Status | Meaning                                                  |
+|----------------------------------------------------|-------:|----------------------------------------------------------|
+| `urn:wia:miot:problem:udi-required`                | 422    | UDI absent or unparseable                                |
+| `urn:wia:miot:problem:metric-code-out-of-range`    | 422    | 11073 code not in nomenclature or vendor-extension range |
+| `urn:wia:miot:problem:calibration-overdue`         | 200    | accepted but flagged                                     |
+| `urn:wia:miot:problem:alarm-priority-required`     | 422    | IEC 60601-1-8 priority absent                            |
+| `urn:wia:miot:problem:device-offline`              | 503    | device has no active connectivity binding                |
+| `urn:wia:miot:problem:no-active-consent`           | 403    | no consent matches the declared purpose                  |
+| `urn:wia:miot:problem:out-of-order-window`         | 200    | out-of-order frame, recorded with annotation              |
+
+Body example:
+
+```json
+{
+  "type": "urn:wia:miot:problem:udi-required",
+  "title": "UDI is required for device admission",
+  "status": 422,
+  "detail": "POST /Device received a payload without a parseable UDI carrier.",
+  "instance": "/Device"
+}
+```
+
+## §9 Bulk export
+
+The FHIR R5 Bulk Data Access (Flat FHIR) operations are
+supported with PHASE 1 §10 minimum-necessary discipline:
+
+```
+GET /$export?_type=Observation,Device,AlarmCondition&purpose=HRESCH&consentBundle=<id>
+```
+
+The export is allowed only if the consent bundle names every
+subject in the cohort. The exported NDJSON is signed; the
+manifest references a de-identification job record (per
+WIA-medical-data-privacy PHASE 1 §7) so the recipient can
+verify the residual-risk band of the dataset.
+
+## §10 Subject self-service
+
+A patient or their authorised proxy queries their own data:
+
+- `GET /Patient/<self>/$device-summary` — devices currently
+  associated and their most recent observation per metric
+- `GET /Patient/<self>/AlarmCondition` — alarms for the patient
+- `POST /Patient/<self>/$rectification` — correct an erroneous
+  observation (subject to clinical-review workflow)
+
+Self-service authentication uses the deployment's identity
+provider; AuditEvents are emitted for self-service calls so
+that impersonation patterns are detectable.
+
+## §11 Versioning
+
+The API version is announced in the CapabilityStatement
+(`software.version`). Breaking changes require a new path
+prefix (`/v2/...`) with at least 90 days of parallel operation.
+
+## §12 Idempotency
+
+Mutating endpoints accept `Idempotency-Key`. The boundary
+stores keys for 30 days. Replays return the original response;
+conflicts return `urn:wia:miot:problem:idempotency-conflict`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked alarm acknowledgement (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+PUT /AlarmCondition/a-91a7/$acknowledge HTTP/1.1
+Authorization: Bearer <rn-jwt>
+Content-Type: application/json
+WIA-Purpose-Of-Use: TREAT
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+{
+  "acknowledgedBy": "urn:wia:hr:rn:nurse-stn-3-floor-7-rn-1",
+  "acknowledgedAt": "2026-04-28T03:14:09+09:00",
+  "note": "Bedside; Spo2 transient drop on patient turning. No intervention."
+}
+```
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+200 OK
+Content-Type: application/fhir+json
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+{
+  "resourceType": "AlarmCondition",
+  "id": "a-91a7",
+  "status": "acknowledged",
+  "alarmKind": "high",
+  "alarmCategory": "physiological",
+  "triggeringObservationRef": "urn:wia:miot:obs:o-77c2",
+  ...
+}
+```
 
-## Annex F — Adoption Roadmap
+## Annex B — Capability statement excerpt (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```json
+{
+  "resourceType": "CapabilityStatement",
+  "status": "active",
+  "fhirVersion": "5.0.0",
+  "format": ["application/fhir+json"],
+  "rest": [{
+    "mode": "server",
+    "resource": [
+      {"type": "Device", "interaction": [{"code": "read"},{"code": "search-type"},{"code": "create"},{"code": "update"}]},
+      {"type": "Observation", "interaction": [{"code": "read"},{"code": "search-type"},{"code": "create"}]},
+      {"type": "DeviceAssociation", "interaction": [{"code": "read"},{"code": "search-type"},{"code": "create"},{"code": "update"}]}
+    ]
+  }],
+  "extension": [{
+    "url": "https://wia.example/fhir/StructureDefinition/wia-medical-iot-capabilities",
+    "extension": [
+      {"url": "metricCodeSystem", "valueUri": "urn:iso:std:iso:11073:10101"},
+      {"url": "alarmStandard", "valueUri": "urn:iec:std:iec:60601-1-8"},
+      {"url": "riskClass", "valueString": "IEC 80001-1 Class C"}
+    ]
+  }]
+}
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex C — Cross-domain reference resolution (informative)
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+GET /Observation/o-77c2 HTTP/1.1
+Authorization: Bearer ...
+WIA-Purpose-Of-Use: TREAT
+Accept: application/fhir+json
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Boundary verifies the consent at WIA-medical-data-privacy
+(`/Consent?subject=<subjectRef>&status=active`) before
+returning. If the consent reference resolves but its
+purpose binding does not include `TREAT`, the response is:
 
-## Annex G — Test Vectors and Conformance Evidence
+```
+403 Forbidden
+Content-Type: application/problem+json
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+{
+  "type": "urn:wia:miot:problem:no-active-consent",
+  "title": "No consent matches purpose TREAT for this subject",
+  "status": 403,
+  "detail": "Subject's active consent is scoped HRESCH only.",
+  "instance": "/Observation/o-77c2"
+}
+```
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The 403 carries the cross-domain trace so clinicians can
+escalate to the medical-data-privacy boundary for a renewed
+consent rather than re-attempting the same call.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+## Annex D — Subscription delivery contract (informative)
 
-## Annex H — Versioning and Deprecation Policy
+When an EHR subscribes to alarm conditions for a patient
+cohort, the boundary delivers a notification bundle:
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```json
+{
+  "resourceType": "Bundle",
+  "type": "history",
+  "entry": [
+    {"resource": {"resourceType": "AlarmCondition", "id": "a-91a7", "status": "active", "alarmKind": "high", ...}},
+    {"resource": {"resourceType": "Observation", "id": "o-77c2", "status": "final", ...}}
+  ]
+}
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Delivery is signed (`Wia-Signature` header carrying detached
+JWS). The EHR responds 200 OK on successful processing or
+4xx with retry guidance; the boundary retries per the
+deployment's exponential-backoff schedule, capped at 24
+hours. After 24 hours of failed delivery the subscription is
+suspended and operations are alerted.

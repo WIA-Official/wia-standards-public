@@ -1,241 +1,267 @@
-# WIA-medical-iot PHASE 1 — DATA-FORMAT Specification
+# WIA-medical-iot PHASE 1 — Data Format Specification
 
 **Standard:** WIA-medical-iot
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-medical-iot (Medical Iot).
+This PHASE defines the canonical data format for medical IoT
+(MedIoT) deployments: connected patient-monitoring devices,
+ambulatory and in-hospital biosensors, infusion pumps, ventilators,
+imaging gateways, and the personal-health devices that feed clinical
+records. The shape interoperates with HL7 FHIR R5 Device,
+DeviceMetric, and Observation resources, and with IEEE 11073-10101
+nomenclature, so that an existing IHE Patient Care Device (PCD)
+deployment adopts this PHASE without parallel data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Device (R5/device.html), DeviceMetric (R5/devicemetric.html),
+  Observation (R5/observation.html), DeviceAssociation, DeviceUsage
+- ISO/IEEE 11073-10101:2020 — Health informatics — Point-of-care medical
+  device communication — Nomenclature
+- IEEE 11073-10206:2021 — Personal health device communication, abstract
+  content information model
+- IEEE 11073-20601:2019 — Personal health device communication,
+  application profile (optimised exchange protocol)
+- ISO 13485:2016 — Medical devices — Quality management systems
+- ISO 14971:2019 — Medical devices — Application of risk management
+- IEC 62304:2006/A1:2015 — Medical device software — Software life cycle
+- IEC 60601-1:2005/A2:2020 — Medical electrical equipment — General
+  requirements for basic safety and essential performance
+- IEC 60601-1-8:2020 — Alarm systems
+- IEC 80001-1:2021 — Application of risk management for IT-networks
+  incorporating medical devices
+- IHE Patient Care Device (PCD) Technical Framework
+- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 3339 (timestamps)
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-medical-iot
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that collect, normalise, or relay
+data from medical devices subject to medical-device regulation
+(US FDA 21 CFR §820, EU MDR 2017/745, K-MFDS Medical Devices Act,
+Japan PMDA, Brazil ANVISA). It standardises the *shape* of device
+records, observation streams, alarm conditions, and the cross-
+references that bind them to a clinical record. Wireless-link
+behaviour, encryption-key generation, and transport are addressed
+in PHASE 3 (Protocol).
 
-## §2 Manifest
+Devices are classified by IEC 62304 software-safety class
+(Class A / B / C) and by their regulatory class (Class I / II /
+III for FDA; Class I / IIa / IIb / III for MDR). The classification
+travels with every record so downstream systems apply the correct
+risk handling.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-iot"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+## §2 Device identity
 
-## §3 Conformance Tiers
+Every connected device carries a structured identifier that maps
+to FHIR Device:
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+- `deviceRef` — URN of form `urn:wia:miot:device:<udi-di>:<udi-pi>`
+  where UDI-DI is the Device Identifier portion of the Unique Device
+  Identification per FDA 21 CFR §830 / EU MDR Article 27, and UDI-PI
+  is the Production Identifier (lot, serial, expiry, manufacture date)
+- `manufacturerRef` — GS1 GLN of the manufacturer, mirrored to
+  FHIR Device.manufacturer
+- `modelRef` — UDI-DI alone, for cross-device-instance aggregation
+- `softwareRef` — IEC 62304 software identifier (versionString +
+  build hash) for the firmware/embedded-software version
+- `udiCarrier` — the carrier that transmitted the UDI to the
+  boundary (HRF text, AIDC barcode, RFID tag, GS1-128, GS1 DataMatrix)
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+A record without a recognised UDI is rejected at the edge with
+`urn:wia:miot:problem:udi-required`. Unknown UDIs are queued for
+the device-registry sync described in PHASE 4 §2 rather than
+auto-admitted.
 
-## §4 Discovery
+## §3 Observation envelope (FHIR + IEEE 11073)
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-iot`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Every measurement emits a FHIR Observation profiled to
+IEEE 11073-10101:
 
-## §5 Time and Identity
+| FHIR field         | Binding                                                          |
+|--------------------|------------------------------------------------------------------|
+| `status`           | one of registered / preliminary / final / amended                |
+| `category`         | from FHIR ObservationCategoryCodes (vital-signs, laboratory, …)  |
+| `code`             | a 11073-10101 nomenclature code in `system: urn:iso:std:iso:11073:10101` |
+| `subject`          | Reference to the pseudonymous patient (cross to medical-data-privacy) |
+| `effectiveDateTime`| RFC 3339 with offset; device-clock plus authoritative skew (PHASE 3 §6) |
+| `device`           | Reference to the originating Device                              |
+| `valueQuantity`    | `value` + `unit` + `system: http://unitsofmeasure.org` (UCUM)    |
+| `interpretation`   | one of normal / high / low / critical-high / critical-low (subset of v3-ObservationInterpretation) |
+| `referenceRange`   | per the device's calibration sheet                               |
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Numeric values are accompanied by an explicit measurement uncertainty
+band (per ISO/IEC Guide 98-3 GUM principles); a value without
+uncertainty is permitted only when the device's calibration sheet
+declares the metric as out-of-scope for uncertainty reporting.
 
-## §6 Versioning and Deprecation
+## §4 Vital-sign metric set
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+The closed set of metrics this PHASE recognises uses IEEE 11073-10101
+codes (selection):
 
-## §7 Privacy and Security
+- MDC_PULS_OXIM_SAT_O2 (150456) — peripheral capillary oxygen saturation, %
+- MDC_PRESS_BLD_NONINV_SYS / DIA / MEAN — non-invasive blood pressure, mmHg
+- MDC_TEMP_BODY (188424) — body temperature, °C
+- MDC_RESP_RATE (151562) — respiratory rate, breaths/min
+- MDC_PULS_RATE (147842) — pulse rate, /min
+- MDC_ECG_HEART_RATE (147842) — ECG-derived heart rate, /min
+- MDC_FLOW_AWAY_INSP (151612) — inspired airflow, L/min
+- MDC_GLU_CAP_WB (160368) — capillary whole-blood glucose, mg/dL or mmol/L
+- MDC_MASS_BODY (188736) — body mass, kg
+- MDC_BODY_FAT (57664) — body-fat percentage, %
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Additional metrics MAY be carried with vendor-extension codes from
+the IEEE 11073-10101 partition reserved for extensions (range
+524288–589823). Boundary publishes the accepted vendor-extension
+list in the capability document.
 
-## §8 Open Governance
+## §5 Alarm condition record
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-iot` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+When a device asserts an alarm condition (per IEC 60601-1-8), the
+boundary captures:
+
+- `alarmConditionId` — URN
+- `deviceRef` — emitting device
+- `subject` — patient under monitoring
+- `alarmKind` — high / medium / low priority (IEC 60601-1-8 §6.1.2)
+- `alarmCategory` — physiological / technical
+- `triggeringObservationRef` — the Observation that crossed threshold
+- `assertedAt`, `acknowledgedAt`, `resolvedAt` — RFC 3339 timestamps
+- `acknowledgedBy` — principal URN of the clinician acknowledging
+- `escalation[]` — escalation path (caregiver→nurse→rapid-response)
+  with timestamps; per IEC 60601-1-8 the priority escalates if
+  unacknowledged within the configured tau
+
+Alarms are append-only; subsequent state transitions are added as
+new entries that reference the alarm-condition ID rather than
+overwriting.
+
+## §6 Calibration record
+
+Each device carries a calibration record updated on every successful
+calibration:
+
+- `calibrationId` — URN
+- `deviceRef` — calibrated device
+- `metricCode` — 11073 code being calibrated
+- `referenceMaterial` — traceable reference (NIST SRM, BIPM
+  primary-realisation reference, manufacturer-traceable secondary)
+- `result` — declared correction factor + residual uncertainty
+- `performedAt`, `nextDueAt` — RFC 3339
+- `performedBy` — biomedical-engineering principal URN
+- `evidenceRef` — URI of the signed calibration certificate
+
+Devices with `nextDueAt < now` enter a degraded mode: observations
+are flagged `interpretation: "calibration-overdue"` until calibration
+is performed.
+
+## §7 Connectivity binding
+
+The connectivity binding describes how the device is reaching the
+boundary:
+
+- `connectivityKind` — one of {`wifi-802.11`, `bluetooth-le`,
+  `bluetooth-classic`, `cellular-3gpp`, `lorawan`, `zigbee`,
+  `wired-ethernet`, `usb-classic`, `nfc`, `proprietary`}
+- `effectiveBitRate` — declared link bit rate, bps
+- `linkQualityRsrp` — for cellular; dBm
+- `linkQualityRssi` — for Wi-Fi / BLE; dBm
+- `gatewayRef` — URN of the IoT gateway that aggregates, if any
+- `dnsResolverRef` — internal-DNS-resolver URN
+- `lastHandshakeAt` — RFC 3339 of the most recent successful TLS
+  handshake (PHASE 3 §1)
+
+Devices that lack any active connectivity binding for longer than
+the deployment-declared offline-tolerance window emit a
+`device-offline` alarm condition.
+
+## §8 Patient-association record
+
+A device is associated with a patient via FHIR DeviceAssociation:
+
+- `associationId` — URN
+- `deviceRef` — instrumented device
+- `subject` — pseudonymous patient (cross-domain reference per §10)
+- `period.start` / `period.end` — RFC 3339
+- `bodysite` — SNOMED CT bodysite code where the device is applied
+- `operator` — the clinical role authorising the association
+  (attending, RN, RRT, patient self-care)
+
+Disassociation closes the period and triggers a check that the
+device's data buffers contain no residual patient-identified data
+before the device is reissued. The check emits an audit event so
+auditors can confirm hygiene.
+
+## §9 Cross-domain references
+
+| Reference                  | Use site                                                  |
+|----------------------------|-----------------------------------------------------------|
+| WIA-medical-data-privacy   | every observation references the consent record for purpose-of-use |
+| WIA-medical-imaging        | imaging-gateway devices cross-reference imaging study UID |
+| WIA-network-security       | TLS cipher-suite floor and certificate trust roots        |
+| WIA-pq-crypto              | post-quantum migration phase that governs key rotation    |
+
+The boundary verifies the cross-domain reference exists at the
+referenced standard's boundary before delivery, so downstream
+readers do not see dangling references.
+
+## §10 Subject identifier scope
+
+Subject identifiers in this standard are *pseudonymous* and follow
+the WIA-medical-data-privacy `subjectRef` shape (URN of form
+`urn:wia:mdp:subject:<opaque>`). The MedIoT boundary holds no direct
+identifiers and does not log them in audit chains; full PHI lives
+in the medical-data-privacy boundary, which mediates re-identification.
+
+## §11 Versioning and deprecation
+
+Versioning follows Semantic Versioning 2.0.0. Major bumps require
+≥ 90 days overlap with the prior major version on every fielded
+reference implementation. Deprecation enters a 12-month sunset
+window with migration notes; deprecated metric codes remain
+verifiable in historical observations even after the verification
+cutoff date so audit-chain reconstruction is possible.
+
+## §12 Conformance levels
+
+| Level     | Scope                                                  |
+|-----------|--------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                   |
+| Verified  | annual third-party audit including IEC 62304 review    |
+| Anchored  | continuous evidence package + IEC 80001-1 risk file    |
+
+Implementations declare their level in the capability advertisement.
+Deployments that span multiple safety classes inherit the highest
+class's verification cadence.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked observation example (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```json
+{
+  "resourceType": "Observation",
+  "status": "final",
+  "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs"}]}],
+  "code": {"coding": [{"system": "urn:iso:std:iso:11073:10101", "code": "150456", "display": "MDC_PULS_OXIM_SAT_O2"}]},
+  "subject": {"reference": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e"},
+  "effectiveDateTime": "2026-04-28T03:14:00+09:00",
+  "device": {"reference": "urn:wia:miot:device:M-PULSE-1.2.3:SN-91A7"},
+  "valueQuantity": {"value": 97, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"},
+  "interpretation": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", "code": "N", "display": "Normal"}]}],
+  "referenceRange": [{"low": {"value": 95}, "high": {"value": 100}}]
+}
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Negative test vectors (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
-
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
-
-## Annex F — Adoption Roadmap
-
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
-
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
-
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
-
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+| Stimulus                                      | Expected outcome                            |
+|-----------------------------------------------|---------------------------------------------|
+| Observation without UDI                       | 422 + `udi-required`                        |
+| Observation with calibration-overdue device   | accepted, flagged `calibration-overdue`     |
+| Alarm without IEC 60601-1-8 priority          | 422 + `alarm-priority-required`             |
+| Patient association without `period.start`    | 422 + `association-period-required`         |
+| Vendor-extension code outside reserved range  | 422 + `metric-code-out-of-range`            |

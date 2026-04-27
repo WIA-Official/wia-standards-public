@@ -1,241 +1,310 @@
-# WIA-pq-crypto PHASE 1 — DATA-FORMAT Specification
+# WIA-pq-crypto PHASE 1 — Data Format Specification
 
 **Standard:** WIA-pq-crypto
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-pq-crypto (Pq Crypto).
+This PHASE defines the canonical data format for post-
+quantum cryptography lifecycle operations: PQC algorithm
+registry records, key-pair registry records, key-rotation
+records, hybrid-mode binding records, migration-phase
+declarations, conformance-evidence records, and the cross-
+references binding cryptographic state to the systems that
+depend on it. The shape interoperates with NIST PQC
+standards (FIPS 203 ML-KEM, FIPS 204 ML-DSA, FIPS 205
+SLH-DSA), CNSA 2.0 transition guidance, and IETF protocols
+for hybrid handshakes.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- NIST FIPS 203 — Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM)
+- NIST FIPS 204 — Module-Lattice-Based Digital Signature Algorithm (ML-DSA)
+- NIST FIPS 205 — Stateless Hash-Based Digital Signature Algorithm (SLH-DSA)
+- IETF RFC 8446 (TLS 1.3), RFC 8410 (Ed25519/Ed448),
+  RFC 8032 (EdDSA), RFC 9180 (HPKE)
+- IETF draft-ietf-tls-hybrid-design — TLS 1.3 hybrid key exchange
+- IETF RFC 9258 (PQ in CMS), RFC 9162 (Certificate Transparency 2.0)
+- ISO/IEC 18033-2 — Encryption algorithms reference
+- NSA Commercial National Security Algorithm Suite 2.0 (CNSA 2.0)
+- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 7517 (JWK)
+- ISO/IEC 27001:2022 — information security management
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-pq-crypto
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to the data shape used by deployments
+operating cryptographic infrastructure undergoing or having
+completed migration to post-quantum primitives. It addresses
+the algorithm registry, key-pair lifecycle, hybrid-mode
+binding, migration-phase declaration, and conformance
+evidence; transport protocols and detailed key-exchange
+mechanics are in PHASE 3 and integration with broader
+identity, transport, and signing systems is in PHASE 4.
 
-## §2 Manifest
+The standard is migration-aware: every operation carries
+the migration phase under which it executed (Classical,
+Hybrid, PQ-only) so cross-deployment interoperability and
+audit replay across the migration are well-defined. A
+deployment is permitted to advance phases per its own
+roadmap; rollback is recorded as a first-class event.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pq-crypto"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: algorithm registry, key-pair registry, key-rotation
+record, hybrid-mode binding, migration-phase declaration,
+algorithm-deprecation record, conformance-evidence record,
+attestation record. Out of scope: cryptographic primitive
+implementation details (carried as references to authoritative
+specs), HSM-vendor proprietary control protocols (carried
+opaquely as vendor extensions), and end-application protocol
+choices (the deployment may elect any PQ-secure protocol it
+declares in its capability document).
 
-## §3 Conformance Tiers
+## §2 Algorithm registry record
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+The deployment's algorithm registry catalogues the
+algorithms it accepts and uses:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+| Field             | Source / Binding                                       |
+|-------------------|--------------------------------------------------------|
+| `algorithmRef`    | URN of form `urn:wia:pqc:alg:<id>`                     |
+| `algorithmName`   | canonical name (e.g., `ML-KEM-768`, `ML-DSA-65`,       |
+|                   | `SLH-DSA-SHA2-128s`, `Ed25519`, `RSA-3072`,            |
+|                   | `ECDSA-P-256`)                                         |
+| `algorithmClass`  | `kem`, `signature`, `hash`, `mac`, `kdf`, `aead`,      |
+|                   | `block-cipher`                                         |
+| `nistCategory`    | NIST PQC security category (1, 2, 3, 5)               |
+| `referenceSpec`   | URN of authoritative spec (FIPS 203/204/205, RFC, etc.)|
+| `vendorImpls[]`   | URNs of validated implementations                      |
+| `deprecationDate` | RFC 3339 (or null if not deprecated)                  |
+| `acceptedFor[]`   | role classes that may use this algorithm              |
 
-## §4 Discovery
+Registry mutations are signed and audit-chained. An algorithm
+moved to deprecated state still remains usable for verifying
+historical artifacts but is refused for new operations.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pq-crypto`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Key-pair registry record
 
-## §5 Time and Identity
+Every active key pair is tracked:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `keypairRef` — URN of form `urn:wia:pqc:keypair:<authority>:<id>`
+- `algorithmRef` — URN of the algorithm
+- `holderRef` — URN of the holding entity (operator, system,
+  identity)
+- `purpose` — `tls-server`, `tls-client`, `code-signing`,
+  `document-signing`, `key-encapsulation`, `audit-signing`,
+  `attestation`, `iot-device-attestation`
+- `publicKeyRef` — URI of the public key (JWK, X.509 cert, or
+  HPKE public key)
+- `keyManagementRef` — URN of the HSM or key-management
+  system holding the private key
+- `createdAt` — RFC 3339
+- `validNotBefore`, `validNotAfter` — RFC 3339
+- `migrationPhase` — `classical`, `hybrid`, `pq-only`
+- `successorRef` — URN of the successor key pair after
+  rotation (null until rotation)
 
-## §6 Versioning and Deprecation
+Key pairs without `keyManagementRef` (i.e., keys held
+outside an audited key-management system) are refused at
+boundary intake.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Key-rotation record
 
-## §7 Privacy and Security
+Each rotation event is recorded:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- `rotationId` — URN
+- `predecessorRef` — URN of the prior key pair
+- `successorRef` — URN of the new key pair
+- `rotatedAt` — RFC 3339
+- `rotationReason` — `scheduled`, `compromise`, `algorithm-
+  deprecation`, `migration-phase-advance`, `key-management-
+  migration`
+- `overlapWindowStart`, `overlapWindowEnd` — period during
+  which both keys remain valid for verification
+- `attestationRefs[]` — URNs of attestations from the key-
+  management system confirming the rotation
+- `signatures[]` — signing-authority signatures
 
-## §8 Open Governance
+Rotations whose `overlapWindow` is shorter than the
+deployment-declared minimum are flagged as urgent (e.g.,
+compromise rotations); the audit chain records the urgency
+class.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pq-crypto` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Hybrid-mode binding record
+
+For migration-phase `hybrid`, the binding between classical
+and PQ algorithms is recorded:
+
+- `bindingId` — URN
+- `classicalAlgorithmRef` — URN
+- `pqAlgorithmRef` — URN
+- `bindingMode` — `concatenate` (concatenation of secrets),
+  `kdf-combine` (KDF over both secrets), `dual-signature`
+  (independent signatures verified together)
+- `protocolRef` — URN of the protocol the binding applies to
+  (e.g., TLS 1.3 hybrid handshake, hybrid CMS signature)
+- `validFromPhase` — migration phase at which this binding
+  becomes active
+- `validToPhase` — migration phase at which this binding
+  is superseded
+
+Hybrid bindings are versioned; partner-facing bindings are
+mirrored to partners' capability documents through the
+exchange protocol in PHASE 3.
+
+## §6 Migration-phase declaration record
+
+The deployment's overall migration-phase posture:
+
+- `phaseDeclarationId` — URN
+- `currentPhase` — `classical`, `hybrid`, `pq-only`
+- `phaseEntryAt` — RFC 3339
+- `targetNextPhase` — closed enum or null
+- `targetNextPhaseAt` — declared target date or null
+- `algorithmRosterRef` — URN of the algorithm-registry
+  snapshot active at this declaration
+- `exceptionsRef[]` — URNs of role classes operating under
+  documented exception (e.g., legacy IoT devices on classical)
+- `responsibleOfficerRef` — URN of the deployment's
+  cryptographic-officer
+
+Phase advances and rollbacks are first-class events that
+update this record and emit cross-references to all keys
+operating under the new phase.
+
+## §7 Algorithm-deprecation record
+
+Per algorithm undergoing deprecation:
+
+- `deprecationId` — URN
+- `algorithmRef` — URN
+- `deprecationAnnouncedAt` — RFC 3339
+- `acceptanceCutoffAt` — RFC 3339 — boundary refuses new
+  operations using this algorithm beyond this date
+- `verificationCutoffAt` — RFC 3339 — boundary refuses
+  verification of historical artifacts beyond this date
+- `replacementAlgorithmRefs[]` — URNs of the recommended
+  replacements
+- `migrationGuidanceRef` — URI of deployment-internal
+  migration guidance
+
+A deprecation announcement is mandatory at least
+deployment-declared notice ahead of the acceptance cutoff;
+shorter notices are exception-classed and require
+cryptographic-officer counter-signature.
+
+## §8 Conformance-evidence record
+
+Conformance evidence accumulates per the deployment's
+declared cadence:
+
+- `evidenceId` — URN
+- `period` — declared evidence period (e.g., `2026-Q2`)
+- `phaseDeclarationRef` — URN
+- `keypairCensusRef` — URN of the keypair-census artifact
+  for the period
+- `rotationLogRef` — URN of rotation events in the period
+- `deprecationLogRef` — URN of deprecation events in the
+  period
+- `attestationsRef[]` — HSM attestations in the period
+- `auditSignatureRef` — auditor signature URN
+
+Conformance-evidence records are versioned and referenced by
+partners and regulators.
+
+## §9 HSM attestation record
+
+Attestations from the key-management system:
+
+- `attestationId` — URN
+- `kmRef` — URN of the key-management system
+- `attestationKindRef` — declared attestation type (HSM
+  health, key creation, key rotation, key destruction)
+- `attestationPayloadRef` — URI of the signed attestation
+  payload
+- `attestationSignature` — signature over the payload
+- `at` — RFC 3339
+
+Attestations bind key-pair lifecycle events to evidence that
+the private key was generated and held inside the audited
+KM system.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain references (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+| Reference                     | Use site                                                 |
+|-------------------------------|----------------------------------------------------------|
+| WIA-network-security          | TLS cipher-suite floor governance                        |
+| WIA-supply-chain              | code-signing key registry                                 |
+| WIA-military-satellite        | TT&C cipher-suite migration                               |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Conformance disclosure
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Sections §2, §3, §4, §6, §7, §8 are mandatory. §5 (Hybrid)
+is mandatory for any deployment in `hybrid` migration phase;
+§9 (Attestation) is mandatory for any deployment using HSM-
+based key management (effectively all production deployments).
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Versioning and deprecation
 
-## Annex F — Adoption Roadmap
+Versioning follows SemVer 2.0.0. Algorithm-deprecation events
+respect the cutoff dates declared in §7; emergency
+deprecations (CVE-driven) follow the deployment's incident-
+response cycle.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Worked algorithm registry entry (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```json
+{
+  "algorithmRef": "urn:wia:pqc:alg:ml-kem-768",
+  "algorithmName": "ML-KEM-768",
+  "algorithmClass": "kem",
+  "nistCategory": 3,
+  "referenceSpec": "urn:wia:spec:nist-fips-203",
+  "vendorImpls": ["urn:wia:vendor-impl:vendor-a-mlkem-1.2"],
+  "deprecationDate": null,
+  "acceptedFor": ["tls-server","tls-client","kem-hybrid"]
+}
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex E — Vendor extensions
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+HSM and KM vendors may extend records with `x-vendor-*`
+fields. Extensions MUST NOT contradict canonical fields and
+MUST NOT be required for core conformance.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex F — Time discipline cross-reference
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Time fields use the discipline of PHASE 3 §6. Records that
+fail clock discipline are tagged `provisional` until
+backfilled.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex G — Conformance level
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
+Implementations declare conformance level (Surface / Verified
+/ Anchored). Anchored requires a continuous evidence package
+plus an annual cryptographic-audit covering the integration
+contracts in PHASE 4.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex H — Worked migration-phase declaration
 
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+```json
+{
+  "phaseDeclarationId": "urn:wia:pqc:phase:authority-x:p-2026-q2",
+  "currentPhase": "hybrid",
+  "phaseEntryAt": "2026-04-01T00:00:00+09:00",
+  "targetNextPhase": "pq-only",
+  "targetNextPhaseAt": "2027-04-01T00:00:00+09:00",
+  "algorithmRosterRef": "urn:wia:pqc:roster:authority-x:r-2026-q2",
+  "exceptionsRef": ["urn:wia:pqc:exception:authority-x:legacy-iot"],
+  "responsibleOfficerRef": "urn:wia:auth:authority-x-crypto-officer"
+}
+```
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex I — Algorithm-acceptance matrix
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The deployment publishes a matrix declaring which algorithms
+are accepted for which roles in which migration phase. The
+matrix is the canonical reference for partners verifying
+cipher-suite negotiation; mismatches are surfaced as
+capability-document violations during exchange.

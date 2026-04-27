@@ -1,241 +1,312 @@
-# WIA-medical-alert-system PHASE 4 — INTEGRATION Specification
+# WIA-medical-alert-system PHASE 4 — Integration Specification
 
 **Standard:** WIA-medical-alert-system
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-medical-alert-system (Medical Alert System).
+This PHASE specifies how a medical-alert-system deployment
+integrates the data, APIs, and protocols of PHASEs 1–3 with
+broader operational systems: hospital EHR, primary-care
+records, monitoring-station CRM, EMS dispatch, family-contact
+apps, regulator audit pipelines, manufacturer post-market
+surveillance, and the social services that close the loop on
+welfare-related activations.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Subscriptions, Bulk Data Access, Bundle,
+  Communication, CommunicationRequest, Encounter
+- HL7 v2.x ADT messages — for hospital admit/discharge
+  flow correlation
+- IHE PCC profile — Patient Care Coordination
+- ISO 13485:2016, ISO 14971:2019, IEC 62304, IEC 80001-1
+- IEC 60601-1-8:2020, IEC 80601-2-58:2019
+- EN 50134 series
+- WIA-medical-data-privacy, WIA-medical-iot, WIA-medical-imaging,
+  WIA-network-security, WIA-pq-crypto
 
 ---
 
-## §1 Scope
+## §1 EHR integration
 
-This PHASE document is one of four that together define the WIA-medical-alert-system
-standard. It addresses the integration layer of the standard.
+EHR systems consume alarm-system data via:
 
-## §2 Manifest
+- **FHIR subscription** — for activations triggering hospital
+  admission via EMS dispatch; the EHR receives a heads-up
+  before the patient arrives in the ED
+- **FHIR bulk export** — for population-level activation
+  pattern review
+- **HL7 v2 ADT linkage** — admission events from EMS-
+  transported PERS activations correlate with the hospital's
+  ADT stream
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-alert-system"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The deployment policy declares which patterns are active.
 
-## §3 Conformance Tiers
+## §2 Primary-care records integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For ambulatory deployments, the patient's primary-care record
+is updated post-resolution:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- Activation summary (with disposition)
+- Vital-sign metrics captured at activation
+- Clinical-team commentary if dispatched
 
-## §4 Discovery
+This closes the loop so the primary-care clinician has
+visibility into between-visit events.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-alert-system`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Monitoring-station CRM integration
 
-## §5 Time and Identity
+Monitoring stations maintain CRM records of the subjects
+they cover:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Subject demographic and clinical-history overview (per
+  consent scope)
+- Routing-policy preferences
+- Family-contact roster
+- Recent activation history
 
-## §6 Versioning and Deprecation
+The boundary feeds these via FHIR subscription; the CRM is
+the canonical operator workspace for handling activations.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 EMS dispatch integration
 
-## §7 Privacy and Security
+For PERS deployments where dispatch is part of the routing
+chain:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Boundary pushes a structured dispatch payload to the
+  EMS dispatch system (typically NEMSIS-style payload in
+  US, similar national equivalents elsewhere)
+- Payload includes location, subject identifier,
+  presenting-event, vital-sign metrics, and consent for
+  emergency-disclosure
+- EMS arrives, performs assessment, transports if
+  warranted; transport notification flows back to the
+  boundary
+- Hospital admission flows via HL7 v2 ADT
 
-## §8 Open Governance
+## §5 Family-contact app integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-alert-system` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The family-contact app receives notifications per the
+subject's documented consent:
+
+- Activation occurred (redacted if non-emergency)
+- Acknowledgement and disposition once known
+- Welfare-check fires (if subject has authorised family
+  notification)
+
+Apps are SMART-launched against the family contact's
+authenticated identity provider.
+
+## §6 Regulator audit integration
+
+Regulators receive structured exports for:
+
+- Adverse event reports if activation outcomes include
+  patient harm
+- Aggregate activation-rate reports for the deployment
+- Post-market surveillance for medical-class devices
+  (PERS pendants, fall detectors, nurse-call panels)
+
+Each regulator-export endpoint is gated by a release
+authority specific to the jurisdiction.
+
+## §7 Manufacturer post-market surveillance
+
+Manufacturers receive:
+
+- Aggregate activation rates per device kind
+- False-alarm distributions (device-malfunction false
+  alarms vs. user-side false alarms)
+- Battery-life and connectivity-quality histograms
+- Software-related issue reports per IEC 62304 §6.2
+
+Aggregation thresholds prevent re-identification: cohorts
+fewer than 30 devices or 30 patients are suppressed.
+
+## §8 Operational SLAs
+
+| Concern                                          | Default SLA                |
+|--------------------------------------------------|----------------------------|
+| Alarm activation acknowledged at boundary p95    | ≤ 1 s                      |
+| First routing attempt initiated p95              | ≤ 2 s                      |
+| Monitoring-station webhook delivery p95          | ≤ 5 s                      |
+| EMS dispatch delivery p95                        | ≤ 10 s                     |
+| Voice-call establishment p95 to primary station  | ≤ 30 s                     |
+| Welfare-check escalation                         | per EN 50134-7 cadence     |
+| Audit chain entry available after operation      | ≤ 10 s                     |
+
+Tighter SLAs are negotiable per deployment; loosening them
+requires clinical-leadership and operations sign-off.
+
+## §9 Quarterly compliance report
+
+The boundary emits a quarterly compliance report covering:
+
+- Total activations by device kind and trigger kind
+- Routing-policy outcome distribution (acknowledged at
+  level 0, 1, 2; failover events)
+- False-alarm rates by device kind
+- Welfare-check generation and resolution rates
+- EMS dispatches and transport rates
+- Cross-domain references honoured vs. refused
+- Audit-chain integrity check results
+
+The report is signed and is itself in scope for the audit
+chain.
+
+## §10 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Every fielded device or installation is in the registry
+   with current certification status
+2. Every alarm in the past quarter has a matching audit
+   chain entry with verifiable inclusion proof
+3. Every alarm has a resolution event or an active
+   escalation
+4. Monitoring-station integration delivers within SLA across
+   at least 99% of activations
+5. Quarterly compliance report has no integrity-check
+   failures
+6. Cross-domain references resolve at the partner boundary
+   for ≥ 99% of bound activations
+
+A deployment failing any of these reports the gap.
+
+## §11 Common pitfalls (informative)
+
+- **PERS battery exhaustion** — devices stop emitting
+  heartbeat without explicit failure signal; the boundary
+  detects via heartbeat-timeout welfare-check. The
+  deployment SHOULD review battery-low alerts and
+  proactive replacement schedule
+- **Shared-device subject confusion** — pendants
+  reassigned to a new patient may carry stale subject
+  reference; sanitisation is mandatory before re-deployment
+- **False-alarm fatigue** — fall detectors with poor
+  calibration produce excessive false alarms; the
+  deployment SHOULD review false-alarm rates quarterly and
+  retune
+- **Family-contact churn** — patients change family contacts
+  frequently; the deployment SHOULD make roster maintenance
+  a low-friction operation
+- **EN 50134-7 cadence drift** — escalation cadences may
+  drift if the routing policy is edited without review;
+  the deployment SHOULD audit cadence quarterly
+
+## §12 Decommissioning
+
+When a deployment is decommissioned:
+
+1. Active devices are returned to inventory or family
+2. Monitoring-station coverage transferred to receiving
+   service
+3. EHR and primary-care records updated with deployment
+   end date
+4. Audit chain sealed and final root published
+5. Regulator notification filed if required
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain reference table (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Reference                  | Use site                                                  | Gate applied                                   |
+|----------------------------|-----------------------------------------------------------|------------------------------------------------|
+| WIA-medical-data-privacy   | every activation references the consent record            | medical-side consent + alert-side purpose      |
+| WIA-medical-iot            | vital-sign metrics carried on activations                 | medical-iot device association                 |
+| WIA-network-security       | TLS cipher-suite floor for monitoring-station partners    | network-security-side floor on each session    |
+| WIA-pq-crypto              | post-quantum migration phase                              | pq-crypto-side phase declaration current       |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — Decommissioning checklist (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+- [ ] Active devices returned or transferred
+- [ ] Monitoring-station coverage transferred
+- [ ] EHR and primary-care records updated
+- [ ] Audit chain sealed and final root published
+- [ ] Manufacturer notifications filed
+- [ ] Regulator notification filed if required
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Conformance disclosure
 
-## Annex F — Adoption Roadmap
+Sections §1, §2, §3, §8, §10 are mandatory. §4 (EMS) is
+mandatory for PERS deployments where EMS dispatch is part
+of the response chain. §5, §6, §7, §11 are mandatory where
+the corresponding flow is offered.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Worked PERS-to-EMS dispatch (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+```
+1. Subject presses pendant; device transmits activation
+2. Boundary receives, creates AlarmEvent
+3. First routing attempt: webhook to primary monitoring station
+4. Operator picks up call; subject confirms emergency
+5. Operator $triage with confirmed-emergency note
+6. Operator $dispatch with EMS-dispatch payload
+7. Boundary forwards to EMS dispatch system (NEMSIS or equivalent)
+8. EMS arrives, performs assessment
+9. EMS transports to nearest hospital
+10. Hospital ADT system records admission with reference back
+    to the alarm event id (HL7 v2 PV1.50 placer order number)
+11. Boundary records $transfer-to-care with hospital reference
+12. Activation closed; quality-improvement metrics recomputed
+```
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex E — Welfare-check escalation worked example (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+1. Subject in assisted-living; bed-occupancy sensor reports
+   no occupancy at 07:30 (outside expected wakeup window)
+2. Boundary creates WelfareCheck with kind=morning-wakeup
+3. First routing attempt: care-team facility-floor-staff app
+4. No acknowledgement within 90 seconds
+5. Escalation to facility on-call nurse
+6. Nurse acknowledges, performs in-person check
+7. Subject is found; reports having gone for early walk
+8. Nurse $resolve with reason: subject-found-active
+9. Welfare-check closed; quality-improvement records the
+   resolution time and reason
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex F — Manufacturer post-market quarterly bundle (informative)
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The boundary provides manufacturers with a quarterly bundle:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+- Aggregate activation counts per device model
+- False-alarm rate distribution (with reasons)
+- Battery-life histograms
+- Connectivity-quality histograms
+- Software-related issue summary
+- Recall-scope query results if any
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+Aggregation thresholds prevent re-identification of
+small-volume installations (n < 30).
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Social-services integration (informative)
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+For welfare-related activations (inactivity, missed welfare-
+check) where there is no clinical emergency, deployments
+may integrate with social services:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+- Local-government adult protective services for vulnerable
+  adults with patterns of welfare-check escalation
+- Voluntary community-care organisations for befriending
+  and reassurance follow-ups
+- Family-mediation services where family-contact roster
+  conflicts surface
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Integration is governed by the patient's documented consent
+and the deployment's social-services-partnership agreement.
 
-## Annex I — Interoperability Profiles
+## Annex H — Quality-improvement programme integration
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Deployments often participate in industry-wide quality-
+improvement programmes:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- Aggregate false-alarm rates reported to industry consortium
+- Benchmark response-time distributions
+- Best-practice routing-policy reference templates
+- Adverse-event lessons-learned shared with peer deployments
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Participation is governed by the deployment's quality-
+improvement-partnership agreement; aggregation thresholds
+prevent re-identification.

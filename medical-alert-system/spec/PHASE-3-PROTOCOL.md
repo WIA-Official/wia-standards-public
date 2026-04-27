@@ -1,241 +1,330 @@
-# WIA-medical-alert-system PHASE 3 — PROTOCOL Specification
+# WIA-medical-alert-system PHASE 3 — Protocol Specification
 
 **Standard:** WIA-medical-alert-system
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-medical-alert-system (Medical Alert System).
+This PHASE specifies the protocols binding data formats
+(PHASE 1) and API surface (PHASE 2) to operational exchanges:
+PERS device authentication and connectivity, social-alarm
+controller protocols (per EN 50134-5), nurse-call wired
+protocols (IEC 80601-2-58), monitoring-station handoff,
+voice-call routing, escalation-cadence enforcement, time
+discipline, and audit-chain construction.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7525, RFC 9162 (CT pattern)
+- IETF RFC 7252 (CoAP), RFC 8613 (OSCORE) — for constrained
+  battery-powered PERS pendants
+- IETF RFC 3261 (SIP) — for voice-call routing where the
+  monitoring station integrates with PSTN/cellular voice
+- IETF RFC 8829 (WebRTC) — for app-based audio between
+  responders and subjects
+- 3GPP TS 22.011 — Cellular emergency calling (where PERS
+  uses cellular bearer)
+- IEC 60601-1-8:2020, IEC 80601-2-58:2019
+- EN 50134-5:2004 — Interconnections and communications
+- EN 50134-7:2017 — Application guidelines
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-medical-alert-system
-standard. It addresses the protocol layer of the standard.
+PERS devices, social-alarm base units, nurse-call panels,
+monitoring-station operators, family contacts, and EMS
+liaisons authenticate via JWS-signed JWTs:
 
-## §2 Manifest
+- `iss`, `sub`, `aud`, `iat`, `exp`
+- `wia.role` — one of {`alert-device`, `alert-installation`,
+  `monitoring-operator`, `clinician`, `family-contact`,
+  `ems-liaison`, `auditor`}
+- `wia.deviceRef` / `wia.installationRef` — bound device
+  or installation
+- `cnf` — confirmation claim binding to TLS client certificate
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-alert-system"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Monitoring-station operator tokens require two-factor
+authentication on shift sign-on. Family-contact tokens are
+limited to read access on specific subjects.
 
-## §3 Conformance Tiers
+## §2 PERS device connectivity
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+PERS devices typically use one of:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- **Cellular bearer** — 3GPP cellular with TS 22.011
+  emergency-calling capability; the device itself maintains
+  a long-lived bearer for periodic heartbeat and instant
+  activation
+- **Wi-Fi + Cellular fallback** — home Wi-Fi for normal
+  operation, cellular fallback when out-of-home
+- **Bluetooth + smartphone gateway** — for wearable devices
+  paired to a patient-owned smartphone
 
-## §4 Discovery
+Heartbeat cadence: typically every 60 seconds for cellular-
+only devices; lengthier for battery-conserving devices with
+deployment-policy-declared limits. Missed heartbeats beyond
+the policy threshold trigger a `device-offline` welfare-check.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-alert-system`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Social-alarm protocol (EN 50134-5)
 
-## §5 Time and Identity
+Fixed-installation social-alarm systems implement EN 50134-5
+on the wired backplane (typically LAN-based for modern
+installations, BS 8521 / DTMF for legacy):
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- The base unit detects trigger-device activations
+  (pull-cords, mat sensors, bed-exit sensors)
+- The base unit transmits an alarm to the boundary via
+  TLS 1.3 over LAN
+- For legacy DTMF / Voice connect, the boundary supports
+  a SIP-to-FHIR translator gateway
 
-## §6 Versioning and Deprecation
+The boundary respects the EN 50134-7 escalation cadence
+(typically 90s acknowledgement window before escalating to
+the next contact level).
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Nurse-call protocol (IEC 80601-2-58)
 
-## §7 Privacy and Security
+In-hospital nurse-call panels follow IEC 80601-2-58:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Wired backplane between bedside / bathroom / room buttons
+  and the nursing station
+- Modern installations expose a network-side API (typically
+  REST or HL7 v2 messages) translated to FHIR by the boundary
+- Voice channel between bedside and nursing station follows
+  the manufacturer's audio protocol; the boundary records
+  the timestamp of voice-link establishment but does not
+  record audio content
 
-## §8 Open Governance
+Rapid-response (Code Blue, Code Stroke) integrate with the
+hospital's overhead-paging and rapid-response-team workflow;
+the boundary emits CommunicationRequest resources that the
+RRT app consumes.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-alert-system` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Monitoring-station handoff
+
+Monitoring-station handoff uses webhook delivery as the
+canonical channel:
+
+- TLS 1.3 with mTLS; monitoring station presents a partner
+  certificate
+- Webhook payload is a FHIR Bundle with the AlarmEvent
+- Detached JWS in `Wia-Signature`
+- Boundary expects 200 OK acknowledgement within deployment-
+  declared latency
+- Failure to acknowledge triggers fail-over to the secondary
+  monitoring station per the routing policy
+
+For monitoring stations integrating with PSTN voice (typical
+for PERS), the boundary additionally initiates a SIP call to
+the operator's queue with the alarm-event-id in a custom
+SIP header so the operator's CTI can correlate.
+
+## §6 Voice-call routing
+
+Voice calls between subjects, monitoring stations, EMS, and
+family contacts route per the deployment's voice topology:
+
+- **Primary** — SIP via the deployment's session-border
+  controller to the relevant terminating network
+- **Backup** — PSTN trunk via a documented backup carrier
+- **In-app audio** — WebRTC for app-based responder voice
+  (typically used for app-only deployments without
+  monitoring-station)
+
+Voice-call records (timestamp, parties, outcome) are
+captured but content is not recorded except where consent
+explicitly authorises (e.g., quality-improvement recording).
+
+## §7 Time discipline
+
+Boundary clock: NTPv4 stratum-2. Devices on AC mains:
+NTPv4 stratum-3. Battery-powered devices: time set on each
+heartbeat or activation.
+
+A device whose declared timestamp is more than the
+deployment-declared skew tolerance from boundary time has
+the alarm accepted but flagged `time-skew`. Persistent
+skew triggers a maintenance ticket.
+
+## §8 Audit chain
+
+Every alarm event, routing attempt, transition, voice-call
+record, and welfare-check emits an AuditEvent. Chain
+construction follows the same pattern as WIA-medical-iot
+PHASE 3 §5.
+
+For high-volume deployments (large nursing homes,
+multi-tenant social-alarm), the chain is sharded by
+`installationRef` hash prefix.
+
+## §9 Replay protection
+
+All write endpoints accept `Idempotency-Key`; the boundary
+stores keys for 30 days. CoAP/OSCORE replay protection uses
+the OSCORE sequence-number window for constrained PERS
+devices.
+
+## §10 Disaster recovery
+
+Boundary outages: monitoring stations operate from cached
+roster + last-known device states. New activations queue at
+the device until reconnect. Subjects with critical risk
+profiles (recent hospital discharge, fall history) trigger
+heightened-monitoring at the monitoring station during
+boundary outage.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Algorithm choices (informative)
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+| Concern              | Default                            | Notes                                      |
+|----------------------|------------------------------------|--------------------------------------------|
+| Token signing        | ES256                              | mTLS-bound (RFC 8705)                      |
+| TLS                  | 1.3 (RFC 8446)                     | hybrid groups when WIA-pq-crypto hybrid    |
+| OSCORE AEAD          | AES-CCM-16-64-128                  | for constrained PERS devices               |
+| Audit hash           | SHA-256                            |                                            |
+| SIP signalling       | SIPS / TLS                         | TLS-protected SIP                          |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — PERS heartbeat protocol (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+Device → Boundary: POST /Heartbeat
+{
+  "deviceRef": "urn:wia:malert:device:PERS-PDT-1.0:SN-91A7",
+  "at": "2026-04-28T09:42:00+09:00",
+  "battery": 0.74,
+  "linkRsrp": -85,
+  "buttonState": "idle",
+  "lastSelfTestAt": "2026-04-27T03:00:00+09:00"
+}
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+Boundary → Device: 200 OK
+{"nextHeartbeatBy": "2026-04-28T09:43:00+09:00", "config": {...}}
+```
 
-## Annex F — Adoption Roadmap
+Missed heartbeats trigger welfare-checks; the boundary
+publishes the missed-heartbeat threshold per device kind in
+the capability document.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Negative-test vectors (informative)
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+| Stimulus                                              | Expected outcome                                 |
+|-------------------------------------------------------|--------------------------------------------------|
+| Activation without subject reference (shared device)  | accepted; queued for subject resolution          |
+| Activation with battery below operating threshold     | accepted; flagged with `low-battery` annotation  |
+| Monitoring station offline beyond fail-over window    | secondary monitoring station receives           |
+| Wifi-only device on cellular fallback                  | recorded as `bearer-fallback` annotation         |
+| EN 50134-7 escalation timeout missed                   | next-level routing executed automatically        |
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Disaster recovery worked example (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+A monitoring station experiences a network outage during a
+busy evening. The deployment's failover policy:
 
-## Annex G — Test Vectors and Conformance Evidence
+1. Boundary detects no acknowledgement within 30 seconds
+2. Failover to secondary monitoring station
+3. Secondary station picks up; alarm event marked routed
+4. Primary station logs reconnect on recovery
+5. Boundary records the failover event in the audit chain
+6. Quarterly compliance report counts failover events
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex E — Voice-call SIP integration (informative)
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+For monitoring stations integrating via SIP:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+```
+INVITE sip:operator-queue@monitoring-station.example SIP/2.0
+From: <sip:wia-boundary@boundary.example>;tag=<random>
+To: <sip:operator-queue@monitoring-station.example>
+Call-ID: <random>
+CSeq: 1 INVITE
+X-WIA-Alarm-Event-Id: urn:wia:malert:event:PERS-PDT-1.0:SN-91A7:e-001
+X-WIA-Subject-Hint: <redacted unless break-glass>
+Contact: <sip:wia-boundary@boundary.example>
+Content-Type: application/sdp
+...
+```
 
-## Annex H — Versioning and Deprecation Policy
+The X-WIA-Alarm-Event-Id header lets the operator's CTI
+correlate the call with the alarm event in the FHIR
+notification. Subject identifiers are not included unless
+the operator's role grants break-glass authority for the
+emergency context.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex F — Battery management (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+PERS devices report battery state on every heartbeat. The
+boundary computes:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- Current battery percentage
+- Estimated remaining-life based on usage pattern
+- Replacement-due indicator at deployment-declared threshold
 
-## Annex I — Interoperability Profiles
+Replacement scheduling integrates with the deployment's
+biomedical-engineering or facilities operations workflow.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex G — Decommissioning hardware-erase
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+PERS devices reassigned between subjects undergo a
+hardware-erase sequence:
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+1. Operations submits decommission intent via control-plane
+2. Device receives erase command over its bearer
+3. Device clears all subject-bound storage and emits a
+   completion attestation
+4. Boundary verifies the attestation before clearing the
+   subject-association record
+5. Reuse is permitted only after attestation verified
+
+The attestation is part of the device-pairing audit chain
+so the next-subject pairing event traces back to the
+sanitised state.
+
+## Annex H — DTMF legacy social-alarm gateway
+
+For legacy installations using DTMF / voice-band signalling
+(BS 8521 in UK, similar in EU member states), the boundary
+operates a translation gateway:
+
+1. Legacy base unit places a voice call to the boundary's
+   PSTN number
+2. Gateway answers; legacy unit transmits DTMF identification
+   and event-type codes
+3. Gateway translates DTMF codes to FHIR AlarmEvent per the
+   manufacturer's DTMF code map
+4. Modern monitoring-station receives the FHIR AlarmEvent
+
+The gateway is a transitional component; deployments are
+encouraged to migrate to native LAN-based EN 50134-5
+installations as legacy hardware reaches end of life.
+
+## Annex I — Tamper detection protocol
+
+Devices supporting tamper detection emit a tamper signal
+on:
+
+- Battery removed
+- Pendant case opened
+- Wall unit moved beyond declared installation position
+- Device removed from charging cradle for an extended period
+
+Tamper events are recorded as alarm events with
+triggerKind=tamper-detected. Routing policy may handle
+tamper events differently from physiological alarms (e.g.,
+notify maintenance rather than EMS).
+
+## Annex J — Boundary-to-EMS NEMSIS payload mapping
+
+The boundary maps internal AlarmEvent fields to NEMSIS-style
+payload fields for EMS dispatch (US):
+
+| Internal field             | NEMSIS field                                      |
+|----------------------------|---------------------------------------------------|
+| triggerKind                | eDispatch.01 (Complaint Reported by Dispatch)    |
+| location                   | eScene.06 (Incident Address) + eScene.16 (GPS)   |
+| priority                   | eDispatch.05 (Possible Injury)                   |
+| vitalsAttached             | eVitals.06 (...) carried as on-scene observations |
+| subject demographic        | ePatient.01 (...) per consent + break-glass      |
+
+Equivalent mappings exist for other regions; the deployment
+declares its dispatch standard in the capability document.

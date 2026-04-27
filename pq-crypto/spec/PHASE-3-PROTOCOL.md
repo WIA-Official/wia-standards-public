@@ -1,241 +1,312 @@
-# WIA-pq-crypto PHASE 3 — PROTOCOL Specification
+# WIA-pq-crypto PHASE 3 — Protocol Specification
 
 **Standard:** WIA-pq-crypto
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-pq-crypto (Pq Crypto).
+This PHASE specifies the protocols binding the data format
+(PHASE 1) to the API surface (PHASE 2) and to operational
+cryptographic exchanges: authentication of crypto-officers,
+HSM control planes, and partners; the HSM control-plane
+binary protocol; the TLS 1.3 hybrid handshake configuration;
+hybrid CMS / JWS signature construction; key-rotation
+overlap discipline; audit-chain construction; time
+discipline; and the migration-phase advance/rollback
+protocol.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK),
+  RFC 9162 (Certificate Transparency 2.0)
+- IETF draft-ietf-tls-hybrid-design — TLS 1.3 hybrid key exchange
+- IETF RFC 9258 — Composite signatures in CMS
+- NIST FIPS 203/204/205 — for primitive references
+- NIST SP 800-208 — Stateful hash-based signature scheme considerations
+- NSA CNSA 2.0 — for transition cadence
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-pq-crypto
-standard. It addresses the protocol layer of the standard.
+Crypto-officers, key-holders, HSM control planes, partners,
+and auditors authenticate using JWS-signed JWTs issued by
+the deployment's identity authority. Token claims:
 
-## §2 Manifest
+- `iss`, `sub`, `aud`, `iat`, `exp`
+- `wia.role` — one of the roles in PHASE 2 Annex F
+- `wia.scope[]` — operation-class scopes
+- `wia.holderRef` — for key-holder tokens, the authority
+  whose keys may be managed
+- `wia.kmRef` — for HSM control-plane tokens, the KM URN
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "pq-crypto"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Crypto-officer write tokens are short-lived (typically 5
+minutes) and require a hardware-token-backed user signature;
+the audit chain records the user's hardware-token attestation
+on every officer action.
 
-## §3 Conformance Tiers
+## §2 HSM control-plane binary protocol
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+HSM control-plane interactions use a length-prefixed CBOR
+stream over a mutual-TLS 1.3 connection with the HSM as
+client and the boundary as server (or vice versa per
+deployment topology). Each frame:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- 4-byte length prefix
+- CBOR-encoded operation envelope (request, response, or
+  attestation push)
+- 32-byte per-frame MAC (HMAC-SHA-256 with rotated key)
 
-## §4 Discovery
+Operation envelopes include:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/pq-crypto`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+- `op` — operation name (e.g., `keypair-create`,
+  `keypair-attest`, `rotation-prepare`, `rotation-commit`,
+  `compromise-flag`)
+- `params` — operation-specific
+- `requestId` — opaque request identifier
+- `clientSignature` — client signature over the canonical
+  encoding
 
-## §5 Time and Identity
+The boundary persists frame-level acknowledgements; a
+client may resume on reconnect using the boundary's
+last-acknowledged cursor.
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+## §3 TLS 1.3 hybrid handshake configuration
 
-## §6 Versioning and Deprecation
+For migration phase `hybrid`, the deployment's TLS 1.3
+endpoints configure:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- Supported groups list including a hybrid group
+  (e.g., `x25519_kyber768`, conventionally referenced via
+  the IANA registry alias for ML-KEM-768)
+- ClientHello signature_algorithms list including hybrid
+  signature options (per draft-ietf-tls-hybrid-design)
+- Cipher suites with PQ-secure AEAD parameters
 
-## §7 Privacy and Security
+The boundary's capability document publishes the supported
+hybrid groups so partners verify negotiation feasibility
+before exchange. Partners that cannot negotiate a hybrid
+group fall back per the deployment's documented fallback
+policy.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Hybrid CMS / JWS signature construction
 
-## §8 Open Governance
+For document and code signing in `hybrid` phase, signatures
+are constructed per RFC 9258 composite-signature pattern:
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `pq-crypto` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+- Two underlying signatures: classical (e.g., Ed25519) +
+  PQ (e.g., ML-DSA-65)
+- Composite signature object identifies both algorithms via
+  `algorithmRef` URN and includes both signature blobs
+- Verifiers verify both signatures independently; failure of
+  either is a verification failure
+
+Signing-keys for hybrid signatures are typically two
+separate keypairs in the registry (PHASE 1 §3); the
+hybrid-binding record (PHASE 1 §5) names the pair.
+
+## §5 Key-rotation overlap discipline
+
+During rotation overlap windows:
+
+- Both predecessor and successor keys are valid for
+  verification
+- New artifacts are signed with the successor key
+- Verifiers honouring the deployment's policy accept either
+  key during the overlap
+
+Rotation discipline rules:
+
+- Overlap window must not be shorter than the deployment-
+  declared minimum (typically 24 hours for routine rotations,
+  zero for compromise rotations)
+- Compromise rotations include a `compromise-flag`
+  attestation from the HSM control plane confirming the
+  key has been destroyed
+- Successor key MUST exist before predecessor `validNotAfter`
+
+## §6 Time discipline
+
+All record timestamps use RFC 3339 with explicit offset.
+Boundary clock is disciplined to a national-laboratory time
+reference; drift outside declared bound triggers a
+`boundary-clock-degraded` capability flag and tags subsequent
+records `provisional` until recovered.
+
+## §7 Audit chain
+
+Every boundary state transition is appended to a Merkle
+audit log:
+
+- `entryId`, `parent`, `at`, `actor`, `kind`, `payloadHash`,
+  `signature`
+- `kind` enum: `algorithm-registered`, `algorithm-deprecated`,
+  `keypair-registered`, `keypair-rotated`, `keypair-retired`,
+  `compromise-rotation-flagged`, `phase-advanced`,
+  `phase-rolled-back`, `evidence-published`,
+  `attestation-recorded`, `partner-roster-mutated`
+
+Anchored deployments mirror the audit chain to a regulator-
+trusted witness on a declared cadence; regulators receiving
+phase-advance and compromise-rotation entries on a
+push subscription.
+
+## §8 Migration-phase advance/rollback protocol
+
+Phase advance follows a documented protocol:
+
+1. Crypto-officer drafts the phase declaration
+2. Audit committee reviews the deployment's roadmap
+   compliance and risk file
+3. Boundary stages the new phase declaration in test mode
+   with all subscribed partners notified
+4. Partner acknowledgement window (typically 30 days)
+5. Activation: phase declaration becomes current; the
+   boundary refreshes capability document and notifies all
+   subscribers
+
+Rollback is the inverse; rollback within the deployment-
+declared safety window does not require partner
+acknowledgement, but emergency rollback (e.g., critical
+algorithm vulnerability) requires crypto-officer counter-
+signature plus an incident-record reference.
+
+## §9 Replay protection
+
+All write endpoints accept `Idempotency-Key`; the boundary
+stores keys for 30 days. Replays return the original
+response; conflicts return
+`urn:wia:pqc:problem:idempotency-conflict`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cryptographic signature suite
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Default boundary signatures use Ed25519 in classical phase
+and ML-DSA-65 in PQ-only phase; hybrid phase uses both
+under the composite-signature pattern of §4.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — Compromise-rotation handling
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+Compromise rotations bypass the standard overlap window:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+1. HSM control plane emits `compromise-flag` attestation
+2. Successor key is created and signed with the highest
+   priority
+3. Predecessor key's `validNotAfter` is set to current epoch
+4. Boundary refuses any further use of the predecessor for
+   signing (verification of historical artifacts continues
+   per deployment policy)
+5. Audit-chain entry at `kind=compromise-rotation-flagged`
+   carries an incident-record reference for the cause
+6. All subscribers are notified within the deployment-
+   declared latency
 
-## Annex F — Adoption Roadmap
+## Annex C — Cipher-suite floors
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+The deployment publishes per-protocol cipher-suite floors in
+the capability document. Floors are tightened over time as
+algorithms are deprecated; partners verify floor compatibility
+on each exchange.
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Negative-test vectors for protocol layer
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+| Stimulus                                              | Expected outcome                              |
+|-------------------------------------------------------|-----------------------------------------------|
+| Keypair-create without HSM attestation                | refused; recorded                              |
+| Rotation with successor not yet attested              | refused; recorded                              |
+| Phase rollback without elevation                      | refused with rollback-elevation-required      |
+| Hybrid CMS signature missing PQ component             | verification fails                             |
+| Compromise rotation without HSM compromise-flag       | refused; recorded                              |
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex E — Algorithm registry maintenance cadence
 
-## Annex G — Test Vectors and Conformance Evidence
+The algorithm registry is reviewed on a documented cadence
+(typically quarterly). Reviews consider:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+- New NIST publications
+- Cryptanalytic advances in the literature
+- CNSA 2.0 transition guidance updates
+- Partner roster's preferred algorithms
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Registry updates emit audit-chain entries and notify
+subscribers.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+## Annex F — Boundary-clock health
 
-## Annex H — Versioning and Deprecation Policy
+The boundary publishes a clock-health record in the
+capability document including the primary and secondary time
+sources, the most recent successful sync, and the current
+drift estimate.
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex G — Hardware-token-backed officer signatures
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+Crypto-officer actions require a hardware-token-backed user
+signature (e.g., FIDO2 / WebAuthn-class attestation). The
+deployment's identity authority records the hardware token's
+attestation in the audit chain alongside the officer action.
+A token marked compromised or lost is revoked immediately
+and outstanding tokens it backed are refused at the boundary.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex H — Worked TLS 1.3 hybrid negotiation (informative)
 
-## Annex I — Interoperability Profiles
+A worked hybrid handshake:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+1. Client offers `supported_groups` including
+   `x25519_kyber768` (hybrid) and `x25519` (classical
+   fallback)
+2. Server selects `x25519_kyber768`
+3. Both endpoints derive shared secret per the hybrid KDF
+4. Application data encrypted under the derived secret
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The boundary records the negotiated group on each TLS
+session for audit; persistent classical-fallback exceeds
+the deployment's tolerance triggers a roadmap review.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex I — Out-of-band partner-key bootstrap
+
+Initial partner enrolment uses an out-of-band exchange (e.g.,
+diplomatic-pouch, in-person hardware-token swap, signed
+postal package via two-person courier). The boundary
+verifies the bootstrap channel's evidence record before
+admitting the partner's key into the registry. Subsequent
+key rotations of a bootstrapped partner re-use the
+established trust path; loss of the bootstrap-evidence
+record forces a fresh out-of-band exchange.
+
+## Annex J — Disaster-recovery audit-chain reconstruction
+
+If the audit chain experiences a recoverable corruption
+(disk failure, partial power loss), reconstruction draws on:
+
+- The most recent regulator-witness mirror snapshot
+- Hash-chained backup copies held by partner deployments
+  per a documented mutual-attestation arrangement
+- Per-actor signed archives of write operations they
+  originated
+
+The boundary publishes a reconstruction-evidence record
+and reissues a phase-rolled-back marker if the
+reconstruction excludes any phase-advance event.
+Partners are notified within the deployment-declared
+recovery window and re-verify capability documents
+before resuming exchanges.
+
+## Annex K — Cross-region replication discipline
+
+For deployments that span multiple regions (DR pairs,
+multi-jurisdiction operations), inter-region replication
+respects the migration-phase declaration of each region:
+
+- A region in `pq-only` MUST NOT import classical-only
+  artifacts from a peer in `classical` phase except via
+  hybrid re-signing at the boundary
+- Cross-region phase advances are coordinated; a unilateral
+  phase-advance in one region without partner readiness
+  is logged as an audit-chain warning
+- Replication of the audit chain itself is per-region with
+  cross-region cross-references for incidents requiring
+  multi-region coordination
+
+Partners verify the per-region capability document of the
+peer they are exchanging with; capability mismatches
+between sibling regions are surfaced explicitly.

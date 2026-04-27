@@ -1,241 +1,331 @@
-# WIA-network-security PHASE 3 — PROTOCOL Specification
+# WIA-network-security PHASE 3 — Protocol Specification
 
 **Standard:** WIA-network-security
-**Phase:** 3 — PROTOCOL
+**Phase:** 3 — Protocol
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical PROTOCOL layer for WIA-network-security (Network Security).
+This PHASE specifies the protocols binding the data format
+(PHASE 1) to the API surface (PHASE 2): authentication of
+detectors, analysts, partners, and asset owners; the
+streaming binary projection for high-volume event ingestion;
+audit-chain construction; time discipline; TLP marking
+enforcement; cryptographic signing; and post-quantum
+migration.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 8446 (TLS 1.3), RFC 7515 (JWS), RFC 7517 (JWK),
+  RFC 9162 (Certificate Transparency 2.0)
+- OASIS TAXII 2.1 — for partner-exchange transport
+- OASIS Sigma — for correlation-rule signing
+- IETF RFC 6545 (RID) — for cross-organisation incident notification
+- WIA-pq-crypto PHASE 3 — for ML-KEM/ML-DSA migration profiles
 
 ---
 
-## §1 Scope
+## §1 Authentication
 
-This PHASE document is one of four that together define the WIA-network-security
-standard. It addresses the protocol layer of the standard.
+Detectors, analysts, asset owners, partners, and regulator
+roles authenticate using JWS-signed JWTs issued by the
+deployment's identity authority. Token claims:
 
-## §2 Manifest
+- `iss` — issuing authority URN
+- `sub` — operator/system URN
+- `aud` — boundary URN
+- `iat`, `exp` — RFC 3339 with offset
+- `wia.role` — one of the roles in PHASE 2 Annex F
+- `wia.scope[]` — operation-class scopes
+- `wia.detectorRef` — for detector tokens, the URN of the
+  detector the token speaks for
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "network-security"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Analyst tokens are short-lived (typically 15 minutes for
+write-capable, 60 minutes for read-only). Detector tokens
+may be longer-lived (24 hours) where rotated by the
+deployment's secrets pipeline; long-lived static credentials
+are forbidden for any human role.
 
-## §3 Conformance Tiers
+## §2 Streaming binary projection
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+For very-high-volume event ingestion (millions of events per
+second across a fleet), a binary projection is offered. The
+projection is a length-prefixed CBOR stream over a mutual-TLS
+1.3 connection. Each frame:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- 4-byte length prefix
+- CBOR-encoded event record (PHASE 1 §3 with canonical key
+  ordering)
+- 32-byte per-frame MAC (HMAC-SHA-256 with rotated key)
 
-## §4 Discovery
+The boundary acknowledges in batches; consumers retransmit
+unacknowledged events on reconnect using the boundary's
+last-known-good cursor. The binary projection is opt-in;
+deployments without high-volume needs use the JSON streaming
+endpoint of PHASE 2 §2.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/network-security`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Audit chain
 
-## §5 Time and Identity
+Every boundary state transition is appended to a Merkle
+audit log:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `entryId` — URN
+- `parent` — prior `entryId` SHA-256
+- `at` — RFC 3339 with offset
+- `actor` — authority URN making the transition
+- `kind` — closed enum: `asset-registered`, `event-ingested`,
+  `ioc-published`, `tio-published`, `vuln-published`,
+  `vuln-remediated`, `incident-opened`, `incident-state-changed`,
+  `incident-closed`, `alert-state-changed`, `action-executed`,
+  `action-outcome-recorded`, `tlp-marking-changed`,
+  `regulator-witnessed`, `risk-accepted`
+- `payloadHash` — SHA-256 of the canonical JSON payload
+- `signature` — JWS by the actor
 
-## §6 Versioning and Deprecation
+Anchored deployments mirror the audit chain to a regulator-
+trusted witness on a declared cadence. Specific entry classes
+(`risk-accepted`, `regulator-witnessed`) are mandatory-mirror
+under regulator MoUs.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 TLP marking enforcement
 
-## §7 Privacy and Security
+TLP markings flow with IOCs, TIOs, and incident-related
+artifacts. The boundary enforces:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Re-distribution refused if target's clearance is below
+  marking
+- Marking downgrade requires a signed downgrade record
+  (PHASE 1 §7 incident `lessonsLearnedRef` typically
+  references the downgrade rationale)
+- Marking upgrade is permitted unilaterally and propagated
+  to subscribers via the webhook surface
 
-## §8 Open Governance
+Refusals are audit-chained at `kind=tlp-marking-refusal` with
+the partner identity that was refused.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `network-security` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Time discipline
+
+All record timestamps use RFC 3339 with explicit offset.
+Boundary clock is disciplined to a national-laboratory time
+reference; drift outside declared bound triggers a
+`boundary-clock-degraded` capability flag and tags subsequent
+records `provisional` until recovered. Detector clocks are
+expected to be NTP-disciplined; events with timestamps
+outside the boundary's declared `clockSlackBudget` are
+refused.
+
+## §6 Transport security
+
+All endpoints require TLS 1.3 (RFC 8446) with a deployment-
+declared cipher-suite list. Mutual TLS is required for
+detector, partner-TAXII, regulator, and binary-projection
+endpoints. Certificate revocation is published through the
+deployment's revocation surface; aligned with the
+deployment-declared revocation cadence.
+
+## §7 RID cross-organisation notification
+
+For incidents requiring cross-organisation notification (e.g.,
+infections traced to a partner's network), the boundary
+emits an IETF RFC 6545 RID message:
+
+- Iodef-bound XML payload (or JSON projection where the
+  partner supports it)
+- Signed by the deployment's incident-notification key
+- Delivered over the partner's documented RID endpoint or
+  via TAXII as a fallback
+
+Receipt acknowledgements are audit-chained.
+
+## §8 OpenC2 action authentication
+
+Response actions (PHASE 1 §9) carry an OpenC2-signed
+authorisation token in addition to the analyst's JWT. The
+token identifies the action's policy basis and is verified
+by the executing control-plane component before execution.
+Unauthorised actions are refused at the control plane and
+the refusal is audit-chained.
+
+## §9 Replay protection
+
+Event POST, IOC POST, and action POST require
+`Idempotency-Key`; the boundary stores keys for 24 hours.
+Replays within that window with the same body return the
+original response; different bodies return
+`urn:wia:nsec:problem:idempotency-conflict`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cryptographic signature suite
 
-## Annex E — Implementation Notes for PHASE-3-PROTOCOL
+Default signature algorithms are ECDSA P-256 with SHA-256 for
+analyst and detector tokens, and EdDSA (Ed25519) for audit-
+chain entries. Deployments may declare alternative suites in
+the capability document; partners verify suite compatibility
+on initial connection.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-3-PROTOCOL.
+## Annex B — Post-quantum migration
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+The standard supports a phased PQC migration aligned with
+WIA-pq-crypto PHASE 3:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+- Phase A — classical-only (current default)
+- Phase B — hybrid (classical + ML-KEM, classical + ML-DSA)
+- Phase C — PQ-only
 
-## Annex F — Adoption Roadmap
+Detectors in unmaintained appliances may remain on Phase A
+under documented exception; the exception is recorded in the
+capability document and tracked for end-of-support
+remediation.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Cipher-suite floors
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Endpoints accept only TLS 1.3 cipher suites with forward
+secrecy. The cipher-suite floor is published in the
+capability document; partners verify compatibility before
+exchange. The detector-onboarding playbook explicitly lists
+the floor so detector vendors can verify support before
+integration.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Negative-test vectors for protocol layer
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Stimulus                                              | Expected outcome                              |
+|-------------------------------------------------------|-----------------------------------------------|
+| Detector token without `wia.detectorRef`              | 422 + detector-token-malformed                |
+| Event with timestamp outside clock-slack budget       | 422 + clock-discipline-violation              |
+| TAXII partner request with insufficient TLP clearance | 403 + tlp-distribution-denied                 |
+| OpenC2 action without authorisation token             | 403 + action-authorisation-missing            |
+| Audit-chain entry with broken parent hash             | rejected at append; boundary alerts           |
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Algorithm registry
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-3-PROTOCOL. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+The deployment maintains an algorithm registry naming the
+cipher and signature algorithms in use per role class. The
+registry is published in the capability document and tracked
+across PQ migration phases for partner verification.
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-3-protocol/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-3-PROTOCOL with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+## Annex F — Boundary-clock health
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-3-PROTOCOL does not require bespoke
-auditor tooling.
+The boundary publishes a clock-health record in the
+capability document including the primary and secondary time
+sources, the most recent successful sync, and the current
+drift estimate. Partners verify clock health before
+accepting time-sensitive products.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex G — Worked correlation-rule signing
 
-This annex codifies the versioning and deprecation policy for PHASE-3-PROTOCOL.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+Sigma-aligned correlation rules are signed for distribution:
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+1. SOC-author drafts the rule and submits it via the SIEM's
+   rule-management interface
+2. The deployment's rule-review workflow signs off; the
+   signed rule package is stored with its `correlationRuleRef`
+3. Rule package signatures are verified at SIEM load time;
+   unverified rules are not loaded into production
+4. Rule mutations enter a versioned chain; the rule library's
+   Merkle root is published in the capability document
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+For partner-shared rules (e.g., a TLP:GREEN community rule),
+the partner's signature is verified against their published
+key before promotion.
 
-## Annex I — Interoperability Profiles
+## Annex H — Action-blast-radius limits
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-3-PROTOCOL. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Response actions (PHASE 1 §9) carry implicit blast-radius
+limits enforced at protocol level:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P3-PROTOCOL-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- `block-network-flow` — limited to /24 by default for
+  Tier-1 analysts; broader scopes require Tier-2 or above
+- `quarantine-host` — limited to non-tier-1-criticality assets
+  for Tier-1; tier-1 assets require SOC-lead approval
+- `disable-account` — non-privileged accounts only for
+  Tier-1; privileged accounts require IAM-lead approval
+- `kill-process` — single host scope for Tier-1; fleet-wide
+  process kill requires Tier-2 or above
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The deployment publishes its action-blast-radius matrix in
+the capability document.
+
+## Annex I — Anonymisation envelope
+
+Where TLP and PPI controls require anonymisation before
+re-disclosure, the boundary applies a documented anonymisation
+envelope:
+
+- IPs in PPI:USER class are k-anonymised (k declared per
+  policy) for partner sharing
+- Usernames are replaced with deterministic per-partner
+  pseudonyms so the partner can correlate across messages
+  without learning identity
+- Free-text fields are scanned for PII and redacted; the
+  redactor's policy version is included in the envelope
+
+The anonymisation envelope is itself a versioned artifact;
+changes to the envelope require a privacy-officer counter-
+signature and emit a `privacy-envelope-mutated` audit-chain
+entry.
+
+## Annex J — RID notification template
+
+A worked RID-over-TAXII notification:
+
+```json
+{
+  "ridId": "urn:wia:nsec:rid:soc-x:rid-2026-04-27-014",
+  "incidentRef": "urn:wia:nsec:incident:soc-x:i-2026-04-27-001",
+  "partnerRef": "urn:wia:auth:partner-y",
+  "kind": "infection-sourced-from-partner",
+  "evidenceRefs": ["urn:wia:nsec:event:soc-x:e-991","urn:wia:nsec:ioc:soc-x:i-2-001"],
+  "tlpMarking": "amber",
+  "originatorSignature": "<jws-detached>"
+}
+```
+
+Partner receipt acknowledgement:
+
+```json
+{
+  "ackId": "urn:wia:nsec:rid-ack:partner-y:a-2026-04-27-014",
+  "ridRef": "urn:wia:nsec:rid:soc-x:rid-2026-04-27-014",
+  "receivedAt": "2026-04-27T22:45:00+09:00",
+  "partnerSignature": "<jws-detached>"
+}
+```
+
+## Annex K — JWT claim cookbook
+
+Worked claim sets per role:
+
+```json
+{
+  "iss": "urn:wia:auth:soc-x-identity",
+  "sub": "urn:wia:auth:soc-x-analyst-3",
+  "aud": "urn:wia:nsec:boundary:soc-x",
+  "iat": "2026-04-27T22:30:00+09:00",
+  "exp": "2026-04-27T22:45:00+09:00",
+  "wia.role": "analyst",
+  "wia.scope": ["events:read","alerts:write","incidents:write"],
+  "wia.tier": 1
+}
+```
+
+Detector token claims include `wia.detectorRef` and a
+narrower scope (`events:write` only). Partner-TAXII tokens
+include `wia.tlpClearance` declaring the highest TLP marking
+the partner is cleared to receive on the collection.
+
+## Annex L — Detector-onboarding handshake
+
+Detector onboarding follows a documented handshake:
+
+1. Detector vendor presents a signed detector-bundle manifest
+   declaring `detectorRef`, supported event schemas, and
+   confidence calibration
+2. Boundary verifies the manifest's signature against the
+   vendor's published key
+3. Initial test events are submitted in a sandbox lane
+4. SOC lead reviews and approves promotion to production
+5. Production token is issued; the detector is recorded in
+   the capability document
+
+A detector promoted to production is monitored for false-
+positive rate and confidence calibration; persistent drift
+triggers a re-onboarding review.

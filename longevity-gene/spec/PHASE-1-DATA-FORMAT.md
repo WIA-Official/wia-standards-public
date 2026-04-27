@@ -1,241 +1,276 @@
-# WIA-longevity-gene PHASE 1 — DATA-FORMAT Specification
+# WIA-longevity-gene PHASE 1 — Data Format Specification
 
 **Standard:** WIA-longevity-gene
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-longevity-gene (Longevity Gene).
+This PHASE defines the canonical data format for longevity-
+gene research and clinical genomics: variant records linked to
+longevity-relevant phenotypes, polygenic-risk scores for healthy
+ageing, biological-age estimators (DNA methylation clocks,
+telomere length, gene-expression panels), and the cross-references
+that bind these genomic artefacts to clinical and lifestyle
+records. The shape interoperates with HL7 FHIR R5 Genomics
+Reporting and with GA4GH Variation Representation Specification
+(VRS) so existing clinical-genomics deployments adopt this PHASE
+without parallel data models.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Genomics Reporting Implementation Guide,
+  Observation, MolecularSequence, DiagnosticReport
+- GA4GH Variation Representation Specification (VRS) 1.3
+- GA4GH Phenopacket Schema 2.0
+- HGNC (HUGO Gene Nomenclature Committee) gene symbols and
+  identifiers
+- Ensembl / RefSeq / LRG transcript and reference-sequence systems
+- HGVS sequence-variant nomenclature 21.0.5 (https://hgvs-nomenclature.org)
+- ACMG/AMP 2015 + 2017 amendments — sequence-variant
+  interpretation
+- ClinVar / dbSNP — public variant references
+- ISO 20691:2022 — Bioinformatics standard data formats for
+  next-generation sequencing
+- ISO/TS 22692:2020 — Quality control for NGS
+- ISO 23950 / Z39.50 — only as legacy (not preferred)
+- CDISC SDTM, CDASH — clinical research data standards
+- WHO ICD-11
+- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 3339
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-longevity-gene
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that:
 
-## §2 Manifest
+- Generate or interpret germline variants relevant to healthy
+  ageing or longevity (APOE, FOXO3, TP53, SIRT genes, telomere-
+  pathway genes, etc.)
+- Compute polygenic-risk scores (PRS) for ageing-related
+  phenotypes (cardiovascular, cognitive, metabolic, frailty)
+- Quantify biological age (epigenetic clocks: Horvath, Hannum,
+  PhenoAge, GrimAge, DunedinPACE; telomere length; transcriptomic
+  age)
+- Combine genomic and phenotypic signals into longevity reports
+  for individual or population studies
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "longevity-gene"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Out of scope: somatic-cancer variant calling (covered by sibling
+oncology-genomics standard) and pharmacogenomic dosing (covered
+by sibling pharmacogenomics standard).
 
-## §3 Conformance Tiers
+The standard is jurisdiction-aware: deployments declare the
+applicable genetic-information regulation (US GINA, EU GDPR
+Article 9 + national genetics laws, K-PIPA 유전정보 특별보호,
+JP Act on the Protection of Personal Information, BR LGPD).
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Sequence-variant identity
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Variants are identified following GA4GH VRS:
 
-## §4 Discovery
+- `variantRef` — URN of form `urn:wia:long:variant:<vrs-id>`
+  where `vrs-id` is the deterministic VRS identifier
+- `genomeAssembly` — URN of the reference assembly
+  (`urn:wia:long:assembly:GRCh38.p14`, `GRCh37.p13`, `T2T-CHM13v2.0`)
+- `transcriptRef` — Ensembl/RefSeq/LRG transcript URN where the
+  variant is annotated against a transcript
+- `geneSymbol` — HGNC-approved gene symbol (e.g., `APOE`)
+- `hgvsExpressions[]` — HGVS string forms across genomic, coding
+  DNA, and protein where applicable
+- `clinvarId` / `dbsnpId` — public registry cross-references
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/longevity-gene`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The boundary verifies VRS identifiers via canonicalisation;
+non-canonical forms are normalised before storage so duplicate
+representations of the same variant collapse to one record.
 
-## §5 Time and Identity
+## §3 Variant interpretation record
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Each variant interpretation is a FHIR Observation profiled to
+the Genomics Reporting IG:
 
-## §6 Versioning and Deprecation
+| FHIR field            | Binding                                                          |
+|-----------------------|------------------------------------------------------------------|
+| `status`              | preliminary / final / amended / corrected                        |
+| `category`            | `genomics`                                                       |
+| `code`                | LOINC variant-interpretation code (53037-8 for sequence variant) |
+| `subject`             | pseudonymous individual                                          |
+| `effectiveDateTime`   | RFC 3339 with offset                                            |
+| `valueCodeableConcept`| ACMG/AMP classification (Pathogenic / Likely Pathogenic / VUS / Likely Benign / Benign) |
+| `interpretation`      | longevity-relevant interpretation (e.g., `risk-allele`, `protective-allele`) |
+| `evidence[]`          | references to ClinVar, literature DOIs, in-silico predictors,
+                          functional studies                                              |
+| `note[]`              | clinician/curator commentary                                      |
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Interpretation criteria use the ACMG/AMP framework; the boundary
+records the specific criteria invoked (PVS1, PS1, PM2, etc.) so
+re-interpretation in light of new evidence is traceable.
 
-## §7 Privacy and Security
+## §4 Polygenic-risk score record
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+PRS records are FHIR Observations with structured PRS-specific
+extensions:
 
-## §8 Open Governance
+- `prsId` — URN
+- `prsModelRef` — URN of the PRS model with version
+  (e.g., `urn:wia:long:prs-model:PGS001234:v1.0`)
+- `subject` — pseudonymous individual
+- `effectiveDateTime` — RFC 3339
+- `rawScore` — model output (typically a continuous value)
+- `percentile` — within-population percentile with declared
+  population reference
+- `populationReferenceRef` — URN of the reference population
+  (1000 Genomes Project, gnomAD, UK Biobank, KOREA-1K, J-MICC)
+- `effectMeasure` — declared effect measure (odds ratio,
+  hazard ratio, age-adjusted risk)
+- `confidenceInterval` — declared CI (95% conventional)
+- `model.qcStatus` — `passed` / `failed` per the model's QC
+  cadence
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `longevity-gene` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+PRS scores are not portable across populations without
+re-calibration; the boundary refuses to display a score
+computed against a population reference that does not match
+the subject's declared ancestry without an explicit
+disclaimer record.
+
+## §5 Biological-age record
+
+Biological-age estimates are FHIR Observations with epigenetic-
+or transcriptomic-clock metadata:
+
+- `bioAgeId` — URN
+- `clockModelRef` — URN of the clock model with version
+  (e.g., `urn:wia:long:clock-model:Horvath-2013:v1.0`)
+- `subject` — pseudonymous individual
+- `effectiveDateTime` — RFC 3339 of sample acquisition
+- `chronologicalAgeYears` — declared at sample time
+- `biologicalAgeYears` — model output
+- `accelerationYears` — bio-age − chronological-age
+- `tissueRef` — sample tissue (whole blood, saliva, buccal,
+  PBMC, dermal fibroblast, etc.)
+- `assayPlatform` — methylation array (e.g., Illumina
+  EPICv1.0/v2.0, HumanMethylation450), sequencing-based
+  methylation, transcriptomic platform
+- `qcMetrics` — bisulfite-conversion efficiency, missing-CpG
+  rate, batch effect indicator
+
+Biological-age measurements are tissue- and platform-specific;
+the boundary records both metadata fields on every record so
+cross-study aggregation honours methodological boundaries.
+
+## §6 Telomere-length record
+
+Telomere length is captured per cell type or whole sample:
+
+- `telomereId` — URN
+- `subject` — pseudonymous individual
+- `effectiveDateTime` — RFC 3339
+- `tissueRef` — sample tissue
+- `cellType` — for sorted-cell measurements (e.g., naive CD4+
+  T-cells); null for whole-blood
+- `methodRef` — URN denoting method (qPCR T/S ratio, TRF
+  Southern blot, STELA, qFISH, computational from WGS)
+- `mean` — value with unit (`base-pair`, `T/S`)
+- `confidenceInterval` — declared CI
+- `qcStatus` — `passed` / `failed`
+
+## §7 Phenotype linkage
+
+Variant interpretations and biological-age records reference
+a Phenopacket-aligned phenotype record:
+
+- `phenotypeRef` — URN of the linked Phenopacket
+- `phenotypeOnsetAge` — declared onset (HPO age group or
+  ISO 8601 duration)
+- `phenotypeSeverity` — HPO severity term where applicable
+
+Phenopackets carry the longitudinal phenotype context
+(disease history, family history, environmental exposures)
+that contextualises the genomic finding.
+
+## §8 Cross-domain references
+
+| Reference                  | Use site                                                  |
+|----------------------------|-----------------------------------------------------------|
+| WIA-medical-data-privacy   | every record references the consent record (genetics-specific consent class) |
+| WIA-medical-iot            | wearables that contribute to bio-age inputs (sleep, HRV)  |
+| WIA-medication-adherence   | longitudinal pharmacological exposures                    |
+| WIA-network-security       | TLS cipher-suite floor for clinical-lab data flows        |
+| WIA-pq-crypto              | post-quantum migration phase                              |
+
+## §9 Subject identifier scope
+
+Subject identifiers are pseudonymous per WIA-medical-data-privacy
+`subjectRef` shape. Genetic data is exceptionally high-sensitivity
+PHI and inherits the highest-class consent and disclosure
+discipline.
+
+## §10 Conformance levels
+
+| Level     | Scope                                                              |
+|-----------|--------------------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                               |
+| Verified  | annual third-party audit including GA4GH VRS conformance review    |
+| Anchored  | continuous evidence package + ISO 20691 NGS quality-control attestation |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked variant interpretation (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```json
+{
+  "resourceType": "Observation",
+  "status": "final",
+  "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "genomics"}]}],
+  "code": {"coding": [{"system": "http://loinc.org", "code": "53037-8", "display": "Genetic variation clinical significance"}]},
+  "subject": {"reference": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e"},
+  "effectiveDateTime": "2026-04-28T12:00:00+09:00",
+  "valueCodeableConcept": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", "code": "B", "display": "Benign"}]},
+  "extension": [{
+    "url": "https://wia.example/fhir/StructureDefinition/wia-longevity-variant",
+    "extension": [
+      {"url": "variantRef", "valueUri": "urn:wia:long:variant:ga4gh:VA.E0o4HzNvjnqQyDg-Sp-ddlyZpv9R-7TI"},
+      {"url": "geneSymbol", "valueString": "APOE"},
+      {"url": "hgvsCdna", "valueString": "NM_000041.4:c.388T>C"},
+      {"url": "hgvsProtein", "valueString": "NP_000032.1:p.Cys130Arg"},
+      {"url": "longevityInterpretation", "valueCode": "risk-allele"}
+    ]
+  }]
+}
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Negative test vectors (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Stimulus                                                | Expected outcome                                  |
+|---------------------------------------------------------|---------------------------------------------------|
+| Variant interpretation without ACMG/AMP criteria         | 422 + `acmg-criteria-required`                    |
+| PRS computed against mismatched population reference     | accepted with disclaimer; flagged in summary      |
+| Bio-age record without QC metrics                        | 422 + `bio-age-qc-required`                       |
+| Telomere-length record without method reference          | 422 + `telomere-method-required`                  |
+| Variant interpretation referencing retracted publication | accepted, flagged for re-interpretation review    |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Longevity-gene panel reference (informative)
 
-## Annex F — Adoption Roadmap
+The deployment publishes its longevity-gene panel as a versioned
+catalogue; each entry includes the gene symbol, longevity
+relevance category, and supporting literature reference:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- **APOE** — Alzheimer's risk and lipid metabolism;
+  ε2/ε3/ε4 alleles influence late-onset Alzheimer's risk
+- **FOXO3** — extreme-longevity association across multiple
+  populations (Okinawan, Ashkenazi, Italian centenarian cohorts)
+- **TP53** — somatic-stability and ageing; rare germline
+  variants influence longevity through senescence
+- **KLOTHO** — KL gene variants influencing klotho protein
+  levels; longevity association in some populations
+- **SIRT1, SIRT3, SIRT6** — sirtuin family
+- **TERT, TERC, DKC1** — telomere-pathway core genes
+- **WRN, BLM, RECQL4** — DNA repair (RecQ helicases)
+- **APOC3** — protective rare variants
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The catalogue is signed; updates are version-bumped and
+notified to consumers.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Versioning and deprecation
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
-
-## Annex G — Test Vectors and Conformance Evidence
-
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
-
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Versioning follows Semantic Versioning 2.0.0. Major bumps
+require ≥ 90 days overlap on all fielded reference
+implementations. Deprecated VRS-version representations
+remain valid for verification of historical observations.

@@ -1,241 +1,390 @@
-# WIA-neural-enhancement PHASE 2 — API-INTERFACE Specification
+# WIA-neural-enhancement PHASE 2 — API Interface Specification
 
 **Standard:** WIA-neural-enhancement
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-neural-enhancement (Neural Enhancement).
+This PHASE defines the API surface a neural-enhancement
+deployment exposes for device registry, recording-session
+publication, stimulation-session control, decoded-intent
+streams, calibration management, adverse-event reporting,
+consent management, and clinical-context capture. The shape
+is HTTP/JSON for clinical-system planes; high-rate neural
+streaming uses the binary projection in PHASE 3.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS)
+- HL7 FHIR R5 — for AE-reporting resources
+- Brain Imaging Data Structure (BIDS) — for recording bundle layout
+- Neurodata Without Borders (NWB) 2.x
+- WIA-privacy PHASE 2 — for participant-pseudonym binding
+- IEC 62366-1 — for usability-engineering linkage
 
 ---
 
-## §1 Scope
+## §1 Device registry endpoints
 
-This PHASE document is one of four that together define the WIA-neural-enhancement
-standard. It addresses the api-interface layer of the standard.
+```
+POST /devices HTTP/1.1
+Authorization: Bearer <jws-clinician-jwt>
+Content-Type: application/json
+```
 
-## §2 Manifest
+Body is a PHASE 1 §2 device record. Successful intake
+returns 201 Created with the boundary's URN binding. Updates
+to firmware version use PUT against the device URN; the
+boundary verifies the firmware-update artifact's provenance
+through the WIA-supply-chain integration.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "neural-enhancement"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /devices/{deviceRef}
+GET /devices?vendorRef=…&deviceClass=intracortical-array
+```
 
-## §3 Conformance Tiers
+## §2 Recording-session publication
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+```
+POST /recordings HTTP/1.1
+```
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+Body is a PHASE 1 §3 recording record. The boundary verifies
+`consentRef` is current and includes `recording` in scope;
+without that, the response is 403 with
+`urn:wia:nenh:problem:consent-missing-recording-scope`.
 
-## §4 Discovery
+```
+GET /recordings/{recordingId}
+GET /recordings?participantPseudonym=…&since=…
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/neural-enhancement`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+The BIDS/NWB bundle is referenced by URI; the boundary
+does not store raw neural data inline. Bundles are stored
+in the deployment's clinical-data store with appropriate
+access controls.
 
-## §5 Time and Identity
+## §3 Stimulation-session control
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+```
+POST /stimulation/sessions HTTP/1.1
+```
 
-## §6 Versioning and Deprecation
+Body is a PHASE 1 §4 stimulation record. Pre-checks at
+intake:
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+- `consentRef` is current and includes `stimulation` scope
+- `safetyEnvelopeRef` is current and signed by the
+  responsible clinician
+- Device is within calibration window (or under documented
+  exception)
 
-## §7 Privacy and Security
+```
+PUT /stimulation/sessions/{stimulationId}/state
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+State transitions: `proposed` → `scheduled` → `in-progress`
+→ `completed`. Mid-session interruption requires the safety-
+envelope's `interrupt` action to be issued; the boundary
+records the interruption rationale.
 
-## §8 Open Governance
+```
+POST /stimulation/sessions/{stimulationId}/interrupt
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `neural-enhancement` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Issued by the safety system or clinician; the boundary halts
+ongoing stimulation, records the interruption, and emits a
+`stimulation-interrupted` audit-chain entry. Re-engagement
+requires an explicit re-authorisation step.
+
+## §4 Decoded-intent stream
+
+For BCI applications, decoded-intent records are streamed:
+
+```
+GET /decode/sessions/{recordingId}/stream HTTP/1.1
+Accept: text/event-stream
+```
+
+Each event is a PHASE 1 §5 decoded-intent record. The
+stream is filtered to the analyst's authorised scope and
+respects the participant's consent. Effector-output
+dispatch is subject to the active safety envelope.
+
+```
+POST /decode/effector-acks HTTP/1.1
+```
+
+Effector control planes acknowledge dispatch by posting an
+ack record referencing the decoded-intent URN.
+
+## §5 Calibration management
+
+```
+POST /calibrations HTTP/1.1
+GET /calibrations/{calibrationId}
+GET /calibrations?deviceRef=…&since=…
+```
+
+POST submits a PHASE 1 §6 calibration record. The boundary
+updates the device's `lastServiceAt` and `reCalibrationDueAt`
+based on the methodology. Devices past their due date are
+flagged in the registry; subsequent stimulation sessions
+against them are refused (or flagged for documented
+exception).
+
+## §6 Adverse-event reporting
+
+```
+POST /adverse-events HTTP/1.1
+```
+
+Body is a PHASE 1 §7 adverse-event record. The boundary:
+
+- Verifies `participantPseudonym` matches an active
+  participant
+- Notifies the clinical-team's AE workflow via webhook
+- Pauses outstanding stimulation sessions for the
+  participant pending review
+- Triggers PHASE 4 §6 regulatory-reporting workflow
+
+```
+PUT /adverse-events/{aeId}/state
+```
+
+State transitions follow the deployment's AE workflow:
+`open` → `under-investigation` → `assessed` → `reported` →
+`closed`. Each transition is signed.
+
+## §7 Consent management
+
+```
+POST /consents HTTP/1.1
+```
+
+Body is a PHASE 1 §8 consent record. The boundary verifies
+the protocol exists and the participant pseudonym is
+recognised.
+
+```
+PUT /consents/{consentId}/withdraw
+```
+
+Withdraws an active consent. The withdrawal:
+
+- Revokes outstanding session-permissions associated with
+  the consent's scope
+- Notifies the clinical team
+- Preserves data already collected per the deployment's
+  retention policy
+- Audit-chains the withdrawal
+
+## §8 Clinical-context note publication
+
+```
+POST /clinical-notes HTTP/1.1
+```
+
+Body is a PHASE 1 §9 clinical-context note. The boundary
+stores the note and links it to referenced sessions; notes
+are accessible to the participant's care team and the
+research analytics team per the consent's scope.
+
+## §9 Capability discovery
+
+```
+GET /.well-known/wia/neural-enhancement HTTP/1.1
+```
+
+Returns the capability document:
+
+```json
+{
+  "wia.standardVersion": "1.0",
+  "wia.implementationVersion": "clinic-x-2.1.0",
+  "supportedDeviceClasses": ["intracortical-array","ecog-grid","eeg-headset"],
+  "supportedModalities": ["electrical","magnetic"],
+  "preferredBundleFormat": "bids",
+  "consentFrameworkRef": "urn:wia:nenh:consent-framework:clinic-x-v3",
+  "manifest": "https://clinic-x.example/.well-known/wia/neural-enhancement/manifest.jws"
+}
+```
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Idempotency
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Recording POST and stimulation POST accept `Idempotency-Key`.
+Boundary stores keys for 7 days. Replays return the original
+response.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## Annex B — Pagination
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+List endpoints support cursor pagination with cursors signed
+by the boundary, valid for 30 minutes. Page envelopes
+declare the snapshot epoch.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Negative-test vectors (informative)
 
-## Annex F — Adoption Roadmap
+| Stimulus                                            | Expected response                              |
+|-----------------------------------------------------|------------------------------------------------|
+| Recording POST without consent in scope             | 403 + consent-missing-recording-scope          |
+| Stimulation POST against device past calibration    | 403 + calibration-expired (or under-exception) |
+| Stimulation parameters outside safety envelope      | 422 + safety-envelope-violation                |
+| AE POST referencing unknown participant pseudonym   | 422 + participant-unknown                      |
+| Consent withdrawal during in-progress stimulation   | 200 + queued; safe-exit triggered              |
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex D — Bulk export
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+For research replay, bulk export endpoints serve NDJSON over
+a date range, gated by the deployment's bulk-quota policy:
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+```
+GET /export/recordings?from=…&to=…&protocolRef=…
+GET /export/decode?from=…&to=…
+```
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+Bulk export honours the consent's data-sharing scope; export
+of non-sharing-scoped data is refused.
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Webhook subscriptions
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+Push subscriptions for clinical teams, research teams, and
+device vendors:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+POST /subscriptions HTTP/1.1
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Body declares event classes (`stimulation-interrupted`,
+`adverse-event-opened`, `consent-withdrawn`, `device-firmware-
+updated`) and filters. Webhook delivery uses TLS 1.3 with a
+detached JWS in `Wia-Signature`.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Authorities and roles
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+| Role                    | Scope                                            |
+|-------------------------|--------------------------------------------------|
+| `responsible-clinician` | full read/write on managed participants          |
+| `treating-clinician`    | session-level write within consent               |
+| `research-analyst`      | recording read within consent's data-sharing scope |
+| `device-vendor`         | firmware update artifact submission              |
+| `regulatory-officer`    | AE-reporting workflow                            |
+| `participant`           | own consent and own data access                  |
+| `auditor`               | read-only across engagement scope                |
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex G — Worked AE record (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```json
+{
+  "aeId": "urn:wia:nenh:ae:clinic-x:ae-2026-04-27-001",
+  "participantPseudonym": "p-clinic-x-PR-014",
+  "deviceRef": "urn:wia:nenh:device:clinic-x:d-001",
+  "relatedSessionRefs": ["urn:wia:nenh:stimulation:clinic-x:s-2026-04-27-014"],
+  "onsetAt": "2026-04-27T14:50:00+09:00",
+  "severity": "moderate",
+  "narrativeRef": "urn:wia:nenh:note:clinic-x:n-001",
+  "causalityAssessment": "possible",
+  "reportingObligationsRef": "urn:wia:reg:rok-mfds-medical-device-ae"
+}
+```
 
-## Annex I — Interoperability Profiles
+## Annex H — Capability versioning
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+Capability documents declare both `wia.standardVersion` and
+`wia.implementationVersion`. A standard-version mismatch is
+a hard refusal; an implementation-version mismatch is logged
+but not refusing.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex I — Audit-chain replay
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+For regulators and Anchored auditors, the boundary serves a
+selective audit-chain replay at `/audit/chain` filtered by
+kind and time range. Restricted kinds (e.g., AE) require
+the requester's role to authorise access.
+
+## Annex J — Re-identification request endpoint
+
+When clinically necessary, re-identification of a
+participant pseudonym may be requested:
+
+```
+POST /reidentify HTTP/1.1
+Authorization: Bearer <jws-responsible-clinician-jwt>
+Content-Type: application/json
+
+{
+  "reidentifyId": "urn:wia:nenh:reid:clinic-x:r-001",
+  "participantPseudonym": "p-clinic-x-PR-014",
+  "rationale": "treating-clinician requires medical-history access for AE assessment",
+  "consentRef": "urn:wia:nenh:consent:clinic-x:c-014-2026-q1",
+  "responsibleClinicianSignature": "<jws>"
+}
+```
+
+The boundary verifies the consent includes `re-identification`
+in scope; without that, the request is refused. Approved
+re-identification is audit-chained at
+`kind=participant-reidentified`.
+
+## Annex K — Effector control-plane handshake
+
+Effector control planes register with the boundary via:
+
+```
+POST /effectors HTTP/1.1
+Authorization: Bearer <jws-effector-control-plane-jwt>
+
+{
+  "effectorRef": "urn:wia:nenh:effector:clinic-x:e-001",
+  "effectorType": "prosthetic-arm",
+  "vendorRef": "urn:wia:vendor:effector-vendor-a",
+  "safetyEnvelopeHash": "<sha-256>",
+  "controlPlaneSignature": "<jws>"
+}
+```
+
+The boundary verifies the safety-envelope hash against the
+clinician-signed envelope referenced by sessions targeting
+the effector. Mismatches cause refusal of dispatch until
+reconciled.
+
+## Annex L — Sandbox lane
+
+For pre-production validation, the boundary exposes a
+sandbox lane:
+
+```
+POST /sandbox/recordings
+POST /sandbox/stimulation/sessions
+```
+
+Sandbox endpoints accept records under a synthetic-data
+participant pseudonym. Sandbox results never feed clinical
+review or regulatory reporting.
+
+## Annex M — Data-access request handling
+
+Participant data-access requests are received via the portal
+or a written request to the deployment's privacy officer:
+
+- Request is recorded as a `data-access-request` artifact
+- The privacy officer reviews scope and produces the
+  exportable bundle (PHASE 1 §3 records, AE records,
+  consent records, decoded-intent summaries)
+- Bundle is delivered via a secure channel chosen by the
+  participant
+- Request handling is audit-chained at `kind=data-access-fulfilled`
+
+## Annex N — Operations dashboard endpoints
+
+For SOC-leadership and risk-officer visibility, the boundary
+exposes aggregate dashboards:
+
+```
+GET /metrics/sessions?period=2026-Q2&groupBy=deviceClass
+GET /metrics/ae?period=2026-Q2&groupBy=severity
+GET /metrics/calibration-trend?deviceClass=intracortical-array
+```
+
+Metrics are aggregated and respect TLP markings on the
+underlying records.

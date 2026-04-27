@@ -1,241 +1,388 @@
-# WIA-mineral-mining PHASE 2 — API-INTERFACE Specification
+# WIA-mineral-mining PHASE 2 — API Interface Specification
 
 **Standard:** WIA-mineral-mining
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-mineral-mining (Mineral Mining).
+This PHASE defines the API surface a mining operation
+exposes for asset registry, exploration data submission,
+resource and reserve filings, production publication,
+assay intake, environmental sample publication, worker-
+exposure reporting, and supply-chain handover. The shape
+is HTTP/JSON.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- IETF RFC 9457 (Problem Details), RFC 7515 (JWS)
+- CRIRSCO International Reporting Template
+- ISO 17025 — laboratory accreditation reference
+- OECD DDG — handover status framework
+- WIA-supply-chain PHASE 2 — for handover delegation
 
 ---
 
-## §1 Scope
+## §1 Asset registry endpoints
 
-This PHASE document is one of four that together define the WIA-mineral-mining
-standard. It addresses the api-interface layer of the standard.
+```
+POST /assets HTTP/1.1
+Authorization: Bearer <jws-operator-jwt>
+Content-Type: application/json
+```
 
-## §2 Manifest
+Body is a PHASE 1 §2 asset registry record. Successful
+intake returns 201 Created with the boundary's URN binding.
+Updates use PUT against the asset URN; closure-bond
+mutations require an additional regulator counter-signature
+delivered via Annex C.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "mineral-mining"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Lookups:
 
-## §3 Conformance Tiers
+```
+GET /assets/{assetRef}
+GET /assets?operator={operatorRef}
+GET /assets?commodity=Cu
+```
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+List responses paginate (Annex B); per-asset detail responses
+include the most recent registry version plus a link to the
+audit-chain history.
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+## §2 Exploration data submission
 
-## §4 Discovery
+```
+POST /exploration HTTP/1.1
+```
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/mineral-mining`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+Body is a PHASE 1 §3 exploration record. Successful intake
+returns 202 Accepted with the boundary's URN binding and a
+queued status indicator; full processing (e.g., lab QA/QC
+linkage to assay records) completes asynchronously.
 
-## §5 Time and Identity
+```
+GET /exploration/{explorationId}
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Returns the status: `received`, `qaqc-pending`, `validated`,
+`linked`, `published`, `withdrawn`. A `withdrawn` event
+requires a competent-person signature explaining the
+withdrawal.
 
-## §6 Versioning and Deprecation
+## §3 Resource and reserve filing
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+Filings under a CRIRSCO-family code:
 
-## §7 Privacy and Security
+```
+POST /estimates HTTP/1.1
+```
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+Body is a PHASE 1 §4 estimate record. The boundary verifies:
 
-## §8 Open Governance
+- `code` matches a recognised CRIRSCO-family code
+- `competentPersonRef` matches a competent person registered
+  for the operation
+- `effectiveDate` is in the past or current
+- `reportRef` is reachable
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `mineral-mining` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+Refusal responses use RFC 9457 Problem Details:
+
+| problem URN                                  | meaning                              |
+|----------------------------------------------|--------------------------------------|
+| `urn:wia:mm:problem:code-unknown`            | classification code not recognised   |
+| `urn:wia:mm:problem:cp-unknown`              | competent person not registered      |
+| `urn:wia:mm:problem:effective-date-future`   | effective date in the future         |
+| `urn:wia:mm:problem:report-unreachable`      | reportRef returns 404 or non-200     |
+| `urn:wia:mm:problem:reserve-without-resource`| reserve filing without backing resource |
+
+```
+GET /estimates/{estimateId}
+GET /estimates?assetRef=…&code=JORC
+```
+
+## §4 Production publication
+
+```
+POST /production HTTP/1.1
+```
+
+Body is a PHASE 1 §5 production record. Successful intake
+returns 202 Accepted; gate-of-mine reconciliation (PHASE 4
+§6) runs asynchronously.
+
+```
+GET /production?assetRef=…&shiftStart=…&shiftEnd=…
+```
+
+List paginates and supports CSV/NDJSON output for analytics
+consumers.
+
+## §5 Assay intake
+
+Laboratories or operator's lab gateway submit assays:
+
+```
+POST /assays HTTP/1.1
+Authorization: Bearer <jws-laboratory-jwt>
+```
+
+Body is a PHASE 1 §6 assay record. The boundary verifies the
+laboratory's ISO 17025 scope covers the analyte/method
+combination declared. Out-of-scope analytes are refused.
+
+QA/QC linkage is enforced asynchronously: the boundary
+reconciles each assay against its declared QA/QC packages
+within a deployment-declared window (typically 30 days).
+Failures appear in the lab's reconciliation report and
+escalate to the operator.
+
+## §6 Environmental sample publication
+
+```
+POST /environmental HTTP/1.1
+```
+
+Body is a PHASE 1 §7 environmental sample record. The
+boundary computes the exceedance flag against the cited
+regulatory threshold; an exceedance triggers PHASE 4 §7
+incident workflow within the deployment-declared latency
+budget.
+
+```
+GET /environmental?assetRef=…&mediaType=surface-water&since=…
+```
+
+For exceedance events, the response includes the open
+incident URN if one has been raised.
+
+## §7 Worker-exposure reporting
+
+```
+POST /exposure HTTP/1.1
+```
+
+Body is a PHASE 1 §8 worker-exposure record. The boundary
+enforces the privacy contract: worker identity is held only
+as a pseudonym in this surface; binding to the underlying
+HR identity is in a separate, access-controlled service per
+PHASE 3 §9.
+
+```
+GET /exposure?assetRef=…&workerRef=…&shiftRef=…
+```
+
+Restricted to authorised health-and-safety personnel; ordinary
+operator roles see aggregate-only views.
+
+## §8 Supply-chain handover
+
+```
+POST /handover HTTP/1.1
+```
+
+Body is a PHASE 1 §9 handover record. The boundary verifies:
+
+- `fromAssetRef` exists
+- `oecdDdgStatus` is one of `green`, `red`, `requires-additional-action`
+- For `red` operations, the handover is refused
+- For `requires-additional-action` operations, the handover
+  succeeds but is flagged for downstream review
+
+The successful response includes the URN that the receiving
+custody chain references back to verify origin.
+
+## §9 Capability discovery
+
+```
+GET /.well-known/wia/mineral-mining HTTP/1.1
+```
+
+Returns the deployment's capability document:
+
+```json
+{
+  "wia.standardVersion": "1.0",
+  "wia.implementationVersion": "operator-x-2.1.0",
+  "supportedCommodities": ["Cu","Au","Zn"],
+  "supportedAssetTypes": ["open-pit","underground-mine","tailings-storage"],
+  "supportedCodes": ["JORC","SAMREC"],
+  "isoCertifications": ["ISO-14001","ISO-45001"],
+  "manifest": "https://operator-x.example/.well-known/wia/mineral-mining/manifest.jws"
+}
+```
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Idempotency
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+Production POST and assay POST accept `Idempotency-Key`.
+Boundary stores keys for 30 days (long enough to cover
+typical lab QA/QC reconciliation windows). Replays return
+the original response.
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+## Annex B — Pagination
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+List endpoints support cursor pagination with cursors signed
+by the boundary, valid for 30 minutes. Cursor envelopes
+declare the snapshot epoch so consumers can detect drift.
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Regulator counter-signature
 
-## Annex F — Adoption Roadmap
+Closure-bond mutations and other regulator-witnessed events
+require a regulator counter-signature delivered via:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```
+POST /regulator-witness HTTP/1.1
+Authorization: Bearer <jws-regulator-jwt>
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Body is a JWS detached signature over the mutation it
+endorses. The boundary verifies the regulator's authority
+URN against the asset's `coordinatingAuthority` and applies
+the mutation only after successful verification.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Negative-test vectors (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+| Stimulus                                            | Expected response                              |
+|-----------------------------------------------------|------------------------------------------------|
+| Estimate with unknown competent person              | 422 + `urn:wia:mm:problem:cp-unknown`          |
+| Reserve filing without backing resource             | 422 + `urn:wia:mm:problem:reserve-without-resource` |
+| Assay submission outside lab ISO 17025 scope        | 422 + `urn:wia:mm:problem:lab-scope-mismatch`  |
+| Handover with `red` DDG status                      | 403 + `urn:wia:mm:problem:ddg-red-handover`    |
+| Worker-exposure write by non-HSE role               | 403 + `urn:wia:mm:problem:role-denied`         |
 
-## Annex G — Test Vectors and Conformance Evidence
+## Annex E — Bulk export
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+For analytical replay or audit, bulk export endpoints serve
+NDJSON over a date range:
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+```
+GET /export/production?from=…&to=…&assetRef=…
+GET /export/assays?from=…&to=…
+```
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+Bulk export is gated by the deployment's bulk-quota policy
+and audit-logged with `kind=bulk-export`.
 
-## Annex H — Versioning and Deprecation Policy
+## Annex F — Webhook subscriptions
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+For consumers requiring pushed updates (downstream supply-
+chain receivers, regulator monitoring), webhook subscriptions
+are accepted at `/subscriptions`. Webhook delivery uses TLS
+1.3 with detached JWS in a `Wia-Signature` header. Failed
+deliveries retry on an exponential schedule for up to 24
+hours; persistent failure escalates to operations.
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex G — Reconciliation reports
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+Gate-of-mine reconciliation reports are served at:
 
-## Annex I — Interoperability Profiles
+```
+GET /reconciliation?assetRef=…&period=2026-Q1
+```
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+The report compares mined tonnes/grade against the
+contributing resource estimate, classifies the variance,
+and lists material-level explanations. Reconciliation is
+routinely audited under Anchored conformance.
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+## Annex H — Authorities and roles
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+| Role                | Scope                                                |
+|---------------------|------------------------------------------------------|
+| `operator`          | full read/write on owned assets                      |
+| `laboratory`        | assay intake on accredited scopes                    |
+| `competent-person`  | exploration & estimate sign-off                      |
+| `regulator`         | counter-signatures, monitoring read                  |
+| `hse-officer`       | exposure & environmental write                       |
+| `auditor`           | read-only across assets within engagement scope      |
+
+## Annex I — Worked production publication
+
+A worked example for a daily production claim:
+
+```
+POST /production HTTP/1.1
+Authorization: Bearer <jws-operator-jwt>
+Content-Type: application/json
+Idempotency-Key: 2026-04-27-day-shift-north-pit-bench-3
+
+{
+  "productionId": "urn:wia:mm:production:operator-x:p-2026-04-27-d-001",
+  "assetRef": "urn:wia:mm:asset:operator-x:north-pit",
+  "shiftStart": "2026-04-27T07:00:00+09:00",
+  "shiftEnd": "2026-04-27T19:00:00+09:00",
+  "locationRef": "urn:wia:mm:location:operator-x:north-pit:bench-3",
+  "tonnesMined": {"value": 14820.0, "unit": "t", "uncert": 75.0},
+  "gradeSampleRefs": [
+    "urn:wia:mm:sample:operator-x:s-2026-04-27-001",
+    "urn:wia:mm:sample:operator-x:s-2026-04-27-002"
+  ],
+  "commodityProduced": ["Cu"],
+  "equipmentRefs": [
+    "urn:wia:mm:equip:operator-x:truck-12",
+    "urn:wia:mm:equip:operator-x:loader-3"
+  ],
+  "dilutionFactor": 1.04,
+  "recoveryFactor": 0.96,
+  "signatures": [/* foreman + survey JWS detached */]
+}
+```
+
+The boundary returns 202 Accepted with the queued URN; the
+gate-of-mine reconciliation job (PHASE 4 §6) runs against
+this record asynchronously.
+
+## Annex J — Time-series export endpoints
+
+Time-series data (continuous environmental monitoring,
+equipment telemetry) is served via a streaming endpoint:
+
+```
+GET /timeseries/environmental?assetRef=…&from=…&to=…&analyte=…
+Accept: text/event-stream
+```
+
+Each event is a single sample with timestamp, value,
+quality flag, and station URN. Stream resumption is
+supported via opaque resume tokens.
+
+## Annex K — Capability versioning
+
+Capability documents declare both `wia.standardVersion` and
+`wia.implementationVersion` so that partners and regulators
+can verify compatibility independently of vendor build
+numbers. A standard-version mismatch is a hard refusal; an
+implementation-version mismatch is logged but not refusing.
+
+## Annex L — Audit-chain replay endpoint
+
+For regulators and Anchored auditors, the boundary serves a
+selective audit-chain replay:
+
+```
+GET /audit/chain?since=…&kind=incident-opened,exceedance-flagged
+Accept: application/x-ndjson
+```
+
+Each event is one signed audit-chain entry. The endpoint
+verifies the requesting authority's role allows access to
+each requested kind; restricted kinds return only entries
+under operations the requester is authorised for.
+
+## Annex M — Operation closure handover
+
+When an operation reaches end-of-life and enters closure:
+
+```
+POST /closure HTTP/1.1
+
+{
+  "closureId": "urn:wia:mm:closure:operator-x:c-2026-q3",
+  "assetRef": "urn:wia:mm:asset:operator-x:north-pit",
+  "closureBondRef": "urn:wia:mm:bond:closure:b-001",
+  "closurePlanRef": "urn:wia:mm:plan:closure:p-001",
+  "regulatorCounterSignature": "<jws>"
+}
+```
+
+Closure events propagate to handover registers, supply-chain
+receivers, and the deployment's attestation surface.

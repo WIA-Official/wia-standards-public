@@ -1,241 +1,302 @@
-# WIA-longevity-gene PHASE 4 — INTEGRATION Specification
+# WIA-longevity-gene PHASE 4 — Integration Specification
 
 **Standard:** WIA-longevity-gene
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-longevity-gene (Longevity Gene).
+This PHASE specifies how a longevity-gene deployment integrates
+the data, APIs, and protocols of PHASEs 1–3 with broader
+operational systems: clinical laboratories, biobanks, ageing-
+research cohorts, EHR genomics tabs, clinical-decision-support,
+patient-facing apps, regulator audit pipelines, GA4GH discovery
+networks, pharmaceutical-industry research partners, and
+genetic-counselling services.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 Genomics Reporting IG, Subscriptions, Bulk Data
+- GA4GH Beacon v2, Passports, Phenopackets, VRS, DRS, htsget
+- ClinVar, dbSNP, ClinGen actionability framework
+- ACMG SF v3.2 — secondary-findings reportable list
+- ISO 13485, ISO 14971, ISO 20691, ISO/TS 22692
+- US GINA, EU GDPR Article 9, K-PIPA 유전정보 특별보호
+- WIA-medical-data-privacy, WIA-medical-iot, WIA-medication-adherence,
+  WIA-network-security, WIA-pq-crypto
 
 ---
 
-## §1 Scope
+## §1 EHR integration
 
-This PHASE document is one of four that together define the WIA-longevity-gene
-standard. It addresses the integration layer of the standard.
+EHR systems consume genomic data via:
 
-## §2 Manifest
+- **FHIR subscription** — for medically-actionable
+  interpretations (per ACMG SF v3.2 reportable list); the
+  EHR's genomic-actionable-results worklist receives them
+- **FHIR bulk export** — for population-genomics analytics
+- **FHIR DiagnosticReport** — for finalised genomic reports
+  delivered to the EHR's results inbox
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "longevity-gene"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+Genomic data inherits the EHR's most-restrictive PHI
+controls; EHR access requires a genomic-data role.
 
-## §3 Conformance Tiers
+## §2 Clinical-laboratory integration
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Clinical laboratories integrate via:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- Sample submission with structured request forms
+- Laboratory information system (LIS) FHIR or HL7 v2
+  ORU^R01 messages
+- BAM/VCF/methylation-array file delivery via DRS
+- Laboratory accreditation evidence stored in the
+  boundary's accreditation registry
+- Periodic QC summary reports per ISO/TS 22692
 
-## §4 Discovery
+The boundary refreshes laboratory accreditation status
+daily; expired accreditations block new ingestion.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/longevity-gene`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Biobank integration
 
-## §5 Time and Identity
+Biobanks integrate via:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- Sample inventory exchange with double-pseudonymous identifiers
+- Phenopacket exchange for phenotypic context
+- Research-cohort aggregation with linkage authorisations
+- Specimen tracking through aliquot lifecycle
 
-## §6 Versioning and Deprecation
+Cross-biobank research-cohort access uses GA4GH Passports;
+the boundary verifies passport visa signatures against
+each issuing biobank.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Research-cohort access
 
-## §7 Privacy and Security
+Researchers access cohort data via:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Beacon v2 for variant-discovery queries
+- htsget for selective sequencing data streaming
+- Bulk export for full-cohort analysis (with explicit
+  research authorisation)
+- Phenopacket bundles for phenotype-aware analyses
 
-## §8 Open Governance
+Each access emits an audit event; cohort-level summary of
+access patterns is shared with the cohort's governance
+committee on a documented cadence.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `longevity-gene` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Patient-facing app integration
+
+The patient-facing app surfaces:
+
+- Variant interpretations the subject has consented to receive
+- PRS results with population-context disclaimers
+- Bio-age trajectories
+- Telomere-length trajectories
+- Educational resources tied to specific findings
+- Genetic-counsellor scheduling for return-of-results
+  conversations
+
+Apps are SMART-launched against the deployment's identity
+provider. Subject self-service emits AuditEvents to detect
+impersonation patterns.
+
+## §6 Regulator audit integration
+
+Regulators receive structured exports for:
+
+- Clinical-laboratory accreditation compliance
+- Adverse-event reporting (e.g., misinterpreted variant
+  leading to clinical harm)
+- Genetic-information privacy compliance per jurisdiction
+- Aggregate population-level findings reporting where
+  required (e.g., national newborn-screening programmes)
+
+## §7 Pharmaceutical post-market surveillance
+
+Pharmaceutical companies engaged in longevity-related drug
+development receive:
+
+- Aggregate PRS distributions for trial-eligibility
+  population characterisation
+- Bio-age effect-size summaries from registry studies
+  (where consented for industry research purpose)
+- Adverse-event correlation with genomic context
+
+Aggregation thresholds prevent re-identification: cohorts
+fewer than 50 patients are suppressed (more conservative
+than other domains because genomic data is exceptionally
+re-identifiable).
+
+## §8 Operational SLAs
+
+| Concern                                          | Default SLA                |
+|--------------------------------------------------|----------------------------|
+| Variant interpretation submission acceptance p95 | ≤ 2 s                       |
+| Laboratory ingest acceptance p95                 | ≤ 60 s for ≤ 100 MB submission |
+| EHR FHIR subscription delivery p95               | ≤ 5 s                       |
+| Bulk export for ≤ 10K observations               | ≤ 60 s                      |
+| Beacon query response p95                        | ≤ 1 s                       |
+| Reference-sequence retrieval p95                 | ≤ 500 ms                    |
+| Audit chain entry available                       | ≤ 10 s                      |
+
+## §9 Quarterly compliance report
+
+The boundary emits a quarterly compliance report covering:
+
+- Laboratory accreditation status across the partner roster
+- Sample ingestion volumes per laboratory
+- Variant interpretation throughput
+- ACMG/AMP classification distribution
+- PRS / bio-age / telomere observation rates
+- Beacon-network query metrics
+- Cross-domain references honoured vs. refused
+- Audit-chain integrity check results
+
+## §10 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Laboratory accreditation roster is current
+2. Every sample in the past quarter has a matching audit
+   chain entry with verifiable inclusion proof
+3. Genetic-information consent is granular and current
+4. EHR integration delivers within SLA across at least 95%
+   of medically-actionable interpretations
+5. Quarterly compliance report has no integrity-check
+   failures
+6. Cross-domain references resolve at the partner boundary
+   for ≥ 99% of bound observations
+
+## §11 Common pitfalls (informative)
+
+- **PRS ancestry mismatch** — most published PRS models are
+  trained on European-ancestry cohorts; deployments serving
+  non-European populations SHOULD prefer ancestry-matched
+  models or apply explicit disclaimers
+- **VRS canonicalisation drift** — VRS spec evolves; the
+  deployment SHOULD track VRS version updates and re-canonicalise
+  legacy records on minor-version updates
+- **Bisulfite conversion variability** — methylation arrays
+  show batch effects; the deployment SHOULD track batch ID and
+  apply ComBat-style correction
+- **Telomere method variability** — qPCR T/S ratio is not
+  comparable across labs; the deployment SHOULD prefer
+  internally-consistent methods within a longitudinal study
+- **Return-of-results category drift** — ACMG SF reportable
+  list updates periodically; the deployment SHOULD review
+  consent-class definitions on each ACMG SF update
+
+## §12 Decommissioning
+
+When a deployment is decommissioned:
+
+1. Active interpretations transferred to receiving deployment
+2. Biobank samples retained per biobank's retention policy
+3. EHR integration wound down with downstream sign-off
+4. Patient-facing app data retained per consent scope
+5. Audit chain sealed and final root published
+6. Regulator notification filed if required
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain reference table (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Reference                  | Use site                                                  | Gate applied                                         |
+|----------------------------|-----------------------------------------------------------|------------------------------------------------------|
+| WIA-medical-data-privacy   | every record references a genetic-data consent class      | medical-side consent + genetic-data category         |
+| WIA-medical-iot            | wearables that contribute to bio-age inputs               | medical-iot device association                       |
+| WIA-medication-adherence   | longitudinal pharmacological exposures                    | medication-side consent                              |
+| WIA-network-security       | TLS cipher-suite floor                                    | network-security-side floor on each session          |
+| WIA-pq-crypto              | post-quantum migration phase                              | pq-crypto-side phase declaration current             |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — ACMG SF v3.2 actionable-list update workflow (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+When ACMG publishes an SF v3.x update:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+1. Geneticist team reviews the new actionable list
+2. Updates the deployment's return-of-results category
+   definitions
+3. Subjects with active consent for actionable findings
+   receive a notification and re-consent prompt
+4. Researchers with active cohort access receive notification
+   of the catalogue change
+5. Quarterly compliance report tracks the update cycle
+   completion across the subject base
 
-## Annex F — Adoption Roadmap
+## Annex C — Decommissioning checklist (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- [ ] Active interpretations transferred
+- [ ] Biobank samples retained per policy
+- [ ] EHR integration wound down
+- [ ] Patient-facing app data retained per consent
+- [ ] Audit chain sealed
+- [ ] Regulator notification filed
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Conformance disclosure
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Sections §1, §2, §3, §5, §8, §10 are mandatory. §4 (research-
+cohort) is mandatory if the deployment hosts research data.
+§6, §7 are mandatory where the corresponding flow is offered.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex E — Biobank linkage worked example (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+A research consortium queries linked biobank samples:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+1. Researcher submits a cohort definition (age range, sex,
+   phenotype filters) to the boundary
+2. Boundary computes the cohort across consented samples
+3. Boundary issues study-specific release identifiers
+4. Researcher queries variant data via Beacon or htsget
+   using release identifiers
+5. Boundary records each query in the audit chain
+6. Cohort governance committee receives quarterly
+   access-pattern summary
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Re-identification is impossible to the researcher unless
+the biobank curator approves a linkage authorisation
+(WIA-medical-data-privacy PHASE 1 §5).
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## Annex F — Population-genomics reference cohort (informative)
 
-## Annex H — Versioning and Deprecation Policy
+The deployment maintains references to well-curated
+population-genomics cohorts for PRS recalibration:
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+| Population reference        | Coverage                              |
+|-----------------------------|---------------------------------------|
+| 1000 Genomes Project        | Global (26 populations)               |
+| gnomAD v4.x                 | Global with ancestry stratification   |
+| UK Biobank                  | UK population (predominantly EUR)     |
+| KOREA-1K / Genome Korea     | Korean population                     |
+| J-MICC / Tohoku Medical Megabank | Japanese population              |
+| All of Us                   | US diverse-ancestry cohort           |
+| H3Africa                    | African-ancestry cohorts             |
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+PRS models cross-reference their training population; the
+boundary refuses to display a score against a non-matching
+ancestry without a disclaimer.
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+## Annex G — ACMG SF reportable-list lifecycle (informative)
 
-## Annex I — Interoperability Profiles
+Each ACMG SF version (v3.0, v3.1, v3.2, v3.3, ...) updates
+the actionable-gene list:
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+| Version | Release year | Genes added              | Genes removed |
+|---------|-------------|--------------------------|---------------|
+| v3.0    | 2021        | Initial ACMG SF v3       | -             |
+| v3.1    | 2022        | TMEM127, MAX             | -             |
+| v3.2    | 2023        | ATP7B, MFAP5             | -             |
+| (later) | (TBD)       | (per ClinGen WG)         | (per ClinGen WG) |
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+The boundary tracks the version per consent and per
+interpretation; subjects with a v3.0-era consent receive
+re-consent prompts when v3.2 adds new genes that fall
+within their consent class.
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex H — Decommissioning checklist (informative)
+
+- [ ] Active interpretations transferred or archived
+- [ ] Biobank samples retained per biobank policy
+- [ ] EHR integration wound down
+- [ ] Patient app data preserved per consent
+- [ ] Audit chain sealed
+- [ ] Regulator notification filed if required
+- [ ] GA4GH discovery network membership withdrawn
+
+An anchored conformance level is preferred for deployments serving clinical genomics at scale.

@@ -1,241 +1,348 @@
-# WIA-longevity-gene PHASE 2 — API-INTERFACE Specification
+# WIA-longevity-gene PHASE 2 — API Interface Specification
 
 **Standard:** WIA-longevity-gene
-**Phase:** 2 — API-INTERFACE
+**Phase:** 2 — API Interface
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical API-INTERFACE layer for WIA-longevity-gene (Longevity Gene).
+This PHASE defines the HTTP API surface a longevity-gene boundary
+exposes to clinical-genomics laboratories, ageing-research cohorts,
+biobanks, clinical-decision-support tools, regulator audit
+clients, and the patient-facing apps that surface ageing-related
+genomic insight to consented individuals. The shape is FHIR R5
+RESTful with the Genomics Reporting profile, layered with PRS,
+biological-age, and telomere-length operations.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Genomics Reporting IG, RESTful API,
+  MolecularSequence, Observation, DiagnosticReport, Bundle,
+  Subscription, OperationOutcome, CapabilityStatement
+- HL7 SMART App Launch 2.2
+- GA4GH VRS Service API (refget for reference sequences)
+- GA4GH Beacon v2 (where the deployment participates in
+  variant-discovery networks)
+- IETF RFC 9457 (Problem Details), RFC 8615 (well-known URIs),
+  RFC 7515 (JWS), RFC 7519 (JWT), RFC 8259 (JSON), RFC 3339
 
 ---
 
-## §1 Scope
+## §1 Capability discovery
 
-This PHASE document is one of four that together define the WIA-longevity-gene
-standard. It addresses the api-interface layer of the standard.
+```
+GET /metadata HTTP/1.1
+Accept: application/fhir+json
+```
 
-## §2 Manifest
+FHIR CapabilityStatement augmented with WIA extensions:
+declared genome assemblies, supported PRS model versions,
+supported biological-age clock versions, telomere-length
+methods, and Beacon-participation declaration.
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "longevity-gene"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+```
+GET /.well-known/wia/longevity-gene HTTP/1.1
+```
 
-## §3 Conformance Tiers
+Returns deployment policy summary: cohort references,
+laboratory accreditations (CLIA, CAP, ISO 15189), genetic-
+counsellor availability, return-of-results policy.
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+## §2 Variant interpretation lifecycle
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+```
+POST /Observation HTTP/1.1
+Content-Type: application/fhir+json
+WIA-Purpose-Of-Use: HRESCH or TREAT or HOPERAT
+```
 
-## §4 Discovery
+Body is a variant interpretation per PHASE 1 §3. Boundary
+verifies:
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/longevity-gene`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+1. Active consent for genetic-data class
+2. ACMG/AMP criteria are present and consistent
+3. VRS identifier canonicalises to a known variant or is
+   admitted to the deployment's variant registry
+4. Subject's declared ancestry is compatible with PRS model
+   if a PRS observation accompanies the interpretation
 
-## §5 Time and Identity
+```
+PUT /Observation/<id>/$reinterpret HTTP/1.1
+```
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+Re-interpretation creates a new observation linked to the
+prior; the prior remains version-history-preserved.
 
-## §6 Versioning and Deprecation
+## §3 Polygenic-risk score operations
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+```
+POST /Observation HTTP/1.1
+GET  /Patient/<self>/$prs-summary?modelRef=<URN>
+POST /PRSModel/<modelRef>/$validate HTTP/1.1
+```
 
-## §7 Privacy and Security
+`$validate` allows pre-computation validation: a PRS model
+with mismatched population reference returns
+`urn:wia:long:problem:prs-population-mismatch` with the
+disclaimer text the boundary attaches to results.
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+## §4 Biological-age operations
 
-## §8 Open Governance
+```
+POST /Observation HTTP/1.1
+GET  /Patient/<self>/$biological-age-trajectory
+POST /BioAgeModel/<modelRef>/$qc-evaluate HTTP/1.1
+```
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `longevity-gene` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The trajectory operation returns longitudinal bio-age values
+with each declared clock model version, supporting clinical
+review of acceleration trends.
+
+## §5 Telomere-length operations
+
+```
+POST /Observation HTTP/1.1
+GET  /Patient/<self>/$telomere-trajectory
+```
+
+## §6 Phenopacket linkage
+
+```
+POST /Phenopacket HTTP/1.1
+GET  /Patient/<self>/Phenopacket/<id>
+PUT  /Phenopacket/<id>/$amend HTTP/1.1
+```
+
+The boundary stores Phenopackets per GA4GH Phenopacket Schema
+2.0; each Observation cross-references the relevant Phenopacket.
+
+## §7 Search filtering and minimum necessary
+
+```
+GET /Observation?subject=<subjectRef>&category=genomics&code=53037-8
+```
+
+Search results are filtered to consented subset. Genetic-
+information consent is exceptionally granular (variant-class
+opt-in, return-of-results opt-in per condition class) so the
+boundary may filter individual observations even within a
+single subject's record.
+
+## §8 Error model
+
+| URI                                                       | Status | Meaning                                            |
+|-----------------------------------------------------------|-------:|----------------------------------------------------|
+| `urn:wia:long:problem:acmg-criteria-required`             | 422    | ACMG/AMP criteria absent on interpretation         |
+| `urn:wia:long:problem:vrs-canonicalisation-failed`        | 422    | VRS identifier could not be canonicalised          |
+| `urn:wia:long:problem:prs-population-mismatch`            | 200    | Accepted with mandatory disclaimer                 |
+| `urn:wia:long:problem:bio-age-qc-required`                | 422    | Bio-age QC metrics absent                          |
+| `urn:wia:long:problem:telomere-method-required`           | 422    | Telomere-length method reference missing           |
+| `urn:wia:long:problem:no-active-consent`                  | 403    | No genetic-data consent matches purpose            |
+| `urn:wia:long:problem:return-of-results-not-authorised`   | 403    | Subject has not authorised return of this category |
+
+## §9 Bulk export
+
+```
+GET /$export?_type=Observation,Phenopacket&purpose=HRESCH&consentBundle=<id>
+```
+
+Genomic bulk exports respect granular consent: each
+observation in the export must be authorised for the
+declared purpose; aggregated PRS or bio-age summaries
+require their own consent class.
+
+## §10 Beacon v2 participation
+
+Where the deployment participates in a variant-discovery
+network (e.g., GA4GH Beacon v2), the boundary exposes a
+Beacon-style endpoint:
+
+```
+GET /beacon/v2/variants?gene=APOE&assemblyId=GRCh38 HTTP/1.1
+```
+
+Beacon responses report variant *presence* in the cohort
+without disclosing subject identity. Network-policy
+restricts which gene panels are queryable; some categories
+(non-clinically-actionable, conditions of stigma concern)
+may be excluded by deployment policy.
+
+## §11 Subject self-service
+
+```
+GET  /Patient/<self>/$genomic-summary
+POST /Patient/<self>/$opt-in-result-class
+PUT  /Patient/<self>/$revoke-consent-class
+```
+
+Subjects manage their granular consent for return-of-results
+per category (medically actionable, carrier status,
+pharmacogenomic, ancestry, ageing-relevant). The boundary
+honours the most-recent consent on subsequent requests.
+
+## §12 Subscriptions for clinical-decision-support
+
+CDS tools subscribe to medically-actionable interpretations
+in their patient cohort:
+
+```
+POST /Subscription HTTP/1.1
+{
+  "topic": "https://wia.example/SubscriptionTopic/longevity-medically-actionable",
+  "channel": {"type": "rest-hook", "endpoint": "https://cds.example/wia-webhook"}
+}
+```
+
+Delivery uses TLS 1.3 with detached JWS in `Wia-Signature`.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked PRS validation (informative)
 
-## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
+```
+POST /PRSModel/urn:wia:long:prs-model:PGS001234:v1.0/$validate HTTP/1.1
+{
+  "subjectAncestry": "EAS"
+}
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
+Response if model was trained on EUR cohort:
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+```
+200 OK
+{
+  "compatibility": "limited",
+  "disclaimer": "Model PGS001234 v1.0 was trained on participants of European ancestry. Risk estimation in subjects of East Asian ancestry has not been validated and may be biased. Use with clinical judgment.",
+  "alternativeModels": [{"modelRef": "urn:wia:long:prs-model:KOREA-GENE-PRS-CAD:v2.0", "compatibility": "validated"}]
+}
+```
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex B — Pagination and rate limiting (informative)
 
-## Annex F — Adoption Roadmap
+List endpoints paginate at ≤ 100 observations per page (smaller
+than sibling standards because each observation is a substantial
+genomic record). Per-token rate limits default to 10
+interpretation submissions per minute; bulk-import for
+laboratory data uses a separate batch endpoint with declared
+batch size.
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+## Annex C — Conformance disclosure
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+Sections §1, §2, §3, §4, §6, §7, §11 are mandatory. §5 (telomere)
+is mandatory if the deployment provides telomere measurement.
+§9 (bulk export) is mandatory where the deployment shares with
+research warehouses. §10 (Beacon) is mandatory where the
+deployment participates in a discovery network. §12
+(subscriptions) is mandatory where CDS integration is offered.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Worked Beacon v2 query (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```
+GET /beacon/v2/g_variants?geneId=APOE&assemblyId=GRCh38 HTTP/1.1
+Authorization: Bearer <researcher-jwt>
+Accept: application/json
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+```json
+{
+  "responseSummary": {"exists": true, "numTotalResults": 142},
+  "response": {
+    "resultSets": [
+      {
+        "id": "longevity-cohort-1",
+        "type": "dataset",
+        "exists": true,
+        "resultsCount": 142,
+        "results": []
+      }
+    ]
+  },
+  "info": {
+    "disclaimerNote": "Results aggregated across cohort; subject identities not disclosed."
+  }
+}
+```
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex E — Genetic-counselling integration
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+Genetic-counsellor scheduling integrates with the deployment's
+clinical scheduling system:
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
-auditor tooling.
+```
+POST /Patient/<self>/$schedule-genetic-counsellor HTTP/1.1
+{
+  "preferredChannel": "video",
+  "preferredWindow": {"start": "2026-05-01T09:00:00+09:00", "end": "2026-05-01T17:00:00+09:00"},
+  "topicCategory": "actionable-finding-return"
+}
+```
 
-## Annex H — Versioning and Deprecation Policy
+The counsellor app receives the request, schedules a
+session, and delivers a calendar invite to the subject.
 
-This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+## Annex F — Granular consent worked example (informative)
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+A subject's genetic-data consent might enable:
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+- `medically-actionable` (ACMG SF v3.2 list) — return ON
+- `carrier-status` — return ON
+- `pharmacogenomic` — return ON
+- `ancestry` — return OFF (subject does not want)
+- `ageing-relevant` — return ON
+- `non-clinically-actionable-research-only` — return OFF
+- `psychiatric-condition-stigma` — return OFF (subject opt-out)
 
-## Annex I — Interoperability Profiles
+Each category emission is gated independently. A change in
+the ACMG SF list of actionable genes triggers a re-consent
+prompt because the subject's prior consent referenced an
+older catalogue.
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+## Annex G — Idempotency
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+All write endpoints accept `Idempotency-Key`. The boundary
+stores keys for 30 days. Replays return the original
+response. Different body with same key returns
+`urn:wia:long:problem:idempotency-conflict` (409).
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+## Annex H — Capability cache freshness
+
+Capability documents include a `fresh-until` timestamp;
+clients refresh on or before that timestamp. Critical
+changes (PRS model recalibration, ACMG SF update, return-
+of-results policy change) trigger push notification to
+subscribed clients so cache invalidates eagerly.
+
+## Annex I — Phenopacket bundle worked example (informative)
+
+```json
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Phenopacket",
+        "id": "urn:wia:long:phenopacket:p-91a7",
+        "subject": {"id": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e", "ageAtCollection": "P67Y"},
+        "phenotypicFeatures": [
+          {"type": {"id": "HP:0011463", "label": "Childhood-onset short stature"}, "excluded": true},
+          {"type": {"id": "HP:0001640", "label": "Cardiomegaly"}, "modifiers": [{"id": "HP:0012828", "label": "Severe"}]}
+        ],
+        "diseases": [
+          {"term": {"id": "MONDO:0007020", "label": "Familial hypertrophic cardiomyopathy"}, "onset": {"age": "P54Y"}}
+        ],
+        "interpretations": [{"id": "i-1", "diagnosis": {"genomicInterpretations": [{"variantInterpretation": {"variant": "urn:wia:long:variant:..."}}]}}]
+      }
+    }
+  ]
+}
+```
+
+## Annex J — Conformance level discovery
+
+```
+GET /.well-known/wia/longevity-gene/conformance HTTP/1.1
+```
+
+Returns the deployment's declared level (Surface / Verified /
+Anchored), most recent audit date, and auditor signature.
+Anchored deployments include the inclusion-proof URI for
+the audit-chain witness that downstream regulators rely on.

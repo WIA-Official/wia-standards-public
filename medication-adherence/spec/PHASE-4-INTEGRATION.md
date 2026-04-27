@@ -1,241 +1,334 @@
-# WIA-medication-adherence PHASE 4 — INTEGRATION Specification
+# WIA-medication-adherence PHASE 4 — Integration Specification
 
 **Standard:** WIA-medication-adherence
-**Phase:** 4 — INTEGRATION
+**Phase:** 4 — Integration
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical INTEGRATION layer for WIA-medication-adherence (Medication Adherence).
+This PHASE specifies how a medication-adherence deployment
+integrates the data, APIs, and protocols of PHASEs 1–3 with
+broader operational systems: hospital EHR, ambulatory clinic
+practice management, pharmacy systems (in-hospital pharmacy,
+retail chains, mail-order), smart-device manufacturer pipelines,
+clinical data warehouse, regulator audit pipelines, controlled-
+substance monitoring programmes, and pharmaceutical post-market
+surveillance.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Subscriptions, Bulk Data Access, Bundle,
+  MedicationDispense, MedicationAdministration, AdverseEvent
+- HL7 v2.x: RDS, RAS, RGV, RDE messages
+- IHE Pharmacy Hospital Medication Workflow profile
+- ISO 13485:2016, IEC 62304, IEC 80001-1:2021
+- US 21 CFR §1300, §1311 — controlled substance management
+- US FDA REMS programme
+- EU Falsified Medicines Directive 2011/62/EU
+- WIA-medical-data-privacy, WIA-medical-iot, WIA-medical-imaging,
+  WIA-network-security, WIA-pq-crypto, WIA-supply-chain
 
 ---
 
-## §1 Scope
+## §1 EHR integration
 
-This PHASE document is one of four that together define the WIA-medication-adherence
-standard. It addresses the integration layer of the standard.
+EHR systems consume adherence data via:
 
-## §2 Manifest
+- **FHIR subscription** — for clinical-alert deviations and
+  administration events affecting active care plans
+- **FHIR bulk export** — for adherence-summary delivery to
+  the EHR's results inbox on a documented cadence
+- **HL7 v2 ORU^R01** — for legacy EHRs
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medication-adherence"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+The deployment policy declares which patterns are active.
+Non-adherence patterns surface in the EHR as care-plan tasks
+for the responsible clinician.
 
-## §3 Conformance Tiers
+## §2 Pharmacopoeia roster sync
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Pharmacopoeia codes are sourced from:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- RxNorm (US National Library of Medicine) — daily refresh
+- KD (K-MFDS Korean drug code) — daily refresh
+- ATC (WHO) — quarterly refresh
+- SNOMED CT pharmacy subset — quarterly refresh
+- Manufacturer-attestation for new products not yet in any
+  registry
 
-## §4 Discovery
+The boundary refreshes on the documented cadence; the
+deployment policy declares the refresh schedule. Missing
+codes block dispense workflow until added; the deployment
+SHOULD have an exception path for emergency formulary
+addition signed by the chief pharmacist.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medication-adherence`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Pharmacy systems integration
 
-## §5 Time and Identity
+Pharmacy systems integrate with:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- **In-hospital pharmacy** — full FHIR + HL7 v2 support;
+  bidirectional flow including dispense reporting and refill
+  approval
+- **Retail pharmacy chains** — FHIR + chain-specific webhooks
+  for refill workflow
+- **Mail-order pharmacy** — FHIR + extended fulfilment
+  timestamps for shipping coordination
 
-## §6 Versioning and Deprecation
+Each pharmacy partner maintains a partner-roster entry; the
+boundary verifies signed partner credentials before accepting
+dispense events.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Smart-device manufacturer pipelines
 
-## §7 Privacy and Security
+Manufacturers of smart pill bottles, blister packs, and
+ingestion sensors integrate via:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- Device firmware update channels (cross-reference to
+  WIA-supply-chain for signed update manifests)
+- Aggregated adherence metrics for product improvement
+  (anonymised per WIA-medical-iot PHASE 4 §6 thresholds)
+- Failure-mode reports per IEC 62304 §6.2
 
-## §8 Open Governance
+## §5 Clinical data warehouse integration
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medication-adherence` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+The data warehouse consumes:
+
+- Bulk exports of dispense / administration / deviation /
+  adherence-summary records
+- Subject identifiers are pseudonymous per PHASE 1 §11
+- Aggregation at population scale for outcomes research,
+  pharmacoepidemiology, and value-based-care analytics
+
+The warehouse honours de-identification job records; datasets
+expire per the consent's declared period.
+
+## §6 Regulator audit integration
+
+Regulators receive structured reports:
+
+- US DEA / state PMP — controlled-substance dispensation
+- US FDA REMS — risk-evaluation-and-mitigation reporting for
+  REMS-managed medications (clozapine, isotretinoin,
+  thalidomide, etc.)
+- EU Falsified Medicines Directive — pack-level verification
+  records for retail dispense
+- KR M-FDS 마약류 통합관리시스템 — controlled-substance
+  reporting
+
+Each regulator-export endpoint is gated by a release authority
+specific to the jurisdiction.
+
+## §7 Pharmaceutical post-market surveillance
+
+Pharmaceutical companies receive:
+
+- Aggregate adherence rates by medication and indication
+- Adverse-event correlation with adherence patterns
+  (where consented for pharmacovigilance purpose)
+- Dispense channel mix by region
+- New-prescription rates following formulary updates
+
+Aggregation thresholds prevent re-identification: cohorts
+fewer than 30 patients are suppressed.
+
+## §8 Operational SLAs
+
+| Concern                                          | Default SLA                |
+|--------------------------------------------------|----------------------------|
+| Prescription mutation acceptance p95              | ≤ 1 s                       |
+| Dispense event ingest p95                         | ≤ 500 ms                    |
+| Administration ingest p95                         | ≤ 500 ms                    |
+| Clinical-alert deviation propagation p95          | ≤ 2 s                       |
+| Adherence summary computation                     | ≤ 30 s for 30-day window    |
+| EHR FHIR subscription delivery p95                | ≤ 5 s                       |
+| Bulk export for ≤ 10K records                     | ≤ 60 s                      |
+| Audit chain entry available after operation       | ≤ 10 s                      |
+| Controlled-substance regulator report             | per jurisdiction (typically ≤ 24 h after dispense) |
+
+Tighter SLAs are negotiable per deployment; loosening them
+requires clinical-leadership sign-off.
+
+## §9 Quarterly compliance report
+
+The boundary emits a quarterly compliance report covering:
+
+- Total prescriptions written by indication
+- Dispense events by pharmacy partner
+- Administration events by evidence source class
+- Deviation rates by severity and medication category
+- Adherence-summary distributions
+- Refill workflow completion times
+- Controlled-substance reporting timeliness
+- Cross-domain references honoured vs. refused
+- Audit-chain integrity
+
+The report is signed and is itself in scope for the audit chain.
+
+## §10 Acceptance criteria
+
+A deployment claims conformance when:
+
+1. Pharmacopoeia roster is current and verifiable
+2. Every dispense in the past quarter has a matching audit
+   chain entry with verifiable inclusion proof
+3. Controlled-substance reporting timeliness matches the
+   jurisdiction's requirement
+4. EHR integration delivers within SLA across at least 95%
+   of clinical-alert deviations
+5. Quarterly compliance report has no integrity-check failures
+6. Cross-domain references resolve at the partner boundary
+   for ≥ 99% of bound records
+
+A deployment failing any of these reports the gap in its
+compliance package.
+
+## §11 Common pitfalls (informative)
+
+- **Pharmacopoeia drift** — manufacturers register new SKUs
+  before national codes are assigned; the deployment SHOULD
+  have a fast-path for emergency formulary addition
+- **Dose timing tolerance** — overly-narrow tolerance windows
+  generate alarm fatigue; the deployment SHOULD review timing
+  windows quarterly
+- **Self-reported reliability** — patient self-reports are
+  inherently lower-confidence; the deployment SHOULD weight
+  evidence-source mix in the adherence-summary computation
+- **Refill-supply double-counting** — overlapping prescriptions
+  for the same medication can produce double-count of supply;
+  the boundary handles this via the active-prescription set
+  computed at supply-threshold check
+- **Smart-device battery exhaustion** — devices stop emitting
+  events without an explicit failure signal; the boundary
+  detects via heartbeat-timeout and surfaces to patient
+
+## §12 Decommissioning
+
+When a deployment is decommissioned:
+
+1. Active prescriptions are transferred to the receiving system
+2. Patient-paired smart devices are unbound with patient
+   notification
+3. Data warehouse retention continues per consent scope
+4. Controlled-substance records are sealed and archived per
+   regulatory retention
+5. Audit chain is sealed and a final root is published
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Cross-domain reference table (informative)
 
-## Annex E — Implementation Notes for PHASE-4-INTEGRATION
+| Reference                  | Use site                                                  | Gate applied                                         |
+|----------------------------|-----------------------------------------------------------|------------------------------------------------------|
+| WIA-medical-data-privacy   | every adherence record references consent                 | medical-side consent + adherence-side purpose       |
+| WIA-medical-iot            | smart bottles / blister packs / ingestion sensors          | medical-iot device association                       |
+| WIA-network-security       | TLS cipher-suite floor                                     | network-security-side floor on each session          |
+| WIA-pq-crypto              | post-quantum migration phase                               | pq-crypto-side phase declaration current             |
+| WIA-supply-chain           | smart-device firmware-update manifest verification         | supply-chain-side device manifest                    |
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-4-INTEGRATION.
+## Annex B — REMS programme integration (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+For REMS-managed medications (clozapine, isotretinoin,
+thalidomide), the boundary verifies REMS programme
+enrolment before dispense:
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+1. Pharmacy submits dispense intent
+2. Boundary queries REMS-specific verification endpoint
+3. On success, boundary records the dispense
+4. On failure, dispense is refused with REMS-specific
+   problem-detail URI
 
-## Annex F — Adoption Roadmap
+## Annex C — Decommissioning checklist (informative)
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+- [ ] Active prescriptions transferred
+- [ ] Smart devices unbound
+- [ ] Pharmacy partners notified
+- [ ] Data warehouse retention continues per consent
+- [ ] Controlled-substance records archived per retention
+- [ ] Audit chain sealed and final root published
+- [ ] Manufacturer notifications filed per warranty terms
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+## Annex D — Conformance disclosure
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+Sections §1, §3, §5, §8, §9, §10 are mandatory. §6 is mandatory
+for jurisdictions or contracts requiring controlled-substance
+reporting. §7 is mandatory where the deployment shares data
+with pharmaceutical post-market surveillance partners.
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+## Annex E — Worked deviation escalation (informative)
 
-## Annex G — Test Vectors and Conformance Evidence
+A patient on tacrolimus (anti-rejection, time-critical)
+misses the 8 AM dose:
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+1. 08:30 boundary detects no MedicationAdministration matching
+   the scheduled dose
+2. Boundary creates Deviation with severity: clinical-alert
+3. CDS subscription delivers to renal-transplant care team
+4. Care team app receives task; clinician calls patient
+5. Patient takes the dose at 09:15; reports via app
+6. App posts MedicationAdministration with
+   evidenceSource: patient-self-report
+7. Boundary records administration; deviation severity
+   downgrades to "informational"
+8. Adherence summary recomputes; PDC remains within band
+9. Clinician closes the task with note about patient's
+   morning routine
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-4-INTEGRATION with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
+The audit chain captures every step so retrospective review
+can reconstruct how the alert was handled.
 
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
-auditor tooling.
+## Annex F — REMS programme worked example (informative)
 
-## Annex H — Versioning and Deprecation Policy
+For a clozapine prescription (US REMS programme):
 
-This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
+1. Prescriber submits MedicationRequest
+2. Boundary verifies REMS programme enrolment for prescriber
+   and patient at the REMS verification endpoint
+3. On success, prescription is admitted; on failure,
+   refused with REMS-specific problem-detail URI
+4. Pharmacy submits MedicationDispense
+5. Boundary verifies REMS programme dispensing pharmacy
+   authorisation
+6. Boundary records the dispense and reports to REMS-
+   programme reporting per cadence
 
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
+## Annex G — Pharmacy partner-roster entry (informative)
 
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
+```json
+{
+  "partnerRosterEntry": {
+    "partnerId": "urn:wia:mdadh:partner:retail-chain-x",
+    "partnerKind": "retail-pharmacy-chain",
+    "fhirEndpoint": "https://retail-x.example/fhir",
+    "v2Endpoint": "mllp://retail-x.example:2575",
+    "credentials": {
+      "tlsClientCertSubject": "CN=retail-x-pharmacy, O=Retail X",
+      "signingKey": "https://retail-x.example/.well-known/jwks.json"
+    },
+    "supportedFlows": ["dispense", "refill-approval", "transfer-in"],
+    "validNotAfter": "2027-01-01T00:00:00Z"
+  }
+}
+```
 
-## Annex I — Interoperability Profiles
+## Annex H — Pharmacovigilance partnership (informative)
 
-This annex describes how implementations declare interoperability profiles
-for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
+A pharmaceutical company subscribed to pharmacovigilance flow
+receives:
 
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
+- AdverseEvent + linked-administration bundles within 24 hours
+- Aggregate adherence summaries quarterly
+- New-prescription analytics monthly
 
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+The partnership contract declares the data scope and the
+pharmaceutical-company-side responsibilities for reporting
+back to regulators (US FDA MedWatch, EudraVigilance, KR 의약품안전관리원).
+
+## Annex I — Decommissioning checklist (informative)
+
+- [ ] Active prescriptions transferred to receiving deployment
+- [ ] Smart devices unbound with patient notification
+- [ ] Pharmacy partners notified per partnership contract
+- [ ] Data warehouse retention continues per consent scope
+- [ ] Controlled-substance records archived per regulatory retention
+- [ ] Audit chain sealed and final root published
+- [ ] Manufacturer warranty / service contracts wound down
+
+A complete decommissioning report is filed with the controlling
+regulator if required by jurisdiction.

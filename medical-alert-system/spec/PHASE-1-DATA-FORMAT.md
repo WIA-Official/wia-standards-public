@@ -1,241 +1,301 @@
-# WIA-medical-alert-system PHASE 1 — DATA-FORMAT Specification
+# WIA-medical-alert-system PHASE 1 — Data Format Specification
 
 **Standard:** WIA-medical-alert-system
-**Phase:** 1 — DATA-FORMAT
+**Phase:** 1 — Data Format
 **Version:** 1.0
 **Status:** Stable
 
-This document defines the canonical DATA-FORMAT layer for WIA-medical-alert-system (Medical Alert System).
+This PHASE defines the canonical data format for medical
+alert systems: personal emergency-response systems (PERS)
+worn or kept by older adults and people with chronic
+conditions, fall-detection devices, social alarms in
+assisted living, in-hospital nurse-call and rapid-response
+alarms, and the central monitoring services that respond
+to alarm activations. The shape interoperates with FHIR R5
+Communication, CommunicationRequest, and Encounter resources
+and with EN 50134 social-alarm protocols where applicable.
 
 References (CITATION-POLICY ALLOW only):
-- OpenAPI Specification 3.1, JSON Schema 2020-12
-- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
-- ISO/IEC 27001:2022, ISO/IEC 17065:2012
-- CycloneDX 1.5 / SPDX 2.3
-- Sigstore (DSSE envelope, Rekor transparency log)
-- in-toto Attestation Framework 1.0
+- HL7 FHIR R5 — Communication, CommunicationRequest,
+  Encounter, Person, RelatedPerson, ServiceRequest
+- IEC 60601-1-8:2020 — Alarm systems for medical electrical
+  equipment
+- IEC 80601-2-58:2019 — Particular requirements for nurse-call
+  systems (where applicable; legacy installations follow this)
+- EN 50134 series — Alarm systems for social alarms
+  - EN 50134-1:2002 — System requirements
+  - EN 50134-2:2017 — Trigger devices
+  - EN 50134-3:2012 — Local unit and controller
+  - EN 50134-5:2004 — Interconnections and communications
+  - EN 50134-7:2017 — Application guidelines
+- ISO 13485:2016 — QMS for medical devices
+- ISO 14971:2019 — Risk management
+- IEC 62304:2006/A1:2015 — Medical device software life cycle
+- IEC 62366-1:2015/A1:2020 — Usability engineering
+- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 3339
 
 ---
 
 ## §1 Scope
 
-This PHASE document is one of four that together define the WIA-medical-alert-system
-standard. It addresses the data-format layer of the standard.
+This PHASE applies to systems that detect, report, escalate,
+and resolve medical alarms across three primary deployment
+contexts:
 
-## §2 Manifest
+- **PERS / mobile alarm** — patient-worn or patient-carried
+  device that initiates an alarm via button press, fall
+  detection, or vital-sign threshold; reaches a central
+  monitoring station or family contacts
+- **Social alarm / assisted-living** — fixed-installation
+  systems per EN 50134 in care homes, sheltered housing, and
+  multi-tenant elderly-services buildings
+- **In-hospital nurse-call and rapid-response** — fixed-
+  installation alarms in clinical settings; coordinates with
+  IEC 80601-2-58 nurse-call systems and the deployment's
+  rapid-response team workflow
 
-Implementations publish a signed manifest containing standardSlug
-(constant value: "medical-alert-system"), version (Semantic Versioning 2.0.0),
-implementation (name + build digest + SBOM URL), profile (named +
-version), per-requirement support status, and a Sigstore DSSE
-signature. The manifest is anchored to a Sigstore Rekor transparency
-log entry per the cadence declared in the deployment policy.
+In scope: alarm activation, classification, routing,
+acknowledgement, resolution, and audit. Out of scope: cardiac-
+device implant alarms (covered by a sibling implant-cardiac
+standard), vital-sign-monitor alarms during procedures
+(covered by WIA-medical-iot).
 
-## §3 Conformance Tiers
+## §2 Alert device identity
 
-| Tier      | Scope                                                |
-|-----------|------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                 |
-| Verified  | annual third-party audit                             |
-| Anchored  | continuous evidence package per Annex G              |
+Each alert device or installation is identified:
 
-Implementations declare their tier in the OpenAPI document via the
-`x-wia-conformance-tier` extension field.
+- `deviceRef` — URN of form `urn:wia:malert:device:<udi-di>:<udi-pi>`
+  for medical-class devices (PERS pendants are typically
+  Class II medical devices)
+- `installationRef` — URN of form `urn:wia:malert:install:<facility>:<unit>`
+  for fixed installations (social alarm systems, nurse-call)
+- `kindRef` — URN denoting alert-device kind:
+  - `urn:wia:malert:kind:pers-pendant` — patient-worn pendant
+  - `urn:wia:malert:kind:pers-watch` — wristworn alert device
+  - `urn:wia:malert:kind:fall-detector` — automated fall detector
+  - `urn:wia:malert:kind:social-alarm-base` — EN 50134 base unit
+  - `urn:wia:malert:kind:nursecall-bedside` — IEC 80601-2-58 bedside
+  - `urn:wia:malert:kind:nursecall-bath` — bathroom pull-cord
+  - `urn:wia:malert:kind:rapid-response-button` — clinical area RRT button
+- `installationContext` — `home`, `assisted-living`, `nursing-home`,
+  `acute-care`, `outpatient-clinic`
 
-## §4 Discovery
+A record without a recognised device or installation reference
+is rejected at the edge.
 
-Operation discovery uses RFC 8615 well-known URIs at
-`/.well-known/wia/medical-alert-system`. The discovery document declares the
-supported operation groups, the OpenAPI document URL, and the
-manifest signing key. Discovery responses are signed using the same
-Sigstore key as the manifest.
+## §3 Alarm event record
 
-## §5 Time and Identity
+Every alarm activation captures:
 
-Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
-better) so that the protocol's order-of-events guarantees hold across
-the network. Time-bound tokens (RFC 9700) are verified against the
-TLS session's exporter value (RFC 8446 §7.5) for token-binding.
+- `alarmEventId` — URN of form `urn:wia:malert:event:<deviceOrInstall>:<seq>`
+- `subjectRef` — pseudonymous person under care (cross-domain
+  to medical-data-privacy); for shared devices the subject
+  may be unknown until correlation with a beacon, room
+  occupancy, or post-resolution attribution
+- `triggerKind` — closed enum: `manual-button`, `pull-cord`,
+  `fall-detected`, `vital-threshold-exceeded`, `inactivity-detected`,
+  `bed-exit`, `door-monitor`, `caregiver-initiated`,
+  `system-self-test`, `tamper-detected`
+- `priority` — IEC 60601-1-8 priority for clinical contexts:
+  `high`, `medium`, `low`; for social alarm contexts: `urgent`,
+  `routine`
+- `category` — `physiological`, `technical`, `welfare-check`
+- `assertedAt` — RFC 3339 with offset
+- `location` — best-known location at time of trigger:
+  - device-reported coordinates (if PERS device has GNSS)
+  - installation-room URN (for fixed installations)
+  - last-known-zone (for indoor positioning systems)
+  - "unknown" if no localisation data
+- `vitalsAttached[]` — IEEE 11073-10101 metrics carried with
+  the alarm if the device is also a vital-sign monitor
+- `falseAlarmIndicator` — `unknown` initially; updated post-
+  resolution
 
-## §6 Versioning and Deprecation
+Alarm events are append-only; subsequent state transitions
+form additional records that reference the original event.
 
-Versioning follows Semantic Versioning 2.0.0. Major version bumps
-require at least a 90-day overlap with the prior major version on
-every WIA-published reference implementation. Patch releases are
-editorial only. Deprecation enters a 12-month sunset window during
-which the registry marks the version as Deprecated with a migration
-note pointing to the replacement requirement(s) and an explanation
-of why the change was made.
+## §4 Routing and escalation
 
-## §7 Privacy and Security
+Each alarm event carries its routing record:
 
-Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
-at rest (AES-256-GCM or stronger), apply role-based access controls,
-and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
-transparency log pattern). Personal data exchanged via this protocol
-is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
-LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
-regime.
+- `routingId` — URN
+- `alarmEventRef` — parent alarm
+- `routingPolicyRef` — URN of the deployment's routing policy
+  for this device kind and installation context
+- `attempts[]` — ordered list of routing attempts:
+  - `at` — RFC 3339
+  - `target` — URN of routed party (caregiver, monitoring-
+    station operator, on-call clinician, family contact)
+  - `channel` — `voice-call`, `sms`, `app-push`, `pager`,
+    `console-banner`
+  - `outcome` — `acknowledged`, `voicemail`, `no-answer`,
+    `declined`, `escalated-out`
+- `escalationLevel` — current level (0 = first contact)
 
-## §8 Open Governance
+Escalation cadence respects IEC 60601-1-8 (for clinical
+contexts) and EN 50134-7 (for social-alarm contexts). The
+boundary publishes the deployment's documented cadence.
 
-Issues, errata, and proposals are tracked at
-github.com/WIA-Official/wia-standards/issues with the `medical-alert-system` label.
-The WIA Standards working group reviews open issues at the start of
-every minor release cycle and publishes the resulting decision log
-alongside the release notes. Errata are issued as patch releases;
-new normative requirements trigger minor bumps; backwards-incompatible
-changes trigger major bumps with the deprecation procedure above.
+## §5 Acknowledgement and resolution
+
+Every alarm transitions through:
+
+- `acknowledged` — first responder confirms receipt
+- `triaged` — clinical evaluation determined disposition
+- `dispatched` — emergency services or in-person caregiver
+  dispatched
+- `on-scene` — responder physically present
+- `resolved` — situation closed
+- `false-alarm` — classified retrospectively as false-alarm
+- `transferred-to-care` — handed off to receiving care
+  context (e.g., admitted to hospital from PERS activation)
+
+Each transition emits a record:
+
+- `transitionId` — URN
+- `alarmEventRef` — parent alarm
+- `priorState`, `nextState` — closed enum
+- `at` — RFC 3339
+- `actor` — principal URN responsible for the transition
+- `note` — free-text clinical or operational context
+
+## §6 Welfare-check record
+
+Some deployments implement scheduled welfare checks (passive
+inactivity monitoring, scheduled wellness check-ins). When a
+welfare-check fires:
+
+- `welfareCheckId` — URN
+- `subjectRef` — person under check
+- `triggerKind` — `inactivity`, `scheduled-check`, `bed-not-occupied`,
+  `door-not-opened`
+- `detectedAt`, `acknowledgedAt`, `resolvedAt` — RFC 3339
+- `responseChannel[]` — channels used to verify welfare
+
+Welfare-check escalation differs from emergency alarm
+escalation; the routing policy distinguishes the two.
+
+## §7 False-alarm reporting
+
+Post-resolution, the responsible operator classifies the
+event:
+
+- `falseAlarmKind` — closed enum: `not-false-alarm`,
+  `accidental-button`, `device-malfunction`, `caregiver-test`,
+  `system-test`, `false-trigger-fall-detection`,
+  `false-trigger-vital-monitor`
+
+False-alarm rates per device kind feed quarterly compliance
+reporting (PHASE 4) so deployments can tune sensitivity
+without reducing essential performance.
+
+## §8 Cross-domain references
+
+| Reference                  | Use site                                                  |
+|----------------------------|-----------------------------------------------------------|
+| WIA-medical-data-privacy   | every alarm references the consent scope for caregivers   |
+| WIA-medical-iot            | vital-sign metrics carried with alarms                    |
+| WIA-medical-data-privacy   | break-glass override for emergency disclosure to first responders |
+| WIA-network-security       | TLS cipher-suite floor for monitoring-station links       |
+| WIA-pq-crypto              | post-quantum migration phase                              |
+
+## §9 Subject identifier scope
+
+Subject identifiers are pseudonymous per WIA-medical-data-privacy
+`subjectRef` shape; the medical-alert-system boundary may resolve
+to a direct identifier only at the moment of emergency dispatch
+under an explicit break-glass override per WIA-medical-data-privacy
+PHASE 1 §6.
+
+## §10 Conformance levels
+
+| Level     | Scope                                                                  |
+|-----------|------------------------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                                   |
+| Verified  | annual third-party audit + IEC 60601-1-8 / EN 50134 conformance review |
+| Anchored  | continuous evidence package + IEC 80001-1 risk file when device-coupled |
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
+## Annex A — Worked PERS activation (informative)
 
-## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
+```json
+{
+  "resourceType": "Communication",
+  "status": "in-progress",
+  "category": [{"coding": [{"system": "urn:wia:malert:category", "code": "physiological"}]}],
+  "priority": "urgent",
+  "subject": {"reference": "urn:wia:mdp:subject:f4c2-9bd1-7a05-3e8e"},
+  "sender": {"reference": "urn:wia:malert:device:PERS-PDT-1.0:SN-91A7"},
+  "received": "2026-04-28T09:42:11+09:00",
+  "extension": [{
+    "url": "https://wia.example/fhir/StructureDefinition/wia-medical-alert-event",
+    "extension": [
+      {"url": "triggerKind", "valueCode": "fall-detected"},
+      {"url": "location", "valueString": "37.5665,126.9780 ±5m"},
+      {"url": "vitalsAttached", "valueString": "MDC_PULS_RATE=98 bpm"}
+    ]
+  }]
+}
+```
 
-The following implementation notes document field experience from pilot
-deployments and are non-normative. They are republished here so that early
-adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
+## Annex B — Negative test vectors (informative)
 
-- **Operational scope** — implementations SHOULD declare their operational
-  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
-  that downstream auditors can score the deployment against the correct
-  conformance tier in Annex A.
-- **Schema evolution** — additive changes (new optional fields, new error
-  codes) are non-breaking; renaming or removing fields, even in error
-  payloads, MUST trigger a minor version bump.
-- **Audit retention** — a 7-year retention window is sufficient to satisfy
-  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
-  regulators require longer retention, in which case the deployment policy
-  MUST extend the retention window rather than relying on this PHASE's
-  defaults.
-- **Time synchronization** — sub-second deadlines depend on synchronized
-  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
-  expressed in this PHASE; PTP is recommended for sites that require
-  deterministic interlocks.
-- **Error budget reporting** — implementations SHOULD publish a monthly
-  error-budget summary (latency p95, error rate, violation hours) in the
-  format defined by the WIA reporting profile to facilitate cross-vendor
-  comparison without exposing tenant-specific data.
+| Stimulus                                             | Expected outcome                                |
+|------------------------------------------------------|-------------------------------------------------|
+| Alarm without trigger kind                           | 422 + `trigger-kind-required`                   |
+| Routing attempt to disabled contact                  | recorded as failed; next attempt scheduled      |
+| False-alarm without retrospective classification     | accepted; flagged in quarterly compliance report |
+| Welfare-check without subject reference              | 422 + `subject-required`                        |
+| Break-glass disclosure without active emergency      | 403 + `break-glass-not-authorised`              |
 
-These notes are not requirements; they are a reference for field teams
-mapping their existing operations onto WIA conformance.
+## Annex C — Routing policy record (informative)
 
-## Annex F — Adoption Roadmap
+The routing policy is a structured document referenced from
+each alarm:
 
-The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
+```json
+{
+  "routingPolicyId": "urn:wia:malert:routing-policy:facility-X:policy-2026",
+  "appliesTo": {"installationContext": "assisted-living"},
+  "escalationLevels": [
+    {"level": 0, "channels": ["app-push","voice-call"], "targets": ["primary-monitoring-station"], "ackTimeoutSec": 60},
+    {"level": 1, "channels": ["voice-call","sms"], "targets": ["secondary-monitoring-station","on-call-clinician"], "ackTimeoutSec": 90},
+    {"level": 2, "channels": ["voice-call"], "targets": ["family-contact-1","family-contact-2"], "ackTimeoutSec": 120},
+    {"level": 3, "channels": ["voice-call"], "targets": ["emergency-services"], "ackTimeoutSec": 0}
+  ],
+  "voiceCallProvider": "primary-sip-trunk",
+  "voiceFailoverProvider": "backup-pstn-trunk",
+  "publishedAt": "2026-04-01T00:00:00+09:00",
+  "publishedBy": "urn:wia:hr:operations-director:od-1"
+}
+```
 
-- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
-- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
-- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
+The policy is signed (JWS detached); rev-ed policies are
+preserved in version history because alarm reconstruction
+must reference the policy active at the time of the event.
 
-Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
+## Annex D — Welfare-check schedule record (informative)
 
-The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
+```json
+{
+  "welfareScheduleId": "urn:wia:malert:welfare-schedule:facility-X:s-2026",
+  "appliesTo": {"installationContext": "assisted-living"},
+  "checks": [
+    {"kind": "morning-wakeup", "expectedWindow": {"start": "07:00:00", "end": "09:00:00"}, "trigger": "bed-not-occupied"},
+    {"kind": "evening-medication", "expectedWindow": {"start": "20:00:00", "end": "21:00:00"}, "trigger": "scheduled-check"},
+    {"kind": "night-presence", "expectedWindow": {"start": "23:00:00", "end": "06:00:00"}, "trigger": "inactivity"}
+  ],
+  "tolerance": {"sec": 1800}
+}
+```
 
-## Annex G — Test Vectors and Conformance Evidence
+Welfare-checks that fire outside the expected window
+escalate per the deployment's documented escalation cadence.
 
-This annex describes how implementations capture and publish conformance
-evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
-shape of evidence so that auditors and downstream integrators can compare
-implementations without re-running the full test matrix.
+## Annex E — Versioning
 
-- **Test vectors** — every normative requirement in this PHASE has at least
-  one positive vector and one negative vector under
-  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
-  conformance MUST run all vectors in CI and publish the resulting
-  pass/fail matrix in their compliance package.
-- **Evidence package** — the compliance package is a tarball containing
-  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
-  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
-  envelope, Rekor transparency log entry) so that downstream consumers
-  can verify provenance without trusting a private CA.
-- **Quarterly recheck** — implementations re-publish the evidence package
-  every quarter even if no source change occurred, so that consumers can
-  detect environmental drift (compiler updates, dependency updates, OS
-  updates) without polling vendor changelogs.
-- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
-  crosswalk that maps each vector to the equivalent assertion in adjacent
-  industry programs (where one exists), so an implementer that already
-  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
-  reduced incremental effort.
-- **Negative-result reporting** — vendors MUST report negative results
-  with the same fidelity as positive ones. A test that is skipped without
-  recorded justification is treated by auditors as a failure.
-
-These conventions are intended to make conformance evidence portable and
-machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
-auditor tooling.
-
-## Annex H — Versioning and Deprecation Policy
-
-This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
-It is non-normative; the rules below describe the policy that the WIA
-Standards working group commits to when amending this PHASE document.
-
-- **Semantic versioning** — major / minor / patch components follow
-  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
-  Major bump indicates a backwards-incompatible change to a normative
-  requirement; minor bump indicates new normative requirements that do
-  not break existing implementations; patch bump indicates editorial
-  changes only (clarifications, typo fixes, formatting).
-- **Deprecation window** — when a normative requirement is removed or
-  altered in a backwards-incompatible way, the prior major version is
-  maintained in parallel for at least 180 days. During the parallel
-  window, both major versions are marked Stable in the WIA Standards
-  registry and either may be cited as "WIA-conformant".
-- **Sunset notification** — deprecated major versions enter a 12-month
-  sunset window during which the WIA registry marks the version as
-  Deprecated. The deprecation entry includes a migration note pointing
-  to the replacement requirement(s) and an explanation of why the
-  change was made.
-- **Editorial errata** — patch-level errata are issued without a
-  deprecation window because they do not change normative behaviour.
-  Errata are tracked in a public errata register and each entry is
-  signed by the WIA Standards working group chair.
-- **Implementation changelog mapping** — implementations SHOULD publish
-  a changelog mapping each PHASE version they support to the specific
-  build, container digest, or SDK version that satisfies the version.
-  This allows downstream auditors to verify version conformance without
-  re-running the entire test matrix on every release.
-
-The policy is reviewed at the same cadence as the PHASE document and
-any changes to the policy itself are tracked in the version-history
-table at the start of the document.
-
-## Annex I — Interoperability Profiles
-
-This annex describes how implementations declare interoperability profiles
-for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
-deployments of varying scope (single tenant, regional cluster, federated
-network) can advertise the subset of normative requirements they satisfy
-without misrepresenting partial conformance as full conformance.
-
-- **Profile manifest** — every implementation publishes a profile manifest
-  in JSON. The manifest enumerates the normative requirement IDs from this
-  PHASE that are satisfied (`status: "supported"`), partially satisfied
-  (`status: "partial"`, with a reason field), or excluded
-  (`status: "excluded"`, with a justification). The manifest is signed
-  using the same Sigstore key used for the SBOM in Annex G.
-- **Federation profile** — federated deployments publish an aggregated
-  manifest summarizing the union and intersection of member-implementation
-  profiles. The aggregated manifest is consumed by directory services so
-  that callers can route a request to the least common denominator profile
-  required for an interaction.
-- **Backwards-profile compatibility** — when a deployment migrates from one
-  profile to a wider profile, the prior profile manifest remains valid and
-  signed for the deprecation window defined in Annex H. This preserves
-  audit traceability for auditors evaluating long-term interoperability.
-- **Profile registry** — the WIA Standards working group maintains a
-  public registry of named profiles. Common deployment shapes (e.g.,
-  "Edge-only", "Federated-with-replay") are added to the registry by
-  consensus. Registry entries are immutable; new shapes are added under
-  new names rather than amending existing entries.
-- **Profile versioning** — profile names are versioned with the same
-  Semantic Versioning rules described in Annex H. A deployment that
-  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
-  the second major version of the named profile, not the second deployment
-  of an unversioned profile.
-
-The profile mechanism is intentionally lightweight; it is meant to make
-real deployment shapes visible without forcing every deployment to
-satisfy every normative requirement.
+Versioning follows Semantic Versioning 2.0.0. Major bumps
+require ≥ 90 days overlap on all fielded reference
+implementations. Deprecated trigger-kind enumerations
+remain valid for historical alarms during the sunset window.
