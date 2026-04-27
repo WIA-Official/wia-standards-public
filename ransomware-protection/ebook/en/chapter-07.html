@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Identity Hardening Attestation in Practice | WIA Ransomware Protection</title><style>:root{--primary:#8B5CF6;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;color:#f8fafc;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#10b981;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#10b981}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA Ransomware Protection</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-CORE.md" class="muted">Spec</a><a href="../../api/openapi.yaml" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 7 · WIA Ransomware Protection v1.0.0</div><h1>Identity Hardening Attestation in Practice</h1>
+<p>The single most common entry vector for ransomware is a compromised privileged credential. Identity hardening — phishing-resistant MFA, dormant-account expiry, breakglass discipline — is the highest-return control surface, and the <code>identity_hardening_attestation</code> envelope is how the standard makes that surface auditable.</p>
+<h2>7.1 The envelope schema</h2>
+<pre><code>{
+  "attestation_id": "01HXRD9C2KQ3V7N4M8B6P0Z9F1",
+  "tenant_id": "did:wia:tenant:acme-eu",
+  "account_ref": "acct-acme-finance-jdoe",
+  "captured_at": "2026-04-27T03:00:00.000Z",
+  "mfa_factor_count": 2,
+  "mfa_factor_kinds": ["FIDO2", "TOTP"],
+  "phishing_resistant_only": false,
+  "last_credential_rotation_at": "2025-12-01T00:00:00.000Z",
+  "dormant_since": null,
+  "privilege_class": "admin",
+  "breakglass": false,
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<h2>7.2 Phishing resistance is a separate field</h2>
+<p>The standard splits MFA into "any factor" and "phishing-resistant only" because the distinction matters operationally. A SOC can answer "show me every privileged account that has MFA but is not phishing-resistant" with a single query against this stream, without inventing a new control framework.</p>
+<h2>7.3 Dormant-account discipline</h2>
+<p>An account with <code>dormant_since</code> set to a value older than the tenant&rsquo;s dormancy threshold is a candidate for either re-activation review or disablement. The standard does not enforce a threshold — it varies by jurisdiction and by role — but it does require that dormancy be measurable from the attestation stream.</p>
+<h2>7.4 Privilege classes</h2>
+<p>The standard recognises four privilege classes: <code>read</code>, <code>write</code>, <code>admin</code>, <code>root</code>. Vendors may layer richer role models on top, but the four-class projection is what cross-vendor reporting consumes. A tenant can answer "what fraction of root-class accounts are phishing-resistant" without translating between every product&rsquo;s native role hierarchy.</p>
+<h2>7.5 Breakglass accounts</h2>
+<p>Breakglass accounts are exceptional by construction: they exist to be used in catastrophic scenarios and to never be used otherwise. The <code>breakglass: true</code> flag is paired with a <code>breakglass_review_at</code> timestamp; an account in breakglass state without a recent review is itself a finding.</p>
+<h2>7.6 Cadence</h2>
+<p>Identity attestations are emitted on a rolling basis with a cadence not exceeding 24 hours. This is short enough to detect a compromised privilege escalation within one day and long enough to keep the volume manageable for organisations with hundreds of thousands of accounts.</p>
+<h2>7.7 Identity providers and the trust boundary</h2>
+<p>Attestations are signed by the tenant, not by the identity provider, because the tenant is the party accountable to the regulator. An identity provider may co-sign or supply derived attestations, but the tenant&rsquo;s signature is the canonical one.</p>
+<h2>7.8 Cross-reference to Phase 4</h2>
+<p>The identity-hardening envelope feeds the Phase 4 segmentation policies: a privilege class change automatically triggers a re-evaluation of the account&rsquo;s allowed network paths. The cross-reference closes the gap between identity posture and network posture.</p>
+<h2>Worked example</h2><p>Consider a mid-size hospital network running 18 EHR servers, 240 imaging workstations, 42 IoT medical devices, and a separate biomedical engineering subnet. The SOC has one full-time analyst, two contracted analysts, and an MSSP relationship. The cyber-insurer requires annual posture evidence; the national health regulator requires 24-hour breach notification.</p><p>In a pre-standard world, the SOC re-keys every observation into the EDR portal, the SIEM, the MSSP ticketing system, the insurer questionnaire, and the regulator filing form. The total work per real incident exceeds the analyst headcount by a factor of three to five during the first 72 hours, and that is the work done after the technical containment is finished.</p><p>In a post-standard world, the same observation is signed once, propagated automatically to every consumer that has subscribed to the tenant under appropriate TLP and federation rules, and rendered into each consumer’s preferred form by a downstream adaptor. The SOC analyst spends the first 72 hours doing analysis and decision-making, not data entry. That is the entire return on signing the envelope.</p><h2>What to do next</h2><p>Read the next chapter for the next envelope class. The eight chapters together are intended to be readable in roughly two hours — short enough that a working SOC analyst can finish the book between incidents.</p></div></body></html>

@@ -121,9 +121,7 @@
 ---
 
 ## 참고 문헌
-- 선행 연구 Grammatik der ÖGS
 - Krausneker (2006) ÖGS 연구
-- 선행 연구 ÖGS 문법 연구
 - UNESCO Austria - ÖGS 무형문화유산
 
 ---

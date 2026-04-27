@@ -232,7 +232,6 @@ leib (빵) [leip] → leiva (빵의) [leivɑ]
 
 ## 참고 문헌 (References)
 
-1. 선행 연구. *Estonian Language*. Estonian Academy Publishers.
 2. Eesti Keele Instituut (에스토니아어 연구소)
 
 ---

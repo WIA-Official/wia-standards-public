@@ -125,10 +125,6 @@
 - **Shifra Kisch** (1990년대 후반 최초 연구)
 
 ### 주요 문헌
-1. 선행 연구. "The emergence of grammar" - PNAS
-2. 선행 연구. "Emerging sign languages"
-3. 선행 연구. "The grammar of space in two new sign languages"
-4. 선행 연구. "The Gradual Emergence of Phonological Form"
 
 ### 사전
 - ABSL Dictionary: 300개 항목

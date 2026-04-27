@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Consultation Session Envelopes and WebRTC Signalling | WIA Telemedicine</title><style>:root{--primary:#06B6D4;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#06B6D4;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#06B6D4}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA Telemedicine</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 2 · WIA Telemedicine v1.0.0</div><h1>Consultation Session Envelopes and WebRTC Signalling</h1>
+<p>The <code>consultation_session</code> envelope is the smallest unit of remote care. It binds a patient and a provider to a modality (video, audio, chat, async messaging) and a scheduled time, and references the patient&apos;s consent.</p>
+<h2>2.1 Envelope schema</h2>
+<pre><code>{
+  "wia_telemedicine_version": "1.0.0",
+  "type": "consultation_session",
+  "session_id": "01HXR...",
+  "patient_id": "did:wia:patient:...",
+  "provider_id": "did:wia:provider:...",
+  "modality": "video",
+  "specialty": "psychiatry",
+  "scheduled_start": "2026-04-27T14:00:00Z",
+  "scheduled_end":   "2026-04-27T14:50:00Z",
+  "patient_consent_ref": "did:wia:consent:...",
+  "jurisdiction": "KR",
+  "language_pref": "ko",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<h2>2.2 WebRTC signalling</h2>
+<p>The session establishes media via the WebRTC offer/answer + ICE candidate exchange over the <code>/sessions/{id}/signalling</code> endpoint. Signalling is TLS 1.3; media is SRTP with AES-128-GCM. The endpoint is bidirectional — either side may POST — and every signalling message is signed.</p>
+<h2>2.3 Consent first, session second</h2>
+<p>The standard rejects sessions that lack a referenced, signed <code>patient_consent</code> envelope. This is structural, not procedural. A clinician cannot bypass consent by clicking through a modal; the platform refuses to open the session at the protocol layer.</p>
+<h2>2.4 Recording</h2>
+<p>Recording requires a separate <code>patient_consent</code> envelope with <code>scope: recording_session</code>. Patient-facing UI MUST display a clear visual indicator while recording is active. Recordings are stored under the patient&apos;s tenant with retention determined by jurisdiction (HIPAA: 6 years, KR 의료법: 10 years, EU: patient-controlled).</p>
+<h2>2.5 Latency budget</h2>
+<p>End-to-end signalling latency SHOULD target p95 under 250 ms. Re-keying SRTP streams on the hour is standard; mid-call re-keys can introduce audio glitches and SHOULD be reserved for credential rotation events.</p>
+<h2>2.6 Modality selection</h2>
+<p>Video is the default for synchronous consultations. Audio is appropriate for follow-ups where visual examination is unnecessary and avoids the bandwidth burden on patients with poor connectivity. Chat is appropriate for brief clinical questions. Async messaging covers the long-tail of clarifications that do not justify a synchronous slot. Store-and-forward (e.g., a dermatology image submitted now, reviewed within 24 hours) is the appropriate modality for image-based subspecialties where real-time interaction adds little value.</p>
+<h2>Worked example</h2>
+<p>A patient in Seoul, language preference Korean, books a video consultation with a psychiatrist licensed in Korea. The booking flow signs the consent envelope (telemedicine_consultation + recording_session), publishes the session envelope, and at session start time the WebRTC signalling completes within 800 ms. The session runs 50 minutes; the encounter envelope is published 30 minutes later with ICD-11 6A70.0; an e-prescription for sertraline is published 5 minutes after the encounter. The patient receives all four envelopes in their wallet within the hour.</p>
+<h2>What to do next</h2>
+<p>Chapter 3 covers the clinical encounter envelope and how it binds to FHIR R5 Encounter, Condition, and Observation resources.</p>
+<h2>Editor</div></body></html>apos;s note</h2><p>This English chapter is intended for clinicians, integration engineers, and policy stakeholders. The companion Korean chapters in <code>../ko/</code> contain the same envelope content with regulatory cross-references appropriate to the Korean healthcare environment (의료법, HIRA, 의료마이데이터). Sample envelope-signing code, pharmacy gateway integration code, and FHIR R5 binding code are provided in a separate appendix not included in this short-form ebook.</p><h2>Reading order</h2><p>Chapters can be read independently after Chapter 1. Implementers building the platform side typically read 1, 2, 3 first; clinicians evaluating workflow read 1, 4, 7 first; cross-border deployments read 5 and 6 in addition. The complete book is approximately 90 minutes of reading and is intended to be finished by a working clinician between encounters.</p></div></body></html>

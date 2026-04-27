@@ -1,0 +1,34 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>재배분과 세금 손실 수확 | WIA Robo-Advisor</title><style>:root{--primary:#22C55E;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px}nav.top-nav a{color:#22C55E;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#22C55E}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA 로보어드바이저</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">제5장 · WIA Robo-Advisor v1.0.0</div><h1>재배분과 세금 손실 수확</h1>
+<p>재배분과 세금 손실 수확은 로보어드바이저가 인간 어드바이저보다 구조적으로 잘 하는 두 작업입니다 — 24/7 모니터링과 결정적 규칙 적용. 본 장은 두 작업의 봉투 정의와 운영 원칙을 다룹니다.</p>
+<h2>5.1 재배분 트리거 분류</h2>
+<p>표준은 5가지 트리거를 인정합니다: <code>drift_threshold</code>(목표 비중에서 N pp 이상 드리프트)·<code>scheduled</code>(분기/연간 캘린더)·<code>policy_change</code>(투자자 또는 어드바이저 정책 변경)·<code>tax_loss_harvest</code>(세금 손실 수확 동기)·<code>investor_initiated</code>(투자자 명시 요청). 트리거는 봉투에 명시되어 사후 동기 검증이 가능합니다.</p>
+<h2>5.2 세금 영향 추정</h2>
+<p>모든 재배분 봉투는 <code>tax_impact_estimate_base_ccy</code>를 운반합니다. 추정은 어드바이저가 서명하며, 실제 세금 결과는 투자자의 세무 준비자가 조정합니다. 추정이 필수인 이유는 세금 영향 증명 없는 재배분이 거래 후 투자자 놀람의 단일 최대 원천이기 때문입니다.</p>
+<h2>5.3 세금 손실 수확 봉투</h2>
+<pre><code>{
+  "wia_robo_advisor_version": "1.0.0",
+  "type": "tax_loss_harvest",
+  "tlh_id": "...",
+  "portfolio_id": "...",
+  "harvested_at": "2026-04-27T13:00:00Z",
+  "lots_sold": [{
+    "instrument_ref": "ISIN US...",
+    "lot_id": "...",
+    "acquired_at": "2025-09-15T00:00:00Z",
+    "cost_basis_base_ccy": 12500,
+    "proceeds_base_ccy": 9200,
+    "realised_loss_base_ccy": -3300
+  }],
+  "wash_sale_avoided_until": "2026-05-27T00:00:00Z",
+  "replacement_holding": "ISIN US...similar...",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<h2>5.4 워시 세일 회피</h2>
+<p><code>wash_sale_avoided_until</code>은 워시 세일 또는 베드앤브렉퍼스트 규칙(US §1091, UK 30일, KR 유사매매)을 인정하는 관할에서 필수입니다. 어드바이저는 이 날짜 이전에 동일 또는 실질적으로 동일한 증권을 취득해서는 안 됩니다.</p>
+<h2>5.5 한국 적용 노트</h2>
+<p>국내 양도소득세 체계에서 손실 인식은 같은 과세 연도 내 이익과 상계 가능합니다. 본 표준의 <code>tax_loss_harvest</code> + <code>tax_year_summary</code> 조합은 국세청 양도소득세 신고서의 손실 상계 입력을 자동 산출합니다 — 별도 엑셀 가공 불필요.</p>
+<h2>5.6 결제 추적</h2>
+<p>각 거래 라인은 정산 시 수탁사 카운터-서명 <code>settlement_confirmation</code> 봉투와 매칭됩니다. T+5 이상 미확인 재배분은 <code>reconciliation_break</code> 봉투로 에스컬레이션됩니다.</p>
+<h2>워크 예제</h2>
+<p>2026-04-27, 시장 하락. 알고리즘이 미국 ETF 한 종목에 -3,300 USD 미실현 손실 감지, 포트폴리오의 0.4%. 세금 손실 수확 트리거 발화. 어드바이저는 손실 종목 매도, 동일 자산 클래스의 비실질-동일 대체 종목 매수, 30일 워시 세일 윈도우 기록. 모든 거래가 봉투에 서명되어 다음 양도세 신고에 그대로 흘러갑니다.</p>
+<h2>편집자 노트</h2><p>본 한국어 챕터는 영문판의 직역이 아니라 한국 자본시장 환경(자본시장법·금융소비자보호법·마이데이터·KR-GIPS)을 염두에 둔 응용 노트와 함께 재작성됐습니다. 직역이 필요한 경우 영문판을 우선 인용해 주십시오. 봉투 서명·검증 코드 예제와 한국 마이데이터 사업자 연결 예제는 별도 부속서에 수록될 예정입니다.</p><h2>다음 단계</h2><p>다음 장에서 다음 봉투 클래스 또는 운영 측면을 다룹니다. 8개 장 전체는 약 2시간이면 읽을 수 있도록 의도됐습니다 — 일하는 어드바이저 운영자가 분기 보고 사이에 책을 끝낼 수 있을 만큼 짧습니다. 각 장의 워크 예제는 실제 한국 중규모 로보어드바이저(운용자산 1조원 미만, 투자자 5만명 이하)를 가정합니다.</p><h2>참고</h2><p>본 표준의 전체 사양은 <code>spec/PHASE-1-DATA-FORMAT.md</code> 외 4개 파일에 수록되어 있습니다. CLI 참조 구현은 <code>cli/</code>에, OpenAPI 명세는 <code>api/</code>에 있습니다. 시뮬레이터로 봉투 발행을 시각적으로 체험할 수 있습니다 — <code>simulator/index.html</code>.</p></div></body></html>

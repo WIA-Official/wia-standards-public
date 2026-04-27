@@ -213,7 +213,6 @@
 - Wikipedia - Uruguayan Sign Language
 - SIL Digital Resources (2013) - The Uruguayan Deaf
 - Project MUSE - Language Policies in Uruguay and LSU
-- 선행 연구 - LSU-DS Dataset
 - iLSU-T (2025) - Translation Dataset
 
 ---

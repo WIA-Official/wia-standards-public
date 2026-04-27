@@ -566,7 +566,6 @@ From slideshare.net (Numeros LSM) descriptions:
 
 ### Research/Documentation
 - SIL Mexico (mexico.sil.org)
-- 선행 연구 - Lexical variation study
 - Bickford (1991) - Mexican Sign Language lexical variation
 - Smith-Stark (1986) - La lengua manual Mexicana
 

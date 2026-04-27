@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Clinical Encounter Envelopes and FHIR R5 | WIA Telemedicine</title><style>:root{--primary:#06B6D4;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#06B6D4;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#06B6D4}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA Telemedicine</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 3 · WIA Telemedicine v1.0.0</div><h1>Clinical Encounter Envelopes and FHIR R5</h1>
+<p>The <code>clinical_encounter</code> envelope is the post-session record of the interaction&apos;s clinical content. It maps directly to FHIR R5 Encounter and carries the diagnostic codes, findings, and follow-up plan that downstream care depends on.</p>
+<h2>3.1 Envelope schema</h2>
+<pre><code>{
+  "wia_telemedicine_version": "1.0.0",
+  "type": "clinical_encounter",
+  "encounter_id": "01HXR...",
+  "session_id":   "01HXR...",
+  "patient_id":   "did:wia:patient:...",
+  "started_at": "2026-04-27T14:00:00Z",
+  "ended_at":   "2026-04-27T14:50:00Z",
+  "icd11_codes": [
+    { "code": "6A70.0", "display": "Single episode depressive disorder, mild" }
+  ],
+  "snomed_findings": [
+    { "code": "35489007", "display": "Depressive disorder" }
+  ],
+  "vitals_observations": [
+    "fhir:Observation/123-bp"
+  ],
+  "imaging_refs": [],
+  "follow_up_required": true,
+  "signature_by_provider": "Ed25519"
+}</code></pre>
+<h2>3.2 Coding system discipline</h2>
+<p>Diagnostic codes use WHO ICD-11; clinical findings use SNOMED CT International. The standard does not redistribute either — implementations license SNOMED separately under the SNOMED International Affiliate Licence and obtain ICD-11 under WHO terms. The licensing is not a barrier; both are widely available to qualified healthcare implementers.</p>
+<h2>3.3 FHIR mapping</h2>
+<p>Each <code>clinical_encounter</code> envelope corresponds to a FHIR R5 Encounter resource with status "finished". The envelope&apos;s <code>icd11_codes</code> become Condition resources linked to the Encounter; SNOMED findings become Observation resources. Vital signs referenced by URI live as separate FHIR Observation resources with LOINC codes (e.g., 85354-9 for blood pressure panel) and UCUM units.</p>
+<h2>3.4 Provider signature is mandatory</h2>
+<p>Unlike the session envelope (which may be signed by either party), the encounter envelope is always signed by the provider. The provider&apos;s signature is the legal attestation of the clinical content. Patient counter-signatures are optional and used to acknowledge receipt or to dispute content.</p>
+<h2>3.5 Imaging refs</h2>
+<p>Imaging studies are referenced as DICOM Web URLs (WADO-RS endpoints at the originating PACS). The standard does not redistribute imaging payloads; access control is enforced at the PACS, not at the envelope.</p>
+<h2>3.6 Follow-up commitments</h2>
+<p>The <code>follow_up_required</code> field is mandatory and feeds the appointment-scheduling workflow. A provider that records "follow_up_required: true" without ever publishing a follow-up appointment slot is generating a measurable continuity-of-care gap that downstream auditors can detect.</p>
+<h2>Worked example</h2>
+<p>A psychiatry encounter publishes ICD-11 6A70.0 (mild depression, single episode), SNOMED 35489007 (depressive disorder), with a vital-sign Observation resource recording resting heart rate captured by the patient&apos;s wearable during the session. The follow-up flag is set; an appointment slot for 4 weeks later is published in parallel. The patient&apos;s wallet now contains the full encounter record signed by the provider, plus the booked follow-up.</p>
+<h2>What to do next</h2>
+<p>Chapter 4 covers the e-prescription envelope and the drug-interaction discipline that protects patients from the most common preventable harm in remote care.</p>
+<h2>Editor</div></body></html>apos;s note</h2><p>This English chapter is intended for clinicians, integration engineers, and policy stakeholders. The companion Korean chapters in <code>../ko/</code> contain the same envelope content with regulatory cross-references appropriate to the Korean healthcare environment (의료법, HIRA, 의료마이데이터). Sample envelope-signing code, pharmacy gateway integration code, and FHIR R5 binding code are provided in a separate appendix not included in this short-form ebook.</p><h2>Reading order</h2><p>Chapters can be read independently after Chapter 1. Implementers building the platform side typically read 1, 2, 3 first; clinicians evaluating workflow read 1, 4, 7 first; cross-border deployments read 5 and 6 in addition. The complete book is approximately 90 minutes of reading and is intended to be finished by a working clinician between encounters.</p></div></body></html>

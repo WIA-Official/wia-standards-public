@@ -549,7 +549,6 @@
 - Wendy Sandler, Mark Aronoff, Carol Padden, Irit Meir - Key researchers
 - ISL-LEX v.1 database (2022)
 - Meir & Sandler (2008)
-- 선행 연구
 
 ### Cultural
 - israelisignlanguage.com

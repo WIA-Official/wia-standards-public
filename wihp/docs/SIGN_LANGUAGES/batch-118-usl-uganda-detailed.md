@@ -129,7 +129,6 @@
 ### 연구
 - Kyambogo 대학 특수교육학과
 - 음운론, 형태론, 통사론 연구
-- 선행 연구 - "Sign Languages of the World"
 
 ## 교육 현황
 

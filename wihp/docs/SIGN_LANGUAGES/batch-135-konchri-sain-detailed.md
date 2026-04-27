@@ -228,7 +228,6 @@
 
 ### 학술 출판
 - SLIA (Sign Language and Indigenous Americana)
-- 선행 연구
 
 ### 관련 연구
 - 카리브해 수어 연구

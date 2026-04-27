@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIA Robo-Advisor - Interactive Simulator</title>
+    <style>
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #F59E0B;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .nav-home { color: var(--text); text-decoration: none; font-weight: bold; }
+        .nav-home:hover { color: var(--primary); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .sep { color: var(--border); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .nav-links a:hover { color: var(--primary); }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .lang-select { padding: 8px 16px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 6px; cursor: pointer; }
+        .lang-select:hover { border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(90deg, var(--primary), #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--text-muted); font-size: 1.1rem; }
+        .hero .philosophy { color: #ffd700; font-size: 1rem; margin-top: 10px; }
+
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--primary); border-color: var(--primary); }
+        .tab:hover { border-color: var(--primary); }
+
+        .panel { display: none; background: var(--bg-card); border-radius: 12px; padding: 30px; border: 1px solid var(--border); }
+        .panel.active { display: block; }
+        .panel h2 { margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-center { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 20px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+
+        .portfolio-viz { background: linear-gradient(135deg, #059669 0%, #10B981 100%); border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; }
+        .portfolio-value { font-size: 3.5rem; font-weight: bold; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .portfolio-label { font-size: 1.1rem; margin-top: 10px; opacity: 0.9; }
+
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; }
+
+        .asset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .asset-card { background: var(--bg); border: 2px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .asset-card:hover { border-color: var(--primary); }
+        .asset-card.selected { border-color: var(--primary); background: rgba(16, 185, 129, 0.1); }
+        .asset-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .asset-name { font-weight: 600; }
+        .asset-percent { font-size: 0.85rem; color: var(--primary); margin-top: 5px; }
+
+        .slider-row { padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .slider-row:last-child { border-bottom: none; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .slider-value { color: var(--primary); font-weight: 600; }
+        input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: var(--border); appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+
+        .chart-area { height: 200px; background: var(--bg); border-radius: 8px; margin: 20px 0; display: flex; align-items: flex-end; justify-content: space-around; padding: 20px; }
+        .bar { background: var(--primary); border-radius: 4px 4px 0 0; width: 60px; transition: height 0.5s; }
+
+        footer { margin-top: 60px; padding: 30px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); }
+        footer .philosophy { color: #ffd700; font-size: 1.1rem; margin-bottom: 10px; }
+        footer .links { margin-top: 15px; }
+        footer .links a { color: var(--text-muted); text-decoration: none; margin: 0 10px; }
+        footer .links a:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .top-nav { flex-direction: column; gap: 15px; }
+            .tabs { gap: 5px; }
+            .tab { padding: 10px 15px; font-size: 0.85rem; }
+            .hero h1 { font-size: 1.8rem; }
+            .breadcrumb { display: none; }
+            .metric-grid { grid-template-columns: repeat(2, 1fr); }
+            .asset-grid { grid-template-columns: 1fr; }
+        }
+        .emoji-icon { background: none !important; -webkit-background-clip: initial !important; -webkit-text-fill-color: initial !important; background-clip: initial !important; display: inline-block; margin-right: 8px; }
+    
+/* Site-kit spacing fix */
+.hero{margin-top:20px!important}
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="https://wiastandards.com" class="nav-home" target="_blank">🤟 WIA Standards</a>
+                <div class="breadcrumb">
+                    <a href="https://wiastandards.com" target="_blank">Home</a>
+                    <span class="sep">›</span>
+                    <a href="https://wiastandards.com/#standards" target="_blank">Standards</a>
+                    <span class="sep">›</span>
+                    <a href="../index.html">Robo-Advisor</a>
+                    <span class="sep">›</span>
+                    <span class="current">Simulator</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 25px;">
+                <nav class="nav-links">
+                    <a href="https://cert.wiastandards.com" target="_blank">🏆 Certification</a>
+                    <a href="https://wiabook.com" target="_blank">📚 Ebook</a>
+                    <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+                </nav>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo">🤖 WIA Robo-Advisor</div>
+            <select class="lang-select" onchange="setLang(this.value)">
+                <option value="en">🇬🇧 English</option>
+                <option value="ko">🇰🇷 한국어</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="ja">🇯🇵 日本語</option>
+                <option value="zh">🇨🇳 中文</option>
+                <option value="ar">🇸🇦 العربية</option>
+                <option value="hi">🇮🇳 हिन्दी</option>
+                <option value="pt">🇵🇹 Português</option>
+            </select>
+        </header>
+
+        <section class="hero">
+            <h1 data-en="Robo-Advisor Simulator" data-ko="로보어드바이저 시뮬레이터">Robo-Advisor Simulator</h1>
+            <p data-en="AI-powered portfolio management and rebalancing" data-ko="AI 기반 포트폴리오 관리 및 리밸런싱">AI-powered portfolio management and rebalancing</p>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+        </section>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel(0)" data-en="📊 Portfolio" data-ko="📊 포트폴리오">📊 Portfolio</div>
+            <div class="tab" onclick="showPanel(1)" data-en="🎯 Analysis" data-ko="🎯 분석">🎯 Analysis</div>
+            <div class="tab" onclick="showPanel(2)" data-en="⚖️ Rebalance" data-ko="⚖️ 리밸런싱">⚖️ Rebalance</div>
+            <div class="tab" onclick="showPanel(3)" data-en="📈 Performance" data-ko="📈 성과">📈 Performance</div>
+            <div class="tab" onclick="showPanel(4)" data-en="📝 Logs" data-ko="📝 로그">📝 Logs</div>
+        </div>
+
+        <!-- Panel 0: Portfolio -->
+        <div class="panel active" id="panel-0">
+            <h2 data-en="📊 Portfolio Overview" data-ko="📊 포트폴리오 개요">📊 Portfolio Overview</h2>
+
+            <div class="portfolio-viz">
+                <div class="portfolio-value" id="portfolioValue">$150,000</div>
+                <div class="portfolio-label" data-en="Total Portfolio Value" data-ko="총 포트폴리오 가치">Total Portfolio Value</div>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value" id="totalReturn">+15.2%</div>
+                    <div class="metric-label">Total Return</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="sharpeRatio">1.85</div>
+                    <div class="metric-label">Sharpe Ratio</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="maxDrawdown">-8.5%</div>
+                    <div class="metric-label">Max Drawdown</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="riskScore">65</div>
+                    <div class="metric-label">Risk Score</div>
+                </div>
+            </div>
+
+            <div class="asset-grid">
+                <div class="asset-card selected" data-allocation="60">
+                    <div class="asset-icon">📈</div>
+                    <div class="asset-name" data-en="Stocks" data-ko="주식">Stocks</div>
+                    <div class="asset-percent" id="stocksAlloc">60%</div>
+                </div>
+                <div class="asset-card" data-allocation="30">
+                    <div class="asset-icon">💰</div>
+                    <div class="asset-name" data-en="Bonds" data-ko="채권">Bonds</div>
+                    <div class="asset-percent" id="bondsAlloc">30%</div>
+                </div>
+                <div class="asset-card" data-allocation="10">
+                    <div class="asset-icon">🏠</div>
+                    <div class="asset-name" data-en="Real Estate" data-ko="부동산">Real Estate</div>
+                    <div class="asset-percent" id="realEstateAlloc">10%</div>
+                </div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="updatePortfolio()" data-en="🔄 Update Portfolio" data-ko="🔄 포트폴리오 업데이트">🔄 Update Portfolio</button>
+            </div>
+            <div class="output" id="portfolioOutput"></div>
+        </div>
+
+        <!-- Panel 1: Analysis -->
+        <div class="panel" id="panel-1">
+            <h2 data-en="🎯 Risk Analysis" data-ko="🎯 리스크 분석">🎯 Risk Analysis</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Assess portfolio risk and optimize allocation" data-ko="포트폴리오 리스크 평가 및 배분 최적화">Assess portfolio risk and optimize allocation</p>
+
+            <div class="slider-row">
+                <div class="slider-label">
+                    <span data-en="Risk Tolerance" data-ko="리스크 허용도">Risk Tolerance</span>
+                    <span class="slider-value" id="riskToleranceValue">65</span>
+                </div>
+                <input type="range" min="0" max="100" value="65" oninput="updateRiskTolerance(this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-label">
+                    <span data-en="Time Horizon (years)" data-ko="투자 기간 (년)">Time Horizon (years)</span>
+                    <span class="slider-value" id="timeHorizonValue">25</span>
+                </div>
+                <input type="range" min="1" max="50" value="25" oninput="updateTimeHorizon(this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-label">
+                    <span data-en="Initial Investment" data-ko="초기 투자액">Initial Investment</span>
+                    <span class="slider-value" id="initialInvestmentValue">$100,000</span>
+                </div>
+                <input type="range" min="1000" max="1000000" value="100000" step="1000" oninput="updateInitialInvestment(this.value)">
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="analyzeRisk()" data-en="🎯 Analyze Risk" data-ko="🎯 리스크 분석">🎯 Analyze Risk</button>
+            </div>
+            <div class="output" id="analysisOutput"></div>
+        </div>
+
+        <!-- Panel 2: Rebalance -->
+        <div class="panel" id="panel-2">
+            <h2 data-en="⚖️ Portfolio Rebalancing" data-ko="⚖️ 포트폴리오 리밸런싱">⚖️ Portfolio Rebalancing</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" data-en="Optimize asset allocation based on market conditions" data-ko="시장 상황에 따른 자산 배분 최적화">Optimize asset allocation based on market conditions</p>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value" id="driftAmount">+5.2%</div>
+                    <div class="metric-label">Allocation Drift</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="rebalanceCost">$125</div>
+                    <div class="metric-label">Rebalance Cost</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="taxImpact">$850</div>
+                    <div class="metric-label">Tax Impact</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value" id="lastRebalance">45</div>
+                    <div class="metric-label">Days Since</div>
+                </div>
+            </div>
+
+            <div class="chart-area" id="rebalanceChart">
+                <div class="bar" style="height: 150px;"></div>
+                <div class="bar" style="height: 100px;"></div>
+                <div class="bar" style="height: 50px;"></div>
+                <div class="bar" style="height: 80px;"></div>
+                <div class="bar" style="height: 120px;"></div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="executeRebalance()" data-en="⚖️ Execute Rebalance" data-ko="⚖️ 리밸런싱 실행">⚖️ Execute Rebalance</button>
+                <button class="btn btn-secondary" onclick="previewRebalance()" data-en="👁️ Preview" data-ko="👁️ 미리보기">👁️ Preview</button>
+            </div>
+            <div class="output" id="rebalanceOutput"></div>
+        </div>
+
+        <!-- Panel 3: Performance -->
+        <div class="panel" id="panel-3">
+            <h2 data-en="📈 Performance Metrics" data-ko="📈 성과 지표">📈 Performance Metrics</h2>
+
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-value">+12.5%</div>
+                    <div class="metric-label">1 Year Return</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">+8.2%</div>
+                    <div class="metric-label">3 Year CAGR</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">2.15</div>
+                    <div class="metric-label">Sortino Ratio</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">+2.1%</div>
+                    <div class="metric-label">Alpha</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">0.92</div>
+                    <div class="metric-label">Beta</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">14.5%</div>
+                    <div class="metric-label">Volatility</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">-12.3%</div>
+                    <div class="metric-label">Max Drawdown</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">$1,850</div>
+                    <div class="metric-label">Tax Savings</div>
+                </div>
+            </div>
+
+            <div class="chart-area">
+                <div class="bar" style="height: 80px;"></div>
+                <div class="bar" style="height: 120px;"></div>
+                <div class="bar" style="height: 150px;"></div>
+                <div class="bar" style="height: 130px;"></div>
+                <div class="bar" style="height: 170px;"></div>
+                <div class="bar" style="height: 160px;"></div>
+                <div class="bar" style="height: 180px;"></div>
+            </div>
+
+            <div class="btn-center">
+                <button class="btn btn-primary" onclick="generateReport()" data-en="📊 Generate Report" data-ko="📊 보고서 생성">📊 Generate Report</button>
+            </div>
+            <div class="output" id="performanceOutput"></div>
+        </div>
+
+        <!-- Panel 4: Logs -->
+        <div class="panel" id="panel-4">
+            <h2 data-en="📝 Transaction Logs" data-ko="📝 거래 로그">📝 Transaction Logs</h2>
+            <div class="output" id="logsOutput" style="max-height: 500px;">
+[2025-01-15 10:30:00] Portfolio created: $150,000 initial deposit
+[2025-01-15 10:31:15] Risk profile assessed: Score 65 (Moderate-Aggressive)
+[2025-01-15 10:32:30] Asset allocation: 60% Stocks, 30% Bonds, 10% Real Estate
+[2025-01-15 10:35:00] BUY VTI x 500 @ $220.50 = $110,250
+[2025-01-15 10:35:15] BUY BND x 300 @ $75.00 = $22,500
+[2025-01-15 10:35:30] BUY VNQ x 200 @ $87.50 = $17,500
+[2025-01-20 14:20:00] Dividend received: $125.50 (VTI)
+[2025-01-25 09:15:00] Rebalance check: Drift +3.2% (within threshold)
+[2025-02-01 11:00:00] Monthly contribution: $2,000
+[2025-02-15 16:30:00] Rebalance executed: -2.1% drift corrected
+[2025-02-15 16:30:15] SELL VTI x 50 @ $225.00 = $11,250
+[2025-02-15 16:30:30] BUY BND x 100 @ $75.50 = $7,550
+[2025-02-15 16:30:45] BUY VNQ x 40 @ $88.00 = $3,520
+[2025-02-28 10:00:00] Tax-loss harvesting: Saved $185 in taxes
+[2025-03-01 09:00:00] Quarterly review: Performance +5.2% (vs benchmark +4.1%)
+            </div>
+        </div>
+
+        <footer>
+            <p class="philosophy">弘益人間 · Benefit All Humanity</p>
+            <p>&copy; 2025 SmileStory Inc. / WIA</p>
+            <div class="links">
+                <a href="https://wiastandards.com" target="_blank">WIA Standards</a>
+                <a href="https://cert.wiastandards.com" target="_blank">Certification</a>
+                <a href="https://wiabook.com" target="_blank">Ebook</a>
+                <a href="https://github.com/WIA-Official/wia-standards" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let currentPanel = 0;
+
+        function showPanel(index) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`panel-${index}`).classList.add('active');
+            document.querySelectorAll('.tab')[index].classList.add('active');
+            currentPanel = index;
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const text = el.getAttribute(`data-${lang}`) || el.getAttribute('data-en');
+                el.textContent = text;
+            });
+        }
+
+        function updatePortfolio() {
+            const output = document.getElementById('portfolioOutput');
+            output.textContent = `
+📊 Portfolio Updated Successfully
+
+Total Value: $150,000
+Asset Allocation:
+  - Stocks (VTI): 60% = $90,000
+  - Bonds (BND): 30% = $45,000
+  - Real Estate (VNQ): 10% = $15,000
+
+Risk Metrics:
+  - Sharpe Ratio: 1.85
+  - Beta: 0.92
+  - Volatility: 14.5%
+  - Max Drawdown: -8.5%
+
+Status: ✅ Portfolio optimized
+Next rebalance check: 2025-04-15
+            `;
+        }
+
+        function updateRiskTolerance(value) {
+            document.getElementById('riskToleranceValue').textContent = value;
+        }
+
+        function updateTimeHorizon(value) {
+            document.getElementById('timeHorizonValue').textContent = value;
+        }
+
+        function updateInitialInvestment(value) {
+            document.getElementById('initialInvestmentValue').textContent = '$' + parseInt(value).toLocaleString();
+        }
+
+        function analyzeRisk() {
+            const risk = document.getElementById('riskToleranceValue').textContent;
+            const horizon = document.getElementById('timeHorizonValue').textContent;
+            const initial = document.getElementById('initialInvestmentValue').textContent;
+            const output = document.getElementById('analysisOutput');
+
+            output.textContent = `
+🎯 Risk Analysis Complete
+
+Profile: ${risk < 30 ? 'Conservative' : risk < 50 ? 'Moderate-Conservative' : risk < 70 ? 'Moderate' : risk < 85 ? 'Moderate-Aggressive' : 'Aggressive'}
+Risk Score: ${risk}/100
+Time Horizon: ${horizon} years
+Initial Investment: ${initial}
+
+Recommended Allocation:
+  - Stocks: ${Math.min(90, Math.floor(risk * 0.9))}%
+  - Bonds: ${Math.max(10, Math.floor((100 - risk) * 0.8))}%
+  - Alternatives: ${Math.floor((100 - risk) * 0.2)}%
+
+Expected Annual Return: ${(5 + (risk * 0.08)).toFixed(1)}%
+Expected Volatility: ${(8 + (risk * 0.15)).toFixed(1)}%
+Sharpe Ratio (Est): ${(1.2 + (risk * 0.01)).toFixed(2)}
+
+✅ Analysis complete - Portfolio optimized for your risk profile
+            `;
+        }
+
+        function executeRebalance() {
+            const output = document.getElementById('rebalanceOutput');
+            output.textContent = `
+⚖️ Rebalancing Executed
+
+Drift Detected: +5.2%
+Rebalancing Strategy: Tax-optimized
+
+Trades Executed:
+  1. SELL VTI x 75 @ $225.00 = $16,875
+  2. BUY BND x 150 @ $75.50 = $11,325
+  3. BUY VNQ x 60 @ $88.00 = $5,280
+
+Transaction Costs: $125.00
+Tax Impact: $850 (long-term capital gains)
+Tax-Loss Harvesting: $185 saved
+
+New Allocation:
+  - Stocks: 60.0% (target: 60%)
+  - Bonds: 30.0% (target: 30%)
+  - Real Estate: 10.0% (target: 10%)
+
+✅ Portfolio rebalanced successfully
+Next check: 2025-04-15
+            `;
+        }
+
+        function previewRebalance() {
+            const output = document.getElementById('rebalanceOutput');
+            output.textContent = `
+👁️ Rebalance Preview
+
+Current Drift: +5.2%
+Recommended Actions:
+
+  1. Reduce Stocks allocation: 65.2% → 60.0%
+     Action: Sell VTI x 75 shares
+
+  2. Increase Bonds allocation: 27.5% → 30.0%
+     Action: Buy BND x 150 shares
+
+  3. Increase Real Estate: 7.3% → 10.0%
+     Action: Buy VNQ x 60 shares
+
+Estimated Costs:
+  - Trading Fees: $125
+  - Tax Impact: $850
+  - Tax Savings: $185 (loss harvesting)
+
+Net Cost: $790
+
+Approve rebalance to proceed...
+            `;
+        }
+
+        function generateReport() {
+            const output = document.getElementById('performanceOutput');
+            output.textContent = `
+📊 Performance Report Generated
+
+Period: January 2024 - January 2025
+
+Returns:
+  - Total Return: +15.2%
+  - Benchmark (60/40): +12.8%
+  - Alpha: +2.4%
+  - 1-Year: +12.5%
+  - 3-Year CAGR: +8.2%
+
+Risk Metrics:
+  - Sharpe Ratio: 1.85
+  - Sortino Ratio: 2.15
+  - Beta: 0.92
+  - Volatility: 14.5%
+  - Max Drawdown: -12.3%
+  - Calmar Ratio: 1.02
+
+Tax Efficiency:
+  - Tax-Loss Harvesting: $1,850 saved
+  - Effective Tax Rate: 12.5% (vs 15% benchmark)
+
+Portfolio Value:
+  - Starting: $100,000
+  - Contributions: $24,000
+  - Ending: $150,000
+  - Gain: $26,000 (+20.9%)
+
+✅ Report saved to your account
+            `;
+        }
+
+        // Initialize
+        updatePortfolio();
+    </script>
+<script src="https://wiastandards.com/assets/site-kit/ws-site-kit.js?v=20260317b"></script>
+</body>
+</html>

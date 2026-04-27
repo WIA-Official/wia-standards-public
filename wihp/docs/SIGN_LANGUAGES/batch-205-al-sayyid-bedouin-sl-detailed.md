@@ -152,10 +152,6 @@ ABSL may follow same path.
 ## Research Output
 
 ### Key Publications
-1. 선행 연구 PNAS - Grammar emergence
-2. 선행 연구 Emerging sign languages
-3. 선행 연구 Phonological form emergence
-4. 선행 연구 Community structure and language
 5. Kisch (2008, 2012) Anthropological studies
 
 ### Ongoing Studies
@@ -181,7 +177,6 @@ Its preservation matters for all of linguistics.
 
 ## References
 
-1. 선행 연구. PNAS emergence study
 2. Fox, M. (2008). Talking Hands
 3. Kisch, S. (2008, 2012). Al-Sayyid anthropology
 4. University of Haifa Sign Language Research Lab

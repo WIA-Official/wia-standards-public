@@ -141,7 +141,6 @@ Serbia adopted German system → lasting oralist ideology
 
 ### Key Publications
 1. Raičević Bajić & Nikolić (2022) - Turning point in Serbia?
-2. Raičević 선행 연구 - Language attitudes
 3. Dimić & Isaković (2018) - O Znakovnom Jeziku (book)
 4. SZJ Alphabet database study (2024)
 

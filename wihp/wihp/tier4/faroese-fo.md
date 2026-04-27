@@ -266,7 +266,6 @@
 
 ## 참고 문헌 (References)
 
-1. 선행 연구. *Faroese: An Overview and Reference Grammar*. Føroya Fróðskaparfelag.
 2. Petersen, H. P. & Adams, J. (2009). *Faroese: A Language Course for Beginners*. Stiðin.
 3. Hammershaimb, V. U. (1891). *Færøsk Anthologi*. (Historical orthography)
 

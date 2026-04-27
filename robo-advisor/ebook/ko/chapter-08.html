@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>분기 보고와 연간 정산 워크 예제 | WIA Robo-Advisor</title><style>:root{--primary:#22C55E;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px}nav.top-nav a{color:#22C55E;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#22C55E}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA 로보어드바이저</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">제8장 · WIA Robo-Advisor v1.0.0</div><h1>분기 보고와 연간 정산 워크 예제</h1>
+<p>본 마지막 장은 1년 동안의 봉투 사슬이 분기 보고서·연간 양도세 신고·금감원 영업보고서·마이데이터 응답을 모두 동시 만족하는 워크 예제를 다룹니다.</p>
+<h2>8.1 1년 봉투 인벤토리</h2>
+<p>1만명 투자자, 12개월 운영 후 봉투 인벤토리(투자자당 평균):</p>
+<ul>
+<li><code>investor_profile</code>: 1.2건 (초기 + 0.2 재평가)</li>
+<li><code>portfolio</code>: 252건 (영업일마다)</li>
+<li><code>rebalance</code>: 6건 (분기 + 임시)</li>
+<li><code>fee_disclosure</code>: 4건 (분기)</li>
+<li><code>tax_loss_harvest</code>: 2~5건 (시장 변동 의존)</li>
+<li><code>algorithm_attestation</code>: 0~2건 (모델 업그레이드)</li>
+<li><code>settlement_confirmation</code>: 거래마다 1건</li>
+</ul>
+<p>전체 인벤토리는 약 280만 봉투. JCS 직렬화·Ed25519 서명·인덱싱 후 디스크 풋프린트는 약 4 GB.</p>
+<h2>8.2 분기 보고서 자동 생성</h2>
+<p>분기 마지막 영업일 기준 <code>portfolio</code> + 분기 누적 <code>fee_disclosure</code> + 분기 활성 <code>algorithm_attestation</code> + 분기 <code>attribution_report</code>를 묶어 PDF 렌더링. 인간 검토 없이 자동 발행 가능 — 봉투 자체가 진실의 단일 출처이기 때문에 PDF는 단순 표시 계층입니다.</p>
+<h2>8.3 양도세 신고 자동 생성</h2>
+<p>1년 모든 <code>tax_loss_harvest</code>·매수/매도 이벤트가 <code>tax_year_summary</code>로 집계됩니다. 한국 투자자에게는 양도소득세 신고서의 매매 명세 입력으로 사용 가능한 형식. 미국 투자자에게는 Form 8949 입력으로 사용 가능한 형식. 동일 봉투 스트림이 두 관할 모두 만족합니다.</p>
+<h2>8.4 금감원 영업보고서 자동 생성</h2>
+<p>분기 영업보고서 항목 — 운용자산·고객 수·운용 성과·수수료 수익 — 모두 봉투 스트림에서 결정적 산출. <code>regulatory_bundle</code> 봉투에 묶여 CCO 서명. 별도 엑셀 가공·재집계 인력 0.</p>
+<h2>8.5 마이데이터 응답 자동 생성</h2>
+<p>마이데이터 사업자의 매 분기 데이터 요청은 <code>portability_export</code> 엔드포인트로 자동 처리. 60초 내 응답. 신선도는 <code>freshness_attestation</code>으로 공개 보장. 한국 마이데이터 SLA 자동 만족.</p>
+<h2>8.6 한국 어드바이저 운영 비용 변화</h2>
+<p>표준 적용 전: 분기마다 4명의 인력이 7~10일 동안 분기 보고서·금감원 보고서·마이데이터 응답을 수작업 가공. 분기당 약 280인시. 표준 적용 후: 동일 산출물을 자동 발행, 분기당 약 8인시(검토 + 서명). 단일 표준 채택으로 분기 인건비를 35배 줄입니다.</p>
+<h2>8.7 마무리</h2>
+<p>본 표준은 로보어드바이저 시장이 큰 사업자에 집중되지 않게 만드는 도구입니다. 작은 어드바이저가 큰 신탁 의무를 수행할 수 있게, 큰 어드바이저가 작은 어드바이저와 동일 표준에서 비교될 수 있게, 투자자가 어떤 어드바이저를 선택하든 같은 봉투 사슬을 받을 수 있게. 弘益人間 — 모든 투자자에게 이로움.</p>
+<h2>편집자 노트</h2><p>본 한국어 챕터는 영문판의 직역이 아니라 한국 자본시장 환경(자본시장법·금융소비자보호법·마이데이터·KR-GIPS)을 염두에 둔 응용 노트와 함께 재작성됐습니다. 직역이 필요한 경우 영문판을 우선 인용해 주십시오. 봉투 서명·검증 코드 예제와 한국 마이데이터 사업자 연결 예제는 별도 부속서에 수록될 예정입니다.</p><h2>다음 단계</h2><p>다음 장에서 다음 봉투 클래스 또는 운영 측면을 다룹니다. 8개 장 전체는 약 2시간이면 읽을 수 있도록 의도됐습니다 — 일하는 어드바이저 운영자가 분기 보고 사이에 책을 끝낼 수 있을 만큼 짧습니다. 각 장의 워크 예제는 실제 한국 중규모 로보어드바이저(운용자산 1조원 미만, 투자자 5만명 이하)를 가정합니다.</p><h2>참고</h2><p>본 표준의 전체 사양은 <code>spec/PHASE-1-DATA-FORMAT.md</code> 외 4개 파일에 수록되어 있습니다. CLI 참조 구현은 <code>cli/</code>에, OpenAPI 명세는 <code>api/</code>에 있습니다. 시뮬레이터로 봉투 발행을 시각적으로 체험할 수 있습니다 — <code>simulator/index.html</code>.</p></div></body></html>

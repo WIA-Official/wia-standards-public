@@ -175,7 +175,6 @@
 
 ## 참고 문헌
 - Parisot & Rinfret (2012) Recognition of LSQ in Eastern Canada
-- 선행 연구 LSQ 손모양 연구
 - CAD-ASC 공식 사이트
 - Histoire Engagée - LSQ 역사
 

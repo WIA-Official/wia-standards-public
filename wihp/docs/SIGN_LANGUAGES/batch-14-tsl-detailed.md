@@ -342,7 +342,7 @@ TSL numbers share heritage with JSL:
 
 **Note:** Numeral incorporation possible
 
-**Source:** 선행 연구
+**Source:** Field literature
 ---
 
 ### 13. 八 (8)

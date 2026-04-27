@@ -219,7 +219,7 @@ Lithuanian Association of Sign Language Interpreters
 
 ## Manual Alphabet Classification
 
-### 선행 연구 Study
+### Field Background
 LGK placed in "Polish Group":
 - Polish Sign Language
 - Lithuanian Sign Language

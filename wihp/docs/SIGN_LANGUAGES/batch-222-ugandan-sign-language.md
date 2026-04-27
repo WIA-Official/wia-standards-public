@@ -188,7 +188,7 @@ Kyambogo University research on:
 - Phonology
 - Morphology
 - Syntax
-- Summarized in 선행 연구
+- Summarized in field literature
 
 ---
 

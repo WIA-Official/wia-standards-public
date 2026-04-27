@@ -179,7 +179,6 @@
 - Wikipedia - Peruvian Sign Language
 - Wikipedia - Inmaculada Sign Language
 - Endangered Languages Project - LSP
-- 선행 연구 - PeruSIL Framework
 - IEEE (2024) - LSP to Quechua LSTM
 
 ---

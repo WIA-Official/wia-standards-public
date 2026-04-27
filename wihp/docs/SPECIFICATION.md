@@ -1118,8 +1118,6 @@ Software:
 ### 2. Computer Vision & ML
 - Google MediaPipe Hands (2020)
 - Google MediaPipe Face Mesh (2020)
-- 선행 연구. "MediaPipe: A Framework for Building Perception Pipelines"
-- 선행 연구. "MediaPipe: A Framework for Building Multimodal Applied ML Pipelines"
 
 ### 3. Accessibility Standards
 - W3C Web Content Accessibility Guidelines (WCAG) 2.1

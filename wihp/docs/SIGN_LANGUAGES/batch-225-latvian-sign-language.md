@@ -229,7 +229,7 @@
 4. Latvian Association of the Deaf (lns.lv)
 5. WFD Legal Recognition list
 6. Exchange of Signs - Erasmus+
-7. Mahoney (2017), 선행 연구
+7. Mahoney (2017)
 
 ---
 

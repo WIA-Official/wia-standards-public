@@ -97,7 +97,6 @@ Famous case of spontaneous language emergence in 1970s-80s.
 ## References
 
 1. Woodward, James (1991, 1992). Costa Rican SL research
-2. 선행 연구. Sociolinguistic Profile of Deaf People of Panama
 3. Endangered Languages Project
 
 ---

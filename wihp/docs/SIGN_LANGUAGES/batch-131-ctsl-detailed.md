@@ -138,7 +138,6 @@
 
 ### 주요 문헌
 1. Ergin, R. (2017). "Central Taurus Sign Language: A Unique Vantage Point" (박사 논문)
-2. 선행 연구. 수형 발달 연구
 3. Ergin (2021). "Emerging Lexicon for Objects in CTSL"
 4. Brentari et al. "Community interactions and phonemic inventories"
 

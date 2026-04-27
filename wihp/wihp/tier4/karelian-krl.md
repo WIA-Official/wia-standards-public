@@ -530,7 +530,6 @@ T t, U u, V v, Y y, Ä ä, Ö ö
 
 1. Zaikov, Pekka (2013). *Vienankarjalan kielioppi* (Viena Karelian Grammar). Karjalan Kielen Seura.
 2. Markianova, Larisa (2002). *Lyydiläinen kielioppi* (Ludic Grammar). Periodika.
-3. Novak, 선행 연구. *Karjalan kielen sanakirja* (Dictionary of Karelian). KKS.
 4. Sarhimaa, Anneli (2017). *Karelian in Russia*. Multilingual Matters.
 5. Ethnologue: https://www.ethnologue.com/language/krl
 6. Karjalan Kielen Seura: http://www.karjalankie lenseura.fi

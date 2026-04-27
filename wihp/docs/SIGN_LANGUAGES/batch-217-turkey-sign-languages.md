@@ -126,8 +126,6 @@ Turkey has multiple sign languages:
 
 1. Ergin (2017) PhD Thesis - CTSL: A Unique Vantage Point
 2. Ergin & Brentari (2017) - Handshape preferences
-3. 선행 연구 - Argument structure
-4. 선행 연구 - Symmetry/asymmetry
 5. Multiple journal articles in Sign Language & Linguistics
 
 ### Documentation

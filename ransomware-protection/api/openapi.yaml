@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: WIA Ransomware Protection API
+  version: 1.0.0
+  description: |
+    HTTP surface for ransomware detection events, response actions,
+    immutable backup attestation, recovery drill telemetry, and
+    cross-organisation federation. Implements the Phase 2 envelopes
+    in publish/query/stream form.
+servers:
+  - url: https://localhost:8443/rp/v1
+paths:
+  /detection/events:
+    post:
+      summary: Publish a detection_event envelope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectionEvent'
+      responses:
+        '202':
+          description: Accepted
+    get:
+      summary: Query detection events
+      parameters:
+        - { in: query, name: tenant_id, schema: { type: string } }
+        - { in: query, name: since, schema: { type: string, format: date-time } }
+        - { in: query, name: severity_min, schema: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] } }
+      responses:
+        '200':
+          description: OK
+  /detection/stream:
+    get:
+      summary: SSE stream of new detection events
+      responses:
+        '200':
+          description: text/event-stream
+  /response/actions:
+    post:
+      summary: Publish a response_action envelope
+      responses: { '202': { description: Accepted } }
+  /backup/snapshots:
+    post:
+      summary: Publish a backup_snapshot attestation
+      responses: { '202': { description: Accepted } }
+  /recovery/drills:
+    post:
+      summary: Publish a recovery_drill envelope
+      responses: { '202': { description: Accepted } }
+  /federation/handshake:
+    post:
+      summary: Initiate cross-org federation handshake
+      responses: { '200': { description: OK } }
+components:
+  schemas:
+    DetectionEvent:
+      type: object
+      required: [event_id, tenant_id, observed_at, mitre_attack, signature]
+      properties:
+        event_id: { type: string }
+        tenant_id: { type: string }
+        observed_at: { type: string, format: date-time }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        mitre_attack:
+          type: array
+          items:
+            type: object
+            properties:
+              tactic: { type: string }
+              technique: { type: string }
+              sub_technique: { type: string }
+        evidence_hash: { type: string }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+        signature:
+          type: object
+          properties:
+            alg: { type: string, enum: [Ed25519] }
+            value: { type: string }

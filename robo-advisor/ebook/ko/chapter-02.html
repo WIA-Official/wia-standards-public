@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>데이터 봉투 상세 | WIA Robo-Advisor</title><style>:root{--primary:#22C55E;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px}nav.top-nav a{color:#22C55E;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#22C55E}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA 로보어드바이저</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-DATA-FORMAT.md" class="muted">Spec</a><a href="../../api/" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">제2장 · WIA Robo-Advisor v1.0.0</div><h1>데이터 봉투 상세</h1>
+<p><code>investor_profile</code>·<code>portfolio</code>·<code>rebalance</code> 봉투는 본 표준의 핵심입니다. 각각의 필드 선택은 우연이 아니며, 서명된 이벤트 사슬이 사후 분쟁·규제 점검·세무 조사를 견딜 수 있도록 설계됐습니다.</p>
+<h2>2.1 투자자 프로파일 봉투</h2>
+<pre><code>{
+  "wia_robo_advisor_version": "1.0.0",
+  "type": "investor_profile",
+  "investor_id": "did:wia:investor:...",
+  "advisor_id": "did:wia:advisor:...",
+  "captured_at": "2026-04-27T09:00:00Z",
+  "kyc_jurisdiction": "KR",
+  "risk_tolerance": "moderate",
+  "risk_capacity": {
+    "horizon_years": 18,
+    "liquidity_floor_pct": 10,
+    "loss_tolerance_pct_24m": 25
+  },
+  "investment_objectives": ["retirement"],
+  "constraints": { "esg_filters": ["controversial_weapons"] },
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<h2>2.2 위험 허용도 vs 위험 수용 능력</h2>
+<p>표준은 두 개념을 의도적으로 분리합니다. 허용도(tolerance)는 행동적 입력 — 투자자가 손실에 대해 어떻게 <em>느끼는가</em>. 수용 능력(capacity)은 구조적 입력 — 투자자가 목표를 어기지 않고 얼마나 손실을 <em>흡수</em>할 수 있는가. 둘을 합치는 것이 부적합 판정의 가장 흔한 원천입니다.</p>
+<h2>2.3 포트폴리오 봉투</h2>
+<p>포트폴리오 봉투는 <code>base_ccy</code>(생성 시 선택, 조용히 변경되지 않음)와 <code>holdings[]</code> 배열을 포함합니다. 각 보유 종목은 ISIN/FIGI 또는 테넌트 사설 식별자, 자산 클래스, 비중, 세금 로트 수를 가집니다. 성과는 시간가중수익률(TWR)로 보고됩니다 — 투자자 입출금에 강건하고 GIPS 표준의 어드바이저 간 비교 기반이기 때문입니다.</p>
+<h2>2.4 재배분 이벤트</h2>
+<p>재배분 봉투는 트리거(드리프트 임계·예약·정책 변경·세금 손실 수확·투자자 주도)·목표 비중·실행 거래·정산 요약을 모두 포함합니다. <code>tax_impact_estimate_base_ccy</code>는 필수입니다 — 세금 영향 증명 없는 재배분이 거래 후 투자자 놀람의 단일 최대 원천이기 때문입니다.</p>
+<h2>2.5 한국 적용 노트</h2>
+<p>국내 거래 시 KRX 마감환율(원-달러·원-엔)이 <code>portfolio.fx_source</code>로 기록됩니다. 양도소득세 신고는 <code>tax_year_summary</code> 봉투의 KR 필드로 자동 산출되어 국세청 양도소득세 신고서 입력에 그대로 사용됩니다.</p>
+<h2>2.6 알고리즘 증명</h2>
+<p><code>algorithm_attestation</code>는 라이브 알고리즘이 변경될 때마다 발행됩니다 — 버전·종류·학습 윈도우·재배분 정책 변경. 투자자의 포트폴리오 이벤트는 활성 시점의 <code>algorithm_id</code>를 참조합니다. 알고리즘 버전 간 결과 조정이 어드바이저 측 성과 귀속의 핵심입니다.</p>
+<h2>워크 예제</h2>
+<p>40세 투자자, 18년 은퇴 지평선, 보통 위험 허용도, 25% 24개월 손실 수용 능력, 통제 무기 ESG 필터. 어드바이저는 글라이드 패스 알고리즘을 선택해 80/20 주식/채권을 시작점으로 삼고, 50세에 65/35, 58세에 40/60으로 점진 이동. 모든 변경은 <code>glide_path_attestation</code> 봉투에 서명되어 사후 검증 가능합니다.</p>
+<h2>편집자 노트</h2><p>본 한국어 챕터는 영문판의 직역이 아니라 한국 자본시장 환경(자본시장법·금융소비자보호법·마이데이터·KR-GIPS)을 염두에 둔 응용 노트와 함께 재작성됐습니다. 직역이 필요한 경우 영문판을 우선 인용해 주십시오. 봉투 서명·검증 코드 예제와 한국 마이데이터 사업자 연결 예제는 별도 부속서에 수록될 예정입니다.</p><h2>다음 단계</h2><p>다음 장에서 다음 봉투 클래스 또는 운영 측면을 다룹니다. 8개 장 전체는 약 2시간이면 읽을 수 있도록 의도됐습니다 — 일하는 어드바이저 운영자가 분기 보고 사이에 책을 끝낼 수 있을 만큼 짧습니다. 각 장의 워크 예제는 실제 한국 중규모 로보어드바이저(운용자산 1조원 미만, 투자자 5만명 이하)를 가정합니다.</p><h2>참고</h2><p>본 표준의 전체 사양은 <code>spec/PHASE-1-DATA-FORMAT.md</code> 외 4개 파일에 수록되어 있습니다. CLI 참조 구현은 <code>cli/</code>에, OpenAPI 명세는 <code>api/</code>에 있습니다. 시뮬레이터로 봉투 발행을 시각적으로 체험할 수 있습니다 — <code>simulator/index.html</code>.</p></div></body></html>

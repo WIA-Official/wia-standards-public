@@ -182,7 +182,6 @@ SLSL has distinctive place name signs:
 - Gesture-based translation apps
 
 ### Key Publications
-1. 선행 연구 - Sign language usage study
 2. Sinhala literacy teaching research (2024)
 3. Sign language translation approaches (2016)
 

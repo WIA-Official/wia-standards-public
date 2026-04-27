@@ -152,7 +152,6 @@
 
 ## 참고 문헌
 - Boyes Braem & Rathmann (2010) Transmission of SL in Northern Europe
-- 선행 연구 SMILE Dataset
 - FZG Basel 프로젝트 문서
 - Endangered Languages Project
 

@@ -320,7 +320,6 @@ trg [tr̩ɡ] - 광장
 ## 참고 문헌 (References)
 
 1. Alexander, R. (2006). *Bosnian, Croatian, Serbian: A Grammar*. University of Wisconsin Press.
-2. 선행 연구. *Hrvatska gramatika*. Školska knjiga.
 3. Institut za hrvatski jezik i jezikoslovlje (크로아티아어 연구소)
 4. Hrvatski jezični portal (크로아티아어 포털)
 

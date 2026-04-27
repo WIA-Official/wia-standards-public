@@ -185,7 +185,6 @@ WIA Talk should:
 ## References
 
 1. de Vos, C. (2012). Sign-spatiality in Kata Kolok
-2. 선행 연구. Bengkala ethnographies
 3. Marsaja, I.G. (2008). Desa Kolok
 4. MPI Archive - Kata Kolok corpus
 5. Vice, Coconuts Bali - journalism pieces

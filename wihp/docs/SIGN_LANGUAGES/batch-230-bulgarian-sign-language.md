@@ -92,7 +92,6 @@ By December 31, 2022:
 - Possible creolization
 
 ### Manual Alphabet
-선행 연구: Part of "Russian Group"
 - With Russian, Ukrainian, Estonian SL
 
 ---

@@ -1,0 +1,26 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>제1급 증거로서의 복구 훈련 | WIA Ransomware Protection</title><style>:root{--primary:#8B5CF6;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;color:#f8fafc;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#10b981;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#10b981}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA 랜섬웨어 보호</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-CORE.md" class="muted">Spec</a><a href="../../api/openapi.yaml" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 5 · WIA Ransomware Protection v1.0.0</div><h1>제1급 증거로서의 복구 훈련</h1>
+<p>복구 태세는 정책 문서로는 평가할 수 없습니다. 복구 준비도의 유일한 정직한 척도는 현실적 조건에서 수행한 훈련의 결과입니다. 표준은 훈련을 임시 내부 활동이 아니라 1급 서명 증거로 다룹니다.</p>
+<h2>5.1 봉투 스키마</h2>
+<pre><code>{
+  "drill_id": "01HXRB9C2KQ3V7N4M8B6P0Z9F1",
+  "tenant_id": "did:wia:tenant:acme-kr",
+  "kind": "functional",
+  "scope": ["asset_class:database", "region:ap-northeast-2"],
+  "started_at": "2026-04-15T08:00:00.000Z",
+  "ended_at":   "2026-04-15T11:42:00.000Z",
+  "rto_observed_minutes": 222,
+  "rpo_observed_minutes": 11,
+  "signed_off_by": "did:wia:bcp-officer:acme-kr",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<h2>5.2 세 가지 훈련 종류</h2>
+<p>표준은 <code>tabletop</code>(분석가 워크스루, 라이브 시스템 없음), <code>functional</code>(고립된 환경에서 실제 백업으로 복원), <code>full-scale-cutover</code>(복원된 환경으로 운영 트래픽 전환)를 구분합니다. 각각 증거적 무게가 다릅니다.</p>
+<h2>5.3 관측 RTO/RPO는 협상 대상 아님</h2>
+<p>훈련 봉투는 <em>관측된</em> RTO/RPO를 기록합니다 — 테넌트가 지향하는 목표가 아니라 실제 달성한 값입니다. 관측 RTO가 목표를 초과한 훈련도 여전히 유효한 증거이며, 사실 가장 유용한 종류의 증거입니다 — 격차를 식별해 주기 때문입니다.</p>
+<h2>5.4 한국 적용 노트</h2>
+<p>전자금융감독규정 제13조 모의훈련 의무, 정보통신망법 제48조의4 침해사고 대응 훈련 의무는 본 표준의 <code>recovery_drill</code> + <code>scope</code> + <code>rto_observed_minutes</code> 조합으로 자동 충족됩니다. 한 훈련 봉투가 두 규제를 동시에 만족합니다.</p>
+<h2>5.5 법의 격리</h2>
+<p>복원 훈련은 법의적으로 격리된 네트워크에서 실행되어야 합니다(SHOULD). 훈련 중 손상된 자격증명을 운영에 복구하는 것은 사고를 연장하는 교과서 방법입니다. 표준은 훈련 봉투에 격리 경계 식별자와 훈련 전체 동안 경계가 활성이었음을 증명할 것을 요구합니다.</p>
+<h2>5.6 이슈 추적</h2>
+<p>모든 훈련은 0개 이상의 <code>issues</code>를 발행합니다 — 각각 심각도와 <code>remediation_due</code>를 포함합니다. 만기 미해결 이슈는 다음 <code>posture_report</code>에 미해결 항목으로 흘러갑니다. 책임 루프는 구조적이며, 훈련과 다음 규제 주기 사이에 정직하게 이슈를 "잃을" 방법은 없습니다.</p>
+<h2>워크 예제</h2><p>중규모 병원 네트워크를 가정합니다 — 18대 EHR 서버, 240대 영상 워크스테이션, 42대 IoT 의료 기기, 별도 생체의학 엔지니어링 서브넷. SOC는 정직원 분석가 1명, 계약 분석가 2명, MSSP 관계 1건. 사이버 보험사는 연간 태세 증거를 요구하고, 국가 보건 규제기관은 24시간 침해 통지를 요구합니다.</p><p>표준 이전 세계에서, SOC는 모든 관측을 EDR 포털·SIEM·MSSP 티켓 시스템·보험 설문·규제 신고서에 다시 입력합니다. 실제 사고 1건당 총 작업량이 첫 72시간 동안 분석가 인력의 3–5배를 초과하며, 그것은 기술적 봉쇄가 끝난 후에 하는 작업입니다.</p><p>표준 이후 세계에서, 동일 관측이 한 번 서명되고, 적절한 TLP·연합 규칙 하에 테넌트를 구독한 모든 소비자에게 자동 전파되며, 다운스트림 어댑터가 각 소비자의 선호 형식으로 렌더링합니다. SOC 분석가는 첫 72시간을 데이터 입력이 아니라 분석과 의사결정에 씁니다. 그것이 봉투 서명의 전체 회수입니다.</p><h2>다음 단계</h2><p>다음 장에서 다음 봉투 클래스를 다룹니다. 8개 장 전체는 약 2시간이면 읽을 수 있도록 의도됐습니다 — 일하는 SOC 분석가가 사고 사이에 책을 끝낼 수 있을 만큼 짧습니다.</p><h2>편집자 노트</h2><p>본 표준의 한국어 챕터는 영문 챕터의 직역이 아니라 한국 규제 환경(K-ISA, 금융보안원, 개인정보보호위원회, 의료ISAC)을 염두에 둔 응용 노트와 함께 재작성됐습니다. 직역이 필요한 경우 영문판을 우선 인용해 주십시오. 봉투 서명·검증 코드 예제와 한국 ISAC 연결 예제는 별도 부속서에 수록될 예정입니다.</p></div></body></html>

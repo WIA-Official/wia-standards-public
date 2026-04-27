@@ -232,7 +232,6 @@ kietas [kʲiɛtas] - 딱딱한
 ## 참고 문헌 (References)
 
 1. Ambrazas, V. (1997). *Lithuanian Grammar*. Baltos lankos.
-2. 선행 연구. *Introduction to Modern Lithuanian*. Franciscan Fathers.
 3. Lietuvių kalbos institutas (리투아니아어 연구소)
 
 ---

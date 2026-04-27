@@ -122,7 +122,6 @@ This makes them among the most endangered language types globally.
 ### Key Frameworks
 - Zeshan & de Vos (2012) "Sign Languages in Village Communities"
 - Nonaka (2004) "Forgotten Endangered Languages"
-- 선행 연구 "Emerging Sign Languages"
 
 ## Case Study Comparisons
 

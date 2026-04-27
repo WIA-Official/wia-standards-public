@@ -320,7 +320,6 @@ Võro어는 15개의 격을 가지고 있습니다 (표준 에스토니아어와
 ## 참고 문헌 (References)
 
 1. Iva, Sulev (2007). *Võro-eesti sõnaraamat*. Võro Instituut.
-2. Pajusalu, 선행 연구. *Võro keele grammatika*. Tartu Ülikool.
 3. Võro Instituut: https://www.wi.ee
 4. UNESCO Atlas of the World's Languages in Danger
 5. Eesti Keele Instituut

@@ -6,8 +6,8 @@
 | Tier | Count | Description |
 |------|:-----:|-------------|
 | 🏆 Deep Published v3 (21/21) | **519** | Publication-grade. All 17 size/structure + 4 veracity gates passed. Safe to cite externally. |
-| 🟡 Surface (Stub)             | 81 | v3 gates pass structurally, but content is generic boilerplate from a template. Pending domain-specific authoring. **Not safe to cite externally.** Marked by a `.boilerplate-pending` sentinel in the standard's directory. |
-| 📚 Draft                      | 385 | Imported from prior bulk merge. Pending content depth and/or citation cleanup. Not for external citation yet. |
+| 🟡 Surface (Stub)             | 86 | v3 gates pass structurally, but content is generic boilerplate from a template. Pending domain-specific authoring. **Not safe to cite externally.** Marked by a `.boilerplate-pending` sentinel in the standard's directory. |
+| 📚 Draft                      | 380 | Imported from prior bulk merge. Pending content depth and/or citation cleanup. Not for external citation yet. |
 
 **Mission progress**: 519 / 749 standards Deep Published — **69.3%**
 

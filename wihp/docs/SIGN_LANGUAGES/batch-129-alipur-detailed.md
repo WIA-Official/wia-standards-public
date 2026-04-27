@@ -120,8 +120,6 @@
 
 ### 주요 문헌
 1. Panda, S. (2012). "Alipur Sign Language: A sociolinguistic and cultural profile"
-2. 선행 연구. "Cardinal numerals in rural sign languages"
-3. 선행 연구. "Working with village sign language communities"
 
 ### 문서화 현황
 - 300개+ 어휘 수집

@@ -166,7 +166,6 @@
 - Wikipedia - Ecuadorian Sign Language
 - Brenda Clark (2017) - 어휘 유사성 연구
 - Carmen Velásquez García (1994) - 역사 연구
-- 선행 연구 - NFA 통역기 연구
 
 ---
 

@@ -422,7 +422,6 @@ talo (집) → taloin (집들)
 1. Laanest, Arvo (1997). *Isuri keele grammatika* (Ingrian Grammar). Estonian Academy of Sciences.
 2. Junus, Valentin (1936). *Ižoran kieli* (Ingrian Language). Leningrad.
 3. Markus, Elena & Rozhanskiy, Fedor (2017). *Materials on Ingrian*. Institute for Linguistic Studies.
-4. Riionheimo, 선행 연구. *Multilingual Practices of Ingrian Finns*. University of Eastern Finland.
 5. Ethnologue: https://www.ethnologue.com/language/izh
 6. UNESCO Atlas of the World's Languages in Danger
 

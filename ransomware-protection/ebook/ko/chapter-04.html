@@ -1,0 +1,28 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>머클 루트 기반 불변 백업 증명 | WIA Ransomware Protection</title><style>:root{--primary:#8B5CF6;--bg:#0f172a;--text:#f8fafc;--muted:#94a3b8;--border:#334155}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Georgia,serif;background:var(--bg);color:var(--text);line-height:1.8}nav.top-nav{background:#0f172a;color:#f8fafc;padding:12px 24px;border-bottom:1px solid #334155;display:flex;gap:18px;font-family:-apple-system,sans-serif}nav.top-nav a{color:#10b981;text-decoration:none;font-weight:600}nav.top-nav a.muted{color:#94a3b8;font-weight:400}.container{max-width:800px;margin:0 auto;padding:40px 20px}h1{color:var(--primary);font-size:2.4rem;margin-bottom:1rem}h2{color:var(--primary);font-size:1.5rem;margin:2rem 0 1rem;border-left:4px solid var(--primary);padding-left:12px}p{margin:1rem 0}ul,ol{margin:1rem 0 1rem 2rem}code{background:#1e293b;padding:2px 6px;border-radius:4px;font-family:monospace;color:#10b981}pre{background:#0a0f1c;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;margin:1rem 0}pre code{background:none;color:#e2e8f0}.meta{color:var(--muted);font-size:0.95rem;margin-bottom:2rem}</style></head><body><nav class="top-nav"><a href="../../index.html">← WIA 랜섬웨어 보호</a><a href="../../README.md" class="muted">README</a><a href="../../spec/PHASE-1-CORE.md" class="muted">Spec</a><a href="../../api/openapi.yaml" class="muted">API</a><a href="../../cli/" class="muted">CLI</a><a href="./" class="muted">Index</a></nav><div class="container"><div class="meta">Chapter 4 · WIA Ransomware Protection v1.0.0</div><h1>머클 루트 기반 불변 백업 증명</h1>
+<p><code>backup_snapshot</code> 봉투는 랜섬웨어 운영자가 실존적 질문으로 만든 문제에 대한 표준의 답입니다 — 암호화가 끝났을 때, 조직이 미암호화 사본의 존재를 증명할 수 있는가, 그리고 침해를 다시 들이지 않고 그것을 복원할 수 있는가.</p>
+<h2>4.1 봉투 스키마</h2>
+<pre><code>{
+  "snapshot_id": "01HXRA9C2KQ3V7N4M8B6P0Z9F1",
+  "tenant_id": "did:wia:tenant:acme-kr",
+  "captured_at": "2026-04-27T02:00:00.000Z",
+  "asset_class": "volume",
+  "size_bytes": 1099511627776,
+  "encryption": { "algorithm": "AES-256-GCM" },
+  "immutability": {
+    "retention_until": "2026-07-27T02:00:00.000Z",
+    "lock_kind": "compliance"
+  },
+  "merkle_root": "sha384-...",
+  "signature": { "alg": "Ed25519", "value": "..." }
+}</code></pre>
+<h2>4.2 머클 루트인 이유</h2>
+<p>1 TB 스냅샷 위에 단일 평면 해시는 전체 무결성은 증명하지만 부분 집합에 대해서는 아무것도 증명하지 못합니다. 객체별 해시 위에 머클 루트를 두면 둘 다 증명됩니다 — 루트는 전체를, 루트 + 로그 깊이의 증명 경로는 임의의 단일 객체를 증명합니다.</p>
+<h2>4.3 불변성 의미론</h2>
+<p><code>immutability</code> 블록은 세 가지를 명명합니다: 언제 다시 변경 가능한가(<code>retention_until</code>), 어떤 잠금인가(<code>compliance</code>는 테넌트 관리자도 제거 불가; <code>governance</code>는 감사 하에 해제 가능; <code>object-lock-s3</code>는 S3 호환), 그리고 잠금을 보유하는 브로커.</p>
+<h2>4.4 한국 적용 노트</h2>
+<p>전자금융감독규정 제12조의2 백업 의무, 개인정보보호법 시행령 제48조의2 백업 보관 의무는 모두 본 봉투의 <code>retention_until</code> + <code>lock_kind: compliance</code> 조합으로 만족합니다. 감사관은 봉투 서명만 검증하면 됩니다.</p>
+<h2>4.5 법의 보존</h2>
+<p>스냅샷의 일부는 <code>forensic_preservation: true</code>로 표시됩니다. 부모 사고가 <code>incident_closed_at</code>을 기록하기 전까지 일반 보존 만료에서 제외됩니다. 표준은 어느 관할의 증거 처리 규칙이 적용되는지 강제하지 않지만, 보관 사슬 필드(<code>custodian</code>, <code>transfer_log</code>, <code>tamper_seal</code>)는 필수입니다.</p>
+<h2>4.6 다중 리전 증명</h2>
+<p>표준은 권고 — 강제는 아님 — 으로 임계 자산이 최소 두 개의 지리적으로 분리된 리전에 증명된 스냅샷을 보유할 것을 권고합니다. 활성 사고 중 리전 장애는 오프사이트 복제본이 96시간 동안 갱신되지 않았음을 발견할 최악의 시점입니다.</p>
+<h2>워크 예제</h2><p>중규모 병원 네트워크를 가정합니다 — 18대 EHR 서버, 240대 영상 워크스테이션, 42대 IoT 의료 기기, 별도 생체의학 엔지니어링 서브넷. SOC는 정직원 분석가 1명, 계약 분석가 2명, MSSP 관계 1건. 사이버 보험사는 연간 태세 증거를 요구하고, 국가 보건 규제기관은 24시간 침해 통지를 요구합니다.</p><p>표준 이전 세계에서, SOC는 모든 관측을 EDR 포털·SIEM·MSSP 티켓 시스템·보험 설문·규제 신고서에 다시 입력합니다. 실제 사고 1건당 총 작업량이 첫 72시간 동안 분석가 인력의 3–5배를 초과하며, 그것은 기술적 봉쇄가 끝난 후에 하는 작업입니다.</p><p>표준 이후 세계에서, 동일 관측이 한 번 서명되고, 적절한 TLP·연합 규칙 하에 테넌트를 구독한 모든 소비자에게 자동 전파되며, 다운스트림 어댑터가 각 소비자의 선호 형식으로 렌더링합니다. SOC 분석가는 첫 72시간을 데이터 입력이 아니라 분석과 의사결정에 씁니다. 그것이 봉투 서명의 전체 회수입니다.</p><h2>다음 단계</h2><p>다음 장에서 다음 봉투 클래스를 다룹니다. 8개 장 전체는 약 2시간이면 읽을 수 있도록 의도됐습니다 — 일하는 SOC 분석가가 사고 사이에 책을 끝낼 수 있을 만큼 짧습니다.</p><h2>편집자 노트</h2><p>본 표준의 한국어 챕터는 영문 챕터의 직역이 아니라 한국 규제 환경(K-ISA, 금융보안원, 개인정보보호위원회, 의료ISAC)을 염두에 둔 응용 노트와 함께 재작성됐습니다. 직역이 필요한 경우 영문판을 우선 인용해 주십시오. 봉투 서명·검증 코드 예제와 한국 ISAC 연결 예제는 별도 부속서에 수록될 예정입니다.</p></div></body></html>

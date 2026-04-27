@@ -5,290 +5,237 @@
 **Version:** 1.0
 **Status:** Stable
 
-This document defines how an accredited indoor-air-quality
-programme integrates with the systems that surround it: building
-management systems (BMS); sensor-package vendors; ISO/IEC 17025
-laboratories; mechanical contractors; occupant-engagement platforms
-(operator CRM); occupational-health systems; public-health
-authorities; long-term archives; and the certifying bodies that
-audit IAQ programmes.
+This document defines the canonical INTEGRATION layer for WIA-indoor-air-quality (Indoor Air Quality).
 
 References (CITATION-POLICY ALLOW only):
-
-- IETF RFC 8259 (JSON)
-- IETF RFC 9457 (Problem Details)
-- IETF RFC 8615 (well-known URIs)
-- IETF RFC 8288 (Web Linking)
-- IETF RFC 9421 (HTTP Message Signatures)
-- ISO/IEC 27001:2022 (information security management)
-- ISO/IEC 27701:2019 (privacy information management)
-- ISO/IEC 17025:2017 (testing and calibration laboratories)
-- ISO 16000 series
-- ISO 8601 (date and time)
-- ASHRAE Standard 62.1 / 62.2
-- WHO Guidelines for Indoor Air Quality
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 BMS Integration
+## §1 Scope
 
-Building management systems are the primary on-site source of
-continuous IAQ telemetry. Integration is mediated by an adapter
-that translates between the BMS's native protocol (BACnet, Modbus,
-or vendor-specific) and the WIA-native PHASE-1 §4 sample format.
-The adapter is owned by the operating programme and is exercised
-during BMS upgrades.
+This PHASE document is one of four that together define the WIA-indoor-air-quality
+standard. It addresses the integration layer of the standard.
 
-Adapters MUST honour the sensor-package categorisation rule
-(PHASE-3 §1) and MUST refuse to up-categorise a `consumer-grade`
-sensor in the BMS into an `accredited-laboratory-grade` submission
-on the API.
+## §2 Manifest
 
-## §2 Sensor-Package Vendor Integration
+Implementations publish a signed manifest containing standardSlug
+(constant value: "indoor-air-quality"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-Sensor-package vendors register their packages with the operating
-programme via the sensor-register endpoint. Vendor registrations
-include the package's calibration history, the analytes covered,
-the measurement uncertainties, and the firmware version. Updates
-emit new registration records; prior registrations remain
-addressable for retrospective audit.
+## §3 Conformance Tiers
 
-## §3 Evidence Package Format
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-```
-evidence/
-  manifest.json                — package manifest (signed, see §4)
-  site.json                    — site record
-  zones/                       — per-zone configuration and filter
-                                  rotation history
-  iaq-samples/                 — continuous-sample summaries (full
-                                  series referenced by content-
-                                  address)
-  episodic-samples/            — per-sample certificates
-  verifications/               — ventilation-verification reports
-  symptoms/                    — aggregate symptom counts (raw
-                                  records held under access-
-                                  controlled scope)
-  investigations/              — source investigations and root
-                                  causes
-  remediations/                — remediation actions and post-
-                                  action verifications
-  audit/                       — API audit log excerpts
-```
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-The package is content-addressable; the manifest carries the SHA-
-256 of every file. The manifest is signed by the operating
-programme's HTTP-message-signature key (RFC 9421) and counter-
-signed by the analysing laboratory whose certificate appears in
-the package.
+## §4 Discovery
 
-## §4 Manifest and Signatures
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/indoor-air-quality`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-Verification tools recompute file digests, compare to the
-manifest, and reject the package on mismatch with type
-`urn:wia:indoor-air-quality:evidence-mismatch`.
+## §5 Time and Identity
 
-## §5 well-known URI Discovery
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-A conformant programme exposes a discovery document at
-`/.well-known/wia-indoor-air-quality` that links to the API root,
-the public laboratory accreditation references, the published
-quality dossier, the sampling-strategy summary, and the catalogue
-of released ventilation-verification reports.
+## §6 Versioning and Deprecation
 
-## §6 Mechanical Contractor Integration
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Mechanical contractors that perform commissioning, retro-
-commissioning, and ventilation verification integrate via the
-ventilation-verification endpoint (PHASE-2 §6). The contractor's
-client certificate is bound to the contractor's identifier and
-signed verification reports flow through the integration in both
-directions: contractor uploads verification, operator countersigns
-acceptance.
+## §7 Privacy and Security
 
-## §7 Occupant-Engagement Platform Integration
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Occupant-engagement platforms (operator CRM, occupant-portal
-applications, in-building kiosks) integrate via the symptom
-endpoint (PHASE-2 §7). The integration honours occupant consent at
-collection time, redacts clinical identifiers before submission to
-the API, and records the consent reference against each symptom
-record.
+## §8 Open Governance
 
-## §8 Occupational-Health System Integration
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `indoor-air-quality` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
-Occupational-health systems consume zone-level symptom aggregates
-and laboratory-grade IAQ measurements that intersect occupational
-exposure. Integration is restricted to the occupational-health
-client certificate; raw symptom free-text fields and individual
-occupant identifiers are exposed only to authorised occupational-
-health roles.
+弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## §9 Public-Health Authority Integration
 
-Public-health authorities consume aggregate IAQ trends from sites
-with public-health relevance (schools, childcare, healthcare,
-mass-transit). The integration is one-way push at the cadence the
-authority requires and uses the privacy-preserving aggregation
-endpoints (PHASE-2 §10).
+## Annex E — Implementation Notes for PHASE-4-INTEGRATION
 
-## §10 Long-Term Archive Integration
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-4-INTEGRATION.
 
-Programmes designate a long-term archive that holds operational
-records beyond programme wind-down. Quarterly deposits round-trip
-content-addresses; on programme wind-down, remaining records
-transfer to the archive with content-addresses preserved.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## §11 Citation and Pinning
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-Externally cited IAQ findings (peer-reviewed papers, public-health
-guidance updates, building-design case studies) are referenced by
-their evidence package's manifest digest. Programmes MUST keep
-evidence packages addressable for at least seven years from the
-citation event.
+## Annex F — Adoption Roadmap
 
-## §12 Worked Example: Citation Resolution
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-A reader encounters a peer-reviewed publication that cites a
-school's IAQ improvement programme. The reader's tool resolves the
-citation by:
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-1. Parsing the citation to extract the site ID, the period, and
-   the manifest digest.
-2. Fetching the discovery document for the operating programme.
-3. Resolving the manifest URL and verifying the manifest signatures.
-4. Recomputing the manifest digest and comparing it to the pinned
-   digest; aborting on mismatch.
-5. Retrieving the package; recomputing per-file digests; surfacing
-   the resolved evidence (continuous-sample summaries, episodic
-   certificates, verification reports, remediation actions) to the
-   reader.
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-A conformant tool completes this flow without further input.
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## §13 Cross-Standard Linkage
+## Annex G — Test Vectors and Conformance Evidence
 
-Programmes that consume adjacent WIA standards (occupational health,
-building energy management, school facility management) emit cross-
-standard linkage records. Linkages are not transitive; consumers
-verify each adjacent standard's evidence directly.
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-4-INTEGRATION. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-## §14 Reader Tooling
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-4-integration/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-4-INTEGRATION with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-Programmes MAY publish supplementary reader hints (visual time-
-series of CO2 across a school day, episodic-sample compliance
-rollups, symptom-cluster heat maps with privacy-preserving
-aggregation) alongside the canonical evidence package. Reader tools
-are non-normative.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-4-INTEGRATION does not require bespoke
+auditor tooling.
 
-## §15 Public Catalogue
+## Annex H — Versioning and Deprecation Policy
 
-Programmes that publish a public catalogue of IAQ findings emit an
-Atom or JSON Feed listing the participating sites with their
-ventilation-verification dates, last episodic sampling event, and
-any active investigations. The feed does not carry occupant
-symptom records or unredacted clinical detail.
+This annex codifies the versioning and deprecation policy for PHASE-4-INTEGRATION.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-## §16 Backwards-Compatibility Guarantee
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-PHASE-4 minor revisions remain backwards-compatible with prior-
-minor clients. Major revisions go through a deprecation window of
-at least one full ASHRAE 62.1 / 62.2 revision cycle.
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-## §17 Threshold-Table Publication Integration
+## Annex I — Interoperability Profiles
 
-Authoritative threshold tables (WHO, ASHRAE, national authorities)
-are published through their respective bodies and consumed into
-the operating programme via threshold-table publication adapters.
-The adapter signs the imported table with the publishing body's
-key chain (where available) and records the table content-address
-in the programme's quality dossier so that downstream alerting is
-anchored to a verified source.
+This annex describes how implementations declare interoperability profiles
+for PHASE-4-INTEGRATION. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-## §18 Outdoor Air-Quality Feed Integration
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P4-INTEGRATION-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-Sites in regions with episodic outdoor air-quality events (wildfire
-smoke, urban smog, agricultural burn seasons) integrate with
-outdoor-air-quality data feeds (national air-quality monitoring,
-satellite-derived smoke products) so that the indoor ventilation
-control strategy can switch automatically when outdoor conditions
-warrant. The feed integration records the outdoor data source, the
-update cadence, and the trigger thresholds that activate the
-adaptation playbook (PHASE-3 §20).
-
-## §19 Cross-Standard Linkage
-
-Programmes that consume adjacent WIA standards (occupational
-health, building energy management, school facility management,
-healthcare facility management) emit cross-standard linkage
-records. Linkages are not transitive; consumers verify each
-adjacent standard's evidence directly.
-
-## §20 Filter-Vendor Lifecycle Integration
-
-Filter-vendor lifecycle integration carries the vendor's filter
-specifications, the certified service life, the recommended
-rotation cadence, and the disposition guidance for spent filters.
-Vendor lifecycle data is consumed by the operating programme's
-maintenance planner so that filter rotations are scheduled within
-the certified life and the disposition pathway is honoured.
-
-## §21 Pre-Standard Migration
-
-Programmes that operated before WIA-indoor-air-quality reached
-version 1.0 MAY migrate historical IAQ programmes by emitting
-synthetic site records with a `legacyImport` flag. Synthetic
-sites are accepted by the public catalogue but are not eligible
-for evidence-package generation without contemporaneous
-re-validation under PHASE-3 §3.
-
-## §22 Verifiable-Credential Re-Issuance (optional)
-
-Programmes that wish to expose IAQ attestations (ventilation
-verification compliance, episodic-sample acceptance) to consumers
-of W3C Verifiable Credentials MAY re-issue the attestations as
-Verifiable Credentials under the Data Model 2.0 specification.
-Re-issuance is optional; the canonical record remains the JSON
-evidence-package manifest.
-
-## §23 Reader Tooling
-
-Programmes MAY publish supplementary reader hints (visual time
-series of CO2 across school days, episodic-sample compliance
-rollups, symptom-cluster heat maps with privacy-preserving
-aggregation) alongside the canonical evidence package. Reader
-tools are non-normative.
-
-## §24 Outdoor Air-Quality Aggregator Integration
-
-Outdoor air-quality aggregators (national air-quality monitoring
-networks, satellite-derived smoke products, citizen-science
-monitoring projects) consume per-region indoor-air-quality
-aggregates so that joint outdoor-indoor analyses can identify
-infiltration pathways and exposure-stratification by indoor
-function. Aggregator integrations carry the aggregator's
-identifier, the access scope, and the de-identification controls
-that the operating programme applies before publishing
-aggregates.
-
-## §25 Conformance and Sunset
-
-A programme conformant with PHASE-4 has integrated successfully
-with at least one BMS, at least one sensor-package vendor, at
-least one ISO/IEC 17025 laboratory, at least one mechanical
-contractor, and the relevant public-health authority where
-applicable, and has published at least one externally citable
-evidence package.
-
-Sunsetting an integration is announced via the well-known
-discovery document at least 90 calendar days before removal.
-
----
-
-**Document Information:**
-
-- **Version:** 1.0
-- **Phase:** 4 — INTEGRATION
-- **Status:** Stable
-- **Standard:** WIA-indoor-air-quality
-- **Last Updated:** 2026-04-27
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

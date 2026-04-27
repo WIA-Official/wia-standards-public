@@ -160,7 +160,6 @@ KQSL community in contact with:
 - Compared with ISL monolingual data
 
 ### Publications
-1. 선행 연구 - Embedding emergence
 2. Stamp & Jaraisy (2021) - Language contact
 3. Jaraisy (2021) - KQSL study
 4. Jaraisy & Stamp (2022, 2024) - Intra-modal contact
@@ -196,7 +195,6 @@ KQSL community in contact with:
 ## References
 
 1. Kafr Qasem Sign Language Dictionary (2013)
-2. 선행 연구. Embedding emergence
 3. Stamp & Jaraisy (2021). KQSL-ISL contact
 4. Sarsour (2020). Community study
 5. Jaraisy & Stamp (2022, 2024). Contact studies
