@@ -1,346 +1,241 @@
-# WIA-privacy PHASE 2 — API Interface Specification
+# WIA-privacy PHASE 2 — API-INTERFACE Specification
 
 **Standard:** WIA-privacy
-**Phase:** 2 — API Interface
+**Phase:** 2 — API-INTERFACE
 **Version:** 1.0
 **Status:** Stable
 
-This PHASE defines the API surface a privacy-control
-deployment exposes for personal-data inventory queries,
-RoPA management, consent capture and withdrawal, DSR
-intake and fulfillment, DPIA management, breach-notification
-handling, cross-border-transfer registration, sub-processor
-disclosure, and privacy-notice publication.
+This document defines the canonical API-INTERFACE layer for WIA-privacy (Privacy).
 
 References (CITATION-POLICY ALLOW only):
-- ISO/IEC 27701:2019 — PIMS API conventions referenced where applicable
-- ISO/IEC 29184:2020 — online privacy notice + consent surfaces
-- ISO 31700-1:2023 — Privacy by Design surfaces
-- IETF RFC 9457 (Problem Details), RFC 7515 (JWS)
-- W3C DPV (Data Privacy Vocabulary) for purpose / lawful-basis vocabulary
-- WIA-identity-management PHASE 2 — for DSR identity-verification flow
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
-## §1 Inventory + RoPA endpoints
+## §1 Scope
 
-```
-GET /inventory/{inventoryId} HTTP/1.1
-GET /inventory?dataCategory=health-info&controller=...
-POST /inventory HTTP/1.1
-PUT /inventory/{inventoryId}
-DELETE /inventory/{inventoryId}    (with audit + replacement reference)
-```
+This PHASE document is one of four that together define the WIA-privacy
+standard. It addresses the api-interface layer of the standard.
 
-Inventory mutations require DPO / CPO authorisation.
+## §2 Manifest
 
-```
-GET /ropa/{ropaId}
-GET /ropa?controller=...&purpose=direct-marketing-email
-POST /ropa HTTP/1.1
-PUT /ropa/{ropaId}/state           (active / superseded / cancelled)
-```
+Implementations publish a signed manifest containing standardSlug
+(constant value: "privacy"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-RoPA exports for regulator inspection:
+## §3 Conformance Tiers
 
-```
-GET /ropa/$export?format=csv&controller=...&since=...
-GET /ropa/$export?format=ms-excel&controller=...
-GET /ropa/$export?format=jsonl&controller=...
-```
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-The exporter signs the export bundle so regulators can verify
-authenticity offline.
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-## §2 Consent capture and withdrawal
+## §4 Discovery
 
-```
-POST /consents HTTP/1.1
-Content-Type: application/json
-```
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/privacy`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-Body is a PHASE 1 §4 consent record. The boundary verifies
-the noticeTextRef is current and signs the resulting consent
-with the controller's signing key.
+## §5 Time and Identity
 
-```
-GET /consents?dataSubjectRef=...&active=true
-PUT /consents/{consentId}/withdraw
-```
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-Withdrawal is a first-class operation (Art. 7(3) GDPR / K-PIPA
-§22(7)): the boundary timestamps the withdrawal, propagates
-to subscribed downstream systems via webhook, and audit-chains
-the event. Withdrawal MUST be as easy as the original consent
-(K-PIPA §22(8) 동의 방법과 동일한 방법으로 철회).
+## §6 Versioning and Deprecation
 
-```
-GET /consents/{consentId}/evidence
-```
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Returns the evidence-artifact reference (signed) so auditors
-can verify the consent was captured against the notice version
-shown.
+## §7 Privacy and Security
 
-## §3 DSR intake + fulfillment
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-```
-POST /dsr HTTP/1.1
-Content-Type: application/json
-```
+## §8 Open Governance
 
-Body is a PHASE 1 §5 DSR record. The boundary:
-
-1. Acknowledges receipt within the regime's time bound
-   (GDPR: undue delay; K-PIPA: 즉시; CCPA: 10 days for
-   acknowledgement)
-2. Initiates identity-verification proportionate to the
-   request type (cross-reference WIA-identity-management
-   PHASE 2)
-3. Sets the regulatory deadline timer
-4. Routes the request to the controller's DSR fulfillment
-   workflow
-
-```
-GET /dsr/{dsrId}
-PUT /dsr/{dsrId}/state
-PUT /dsr/{dsrId}/extension      (with reason; per regime allowance)
-POST /dsr/{dsrId}/fulfillment   (uploads fulfillment evidence)
-POST /dsr/{dsrId}/refusal       (uploads refusal record with legal basis)
-```
-
-Refusal records cite the specific provision (e.g., GDPR Art. 15(4)
-third-party rights, K-PIPA §35(4) 다른 사람의 권리 침해).
-
-```
-GET /dsr/$export?format=jsonl&controller=...
-```
-
-Returns DSR records for regulator inspection (subject-PII
-redacted unless the requester has the regulator role).
-
-## §4 DPIA management
-
-```
-POST /dpia HTTP/1.1
-GET /dpia/{dpiaId}
-PUT /dpia/{dpiaId}/state
-POST /dpia/{dpiaId}/regulator-consultation
-```
-
-State transitions: `draft` → `under-review` → `approved` →
-`active` → `superseded`. Material RoPA changes flag bound
-DPIAs as `requires-review`.
-
-```
-GET /dpia?triggeringRopaRef=...&active=true
-```
-
-## §5 Breach-notification
-
-```
-POST /breaches HTTP/1.1
-```
-
-Body is a PHASE 1 §7 breach record. The boundary:
-
-1. Starts the regime-specific notification timer (GDPR 72h,
-   K-PIPA 72h KISA + 5일 정보주체, US states per applicable
-   state)
-2. Routes to the regulator-notification workflow
-3. Triggers subject-notification preparation if Art. 34
-   threshold met or jurisdiction requires
-
-```
-PUT /breaches/{breachId}/state
-POST /breaches/{breachId}/regulator-notification
-POST /breaches/{breachId}/subject-notification
-GET /breaches/{breachId}/timeline
-```
-
-Timeline endpoint returns the full chronology with each
-event signed by the responsible authority.
-
-## §6 Cross-border-transfer registry
-
-```
-POST /transfers HTTP/1.1
-GET /transfers?dataExporter=...&active=true
-PUT /transfers/{transferId}/state
-POST /transfers/{transferId}/tia      (Transfer Impact Assessment)
-```
-
-The boundary refuses processing operations whose declared
-transfer mechanism is invalid or expired (e.g., SCC 2010/87
-deprecated since 2022-12-27).
-
-## §7 Sub-processor disclosure
-
-```
-GET /subprocessors?parentProcessor=...
-POST /subprocessors HTTP/1.1
-PUT /subprocessors/{subprocessorId}/state
-```
-
-Webhook subscriptions for sub-processor changes:
-
-```
-POST /subscriptions HTTP/1.1
-{
-  "events": ["subprocessor-added", "subprocessor-removed", "subprocessor-changed"],
-  "webhookUrl": "https://customer-x.example/wia-privacy-webhook"
-}
-```
-
-The boundary signs webhook payloads (detached JWS in
-`Wia-Signature` header) so customers verify provenance.
-
-## §8 Privacy-notice publication
-
-```
-POST /notices HTTP/1.1
-GET /notices/{noticeId}
-GET /notices?language=ko-KR&active=true
-PUT /notices/{noticeId}/state
-```
-
-Notice mutations are versioned; consents reference the
-notice version active at consent-capture time.
-
-```
-GET /notices/{noticeId}/translations?format=icu
-```
-
-Returns ICU-format translation bundle for the notice (where
-multi-language deployments offer localised notice presentation).
-
-## §9 Data-subject self-service portal endpoints
-
-For deployments offering self-service:
-
-```
-GET /me/consents      (subject-token bound)
-GET /me/processing    (subject's RoPA participation overview)
-POST /me/dsr          (self-service DSR submission)
-GET /me/dsr/{dsrId}/status
-```
-
-Self-service portal endpoints are gated by the subject's
-authenticated session (cross-reference WIA-identity-management
-PHASE 2 §3).
-
-## §10 Capability discovery
-
-```
-GET /.well-known/wia/privacy HTTP/1.1
-```
-
-Returns the capability document:
-
-```json
-{
-  "wia.standardVersion": "1.0",
-  "wia.implementationVersion": "controller-x-3.2.0",
-  "supportedRegimes": ["gdpr", "k-pipa", "ccpa", "lgpd"],
-  "primaryAuthority": "urn:wia:org:dpo:controller-x",
-  "ropaExportFormats": ["jsonl", "csv", "ms-excel"],
-  "dsrChannels": ["web-form", "email", "phone", "paper"],
-  "subprocessorPublic": true,
-  "manifest": "https://controller-x.example/.well-known/wia/privacy/manifest.jws"
-}
-```
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `privacy` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## Annex A — Idempotency
 
-Write endpoints accept `Idempotency-Key`. Boundary stores
-keys for 30 days. Replays return the original response.
+## Annex E — Implementation Notes for PHASE-2-API-INTERFACE
 
-## Annex B — Pagination
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-2-API-INTERFACE.
 
-List endpoints support cursor pagination. Cursors are signed
-by the boundary, valid for 30 minutes.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## Annex C — Negative-test vectors (informative)
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-| Stimulus                                               | Expected response                          |
-|--------------------------------------------------------|--------------------------------------------|
-| Consent POST without noticeTextRef                     | 422 + `notice-reference-missing`           |
-| DSR for unverified identity (sensitive request)        | 422 + `identity-verification-required`     |
-| DSR fulfillment past regulatory deadline               | 200 with `delayed=true` + audit warning   |
-| Cross-border POST with expired SCC reference           | 422 + `transfer-mechanism-invalid`         |
-| Breach POST after 72h without regulator notification   | accepts; emits `late-notification` flag   |
-| Subprocessor mutation without DPA reference            | 422 + `dpa-reference-missing`              |
+## Annex F — Adoption Roadmap
 
-## Annex D — Webhook subscriptions
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-Event classes: `consent-given`, `consent-withdrawn`,
-`dsr-received`, `dsr-fulfilled`, `dsr-refused`,
-`breach-opened`, `breach-state-changed`,
-`subprocessor-added`, `subprocessor-removed`,
-`notice-version-published`, `transfer-mechanism-expired`.
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## Annex E — Authorities and roles
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-| Role                        | Scope                                                   |
-|-----------------------------|---------------------------------------------------------|
-| `data-subject`              | own data (self-service consent, DSR submission)         |
-| `dpo` / `cpo`               | full controller-side operations                          |
-| `processor-administrator`   | processor-bound operations                               |
-| `subprocessor`              | scope per parent-processor authorisation                 |
-| `regulator`                 | read-only across deployment scope                        |
-| `auditor`                   | read-only across engagement scope                        |
-| `customer-administrator`    | customer-tenant operations (B2B SaaS)                    |
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## Annex F — Worked DSR fulfillment record (informative)
+## Annex G — Test Vectors and Conformance Evidence
 
-```json
-{
-  "fulfillmentId": "urn:wia:priv:dsr-fulfillment:controller-x:f-014",
-  "dsrRef": "urn:wia:priv:dsr:controller-x:d-014",
-  "fulfilledAt": "2026-04-30T10:00:00+09:00",
-  "fulfilledBy": "urn:wia:hr:dpo-staff:s-7e2c",
-  "deliveryChannel": "secure-portal-download",
-  "evidenceArtifactRef": "urn:wia:priv:evidence:f-014-export.json.signed",
-  "verificationMethod": "subject-account-with-mfa",
-  "completionSignature": "<jws-detached>"
-}
-```
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-2-API-INTERFACE. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-## Annex G — Capability versioning
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-2-api-interface/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-2-API-INTERFACE with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-`wia.standardVersion` and `wia.implementationVersion` declared
-in the capability document. Standard-version mismatch is a
-hard refusal; implementation-version mismatch is logged.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-2-API-INTERFACE does not require bespoke
+auditor tooling.
 
-## Annex H — Audit-chain replay endpoint
+## Annex H — Versioning and Deprecation Policy
 
-```
-GET /audit/chain?since=...&kind=consent-given,dsr-received,breach-opened
-Accept: application/x-ndjson
-```
+This annex codifies the versioning and deprecation policy for PHASE-2-API-INTERFACE.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
 
-For regulators / auditors. Restricted kinds (e.g., breach
-detail) require the requester's role to authorise.
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
 
-## Annex I — Regulator submission endpoints
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
 
-For deployments operating in jurisdictions that require
-direct regulatory submissions:
+## Annex I — Interoperability Profiles
 
-```
-POST /regulator/submissions
-```
+This annex describes how implementations declare interoperability profiles
+for PHASE-2-API-INTERFACE. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
 
-Body declares the regulator URN, the submission kind
-(annual report, breach notification, RoPA inspection
-response), and the artifact bundle reference. The boundary
-records the submission and the regulator's acknowledgement.
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P2-API-INTERFACE-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
 
-## Annex J — Bulk-export gating
-
-Bulk exports (`/ropa/$export`, `/dsr/$export`) are gated by
-the deployment's bulk-quota policy and the requester's role.
-DPO / regulator / auditor roles have higher quotas; processor
-roles are scoped to processor-bound records.
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.

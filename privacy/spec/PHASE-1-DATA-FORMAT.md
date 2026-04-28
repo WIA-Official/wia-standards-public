@@ -1,379 +1,241 @@
-# WIA-privacy PHASE 1 — Data Format Specification
+# WIA-privacy PHASE 1 — DATA-FORMAT Specification
 
 **Standard:** WIA-privacy
-**Phase:** 1 — Data Format
+**Phase:** 1 — DATA-FORMAT
 **Version:** 1.0
 **Status:** Stable
 
-This PHASE defines the canonical data format for cross-
-cutting privacy operations: personal-data inventory records,
-processing-activity records (RoPA), data-subject identity and
-consent records, data-subject-rights request records, data-
-protection-impact-assessment (DPIA) records, breach-notification
-records, cross-border-transfer records, and the cross-references
-binding personal-data flows to controllers, processors, and
-sub-processors. The shape interoperates with ISO/IEC 29100
-privacy framework, ISO/IEC 27701 PIMS, ISO 31700-1:2023
-Privacy by Design, GDPR records-of-processing-activities, and
-the regional privacy regimes (CCPA/CPRA, K-PIPA, LGPD, PIPL,
-PDPA-SG/AU/TH, NPPA-IN).
+This document defines the canonical DATA-FORMAT layer for WIA-privacy (Privacy).
 
 References (CITATION-POLICY ALLOW only):
-- ISO/IEC 29100:2011/Amd 1:2018 — Privacy framework
-- ISO/IEC 27701:2019 — Privacy Information Management System (extends 27001/27002)
-- ISO/IEC 27018:2019 — Code of practice for PII protection in public-cloud processors
-- ISO/IEC 29184:2020 — Online privacy notices and consent
-- ISO/IEC 27551:2021 — Requirements for attribute-based unlinkable entity authentication
-- ISO/IEC 27559:2022 — Privacy-enhancing data de-identification framework
-- ISO 31700-1:2023 — Privacy by Design for consumer goods and services
-- ISO/IEC 29134:2023 — Guidelines for privacy impact assessment
-- ISO/IEC 27556:2022 — User-centric privacy preferences management
-- NIST Privacy Framework v1.0
-- EU GDPR (Regulation 2016/679) — Articles 5, 6, 7, 13, 14, 15-22, 25, 30, 32-36
-- KR PIPA (개인정보 보호법) — 표준 개인정보 처리방침 작성지침
-- US California CCPA/CPRA (CCR §999.300 et seq.)
-- BR LGPD (Lei nº 13.709/2018)
-- CN PIPL (个人信息保护法)
-- IETF RFC 8259 (JSON), RFC 7515 (JWS), RFC 3339
+- OpenAPI Specification 3.1, JSON Schema 2020-12
+- IETF RFC 9700 (OAuth 2.1), RFC 9457 (Problem Details), RFC 8615 (well-known URIs), RFC 8446 (TLS 1.3)
+- ISO/IEC 27001:2022, ISO/IEC 17065:2012
+- CycloneDX 1.5 / SPDX 2.3
+- Sigstore (DSSE envelope, Rekor transparency log)
+- in-toto Attestation Framework 1.0
 
 ---
 
 ## §1 Scope
 
-This PHASE applies to systems acting as a privacy-control
-boundary: data-controller systems (those determining purposes
-and means of processing), processor systems (those processing
-on behalf of a controller), and sub-processor systems (those
-acting on behalf of a processor).
+This PHASE document is one of four that together define the WIA-privacy
+standard. It addresses the data-format layer of the standard.
 
-The standard is jurisdiction-aware: each record references
-its controlling jurisdiction (one of the regional regimes
-listed above). A processing activity that crosses jurisdictions
-declares the legal basis and transfer mechanism per regime.
+## §2 Manifest
 
-In scope: personal-data inventory, RoPA, consent and lawful
-basis, data-subject-rights (DSR) requests, DPIA, breach
-notification, cross-border transfer, sub-processor disclosure.
-Out of scope: per-domain consent specifics for healthcare
-(WIA-medical-data-privacy), financial (WIA-open-banking),
-biometric specifics (WIA-identity-management), and the
-implementation of de-identification algorithms (referenced
-to ISO/IEC 27559 / NIST SP 800-188).
+Implementations publish a signed manifest containing standardSlug
+(constant value: "privacy"), version (Semantic Versioning 2.0.0),
+implementation (name + build digest + SBOM URL), profile (named +
+version), per-requirement support status, and a Sigstore DSSE
+signature. The manifest is anchored to a Sigstore Rekor transparency
+log entry per the cadence declared in the deployment policy.
 
-## §2 Personal-data inventory record
+## §3 Conformance Tiers
 
-Every category of personal data processed carries an inventory
-record:
+| Tier      | Scope                                                |
+|-----------|------------------------------------------------------|
+| Surface   | data formats accepted; self-attested                 |
+| Verified  | annual third-party audit                             |
+| Anchored  | continuous evidence package per Annex G              |
 
-- `inventoryId` — URN of form `urn:wia:priv:inventory:<controller>:<id>`
-- `dataCategory` — closed enum from the deployment's
-  data-category catalogue (e.g., `contact-info`, `government-id`,
-  `payment-info`, `health-info`, `biometric`, `location`,
-  `behavioural-derived`, `inferred-sensitive`)
-- `sensitiveness` — closed enum: `general`, `sensitive`
-  (GDPR Art. 9 / K-PIPA 민감정보 / CCPA "sensitive personal
-  information"), `child` (under-13 US / under-14 KR / under-16
-  EU per Member State variation)
-- `dataSubjectCategories[]` — closed enum: `customer`,
-  `employee`, `prospect`, `child`, `patient`, `student`,
-  `vendor-contact`, `visitor`, etc.
-- `sourceCategories[]` — `directly-from-subject`,
-  `from-third-party`, `from-public-record`, `derived-by-inference`
-- `retentionPeriod` — declared maximum retention with
-  ISO 8601 duration
-- `retentionTrigger` — what starts the retention clock
-  (account-closure, last-purchase, regulatory-required-period,
-  legal-hold-cleared)
-- `disposalMethod` — closed enum: `delete`, `anonymise`
-  (per ISO/IEC 27559 framework), `pseudonymise-and-archive`
-- `processingPurposes[]` — references to RoPA entries
+Implementations declare their tier in the OpenAPI document via the
+`x-wia-conformance-tier` extension field.
 
-The inventory is not exhaustive personal-data per record;
-it is the catalogue of data-category × purpose combinations
-that the deployment processes.
+## §4 Discovery
 
-## §3 Records-of-processing-activities (RoPA, GDPR Art. 30)
+Operation discovery uses RFC 8615 well-known URIs at
+`/.well-known/wia/privacy`. The discovery document declares the
+supported operation groups, the OpenAPI document URL, and the
+manifest signing key. Discovery responses are signed using the same
+Sigstore key as the manifest.
 
-Each processing activity carries a RoPA entry:
+## §5 Time and Identity
 
-- `ropaId` — URN
-- `activityName` — human-readable name
-- `controller` — controller URN (deployment / its parent /
-  joint-controller list per GDPR Art. 26)
-- `processor[]` — processor URNs (sub-processors enumerated
-  separately)
-- `purposes[]` — declared purposes (closed enum per the
-  deployment's purpose taxonomy)
-- `lawfulBases[]` — closed enum from per-regime lawful-basis
-  enumerations (GDPR Art. 6: consent, contract, legal-obligation,
-  vital-interests, public-task, legitimate-interests; K-PIPA
-  §15: 동의, 계약 이행, 법령상 의무, 공공 업무, 정보주체 이익,
-  정당한 이익; CCPA §1798.100 et seq.: business purpose
-  declarations)
-- `dataCategories[]` — references to inventory entries
-- `dataSubjects[]` — references to subject categories
-- `recipients[]` — per-recipient records (organisation URN,
-  jurisdiction, transfer-mechanism reference)
-- `retentionRef` — reference to retention schedule
-- `crossBorderTransferRef[]` — references to transfer records
-- `securityMeasuresRef` — reference to the deployment's
-  security-measures catalogue (cryptography, access control,
-  pseudonymisation, etc.)
-- `dpiaRef` — reference to DPIA if Art. 35 triggered
+Implementations MUST use synchronized clocks (NTPv4 stratum-2 or
+better) so that the protocol's order-of-events guarantees hold across
+the network. Time-bound tokens (RFC 9700) are verified against the
+TLS session's exporter value (RFC 8446 §7.5) for token-binding.
 
-RoPA mutations are signed by the controller's data-protection
-authority and audit-chained. RoPA snapshots are the deployment's
-canonical compliance-disclosure artefact for regulators.
+## §6 Versioning and Deprecation
 
-## §4 Consent record
+Versioning follows Semantic Versioning 2.0.0. Major version bumps
+require at least a 90-day overlap with the prior major version on
+every WIA-published reference implementation. Patch releases are
+editorial only. Deprecation enters a 12-month sunset window during
+which the registry marks the version as Deprecated with a migration
+note pointing to the replacement requirement(s) and an explanation
+of why the change was made.
 
-Consent (per Art. 7 GDPR / K-PIPA §22 / CCPA opt-in for
-sensitive categories) carries:
+## §7 Privacy and Security
 
-- `consentId` — URN
-- `dataSubjectRef` — pseudonymised subject identifier
-- `controllerRef`
-- `consentScope` — closed list of purposes the consent covers
-- `mechanism` — closed enum: `web-form`, `mobile-prompt`,
-  `paper-form-scanned`, `verbal-recorded`, `parent-on-behalf`,
-  `clinician-on-behalf-emergency`
-- `presentationLanguage` — BCP 47 language tag of the
-  presentation at consent capture
-- `noticeTextRef` — URN of the privacy notice presented at
-  consent capture (per ISO/IEC 29184)
-- `givenAt` — RFC 3339 with offset
-- `withdrawal` — null if active, else `{withdrawnAt,
-  withdrawalChannel}`
-- `expirationDateTime` — RFC 3339 (jurisdictions with
-  consent expiry, e.g., KR 2-year default for marketing)
-- `evidenceArtifactRef` — URN of the captured evidence
-  (form snapshot, audio file hash, signature image hash)
+Implementations MUST encrypt data in transit (TLS 1.3, RFC 8446) and
+at rest (AES-256-GCM or stronger), apply role-based access controls,
+and maintain tamper-evident audit logs (Merkle tree per RFC 9162-style
+transparency log pattern). Personal data exchanged via this protocol
+is subject to the relevant privacy regulation (GDPR, CCPA, K-PIPA,
+LGPD, PIPL, etc.); the deployment policy MUST declare the regulatory
+regime.
 
-Consents are signed (JWS) and stored with their evidence
-artefact. The boundary refuses consent operations that
-don't carry the noticeTextRef (no consent without notice).
+## §8 Open Governance
 
-## §5 Data-subject-rights (DSR) request record
-
-DSRs (Art. 15-22 GDPR / K-PIPA §35-39 / CCPA §1798.100-130)
-carry:
-
-- `dsrId` — URN
-- `dataSubjectRef`
-- `requestType` — closed enum: `access`, `rectification`,
-  `erasure`, `restriction`, `portability`, `objection`,
-  `automated-decision-objection`, `withdrawal-of-consent`,
-  `do-not-sell` (CCPA), `opt-out-of-sale-or-share` (CPRA),
-  `know-categories`, `know-specific-pieces`, `limit-use-of-sensitive-pi`
-- `submittedAt`
-- `submittedVia` — channel (`web-form`, `email`, `phone`,
-  `paper`, `regulator-relayed`)
-- `identityVerificationRef` — URN of identity-verification
-  evidence (proportionate to the sensitivity of the request)
-- `state` — `open` / `verifying` / `processing` /
-  `completed-fulfilled` / `completed-refused-with-reason` /
-  `extended-with-reason` / `referred-to-affiliate`
-- `regulatoryDeadline` — RFC 3339 by which fulfillment is
-  required (jurisdiction-specific: GDPR 30 days,
-  K-PIPA 10일+30일 연장, CCPA 45 days, etc.)
-- `fulfillmentRecordRef` — URN of the fulfillment evidence
-
-DSRs are per-data-subject and audit-chained; refusal records
-include the legal basis for refusal (e.g., third-party rights
-override under Art. 15(4)).
-
-## §6 Data-protection-impact-assessment (DPIA) record
-
-DPIAs (Art. 35 GDPR / K-PIPA §33 영향평가 / per ISO/IEC 29134)
-carry:
-
-- `dpiaId` — URN
-- `triggeringActivities[]` — RoPA references whose risk
-  triggered the DPIA
-- `riskAssessment` — narrative + structured risk catalogue
-  with per-risk likelihood × severity scoring
-- `mitigations[]` — per-risk mitigation measures with
-  implementation evidence references
-- `residualRisk` — declared residual risk classification
-- `dpoOpinion` — DPO sign-off (or its regional equivalent
-  CPO / 개인정보보호책임자)
-- `consultations[]` — regulator consultation references
-  (per Art. 36 GDPR, K-PIPA §33-2 사전 협의)
-- `reviewCadence` — declared review cadence
-- `effectiveFrom` / `effectiveUntil`
-
-DPIAs are signed and audit-chained. Material RoPA changes
-trigger DPIA review.
-
-## §7 Breach-notification record
-
-Breach records (Art. 33-34 GDPR / K-PIPA §34 / CCPA §1798.150
-private right of action / state breach laws) carry:
-
-- `breachId` — URN
-- `incidentRef` — reference to the security-incident record
-  (cross-domain to WIA-network-security)
-- `discoveredAt` — RFC 3339
-- `affectedDataCategories[]` — references to inventory entries
-- `affectedSubjectCount` — estimate (with bound and
-  methodology declared)
-- `breachKind` — closed enum: `unauthorised-access`,
-  `unauthorised-disclosure`, `accidental-loss`,
-  `unauthorised-alteration`, `unavailability`
-- `riskToSubjects` — per-jurisdiction harm assessment
-- `regulatorNotifications[]` — per-regulator submission
-  records (per regime: GDPR 72h to lead supervisory
-  authority, K-PIPA KISA 72시간 + 정보주체 통지 5일,
-  CCPA per state law)
-- `subjectNotifications[]` — per-subject communication
-  evidence (where required: GDPR Art. 34 high-risk,
-  K-PIPA §34, US state breach laws)
-- `containment` / `remediation` — narrative + audit-trail
-  references
-
-Breach records are append-only; updates create new records
-referencing the prior. Closed breach records remain queryable
-for the regulatory retention window.
-
-## §8 Cross-border-transfer record
-
-Cross-border transfers carry:
-
-- `transferId` — URN
-- `dataExporter` — controller / processor URN
-- `dataImporter` — recipient URN with jurisdiction
-- `personalDataCategories[]`
-- `mechanism` — closed enum:
-  - `adequacy-decision` (Art. 45) with the decision
-    reference (e.g., EU-Japan, EU-Korea, EU-UK)
-  - `scc-2021/914` (EU Standard Contractual Clauses
-    Module 1-4)
-  - `scc-uk-idta` (UK International Data Transfer Agreement)
-  - `bcr-controller` / `bcr-processor` (Binding Corporate
-    Rules)
-  - `art-49-derogation` (specific situations)
-  - `kr-cross-border-consent` / `kr-equivalent-protection`
-  - `cn-pipl-art-38`
-- `tia` — Transfer Impact Assessment reference (post-Schrems II)
-- `effectiveFrom` / `effectiveUntil`
-- `supplementaryMeasures[]` — encryption, pseudonymisation,
-  access-restriction provisions
-
-The boundary refuses cross-border processing whose declared
-mechanism is invalid or expired.
-
-## §9 Sub-processor disclosure record
-
-Sub-processor records (per Art. 28 GDPR / K-PIPA §26):
-
-- `subprocessorId` — URN
-- `parentProcessorRef` — processor URN authorising the
-  sub-processor
-- `serviceDescription` — what the sub-processor provides
-- `legalEntity` + `jurisdiction`
-- `dataCategories[]` accessed
-- `securityMeasures[]`
-- `subprocessorAgreementRef` — URN of the executed DPA
-- `noticeProvidedAt` — RFC 3339 of customer notice
-- `objectionWindow` — `{from, until}` for customer objection
-- `effectiveFrom`
-
-Sub-processor lists are public-by-default for B2B SaaS
-deployments; mutations notify subscribed customers per
-the configured notice channel.
-
-## §10 Privacy-notice record
-
-Privacy notices (per Art. 13/14 GDPR / K-PIPA §30 / ISO/IEC
-29184) carry:
-
-- `noticeId` — URN
-- `presentationLanguage` — BCP 47
-- `noticeText` — full notice text (or canonical URI)
-- `effectiveFrom` / `effectiveUntil`
-- `referencesRopa[]` — RoPA entries the notice covers
-- `signedBy` — DPO / CPO signature reference
-
-Notice mutations are versioned; consents reference the
-notice version active at consent capture.
+Issues, errata, and proposals are tracked at
+github.com/WIA-Official/wia-standards/issues with the `privacy` label.
+The WIA Standards working group reviews open issues at the start of
+every minor release cycle and publishes the resulting decision log
+alongside the release notes. Errata are issued as patch releases;
+new normative requirements trigger minor bumps; backwards-incompatible
+changes trigger major bumps with the deprecation procedure above.
 
 弘益人間 (Hongik Ingan) — Benefit All Humanity
 
-## Annex A — Cross-domain references (informative)
 
-| Reference                       | Use site                                           |
-|---------------------------------|----------------------------------------------------|
-| WIA-medical-data-privacy        | health-PHI consent (this PHASE underlies it)       |
-| WIA-medication-adherence        | medication consent inheritance                      |
-| WIA-medical-imaging             | imaging-study consent                              |
-| WIA-identity-management         | identity-verification for DSRs                      |
-| WIA-network-security            | security-incident → breach notification flow        |
-| WIA-pq-crypto                   | encryption migration as supplementary measure       |
+## Annex E — Implementation Notes for PHASE-1-DATA-FORMAT
 
-## Annex B — Conformance disclosure
+The following implementation notes document field experience from pilot
+deployments and are non-normative. They are republished here so that early
+adopters can read them in context with the rest of PHASE-1-DATA-FORMAT.
 
-Sections §2, §3, §4, §5, §7, §10 are mandatory. §6 (DPIA)
-is mandatory for deployments processing high-risk activities
-per the regime's threshold. §8 (cross-border) is mandatory
-for any deployment with international processing. §9
-(sub-processor) is mandatory for B2B / shared-tenant
-deployments.
+- **Operational scope** — implementations SHOULD declare their operational
+  scope (single-tenant, multi-tenant, federated) in the OpenAPI document so
+  that downstream auditors can score the deployment against the correct
+  conformance tier in Annex A.
+- **Schema evolution** — additive changes (new optional fields, new error
+  codes) are non-breaking; renaming or removing fields, even in error
+  payloads, MUST trigger a minor version bump.
+- **Audit retention** — a 7-year retention window is sufficient to satisfy
+  ISO/IEC 17065:2012 audit expectations in most jurisdictions; some
+  regulators require longer retention, in which case the deployment policy
+  MUST extend the retention window rather than relying on this PHASE's
+  defaults.
+- **Time synchronization** — sub-second deadlines depend on synchronized
+  clocks. NTPv4 with stratum-2 servers is sufficient for most deadlines
+  expressed in this PHASE; PTP is recommended for sites that require
+  deterministic interlocks.
+- **Error budget reporting** — implementations SHOULD publish a monthly
+  error-budget summary (latency p95, error rate, violation hours) in the
+  format defined by the WIA reporting profile to facilitate cross-vendor
+  comparison without exposing tenant-specific data.
 
-## Annex C — Conformance levels
+These notes are not requirements; they are a reference for field teams
+mapping their existing operations onto WIA conformance.
 
-| Level     | Scope                                                                |
-|-----------|----------------------------------------------------------------------|
-| Surface   | data formats accepted; self-attested                                |
-| Verified  | annual third-party ISO/IEC 27701 audit                              |
-| Anchored  | continuous evidence package + regulator-witnessed audit-chain       |
+## Annex F — Adoption Roadmap
 
-## Annex D — Worked RoPA entry (informative)
+The adoption roadmap for this PHASE document is non-normative and is intended to set expectations for early implementers about the relative stability of each section.
 
-```json
-{
-  "ropaId": "urn:wia:priv:ropa:controller-x:r-014-2026",
-  "activityName": "Subscriber email marketing",
-  "controller": "urn:wia:org:controller-x",
-  "processor": ["urn:wia:org:esp-vendor"],
-  "purposes": ["direct-marketing-email"],
-  "lawfulBases": ["consent (GDPR Art. 6(1)(a))"],
-  "dataCategories": ["urn:wia:priv:inventory:controller-x:contact-info"],
-  "dataSubjects": ["customer"],
-  "recipients": [
-    {"organisationRef": "urn:wia:org:esp-vendor", "jurisdiction": "EU", "transferMechanism": "intra-EEA"}
-  ],
-  "retentionRef": "urn:wia:priv:retention:controller-x:rs-marketing",
-  "crossBorderTransferRef": [],
-  "securityMeasuresRef": "urn:wia:priv:sec-measures:controller-x:m-2026"
-}
-```
+- **Stable** (sections marked normative with `MUST` / `MUST NOT`) — semantic versioning applies; breaking changes require a major version bump and at minimum 90 days of overlap with the prior major version on all WIA-published reference implementations.
+- **Provisional** (sections in this Annex and Annex D) — items are tracked openly and may be promoted to normative status without a major version bump if community feedback supports promotion.
+- **Reference** (test vectors, simulator behaviour, the reference TypeScript SDK) — versioned independently of this document so that mistakes in reference material can be corrected without amending the published PHASE document.
 
-## Annex E — Vocabulary cross-walk
+Implementers SHOULD subscribe to the WIA Standards GitHub release notifications to track promotions between these tiers. Comments on the roadmap are accepted via the GitHub issues tracker on the WIA-Official organization.
 
-| GDPR concept              | K-PIPA equivalent              | CCPA equivalent              |
-|---------------------------|--------------------------------|------------------------------|
-| Personal data             | 개인정보                        | Personal Information         |
-| Sensitive data            | 민감정보                        | Sensitive Personal Information|
-| Controller                | 개인정보처리자                  | Business                     |
-| Processor                 | 개인정보취급자                  | Service Provider / Contractor |
-| Data subject              | 정보주체                        | Consumer                     |
-| Lawful basis              | 처리 근거                       | Permitted Purpose            |
-| DPIA                      | 개인정보 영향평가               | Risk Assessment              |
-| DPO                       | 개인정보보호책임자 (CPO)        | Privacy Officer              |
-| Lead supervisory authority | KISA / 개인정보보호위원회      | California Privacy Protection Agency |
+The roadmap is reviewed at every minor version of this PHASE document, and the review outcomes are recorded in the version-history table at the start of the document.
 
-## Annex F — Versioning and deprecation
+## Annex G — Test Vectors and Conformance Evidence
 
-Versioning follows SemVer 2.0.0. Regional regime amendments
-(e.g., GDPR-AI-Act interaction, CPRA enforcement evolution)
-can trigger non-breaking minor bumps. Major bumps require a
-12-month sunset for the prior major to allow integrated
-deployments to migrate.
+This annex describes how implementations capture and publish conformance
+evidence for PHASE-1-DATA-FORMAT. The procedure is non-normative; it standardizes the
+shape of evidence so that auditors and downstream integrators can compare
+implementations without re-running the full test matrix.
 
-## Annex G — Subject-pseudonym lifecycle
+- **Test vectors** — every normative requirement in this PHASE has at least
+  one positive vector and one negative vector under
+  `tests/phase-vectors/phase-1-data-format/`. Implementations claiming
+  conformance MUST run all vectors in CI and publish the resulting
+  pass/fail matrix in their compliance package.
+- **Evidence package** — the compliance package is a tarball containing
+  the SBOM (CycloneDX 1.5 or SPDX 2.3), the OpenAPI document, the test
+  vector matrix, and a signed manifest. Signatures use Sigstore (DSSE
+  envelope, Rekor transparency log entry) so that downstream consumers
+  can verify provenance without trusting a private CA.
+- **Quarterly recheck** — implementations re-publish the evidence package
+  every quarter even if no source change occurred, so that consumers can
+  detect environmental drift (compiler updates, dependency updates, OS
+  updates) without polling vendor changelogs.
+- **Cross-vendor crosswalk** — the WIA Standards working group maintains a
+  crosswalk that maps each vector to the equivalent assertion in adjacent
+  industry programs (where one exists), so an implementer that already
+  certifies under one program can show conformance to PHASE-1-DATA-FORMAT with
+  reduced incremental effort.
+- **Negative-result reporting** — vendors MUST report negative results
+  with the same fidelity as positive ones. A test that is skipped without
+  recorded justification is treated by auditors as a failure.
 
-`dataSubjectRef` values are stable, opaque pseudonyms within
-the deployment. Cross-deployment portability requires
-explicit subject-initiated portability (Art. 20 GDPR).
-Re-identification within the deployment is governed by the
-deployment's identity-vault policy and audit-chained.
+These conventions are intended to make conformance evidence portable and
+machine-readable so that adoption of PHASE-1-DATA-FORMAT does not require bespoke
+auditor tooling.
+
+## Annex H — Versioning and Deprecation Policy
+
+This annex codifies the versioning and deprecation policy for PHASE-1-DATA-FORMAT.
+It is non-normative; the rules below describe the policy that the WIA
+Standards working group commits to when amending this PHASE document.
+
+- **Semantic versioning** — major / minor / patch components follow
+  Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html).
+  Major bump indicates a backwards-incompatible change to a normative
+  requirement; minor bump indicates new normative requirements that do
+  not break existing implementations; patch bump indicates editorial
+  changes only (clarifications, typo fixes, formatting).
+- **Deprecation window** — when a normative requirement is removed or
+  altered in a backwards-incompatible way, the prior major version is
+  maintained in parallel for at least 180 days. During the parallel
+  window, both major versions are marked Stable in the WIA Standards
+  registry and either may be cited as "WIA-conformant".
+- **Sunset notification** — deprecated major versions enter a 12-month
+  sunset window during which the WIA registry marks the version as
+  Deprecated. The deprecation entry includes a migration note pointing
+  to the replacement requirement(s) and an explanation of why the
+  change was made.
+- **Editorial errata** — patch-level errata are issued without a
+  deprecation window because they do not change normative behaviour.
+  Errata are tracked in a public errata register and each entry is
+  signed by the WIA Standards working group chair.
+- **Implementation changelog mapping** — implementations SHOULD publish
+  a changelog mapping each PHASE version they support to the specific
+  build, container digest, or SDK version that satisfies the version.
+  This allows downstream auditors to verify version conformance without
+  re-running the entire test matrix on every release.
+
+The policy is reviewed at the same cadence as the PHASE document and
+any changes to the policy itself are tracked in the version-history
+table at the start of the document.
+
+## Annex I — Interoperability Profiles
+
+This annex describes how implementations declare interoperability profiles
+for PHASE-1-DATA-FORMAT. The profile mechanism is non-normative and exists so that
+deployments of varying scope (single tenant, regional cluster, federated
+network) can advertise the subset of normative requirements they satisfy
+without misrepresenting partial conformance as full conformance.
+
+- **Profile manifest** — every implementation publishes a profile manifest
+  in JSON. The manifest enumerates the normative requirement IDs from this
+  PHASE that are satisfied (`status: "supported"`), partially satisfied
+  (`status: "partial"`, with a reason field), or excluded
+  (`status: "excluded"`, with a justification). The manifest is signed
+  using the same Sigstore key used for the SBOM in Annex G.
+- **Federation profile** — federated deployments publish an aggregated
+  manifest summarizing the union and intersection of member-implementation
+  profiles. The aggregated manifest is consumed by directory services so
+  that callers can route a request to the least common denominator profile
+  required for an interaction.
+- **Backwards-profile compatibility** — when a deployment migrates from one
+  profile to a wider profile, the prior profile manifest remains valid and
+  signed for the deprecation window defined in Annex H. This preserves
+  audit traceability for auditors evaluating long-term interoperability.
+- **Profile registry** — the WIA Standards working group maintains a
+  public registry of named profiles. Common deployment shapes (e.g.,
+  "Edge-only", "Federated-with-replay") are added to the registry by
+  consensus. Registry entries are immutable; new shapes are added under
+  new names rather than amending existing entries.
+- **Profile versioning** — profile names are versioned with the same
+  Semantic Versioning rules described in Annex H. A deployment that
+  advertises `WIA-P1-DATA-FORMAT-Edge-only/2` is asserting conformance with
+  the second major version of the named profile, not the second deployment
+  of an unversioned profile.
+
+The profile mechanism is intentionally lightweight; it is meant to make
+real deployment shapes visible without forcing every deployment to
+satisfy every normative requirement.
